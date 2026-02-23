@@ -26,7 +26,7 @@ const UpgradeModal = ({ isOpen, onClose }: UpgradeModalProps) => {
           Daily Limit Reached
         </h3>
         <p className="mb-6 text-center text-sm text-muted-foreground">
-          You've used all 5 free simulations today. Upgrade to Entropy Pro for unlimited analyses.
+          You've used all 50 free simulations today. Upgrade to Entropy Pro for unlimited analyses.
         </p>
 
         <div className="mb-6 space-y-3 rounded-lg bg-surface-2 p-4">

@@ -17,7 +17,7 @@ const Index = () => {
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
-    if (usageCount >= 5) {
+    if (usageCount >= 50) {
       setShowUpgrade(true);
       return;
     }
