@@ -20,7 +20,7 @@ const Header = ({ usageCount = 0 }: { usageCount?: number }) => {
           <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5 text-sm">
             <Zap className="h-3.5 w-3.5 text-warning" />
             <span className="font-mono text-muted-foreground">
-              {usageCount}/5 free today
+              {usageCount}/50 free today
             </span>
           </div>
         </div>
