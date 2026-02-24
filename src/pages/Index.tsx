@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import StockSummary from "@/components/StockSummary";
@@ -8,48 +8,103 @@ import SimulationTable from "@/components/SimulationTable";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import UpgradeModal from "@/components/UpgradeModal";
+import PortfolioPanel from "@/components/PortfolioPanel";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<any | null>(null);
+  const [stocks, setStocks] = useState<PortfolioStock[]>([]);
+  const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  const handleAnalyze = async (ticker: string, buyPrice: number, quantity: number) => {
+  const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
+  const isLoading = activeStock?.isLoading ?? false;
+  const analysis = activeStock?.analysis ?? null;
+
+  const analyzeStock = useCallback(
+    async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
+      setStocks((prev) =>
+        prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s))
+      );
+
+      try {
+        const { data, error } = await supabase.functions.invoke("analyze-stock", {
+          body: { ticker, buyPrice, quantity },
+        });
+
+        if (error) throw error;
+
+        setStocks((prev) =>
+          prev.map((s) =>
+            s.id === stockId
+              ? { ...s, isLoading: false, analysis: { ...data, ticker, buyPrice, quantity } }
+              : s
+          )
+        );
+        setUsageCount((c) => c + 1);
+      } catch (err: any) {
+        console.error("Analysis error:", err);
+        setStocks((prev) =>
+          prev.map((s) => (s.id === stockId ? { ...s, isLoading: false } : s))
+        );
+        toast({
+          title: "Analysis Failed",
+          description: err.message || "Could not analyze stock. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    []
+  );
+
+  const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
     if (usageCount >= 50) {
       setShowUpgrade(true);
       return;
     }
 
-    setIsLoading(true);
-    setAnalysis(null);
+    // Check if stock already exists in portfolio
+    const existing = stocks.find(
+      (s) => s.ticker === ticker.toUpperCase()
+    );
 
-    try {
-      const { data, error } = await supabase.functions.invoke("analyze-stock", {
-        body: { ticker, buyPrice, quantity },
-      });
-
-      if (error) throw error;
-
-      setAnalysis({
-        ...data,
-        ticker,
+    if (existing) {
+      // Update and re-analyze
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.id === existing.id ? { ...s, buyPrice, quantity } : s
+        )
+      );
+      setActiveStockId(existing.id);
+      analyzeStock(existing.id, ticker.toUpperCase(), buyPrice, quantity);
+    } else {
+      // Add new stock to portfolio
+      const newId = crypto.randomUUID();
+      const newStock: PortfolioStock = {
+        id: newId,
+        ticker: ticker.toUpperCase(),
         buyPrice,
         quantity,
-      });
-      setUsageCount((c) => c + 1);
-    } catch (err: any) {
-      console.error("Analysis error:", err);
-      toast({
-        title: "Analysis Failed",
-        description: err.message || "Could not analyze stock. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+        isLoading: false,
+      };
+      setStocks((prev) => [...prev, newStock]);
+      setActiveStockId(newId);
+      analyzeStock(newId, ticker.toUpperCase(), buyPrice, quantity);
     }
+  };
+
+  const handleRemoveStock = (id: string) => {
+    setStocks((prev) => prev.filter((s) => s.id !== id));
+    if (activeStockId === id) {
+      setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
+    }
+  };
+
+  const handleAddNew = () => {
+    // Just scroll to / focus on the input — handled by clearing active
+    setActiveStockId(null);
   };
 
   return (
@@ -61,6 +116,16 @@ const Index = () => {
           {/* Left sidebar */}
           <div className="space-y-6">
             <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+
+            {stocks.length > 0 && (
+              <PortfolioPanel
+                stocks={stocks}
+                activeStockId={activeStockId}
+                onSelectStock={setActiveStockId}
+                onRemoveStock={handleRemoveStock}
+                onAddNew={handleAddNew}
+              />
+            )}
 
             {analysis && (
               <RiskIndicator
@@ -115,6 +180,7 @@ const Index = () => {
                     summary={analysis.summary}
                     suggestion={analysis.suggestion}
                     confidence={analysis.confidence}
+                    confidenceReasoning={analysis.confidenceReasoning}
                     macroFactors={analysis.macroFactors}
                   />
                 </div>
