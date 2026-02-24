@@ -23,39 +23,42 @@ serve(async (req) => {
     }
 
     const ALPHAVANTAGE_API_KEY = Deno.env.get("ALPHAVANTAGE_API_KEY");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!ALPHAVANTAGE_API_KEY || !OPENAI_API_KEY) {
+    if (!LOVABLE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "API keys not configured" }),
+        JSON.stringify({ error: "AI API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 1. Fetch current stock price from Alpha Vantage
-    const symbol = ticker.replace(".NS", "").replace(".BO", "");
-    const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${ALPHAVANTAGE_API_KEY}`;
-    const avRes = await fetch(avUrl);
-    const avData = await avRes.json();
-
+    // 1. Fetch current stock price from Alpha Vantage (if key available)
     let currentPrice = 0;
-    if (avData["Global Quote"] && avData["Global Quote"]["05. price"]) {
-      currentPrice = parseFloat(avData["Global Quote"]["05. price"]);
-    }
-
-    // If Alpha Vantage didn't return price (rate limit, etc.), try BSE/NSE format
-    if (!currentPrice) {
-      const avUrl2 = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}.BSE&apikey=${ALPHAVANTAGE_API_KEY}`;
-      const avRes2 = await fetch(avUrl2);
-      const avData2 = await avRes2.json();
-      if (avData2["Global Quote"] && avData2["Global Quote"]["05. price"]) {
-        currentPrice = parseFloat(avData2["Global Quote"]["05. price"]);
+    if (ALPHAVANTAGE_API_KEY) {
+      try {
+        const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${ALPHAVANTAGE_API_KEY}`;
+        const avRes = await fetch(avUrl);
+        const avData = await avRes.json();
+        if (avData["Global Quote"]?.["05. price"]) {
+          currentPrice = parseFloat(avData["Global Quote"]["05. price"]);
+        }
+        if (!currentPrice) {
+          const symbol = ticker.replace(".NS", "").replace(".BO", "");
+          const avUrl2 = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}.BSE&apikey=${ALPHAVANTAGE_API_KEY}`;
+          const avRes2 = await fetch(avUrl2);
+          const avData2 = await avRes2.json();
+          if (avData2["Global Quote"]?.["05. price"]) {
+            currentPrice = parseFloat(avData2["Global Quote"]["05. price"]);
+          }
+        }
+      } catch (e) {
+        console.error("Alpha Vantage error:", e);
       }
     }
 
-    // 2. Use OpenAI to generate comprehensive analysis
-    const prompt = `You are a senior Indian equity research analyst. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
-${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on recent knowledge."}
+    // 2. Use Lovable AI for comprehensive analysis
+    const prompt = `You are a senior Indian equity research analyst. Today's date is ${new Date().toISOString().split('T')[0]}. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
+${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge."}
 
 Return a JSON object with EXACTLY this structure (no markdown, no code fences, just raw JSON):
 {
@@ -88,14 +91,14 @@ Include 5-7 news items covering Company, Sector, Macro, and Competitor categorie
 Use realistic recent Indian market data and events. All price ranges should be in INR.
 Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI policy, INR/USD, crude oil, GDP growth, inflation, FII flows, etc.`;
 
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a financial analyst. Return only valid JSON, no markdown." },
           { role: "user", content: prompt },
@@ -105,17 +108,17 @@ Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI poli
       }),
     });
 
-    const openaiData = await openaiRes.json();
+    const aiData = await aiRes.json();
 
-    if (!openaiData.choices?.[0]?.message?.content) {
-      console.error("OpenAI response:", JSON.stringify(openaiData));
+    if (!aiData.choices?.[0]?.message?.content) {
+      console.error("AI response:", JSON.stringify(aiData));
       return new Response(
-        JSON.stringify({ error: "AI analysis failed", details: openaiData.error?.message }),
+        JSON.stringify({ error: "AI analysis failed", details: aiData.error?.message || "No response from AI" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const rawContent = openaiData.choices[0].message.content.trim();
+    const rawContent = aiData.choices[0].message.content.trim();
     // Strip possible markdown code fences
     const jsonStr = rawContent.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
     const analysis = JSON.parse(jsonStr);
