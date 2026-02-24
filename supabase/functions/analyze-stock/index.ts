@@ -56,39 +56,53 @@ serve(async (req) => {
       }
     }
 
-    // 2. Use Lovable AI for comprehensive analysis
-    const prompt = `You are a senior Indian equity research analyst. Today's date is ${new Date().toISOString().split('T')[0]}. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
-${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge."}
+    // 2. Use Lovable AI for comprehensive analysis with real confidence & risk
+    const prompt = `You are a senior Indian equity research analyst with access to the latest market data. Today's date is ${new Date().toISOString().split('T')[0]}. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
+${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge and provide your best estimate."}
+
+IMPORTANT: Provide REAL analysis based on actual recent events, earnings, and macro conditions. Do NOT use placeholder or generic data.
+
+For confidence: Base it on data availability, earnings visibility, analyst consensus, and sector predictability. Explain your reasoning.
+For risk: Evaluate volatility, beta, sector risk, regulatory risk, leverage, and macro sensitivity. Quantify with a risk score 0-100.
 
 Return a JSON object with EXACTLY this structure (no markdown, no code fences, just raw JSON):
 {
-  "currentPrice": <number - current price or best estimate>,
+  "currentPrice": <number - current price or best estimate in INR>,
   "riskLevel": "<High | Medium | Low>",
-  "keyRisks": ["<risk1>", "<risk2>", "<risk3>", "<risk4>"],
+  "riskScore": <number 0-100, where 0=no risk, 100=extreme risk>,
+  "riskBreakdown": {
+    "volatilityRisk": <number 0-100>,
+    "sectorRisk": <number 0-100>,
+    "regulatoryRisk": <number 0-100>,
+    "financialRisk": <number 0-100>,
+    "macroRisk": <number 0-100>
+  },
+  "keyRisks": ["<specific recent risk event 1>", "<risk 2>", "<risk 3>", "<risk 4>"],
   "bullRange": [<lower>, <upper>],
   "neutralRange": [<lower>, <upper>],
   "bearRange": [<lower>, <upper>],
   "suggestion": "<Hold | Add | Exit>",
   "confidence": <number 0-100>,
-  "summary": "<3-4 sentence analysis>",
+  "confidenceReasoning": "<1-2 sentence explanation of why confidence is at this level>",
+  "summary": "<3-4 sentence analysis based on real recent events>",
   "macroFactors": ["<factor1>", "<factor2>", ...],
   "overallSentiment": <number -100 to 100>,
-  "totalPressure": <number - estimated % price pressure>,
+  "totalPressure": <number - estimated % price pressure based on news>,
   "news": [
     {
-      "headline": "<real or realistic recent headline>",
+      "headline": "<real recent headline from the last 1-3 months>",
       "category": "<Company | Sector | Macro | Competitor>",
       "sentiment": <number -100 to 100>,
       "shortTermImpact": <number % impact>,
       "longTermImpact": <number % impact>,
       "confidence": <number 0-100>,
-      "explanation": "<1 sentence>"
+      "explanation": "<1 sentence explaining the impact>"
     }
   ]
 }
 
 Include 5-7 news items covering Company, Sector, Macro, and Competitor categories.
-Use realistic recent Indian market data and events. All price ranges should be in INR.
+Use REAL recent Indian market data and events. All price ranges must be in INR.
 Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI policy, INR/USD, crude oil, GDP growth, inflation, FII flows, etc.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -98,7 +112,7 @@ Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI poli
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: "You are a financial analyst. Return only valid JSON, no markdown." },
           { role: "user", content: prompt },
