@@ -8,15 +8,16 @@ import SimulationTable from "@/components/SimulationTable";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import UpgradeModal from "@/components/UpgradeModal";
-import { demoAnalysis, demoNews } from "@/lib/demoData";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<typeof demoAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<any | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
+  const handleAnalyze = async (ticker: string, buyPrice: number, quantity: number) => {
     if (usageCount >= 50) {
       setShowUpgrade(true);
       return;
@@ -25,17 +26,30 @@ const Index = () => {
     setIsLoading(true);
     setAnalysis(null);
 
-    // Simulate API call — will be replaced with real backend
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-stock", {
+        body: { ticker, buyPrice, quantity },
+      });
+
+      if (error) throw error;
+
       setAnalysis({
-        ...demoAnalysis,
+        ...data,
         ticker,
         buyPrice,
         quantity,
       });
       setUsageCount((c) => c + 1);
+    } catch (err: any) {
+      console.error("Analysis error:", err);
+      toast({
+        title: "Analysis Failed",
+        description: err.message || "Could not analyze stock. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 2500);
+    }
   };
 
   return (
@@ -85,7 +99,7 @@ const Index = () => {
                 />
 
                 <NewsImpactTable
-                  news={demoNews}
+                  news={analysis.news || []}
                   overallSentiment={analysis.overallSentiment}
                   totalPressure={analysis.totalPressure}
                 />
