@@ -1,4 +1,15 @@
-import { Target } from "lucide-react";
+import { Target, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from "recharts";
 
 interface SimulationProps {
   currentPrice: number;
@@ -9,7 +20,15 @@ interface SimulationProps {
 
 const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: SimulationProps) => {
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
-  const pct = (target: number) => (((target - currentPrice) / currentPrice) * 100).toFixed(1);
+
+  const chartData = [
+    { name: "Bear Low", value: bearRange[0], color: "hsl(0, 72%, 55%)" },
+    { name: "Bear High", value: bearRange[1], color: "hsl(0, 72%, 55%)" },
+    { name: "Neutral Low", value: neutralRange[0], color: "hsl(38, 92%, 55%)" },
+    { name: "Neutral High", value: neutralRange[1], color: "hsl(38, 92%, 55%)" },
+    { name: "Bull Low", value: bullRange[0], color: "hsl(145, 70%, 50%)" },
+    { name: "Bull High", value: bullRange[1], color: "hsl(145, 70%, 50%)" },
+  ];
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
@@ -18,10 +37,49 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: S
         <h2 className="text-base font-semibold text-foreground">3-Month Simulation</h2>
       </div>
 
+      <div className="h-48 w-full mb-5">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 18%)" />
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 10 }}
+              axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+            />
+            <YAxis
+              tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 10 }}
+              axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+              tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+              width={50}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "hsl(220, 18%, 10%)",
+                border: "1px solid hsl(220, 16%, 18%)",
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              formatter={(value: number) => [fmt(value), "Price"]}
+            />
+            <ReferenceLine
+              y={currentPrice}
+              stroke="hsl(175, 80%, 50%)"
+              strokeDasharray="4 4"
+              label={{ value: "Current", fill: "hsl(175, 80%, 50%)", fontSize: 10, position: "right" }}
+            />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={i} fill={entry.color} fillOpacity={0.8} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
       <div className="space-y-3">
         <ScenarioRow
           label="Bull Case"
-          emoji="🟢"
+          icon={<TrendingUp className="h-4 w-4 text-gain" />}
           range={bullRange}
           currentPrice={currentPrice}
           colorClass="text-gain"
@@ -29,7 +87,7 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: S
         />
         <ScenarioRow
           label="Neutral Case"
-          emoji="🟡"
+          icon={<Minus className="h-4 w-4 text-warning" />}
           range={neutralRange}
           currentPrice={currentPrice}
           colorClass="text-warning"
@@ -37,7 +95,7 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: S
         />
         <ScenarioRow
           label="Bear Case"
-          emoji="🔴"
+          icon={<TrendingDown className="h-4 w-4 text-loss" />}
           range={bearRange}
           currentPrice={currentPrice}
           colorClass="text-loss"
@@ -55,14 +113,14 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: S
 
 const ScenarioRow = ({
   label,
-  emoji,
+  icon,
   range,
   currentPrice,
   colorClass,
   bgClass,
 }: {
   label: string;
-  emoji: string;
+  icon: React.ReactNode;
   range: [number, number];
   currentPrice: number;
   colorClass: string;
@@ -76,7 +134,7 @@ const ScenarioRow = ({
     <div className={`rounded-lg border ${bgClass} p-4`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span>{emoji}</span>
+          {icon}
           <span className="text-sm font-medium text-foreground">{label}</span>
         </div>
         <div className="text-right">
