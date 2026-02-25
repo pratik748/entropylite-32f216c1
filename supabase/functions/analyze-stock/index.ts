@@ -22,7 +22,6 @@ serve(async (req) => {
       );
     }
 
-    const ALPHAVANTAGE_API_KEY = Deno.env.get("ALPHAVANTAGE_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -32,27 +31,26 @@ serve(async (req) => {
       );
     }
 
-    // 1. Fetch current stock price from Alpha Vantage (if key available)
+    // 1. Fetch current stock price from Yahoo Finance (free, accurate for Indian stocks)
     let currentPrice = 0;
-    if (ALPHAVANTAGE_API_KEY) {
+    const suffixes = [".NS", ".BO"];
+    const baseTicker = ticker.replace(".NS", "").replace(".BO", "").replace(".BSE", "");
+
+    for (const suffix of suffixes) {
+      if (currentPrice > 0) break;
       try {
-        const avUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(ticker)}&apikey=${ALPHAVANTAGE_API_KEY}`;
-        const avRes = await fetch(avUrl);
-        const avData = await avRes.json();
-        if (avData["Global Quote"]?.["05. price"]) {
-          currentPrice = parseFloat(avData["Global Quote"]["05. price"]);
-        }
-        if (!currentPrice) {
-          const symbol = ticker.replace(".NS", "").replace(".BO", "");
-          const avUrl2 = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}.BSE&apikey=${ALPHAVANTAGE_API_KEY}`;
-          const avRes2 = await fetch(avUrl2);
-          const avData2 = await avRes2.json();
-          if (avData2["Global Quote"]?.["05. price"]) {
-            currentPrice = parseFloat(avData2["Global Quote"]["05. price"]);
-          }
+        const symbol = `${baseTicker}${suffix}`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        const yahooRes = await fetch(yahooUrl, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+        });
+        const yahooData = await yahooRes.json();
+        const meta = yahooData?.chart?.result?.[0]?.meta;
+        if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
+          currentPrice = meta.regularMarketPrice;
         }
       } catch (e) {
-        console.error("Alpha Vantage error:", e);
+        console.error(`Yahoo Finance error for ${baseTicker}${suffix}:`, e);
       }
     }
 
