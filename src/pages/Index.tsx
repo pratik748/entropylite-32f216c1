@@ -7,17 +7,18 @@ import RiskIndicator from "@/components/RiskIndicator";
 import SimulationTable from "@/components/SimulationTable";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
-import UpgradeModal from "@/components/UpgradeModal";
 import PortfolioPanel from "@/components/PortfolioPanel";
+import PortfolioChart from "@/components/PortfolioChart";
+import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 const Index = () => {
-  const [stocks, setStocks] = useState<PortfolioStock[]>([]);
+  const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
+  const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
@@ -36,14 +37,27 @@ const Index = () => {
 
         if (error) throw error;
 
+        const analysisData = { ...data, ticker, buyPrice, quantity };
+
         setStocks((prev) =>
           prev.map((s) =>
-            s.id === stockId
-              ? { ...s, isLoading: false, analysis: { ...data, ticker, buyPrice, quantity } }
-              : s
+            s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s
           )
         );
-        setUsageCount((c) => c + 1);
+
+        // Save to history
+        setHistory((prev) => [
+          {
+            id: crypto.randomUUID(),
+            ticker,
+            timestamp: Date.now(),
+            suggestion: data.suggestion,
+            currentPrice: data.currentPrice,
+            buyPrice,
+            confidence: data.confidence,
+          },
+          ...prev.slice(0, 49), // keep last 50
+        ]);
       } catch (err: any) {
         console.error("Analysis error:", err);
         setStocks((prev) =>
@@ -56,22 +70,13 @@ const Index = () => {
         });
       }
     },
-    []
+    [setStocks, setHistory]
   );
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
-    if (usageCount >= 50) {
-      setShowUpgrade(true);
-      return;
-    }
-
-    // Check if stock already exists in portfolio
-    const existing = stocks.find(
-      (s) => s.ticker === ticker.toUpperCase()
-    );
+    const existing = stocks.find((s) => s.ticker === ticker.toUpperCase());
 
     if (existing) {
-      // Update and re-analyze
       setStocks((prev) =>
         prev.map((s) =>
           s.id === existing.id ? { ...s, buyPrice, quantity } : s
@@ -80,7 +85,6 @@ const Index = () => {
       setActiveStockId(existing.id);
       analyzeStock(existing.id, ticker.toUpperCase(), buyPrice, quantity);
     } else {
-      // Add new stock to portfolio
       const newId = crypto.randomUUID();
       const newStock: PortfolioStock = {
         id: newId,
@@ -103,13 +107,16 @@ const Index = () => {
   };
 
   const handleAddNew = () => {
-    // Just scroll to / focus on the input — handled by clearing active
     setActiveStockId(null);
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Header usageCount={usageCount} />
+      <Header />
 
       <main className="container py-8">
         <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -127,12 +134,22 @@ const Index = () => {
               />
             )}
 
+            {stocks.filter((s) => s.analysis).length > 1 && (
+              <PortfolioChart stocks={stocks} />
+            )}
+
             {analysis && (
               <RiskIndicator
                 level={analysis.riskLevel}
                 keyRisks={analysis.keyRisks}
               />
             )}
+
+            <AnalysisHistory
+              entries={history}
+              onClear={handleClearHistory}
+              onSelect={() => {}}
+            />
           </div>
 
           {/* Main content */}
@@ -140,7 +157,7 @@ const Index = () => {
             {!isLoading && !analysis && (
               <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-24 animate-fade-in">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2">
-                  <span className="text-3xl">📊</span>
+                  <Activity className="h-8 w-8 text-primary" />
                 </div>
                 <h2 className="mb-2 text-lg font-semibold text-foreground">
                   No Analysis Yet
@@ -189,10 +206,11 @@ const Index = () => {
           </div>
         </div>
       </main>
-
-      <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} />
     </div>
   );
 };
+
+// Import at top would cause circular, just import the icon inline
+import { Activity } from "lucide-react";
 
 export default Index;
