@@ -1,0 +1,205 @@
+import { useState, useEffect } from "react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+
+interface MarketData {
+  indices: { symbol: string; name: string; price: number; change: number; changePct: number }[];
+  sectors: { name: string; price: number; change: number; changePct: number }[];
+  macro: {
+    marketMood: string;
+    moodScore: number;
+    fiiFlow: string;
+    diiFlow: string;
+    vix: number;
+    usdInr: number;
+    crudeBrent: number;
+    topMovers: { name: string; change: number }[];
+    keyEvents: string[];
+    outlook: string;
+  } | null;
+}
+
+const MarketOverview = () => {
+  const [data, setData] = useState<MarketData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMarketData();
+  }, []);
+
+  const fetchMarketData = async () => {
+    setLoading(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke("market-data");
+      if (error) throw error;
+      setData(result);
+    } catch (e) {
+      console.error("Market data error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-sm text-muted-foreground">Loading market data...</span>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        Failed to load market data. Please try again.
+      </div>
+    );
+  }
+
+  const moodConfig: Record<string, { color: string; bg: string }> = {
+    Bullish: { color: "text-gain", bg: "bg-gain/10" },
+    Bearish: { color: "text-loss", bg: "bg-loss/10" },
+    Neutral: { color: "text-warning", bg: "bg-warning/10" },
+    Cautious: { color: "text-warning", bg: "bg-warning/10" },
+  };
+
+  const mood = data.macro?.marketMood || "Neutral";
+  const moodStyle = moodConfig[mood] || moodConfig.Neutral;
+
+  const sectorChartData = data.sectors.map((s) => ({
+    name: s.name.replace("NIFTY ", ""),
+    value: s.changePct,
+    fill: s.changePct >= 0 ? "hsl(145, 70%, 50%)" : "hsl(0, 72%, 55%)",
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Indices */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {data.indices.map((idx) => (
+          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs text-muted-foreground">{idx.name}</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+              {idx.price.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </p>
+            <div className={`mt-1 flex items-center gap-1 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
+              {idx.change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              <span className="font-mono font-semibold">
+                {idx.change >= 0 ? "+" : ""}{idx.change.toFixed(0)} ({idx.changePct >= 0 ? "+" : ""}{idx.changePct.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Macro Summary */}
+      {data.macro && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                <h3 className="text-base font-semibold text-foreground">Market Mood</h3>
+              </div>
+              <span className={`rounded-lg px-3 py-1 font-mono text-sm font-bold ${moodStyle.color} ${moodStyle.bg}`}>
+                {mood}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
+              <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="DII Flow" value={data.macro.diiFlow} />
+              <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={`₹${data.macro.usdInr}`} />
+              <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={`$${data.macro.crudeBrent}`} />
+            </div>
+
+            <div className="mt-4 rounded-lg bg-surface-2 p-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">India VIX</p>
+              <p className="font-mono text-lg font-bold text-foreground">{data.macro.vix}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h3 className="text-base font-semibold text-foreground mb-4">Key Events & Outlook</h3>
+            <div className="space-y-2 mb-4">
+              {data.macro.keyEvents?.map((event, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                  {event}
+                </div>
+              ))}
+            </div>
+            <div className="rounded-lg bg-surface-2 p-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Outlook</p>
+              <p className="text-sm leading-relaxed text-secondary-foreground">{data.macro.outlook}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sector Performance Chart */}
+      {sectorChartData.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold text-foreground mb-4">Sector Performance</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 18%)" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 11 }}
+                  axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+                  tickFormatter={(v) => `${v.toFixed(1)}%`}
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 11 }}
+                  axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+                  width={55}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(220, 18%, 10%)",
+                    border: "1px solid hsl(220, 16%, 18%)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => [`${v.toFixed(2)}%`, "Change"]}
+                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {sectorChartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MacroCard = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
+  <div className="rounded-lg bg-surface-2 p-3">
+    <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+      {icon}
+      <span className="text-xs">{label}</span>
+    </div>
+    <p className="font-mono text-sm font-semibold text-foreground">{value}</p>
+  </div>
+);
+
+export default MarketOverview;

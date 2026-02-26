@@ -2,3 +2,6 @@ project_id = "reprphurmjtveejeqejn"
 
 [functions.analyze-stock]
 verify_jwt = false
+
+[functions.market-data]
+verify_jwt = false
