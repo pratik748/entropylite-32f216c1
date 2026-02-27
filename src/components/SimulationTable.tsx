@@ -40,32 +40,32 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange }: S
       <div className="h-48 w-full mb-5">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 18%)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" />
             <XAxis
               dataKey="name"
-              tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 10 }}
-              axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+              tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }}
+              axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
             />
             <YAxis
-              tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 10 }}
-              axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+              tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }}
+              axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
               tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
               width={50}
             />
             <Tooltip
               contentStyle={{
-                background: "hsl(220, 18%, 10%)",
-                border: "1px solid hsl(220, 16%, 18%)",
-                borderRadius: 8,
+                background: "hsl(0, 0%, 6%)",
+                border: "1px solid hsl(0, 0%, 14%)",
+                borderRadius: 6,
                 fontSize: 12,
               }}
               formatter={(value: number) => [fmt(value), "Price"]}
             />
             <ReferenceLine
               y={currentPrice}
-              stroke="hsl(175, 80%, 50%)"
+              stroke="hsl(0, 0%, 60%)"
               strokeDasharray="4 4"
-              label={{ value: "Current", fill: "hsl(175, 80%, 50%)", fontSize: 10, position: "right" }}
+              label={{ value: "Current", fill: "hsl(0, 0%, 60%)", fontSize: 10, position: "right" }}
             />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, i) => (

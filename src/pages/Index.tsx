@@ -6,6 +6,9 @@ import StockSummary from "@/components/StockSummary";
 import NewsImpactTable from "@/components/NewsImpactTable";
 import RiskIndicator from "@/components/RiskIndicator";
 import SimulationTable from "@/components/SimulationTable";
+import MonteCarloChart from "@/components/MonteCarloChart";
+import ProfitTaskbar from "@/components/ProfitTaskbar";
+import LiveNewsFeed from "@/components/LiveNewsFeed";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioPanel from "@/components/PortfolioPanel";
@@ -132,7 +135,7 @@ const Index = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
@@ -168,6 +171,20 @@ const Index = () => {
                 <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
               )}
 
+              {analysis && (
+                <ProfitTaskbar
+                  ticker={analysis.ticker}
+                  currentPrice={analysis.currentPrice}
+                  buyPrice={analysis.buyPrice}
+                  quantity={analysis.quantity}
+                  suggestion={analysis.suggestion}
+                  confidence={analysis.confidence}
+                  bullRange={analysis.bullRange}
+                  bearRange={analysis.bearRange}
+                  riskLevel={analysis.riskLevel}
+                />
+              )}
+
               <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
             </div>
 
@@ -175,7 +192,7 @@ const Index = () => {
               {!isLoading && !analysis && (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-24 animate-fade-in">
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2">
-                    <Activity className="h-8 w-8 text-primary" />
+                    <Activity className="h-8 w-8 text-foreground" />
                   </div>
                   <h2 className="mb-2 text-lg font-semibold text-foreground">No Analysis Yet</h2>
                   <p className="max-w-sm text-center text-sm text-muted-foreground">
@@ -195,11 +212,22 @@ const Index = () => {
                     buyPrice={analysis.buyPrice}
                     quantity={analysis.quantity}
                   />
+
+                  <MonteCarloChart
+                    currentPrice={analysis.currentPrice}
+                    bullRange={analysis.bullRange}
+                    bearRange={analysis.bearRange}
+                    ticker={analysis.ticker}
+                  />
+
                   <NewsImpactTable
                     news={analysis.news || []}
                     overallSentiment={analysis.overallSentiment}
                     totalPressure={analysis.totalPressure}
                   />
+
+                  <LiveNewsFeed ticker={analysis.ticker} />
+
                   <div className="grid gap-6 lg:grid-cols-2">
                     <SimulationTable
                       currentPrice={analysis.currentPrice}
