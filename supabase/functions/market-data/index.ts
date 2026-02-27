@@ -130,7 +130,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ indices: indexData, sectors: sectorData, macro: macroSummary }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
     );
   } catch (error) {
     console.error("Error in market-data:", error);

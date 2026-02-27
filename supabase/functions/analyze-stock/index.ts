@@ -141,7 +141,7 @@ Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI poli
     }
 
     return new Response(JSON.stringify(analysis), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
     });
   } catch (error) {
     console.error("Error in analyze-stock:", error);

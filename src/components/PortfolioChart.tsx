@@ -6,14 +6,14 @@ interface PortfolioChartProps {
 }
 
 const COLORS = [
-  "hsl(175, 80%, 50%)",
-  "hsl(145, 70%, 50%)",
-  "hsl(38, 92%, 55%)",
-  "hsl(210, 80%, 60%)",
-  "hsl(0, 72%, 55%)",
-  "hsl(280, 60%, 55%)",
-  "hsl(60, 70%, 50%)",
-  "hsl(320, 60%, 55%)",
+  "hsl(0, 0%, 100%)",
+  "hsl(0, 0%, 70%)",
+  "hsl(0, 0%, 50%)",
+  "hsl(0, 0%, 35%)",
+  "hsl(0, 0%, 25%)",
+  "hsl(0, 0%, 85%)",
+  "hsl(0, 0%, 60%)",
+  "hsl(0, 0%, 40%)",
 ];
 
 const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
@@ -39,7 +39,7 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
               innerRadius={45}
               outerRadius={75}
               dataKey="value"
-              stroke="hsl(220, 18%, 10%)"
+              stroke="hsl(0, 0%, 6%)"
               strokeWidth={2}
             >
               {data.map((_, i) => (
@@ -48,9 +48,9 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
             </Pie>
             <Tooltip
               contentStyle={{
-                background: "hsl(220, 18%, 10%)",
-                border: "1px solid hsl(220, 16%, 18%)",
-                borderRadius: 8,
+                background: "hsl(0, 0%, 6%)",
+                border: "1px solid hsl(0, 0%, 14%)",
+                borderRadius: 6,
                 fontSize: 12,
               }}
               formatter={(value: number) => [
