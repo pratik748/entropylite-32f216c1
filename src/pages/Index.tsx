@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Activity, LayoutDashboard, Eye, BookOpen, Shield, Globe } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, BookOpen, Shield, Globe, Sparkles } from "lucide-react";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import StockSummary from "@/components/StockSummary";
@@ -18,16 +18,18 @@ import MarketOverview from "@/components/MarketOverview";
 import Watchlist from "@/components/Watchlist";
 import TradeJournal from "@/components/TradeJournal";
 import RiskDashboard from "@/components/RiskDashboard";
+import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-type Tab = "dashboard" | "market" | "watchlist" | "journal" | "risk";
+type Tab = "dashboard" | "market" | "watchlist" | "journal" | "risk" | "augment";
 
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: "market", label: "Market", icon: <Globe className="h-4 w-4" /> },
+  { id: "augment", label: "Augment", icon: <Sparkles className="h-4 w-4" /> },
   { id: "watchlist", label: "Watchlist", icon: <Eye className="h-4 w-4" /> },
   { id: "journal", label: "Trades", icon: <BookOpen className="h-4 w-4" /> },
   { id: "risk", label: "Risk", icon: <Shield className="h-4 w-4" /> },
@@ -251,6 +253,9 @@ const Index = () => {
 
         {/* Market Overview Tab */}
         {activeTab === "market" && <MarketOverview />}
+
+        {/* Augment Tab */}
+        {activeTab === "augment" && <AugmentDashboard />}
 
         {/* Watchlist Tab */}
         {activeTab === "watchlist" && <Watchlist />}

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 import {
   BarChart,
   Bar,
@@ -29,20 +30,21 @@ interface MarketData {
   } | null;
 }
 
+const REFRESH_INTERVAL = 30_000; // 30 seconds
+
 const MarketOverview = () => {
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    fetchMarketData();
-  }, []);
-
-  const fetchMarketData = async () => {
-    setLoading(true);
+  const fetchMarketData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const { data: result, error } = await supabase.functions.invoke("market-data");
       if (error) throw error;
       setData(result);
+      setLastUpdate(new Date());
     } catch (e) {
       console.error("Market data error:", e);
     } finally {
@@ -50,7 +52,15 @@ const MarketOverview = () => {
     }
   };
 
-  if (loading) {
+  useEffect(() => {
+    fetchMarketData();
+    intervalRef.current = setInterval(() => fetchMarketData(false), REFRESH_INTERVAL);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -85,6 +95,21 @@ const MarketOverview = () => {
 
   return (
     <div className="space-y-6">
+      {/* Auto-refresh indicator */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
+          <span className="text-[10px] text-muted-foreground font-mono">
+            LIVE · Updates every 30s
+            {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
+          </span>
+        </div>
+        <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground">
+          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Indices */}
       <div className="grid gap-4 md:grid-cols-3">
         {data.indices.map((idx) => (
@@ -155,24 +180,24 @@ const MarketOverview = () => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 16%, 18%)" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" horizontal={false} />
                 <XAxis
                   type="number"
-                  tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 11 }}
-                  axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+                  tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 11 }}
+                  axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
                   tickFormatter={(v) => `${v.toFixed(1)}%`}
                 />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  tick={{ fill: "hsl(215, 15%, 50%)", fontSize: 11 }}
-                  axisLine={{ stroke: "hsl(220, 16%, 18%)" }}
+                  tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 11 }}
+                  axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
                   width={55}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(220, 18%, 10%)",
-                    border: "1px solid hsl(220, 16%, 18%)",
+                    background: "hsl(0, 0%, 6%)",
+                    border: "1px solid hsl(0, 0%, 14%)",
                     borderRadius: 8,
                     fontSize: 12,
                   }}
