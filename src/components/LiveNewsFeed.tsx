@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,13 @@ interface LiveNewsFeedProps {
   ticker?: string;
 }
 
+const NEWS_REFRESH_INTERVAL = 60_000; // 60 seconds
+
 const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNews = async () => {
     setLoading(true);
@@ -41,6 +44,10 @@ const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
 
   useEffect(() => {
     fetchNews();
+    intervalRef.current = setInterval(fetchNews, NEWS_REFRESH_INTERVAL);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [ticker]);
 
   return (
@@ -54,11 +61,13 @@ const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
               {ticker}
             </span>
           )}
+          <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
+          <span className="text-[10px] text-muted-foreground font-mono">Auto-refresh 60s</span>
         </div>
         <div className="flex items-center gap-2">
           {lastFetched && (
             <span className="text-[10px] text-muted-foreground">
-              {lastFetched.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+              {lastFetched.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
           )}
           <Button
