@@ -31,18 +31,22 @@ serve(async (req) => {
       );
     }
 
-    // 1. Fetch current stock price from Yahoo Finance (free, accurate for Indian stocks)
+    // 1. Fetch current stock price from Yahoo Finance with cache busting
     let currentPrice = 0;
     const suffixes = [".NS", ".BO"];
     const baseTicker = ticker.replace(".NS", "").replace(".BO", "").replace(".BSE", "");
+    const t = Date.now();
 
     for (const suffix of suffixes) {
       if (currentPrice > 0) break;
       try {
         const symbol = `${baseTicker}${suffix}`;
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d&_t=${t}`;
         const yahooRes = await fetch(yahooUrl, {
-          headers: { "User-Agent": "Mozilla/5.0" },
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Cache-Control": "no-cache, no-store",
+          },
         });
         const yahooData = await yahooRes.json();
         const meta = yahooData?.chart?.result?.[0]?.meta;
@@ -54,20 +58,17 @@ serve(async (req) => {
       }
     }
 
-    // 2. Use Lovable AI for comprehensive analysis with real confidence & risk
+    // 2. Use Lovable AI for comprehensive analysis
     const prompt = `You are a senior Indian equity research analyst with access to the latest market data. Today's date is ${new Date().toISOString().split('T')[0]}. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
-${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge and provide your best estimate."}
+${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge."}
 
-IMPORTANT: Provide REAL analysis based on actual recent events, earnings, and macro conditions. Do NOT use placeholder or generic data.
-
-For confidence: Base it on data availability, earnings visibility, analyst consensus, and sector predictability. Explain your reasoning.
-For risk: Evaluate volatility, beta, sector risk, regulatory risk, leverage, and macro sensitivity. Quantify with a risk score 0-100.
+IMPORTANT: Provide REAL analysis based on actual recent events, earnings, and macro conditions.
 
 Return a JSON object with EXACTLY this structure (no markdown, no code fences, just raw JSON):
 {
-  "currentPrice": <number - current price or best estimate in INR>,
+  "currentPrice": <number>,
   "riskLevel": "<High | Medium | Low>",
-  "riskScore": <number 0-100, where 0=no risk, 100=extreme risk>,
+  "riskScore": <number 0-100>,
   "riskBreakdown": {
     "volatilityRisk": <number 0-100>,
     "sectorRisk": <number 0-100>,
@@ -75,33 +76,38 @@ Return a JSON object with EXACTLY this structure (no markdown, no code fences, j
     "financialRisk": <number 0-100>,
     "macroRisk": <number 0-100>
   },
-  "keyRisks": ["<specific recent risk event 1>", "<risk 2>", "<risk 3>", "<risk 4>"],
+  "keyRisks": ["<risk1>", "<risk2>", "<risk3>", "<risk4>"],
   "bullRange": [<lower>, <upper>],
   "neutralRange": [<lower>, <upper>],
   "bearRange": [<lower>, <upper>],
   "suggestion": "<Hold | Add | Exit>",
   "confidence": <number 0-100>,
-  "confidenceReasoning": "<1-2 sentence explanation of why confidence is at this level>",
-  "summary": "<3-4 sentence analysis based on real recent events>",
-  "macroFactors": ["<factor1>", "<factor2>", ...],
+  "confidenceReasoning": "<1-2 sentence explanation>",
+  "summary": "<3-4 sentence analysis>",
+  "macroFactors": ["<factor1>", "<factor2>"],
   "overallSentiment": <number -100 to 100>,
-  "totalPressure": <number - estimated % price pressure based on news>,
+  "totalPressure": <number>,
+  "sector": "<sector name like Financials, IT, Energy, Consumer, Pharma, Auto, Metals, Realty>",
+  "marketCap": "<Large Cap | Mid Cap | Small Cap>",
+  "pe": <number P/E ratio>,
+  "pbv": <number P/BV ratio>,
+  "dividendYield": <number %>,
+  "beta": <number>,
+  "esgScore": <number 0-100 or null>,
   "news": [
     {
-      "headline": "<real recent headline from the last 1-3 months>",
+      "headline": "<real recent headline>",
       "category": "<Company | Sector | Macro | Competitor>",
       "sentiment": <number -100 to 100>,
-      "shortTermImpact": <number % impact>,
-      "longTermImpact": <number % impact>,
+      "shortTermImpact": <number %>,
+      "longTermImpact": <number %>,
       "confidence": <number 0-100>,
-      "explanation": "<1 sentence explaining the impact>"
+      "explanation": "<1 sentence>"
     }
   ]
 }
 
-Include 5-7 news items covering Company, Sector, Macro, and Competitor categories.
-Use REAL recent Indian market data and events. All price ranges must be in INR.
-Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI policy, INR/USD, crude oil, GDP growth, inflation, FII flows, etc.`;
+Include 5-7 news items. Use REAL recent Indian market data. All prices in INR.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -110,13 +116,13 @@ Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI poli
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a financial analyst. Return only valid JSON, no markdown." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.5,
+        max_tokens: 2500,
       }),
     });
 
@@ -125,17 +131,15 @@ Focus on NSE/BSE listed companies and Indian macroeconomic factors like RBI poli
     if (!aiData.choices?.[0]?.message?.content) {
       console.error("AI response:", JSON.stringify(aiData));
       return new Response(
-        JSON.stringify({ error: "AI analysis failed", details: aiData.error?.message || "No response from AI" }),
+        JSON.stringify({ error: "AI analysis failed", details: aiData.error?.message || "No response" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const rawContent = aiData.choices[0].message.content.trim();
-    // Strip possible markdown code fences
     const jsonStr = rawContent.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
     const analysis = JSON.parse(jsonStr);
 
-    // Override with real price if we got one
     if (currentPrice > 0) {
       analysis.currentPrice = currentPrice;
     }

@@ -2,8 +2,9 @@ import { useState } from "react";
 import {
   Briefcase, BarChart3, Shield, Zap, FileCheck, Database,
   Scale, Layers, DollarSign, Umbrella, LayoutDashboard, Users,
-  Leaf, GitBranch, TrendingUp, ArrowRight,
+  Leaf, GitBranch, TrendingUp,
 } from "lucide-react";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 import PortfolioConstructionModule from "./PortfolioConstructionModule";
 import BenchmarkModule from "./BenchmarkModule";
 import RiskModelingModule from "./RiskModelingModule";
@@ -20,46 +21,50 @@ import ClientReportingModule from "./ClientReportingModule";
 import ESGModule from "./ESGModule";
 import WorkflowModule from "./WorkflowModule";
 
+interface AugmentDashboardProps {
+  stocks: PortfolioStock[];
+}
+
 const modules = [
-  { id: "portfolio", label: "Portfolio Construction", icon: Briefcase, color: "text-foreground" },
-  { id: "benchmark", label: "Benchmark & Attribution", icon: BarChart3, color: "text-foreground" },
-  { id: "riskmodel", label: "Risk Modeling", icon: Shield, color: "text-foreground" },
-  { id: "stress", label: "Stress Testing", icon: Zap, color: "text-foreground" },
-  { id: "oms", label: "Order Management", icon: TrendingUp, color: "text-foreground" },
-  { id: "trade", label: "Trade Lifecycle", icon: FileCheck, color: "text-foreground" },
-  { id: "data", label: "Data Aggregation", icon: Database, color: "text-foreground" },
-  { id: "compliance", label: "Compliance", icon: Scale, color: "text-foreground" },
-  { id: "multiasset", label: "Multi-Asset", icon: Layers, color: "text-foreground" },
-  { id: "valuation", label: "Valuation & Pricing", icon: DollarSign, color: "text-foreground" },
-  { id: "hedging", label: "Hedging Strategy", icon: Umbrella, color: "text-foreground" },
-  { id: "exposure", label: "Exposure Dashboard", icon: LayoutDashboard, color: "text-foreground" },
-  { id: "client", label: "Client Reporting", icon: Users, color: "text-foreground" },
-  { id: "esg", label: "ESG Integration", icon: Leaf, color: "text-foreground" },
-  { id: "workflow", label: "Investment Workflow", icon: GitBranch, color: "text-foreground" },
+  { id: "portfolio", label: "Portfolio Construction", icon: Briefcase },
+  { id: "benchmark", label: "Benchmark & Attribution", icon: BarChart3 },
+  { id: "riskmodel", label: "Risk Modeling", icon: Shield },
+  { id: "stress", label: "Stress Testing", icon: Zap },
+  { id: "oms", label: "Order Management", icon: TrendingUp },
+  { id: "trade", label: "Trade Lifecycle", icon: FileCheck },
+  { id: "data", label: "Data Aggregation", icon: Database },
+  { id: "compliance", label: "Compliance", icon: Scale },
+  { id: "multiasset", label: "Multi-Asset", icon: Layers },
+  { id: "valuation", label: "Valuation & Pricing", icon: DollarSign },
+  { id: "hedging", label: "Hedging Strategy", icon: Umbrella },
+  { id: "exposure", label: "Exposure Dashboard", icon: LayoutDashboard },
+  { id: "client", label: "Client Reporting", icon: Users },
+  { id: "esg", label: "ESG Integration", icon: Leaf },
+  { id: "workflow", label: "Investment Workflow", icon: GitBranch },
 ] as const;
 
 type ModuleId = typeof modules[number]["id"];
 
-const AugmentDashboard = () => {
+const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
   const [activeModule, setActiveModule] = useState<ModuleId>("portfolio");
 
   const renderModule = () => {
     switch (activeModule) {
-      case "portfolio": return <PortfolioConstructionModule />;
-      case "benchmark": return <BenchmarkModule />;
-      case "riskmodel": return <RiskModelingModule />;
-      case "stress": return <StressTestModule />;
-      case "oms": return <OrderManagementModule />;
+      case "portfolio": return <PortfolioConstructionModule stocks={stocks} />;
+      case "benchmark": return <BenchmarkModule stocks={stocks} />;
+      case "riskmodel": return <RiskModelingModule stocks={stocks} />;
+      case "stress": return <StressTestModule stocks={stocks} />;
+      case "oms": return <OrderManagementModule stocks={stocks} />;
       case "trade": return <TradeLifecycleModule />;
       case "data": return <DataAggregationModule />;
-      case "compliance": return <ComplianceModule />;
-      case "multiasset": return <MultiAssetModule />;
-      case "valuation": return <ValuationModule />;
-      case "hedging": return <HedgingModule />;
-      case "exposure": return <ExposureDashboardModule />;
-      case "client": return <ClientReportingModule />;
-      case "esg": return <ESGModule />;
-      case "workflow": return <WorkflowModule />;
+      case "compliance": return <ComplianceModule stocks={stocks} />;
+      case "multiasset": return <MultiAssetModule stocks={stocks} />;
+      case "valuation": return <ValuationModule stocks={stocks} />;
+      case "hedging": return <HedgingModule stocks={stocks} />;
+      case "exposure": return <ExposureDashboardModule stocks={stocks} />;
+      case "client": return <ClientReportingModule stocks={stocks} />;
+      case "esg": return <ESGModule stocks={stocks} />;
+      case "workflow": return <WorkflowModule stocks={stocks} />;
     }
   };
 

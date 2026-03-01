@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Newspaper } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import LiveNewsFeed from "@/components/LiveNewsFeed";
 import {
   BarChart,
   Bar,
@@ -24,13 +25,15 @@ interface MarketData {
     vix: number;
     usdInr: number;
     crudeBrent: number;
+    goldPrice?: number;
     topMovers: { name: string; change: number }[];
     keyEvents: string[];
     outlook: string;
   } | null;
+  timestamp?: number;
 }
 
-const REFRESH_INTERVAL = 30_000; // 30 seconds
+const REFRESH_INTERVAL = 15_000; // 15 seconds
 
 const MarketOverview = () => {
   const [data, setData] = useState<MarketData | null>(null);
@@ -64,7 +67,7 @@ const MarketOverview = () => {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-3 text-sm text-muted-foreground">Loading market data...</span>
+        <span className="ml-3 text-sm text-muted-foreground">Loading live market data...</span>
       </div>
     );
   }
@@ -72,7 +75,8 @@ const MarketOverview = () => {
   if (!data) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        Failed to load market data. Please try again.
+        Failed to load market data.
+        <Button variant="ghost" size="sm" onClick={() => fetchMarketData()} className="ml-2">Retry</Button>
       </div>
     );
   }
@@ -95,32 +99,35 @@ const MarketOverview = () => {
 
   return (
     <div className="space-y-6">
-      {/* Auto-refresh indicator */}
+      {/* Live indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
-          <span className="text-[10px] text-muted-foreground font-mono">
-            LIVE · Updates every 30s
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gain" />
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono tracking-wider">
+            LIVE · Auto-refresh 15s
             {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
           </span>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground">
+        <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
 
       {/* Indices */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         {data.indices.map((idx) => (
-          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5">
-            <p className="text-xs text-muted-foreground">{idx.name}</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/20">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{idx.name}</p>
+            <p className="mt-1.5 font-mono text-2xl font-bold text-foreground tabular-nums">
               {idx.price.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </p>
-            <div className={`mt-1 flex items-center gap-1 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
+            <div className={`mt-1.5 flex items-center gap-1.5 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
               {idx.change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              <span className="font-mono font-semibold">
+              <span className="font-mono font-semibold tabular-nums">
                 {idx.change >= 0 ? "+" : ""}{idx.change.toFixed(0)} ({idx.changePct >= 0 ? "+" : ""}{idx.changePct.toFixed(2)}%)
               </span>
             </div>
@@ -128,55 +135,70 @@ const MarketOverview = () => {
         ))}
       </div>
 
+      {/* Key Macro Metrics Bar */}
+      {data.macro && (
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+          <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `₹${data.macro.usdInr.toFixed(2)}` : "—"} />
+          <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={data.macro.crudeBrent > 0 ? `$${data.macro.crudeBrent.toFixed(2)}` : "—"} />
+          <MacroCard icon={<Activity className="h-4 w-4" />} label="India VIX" value={data.macro.vix > 0 ? data.macro.vix.toFixed(2) : "—"} />
+          <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
+          <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="DII Flow" value={data.macro.diiFlow} />
+        </div>
+      )}
+
       {/* Macro Summary */}
       {data.macro && (
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                <h3 className="text-base font-semibold text-foreground">Market Mood</h3>
-              </div>
+              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Market Mood</h3>
               <span className={`rounded-lg px-3 py-1 font-mono text-sm font-bold ${moodStyle.color} ${moodStyle.bg}`}>
                 {mood}
+                {data.macro.moodScore !== 0 && (
+                  <span className="ml-1.5 text-xs opacity-70">{data.macro.moodScore > 0 ? "+" : ""}{data.macro.moodScore}</span>
+                )}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
-              <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="DII Flow" value={data.macro.diiFlow} />
-              <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={`₹${data.macro.usdInr}`} />
-              <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={`$${data.macro.crudeBrent}`} />
-            </div>
-
-            <div className="mt-4 rounded-lg bg-surface-2 p-3">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">India VIX</p>
-              <p className="font-mono text-lg font-bold text-foreground">{data.macro.vix}</p>
-            </div>
+            {data.macro.topMovers?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Movers</p>
+                {data.macro.topMovers.slice(0, 5).map((m, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{m.name}</span>
+                    <span className={`font-mono font-semibold ${m.change >= 0 ? "text-gain" : "text-loss"}`}>
+                      {m.change >= 0 ? "+" : ""}{m.change}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-base font-semibold text-foreground mb-4">Key Events & Outlook</h3>
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Key Events & Outlook</h3>
             <div className="space-y-2 mb-4">
               {data.macro.keyEvents?.map((event, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
-                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-foreground/50" />
                   {event}
                 </div>
               ))}
             </div>
-            <div className="rounded-lg bg-surface-2 p-3">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Outlook</p>
-              <p className="text-sm leading-relaxed text-secondary-foreground">{data.macro.outlook}</p>
-            </div>
+            {data.macro.outlook && (
+              <div className="rounded-lg bg-surface-2 p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Outlook</p>
+                <p className="text-sm leading-relaxed text-secondary-foreground">{data.macro.outlook}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Sector Performance Chart */}
+      {/* Sector Performance */}
       {sectorChartData.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-base font-semibold text-foreground mb-4">Sector Performance</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Sector Performance</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
@@ -213,17 +235,20 @@ const MarketOverview = () => {
           </div>
         </div>
       )}
+
+      {/* Live News Feed for entire market */}
+      <LiveNewsFeed />
     </div>
   );
 };
 
 const MacroCard = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-  <div className="rounded-lg bg-surface-2 p-3">
+  <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/20">
     <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
       {icon}
-      <span className="text-xs">{label}</span>
+      <span className="text-[10px] uppercase tracking-wider">{label}</span>
     </div>
-    <p className="font-mono text-sm font-semibold text-foreground">{value}</p>
+    <p className="font-mono text-base font-bold text-foreground tabular-nums">{value}</p>
   </div>
 );
 

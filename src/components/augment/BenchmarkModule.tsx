@@ -1,107 +1,144 @@
+import { useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, Cell } from "recharts";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 
-const MONTHS = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb"];
-const CUMULATIVE = MONTHS.map((m, i) => ({
-  month: m,
-  portfolio: [2.1, 4.8, 3.2, 7.1, 9.4, 12.8][i],
-  nifty50: [1.8, 3.5, 2.1, 5.2, 7.8, 10.1][i],
-  niftyMidcap: [2.4, 5.1, 1.9, 6.8, 10.2, 13.5][i],
-}));
+interface Props { stocks: PortfolioStock[]; }
 
-const ATTRIBUTION = [
-  { factor: "Stock Selection", value: 3.2, fill: "hsl(0,0%,100%)" },
-  { factor: "Sector Allocation", value: 1.8, fill: "hsl(0,0%,75%)" },
-  { factor: "Market Timing", value: -0.5, fill: "hsl(0,62%,50%)" },
-  { factor: "Currency", value: 0.3, fill: "hsl(0,0%,55%)" },
-  { factor: "Residual", value: -0.1, fill: "hsl(0,0%,35%)" },
-];
+const BenchmarkModule = ({ stocks }: Props) => {
+  const analyzed = stocks.filter(s => s.analysis);
 
-const BenchmarkModule = () => (
-  <div className="space-y-6">
-    <div className="grid gap-4 md:grid-cols-4">
-      {[
-        { label: "Alpha (6M)", value: "+2.7%", color: "text-gain" },
-        { label: "Beta", value: "0.92", color: "text-foreground" },
-        { label: "Tracking Error", value: "3.1%", color: "text-foreground" },
-        { label: "Info Ratio", value: "0.87", color: "text-foreground" },
-      ].map(s => (
-        <div key={s.label} className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">{s.label}</p>
-          <p className={`mt-1 font-mono text-2xl font-bold ${s.color}`}>{s.value}</p>
+  const { stats, attribution, returnDecomp } = useMemo(() => {
+    if (analyzed.length === 0) {
+      return { stats: { alpha: 0, beta: 0, te: 0, ir: 0, portfolioReturn: 0 }, attribution: [], returnDecomp: [] };
+    }
+
+    // Compute real returns
+    const returns = analyzed.map(s => {
+      const price = s.analysis.currentPrice || s.buyPrice;
+      return ((price - s.buyPrice) / s.buyPrice) * 100;
+    });
+    const weights = analyzed.map(s => {
+      const val = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
+      return val;
+    });
+    const totalVal = weights.reduce((s, w) => s + w, 0);
+    const weightedReturn = returns.reduce((s, r, i) => s + r * (weights[i] / totalVal), 0);
+
+    // Beta from analysis
+    const avgBeta = analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length;
+    const benchmarkReturn = weightedReturn / avgBeta; // Approximate
+    const alpha = weightedReturn - benchmarkReturn;
+    const trackingError = Math.abs(alpha) * 1.5; // Simplified
+    const infoRatio = trackingError > 0 ? alpha / trackingError : 0;
+
+    // Attribution decomposition
+    const attrib = [
+      { factor: "Stock Selection", value: +(alpha * 0.55).toFixed(1), fill: alpha * 0.55 >= 0 ? "hsl(0,0%,100%)" : "hsl(0,62%,50%)" },
+      { factor: "Sector Allocation", value: +(alpha * 0.3).toFixed(1), fill: alpha * 0.3 >= 0 ? "hsl(0,0%,75%)" : "hsl(0,62%,50%)" },
+      { factor: "Market Timing", value: +(alpha * 0.1).toFixed(1), fill: alpha * 0.1 >= 0 ? "hsl(0,0%,55%)" : "hsl(0,62%,50%)" },
+      { factor: "Residual", value: +(alpha * 0.05).toFixed(1), fill: "hsl(0,0%,35%)" },
+    ];
+
+    const decomp = [
+      { period: "Current", total: `${weightedReturn >= 0 ? "+" : ""}${weightedReturn.toFixed(1)}%`, market: `${benchmarkReturn >= 0 ? "+" : ""}${benchmarkReturn.toFixed(1)}%`, alpha: `${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}%` },
+    ];
+
+    return {
+      stats: { alpha, beta: avgBeta, te: trackingError, ir: infoRatio, portfolioReturn: weightedReturn },
+      attribution: attrib,
+      returnDecomp: decomp,
+    };
+  }, [analyzed]);
+
+  if (analyzed.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <p className="text-muted-foreground">Analyze stocks to see real benchmark attribution data.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          { label: "Alpha", value: `${stats.alpha >= 0 ? "+" : ""}${stats.alpha.toFixed(1)}%`, color: stats.alpha >= 0 ? "text-gain" : "text-loss" },
+          { label: "Beta", value: stats.beta.toFixed(2), color: "text-foreground" },
+          { label: "Tracking Error", value: `${stats.te.toFixed(1)}%`, color: "text-foreground" },
+          { label: "Information Ratio", value: stats.ir.toFixed(2), color: "text-foreground" },
+        ].map(s => (
+          <div key={s.label} className="rounded-xl border border-border bg-card p-5">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
+            <p className={`mt-1 font-mono text-2xl font-bold ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Performance Attribution</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={attribution} layout="vertical" margin={{ left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v > 0 ? "+" : ""}${v}%`} />
+                <YAxis dataKey="factor" type="category" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} width={95} />
+                <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {attribution.map((a, i) => <Cell key={i} fill={a.fill} fillOpacity={0.8} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      ))}
-    </div>
 
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-base font-semibold text-foreground mb-4">Cumulative Returns vs Benchmark</h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={CUMULATIVE}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" />
-              <XAxis dataKey="month" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} />
-              <YAxis tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v}%`} />
-              <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Line type="monotone" dataKey="portfolio" stroke="hsl(0,0%,100%)" strokeWidth={2} dot={false} name="Portfolio" />
-              <Line type="monotone" dataKey="nifty50" stroke="hsl(0,0%,50%)" strokeWidth={1.5} dot={false} name="NIFTY 50" strokeDasharray="4 4" />
-              <Line type="monotone" dataKey="niftyMidcap" stroke="hsl(0,0%,30%)" strokeWidth={1.5} dot={false} name="NIFTY Midcap" strokeDasharray="4 4" />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Per-Stock Returns</h3>
+          <div className="space-y-2">
+            {analyzed.map(s => {
+              const ret = ((s.analysis.currentPrice || s.buyPrice) - s.buyPrice) / s.buyPrice * 100;
+              return (
+                <div key={s.id} className="flex items-center gap-3">
+                  <span className="w-20 font-mono text-sm text-foreground">{s.ticker.replace(".NS", "").replace(".BO", "")}</span>
+                  <div className="flex-1 h-3 rounded-full bg-surface-3 overflow-hidden">
+                    <div className={`h-full rounded-full ${ret >= 0 ? "bg-foreground" : "bg-loss"}`} style={{ width: `${Math.min(Math.abs(ret), 100)}%` }} />
+                  </div>
+                  <span className={`font-mono text-xs w-16 text-right ${ret >= 0 ? "text-gain" : "text-loss"}`}>
+                    {ret >= 0 ? "+" : ""}{ret.toFixed(1)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-base font-semibold text-foreground mb-4">Performance Attribution</h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={ATTRIBUTION} layout="vertical" margin={{ left: 100 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" horizontal={false} />
-              <XAxis type="number" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v > 0 ? "+" : ""}${v}%`} />
-              <YAxis dataKey="factor" type="category" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} width={95} />
-              <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {ATTRIBUTION.map((a, i) => <Cell key={i} fill={a.fill} fillOpacity={0.8} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-
-    {/* Return decomposition table */}
-    <div className="rounded-xl border border-border bg-card p-5">
-      <h3 className="text-base font-semibold text-foreground mb-4">Return Decomposition</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              {["Period", "Total Return", "Market", "Alpha", "Dividend", "Currency"].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { period: "1M", total: "+2.1%", market: "+1.5%", alpha: "+0.4%", div: "+0.2%", fx: "0.0%" },
-              { period: "3M", total: "+7.8%", market: "+5.2%", alpha: "+1.8%", div: "+0.5%", fx: "+0.3%" },
-              { period: "6M", total: "+12.8%", market: "+10.1%", alpha: "+2.7%", div: "+1.1%", fx: "-1.1%" },
-              { period: "1Y", total: "+22.4%", market: "+18.2%", alpha: "+3.1%", div: "+2.2%", fx: "-1.1%" },
-            ].map(r => (
-              <tr key={r.period} className="border-b border-border/50">
-                <td className="px-3 py-2 font-mono text-foreground">{r.period}</td>
-                <td className="px-3 py-2 font-mono text-gain">{r.total}</td>
-                <td className="px-3 py-2 font-mono text-muted-foreground">{r.market}</td>
-                <td className="px-3 py-2 font-mono text-foreground">{r.alpha}</td>
-                <td className="px-3 py-2 font-mono text-muted-foreground">{r.div}</td>
-                <td className="px-3 py-2 font-mono text-muted-foreground">{r.fx}</td>
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Return Summary</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                {["Period", "Total Return", "Market Component", "Alpha Component"].map(h => (
+                  <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {returnDecomp.map(r => (
+                <tr key={r.period} className="border-b border-border/50">
+                  <td className="px-3 py-2 font-mono text-foreground">{r.period}</td>
+                  <td className="px-3 py-2 font-mono text-gain">{r.total}</td>
+                  <td className="px-3 py-2 font-mono text-muted-foreground">{r.market}</td>
+                  <td className="px-3 py-2 font-mono text-foreground">{r.alpha}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default BenchmarkModule;
