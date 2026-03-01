@@ -1,73 +1,96 @@
-const HEDGES = [
-  { instrument: "NIFTY 50 PUT 23000", type: "Index Option", notional: "₹3.4 Cr", premium: "₹8.2 L", delta: -0.35, expiry: "2026-03-27", purpose: "Tail risk" },
-  { instrument: "USD/INR Forward", type: "FX Forward", notional: "₹1.9 Cr", premium: "₹2.1 L", delta: -0.98, expiry: "2026-06-30", purpose: "Currency hedge" },
-  { instrument: "BANKNIFTY PUT 48000", type: "Index Option", notional: "₹1.8 Cr", premium: "₹5.4 L", delta: -0.28, expiry: "2026-03-27", purpose: "Sector hedge" },
-  { instrument: "Gold Futures", type: "Commodity", notional: "₹0.8 Cr", premium: "₹0.5 L", delta: 0.95, expiry: "2026-04-30", purpose: "Inflation hedge" },
-];
+import { useMemo } from "react";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 
-const CAPITAL_EFFICIENCY = [
-  { metric: "Gross Exposure", value: "₹58.2 Cr" },
-  { metric: "Net Exposure", value: "₹42.1 Cr" },
-  { metric: "Hedge Ratio", value: "27.6%" },
-  { metric: "Cost of Hedging (ann.)", value: "1.2%" },
-  { metric: "Capital Freed by Netting", value: "₹16.1 Cr" },
-  { metric: "Margin Utilization", value: "68.4%" },
-];
+interface Props { stocks: PortfolioStock[]; }
 
-const STRATEGIES = [
-  { name: "Protective Collar", description: "Buy OTM put + Sell OTM call on NIFTY 50. Net cost: minimal. Caps upside at 8%, protects downside beyond -5%.", effectiveness: "High" },
-  { name: "Macro Hedge — Crude", description: "Short crude futures to offset energy-sensitive portfolio holdings. Covers ~₹4 Cr oil-correlated exposure.", effectiveness: "Medium" },
-  { name: "Duration Management", description: "Interest rate swap to reduce bond portfolio duration from 5.2Y to 3.1Y ahead of potential RBI tightening.", effectiveness: "High" },
-];
+const HedgingModule = ({ stocks }: Props) => {
+  const analyzed = stocks.filter(s => s.analysis);
 
-const HedgingModule = () => (
-  <div className="space-y-6">
-    <div className="grid gap-4 md:grid-cols-3">
-      {[
-        { label: "Total Hedge Notional", value: "₹7.9 Cr" },
-        { label: "Portfolio Delta", value: "0.72" },
-        { label: "Cost of Protection", value: "₹16.2 L" },
-      ].map(s => (
-        <div key={s.label} className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">{s.label}</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{s.value}</p>
-        </div>
-      ))}
-    </div>
+  const { hedges, capitalMetrics, totalValue, avgBeta } = useMemo(() => {
+    if (analyzed.length === 0) return { hedges: [], capitalMetrics: [], totalValue: 0, avgBeta: 1 };
 
-    <div className="rounded-xl border border-border bg-card p-5">
-      <h3 className="text-base font-semibold text-foreground mb-4">Active Hedges</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              {["Instrument", "Type", "Notional", "Premium", "Delta", "Expiry", "Purpose"].map(h => (
-                <th key={h} className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {HEDGES.map(h => (
-              <tr key={h.instrument} className="border-b border-border/50">
-                <td className="px-2 py-2 font-mono text-xs text-foreground">{h.instrument}</td>
-                <td className="px-2 py-2 text-xs text-muted-foreground">{h.type}</td>
-                <td className="px-2 py-2 font-mono text-foreground">{h.notional}</td>
-                <td className="px-2 py-2 font-mono text-muted-foreground">{h.premium}</td>
-                <td className="px-2 py-2 font-mono text-foreground">{h.delta}</td>
-                <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{h.expiry}</td>
-                <td className="px-2 py-2 text-xs text-muted-foreground">{h.purpose}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    const total = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
+    const beta = analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length;
+
+    // Generate hedging suggestions based on portfolio
+    const hedgeList = [
+      { instrument: `NIFTY PUT ${Math.round(total * 0.9 / 50).toFixed(0)}00`, type: "Index Option", notional: `₹${(total * 0.07 / 100000).toFixed(1)} L`, delta: -0.35, purpose: "Tail risk" },
+    ];
+
+    if (beta > 1.1) {
+      hedgeList.push({ instrument: "NIFTY Futures Short", type: "Index Futures", notional: `₹${(total * 0.1 / 100000).toFixed(1)} L`, delta: -1.0, purpose: "Beta reduction" });
+    }
+
+    const highRisk = analyzed.filter(s => (s.analysis.riskScore || 0) >= 60);
+    if (highRisk.length > 0) {
+      hedgeList.push({ instrument: `${highRisk[0].ticker.replace(".NS", "")} PUT`, type: "Stock Option", notional: `₹${((highRisk[0].analysis.currentPrice || highRisk[0].buyPrice) * highRisk[0].quantity * 0.05 / 100000).toFixed(1)} L`, delta: -0.25, purpose: "Stock protection" });
+    }
+
+    const metrics = [
+      { metric: "Gross Exposure", value: `₹${(total / 100000).toFixed(1)} L` },
+      { metric: "Portfolio Beta", value: beta.toFixed(2) },
+      { metric: "Suggested Hedge Ratio", value: `${(beta > 1 ? (beta - 1) * 50 + 10 : 10).toFixed(0)}%` },
+      { metric: "Est. Hedging Cost (ann.)", value: `${(beta * 0.8).toFixed(1)}%` },
+    ];
+
+    return { hedges: hedgeList, capitalMetrics: metrics, totalValue: total, avgBeta: beta };
+  }, [analyzed]);
+
+  if (analyzed.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <p className="text-muted-foreground">Analyze stocks to see hedging strategy suggestions.</p>
       </div>
-    </div>
+    );
+  }
 
-    <div className="grid gap-6 lg:grid-cols-2">
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio Value</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹{(totalValue / 100000).toFixed(1)} L</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio Beta</p>
+          <p className={`mt-1 font-mono text-2xl font-bold ${avgBeta > 1.2 ? "text-warning" : "text-foreground"}`}>{avgBeta.toFixed(2)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Suggested Hedges</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{hedges.length}</p>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-base font-semibold text-foreground mb-4">Capital Efficiency</h3>
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Recommended Hedges</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                {["Instrument", "Type", "Notional", "Delta", "Purpose"].map(h => (
+                  <th key={h} className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hedges.map(h => (
+                <tr key={h.instrument} className="border-b border-border/50">
+                  <td className="px-2 py-2 font-mono text-xs text-foreground">{h.instrument}</td>
+                  <td className="px-2 py-2 text-xs text-muted-foreground">{h.type}</td>
+                  <td className="px-2 py-2 font-mono text-foreground">{h.notional}</td>
+                  <td className="px-2 py-2 font-mono text-foreground">{h.delta}</td>
+                  <td className="px-2 py-2 text-xs text-muted-foreground">{h.purpose}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Capital Efficiency</h3>
         <div className="space-y-2">
-          {CAPITAL_EFFICIENCY.map(c => (
+          {capitalMetrics.map(c => (
             <div key={c.metric} className="flex items-center justify-between rounded-lg bg-surface-2 p-3">
               <span className="text-sm text-muted-foreground">{c.metric}</span>
               <span className="font-mono text-sm font-bold text-foreground">{c.value}</span>
@@ -75,23 +98,8 @@ const HedgingModule = () => (
           ))}
         </div>
       </div>
-
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-base font-semibold text-foreground mb-4">Hedging Strategies</h3>
-        <div className="space-y-3">
-          {STRATEGIES.map(s => (
-            <div key={s.name} className="rounded-lg bg-surface-2 p-3">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold text-foreground">{s.name}</p>
-                <span className={`font-mono text-[10px] font-bold ${s.effectiveness === "High" ? "text-gain" : "text-warning"}`}>{s.effectiveness}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">{s.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default HedgingModule;

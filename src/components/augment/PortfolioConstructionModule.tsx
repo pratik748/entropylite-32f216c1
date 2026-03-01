@@ -1,83 +1,121 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 
-const ALLOCATIONS = [
-  { name: "Large Cap Equity", weight: 35, target: 35, color: "hsl(0, 0%, 100%)" },
-  { name: "Mid Cap Equity", weight: 18, target: 20, color: "hsl(0, 0%, 75%)" },
-  { name: "Small Cap Equity", weight: 8, target: 5, color: "hsl(0, 0%, 55%)" },
-  { name: "Government Bonds", weight: 15, target: 15, color: "hsl(0, 0%, 40%)" },
-  { name: "Corporate Bonds", weight: 10, target: 10, color: "hsl(0, 0%, 30%)" },
-  { name: "Gold / Commodities", weight: 7, target: 8, color: "hsl(0, 0%, 22%)" },
-  { name: "REITs", weight: 4, target: 4, color: "hsl(0, 0%, 15%)" },
-  { name: "Cash", weight: 3, target: 3, color: "hsl(0, 0%, 10%)" },
+interface Props { stocks: PortfolioStock[]; }
+
+const COLORS = [
+  "hsl(0, 0%, 100%)", "hsl(0, 0%, 80%)", "hsl(0, 0%, 65%)", "hsl(0, 0%, 50%)",
+  "hsl(0, 0%, 40%)", "hsl(0, 0%, 30%)", "hsl(0, 0%, 22%)", "hsl(0, 0%, 15%)",
 ];
 
-const EFFICIENT_FRONTIER = Array.from({ length: 20 }, (_, i) => ({
-  risk: 5 + i * 1.5,
-  return: 4 + Math.sqrt(i * 3) * 4 - (i > 15 ? (i - 15) * 0.5 : 0),
-}));
+const PortfolioConstructionModule = ({ stocks }: Props) => {
+  const analyzed = stocks.filter(s => s.analysis);
 
-const REBALANCE_HISTORY = [
-  { date: "2026-02-01", action: "Reduced Mid Cap by 2%", drift: 2.3 },
-  { date: "2026-01-15", action: "Added to Gold on dip", drift: 1.8 },
-  { date: "2025-12-20", action: "Tax-loss harvesting — Small Cap", drift: 3.1 },
-  { date: "2025-11-30", action: "Quarterly rebalance executed", drift: 4.2 },
-];
+  const { allocations, totalValue, sharpe, maxDrawdown, driftData } = useMemo(() => {
+    if (analyzed.length === 0) {
+      return { allocations: [], totalValue: 0, sharpe: 0, maxDrawdown: 0, driftData: [] };
+    }
 
-const PortfolioConstructionModule = () => {
-  const driftData = ALLOCATIONS.map(a => ({
-    name: a.name.split(" ").slice(0, 2).join(" "),
-    drift: a.weight - a.target,
-    fill: a.weight > a.target ? "hsl(0, 62%, 50%)" : "hsl(145, 70%, 45%)",
-  }));
+    const holdings = analyzed.map(s => {
+      const price = s.analysis.currentPrice || s.buyPrice;
+      const value = price * s.quantity;
+      const sector = s.analysis.sector || s.ticker.replace(".NS", "").replace(".BO", "");
+      return { name: s.ticker.replace(".NS", "").replace(".BO", ""), value, sector, price, buyPrice: s.buyPrice };
+    });
+
+    const total = holdings.reduce((sum, h) => sum + h.value, 0);
+    const alloc = holdings.map((h, i) => ({
+      name: h.name,
+      weight: total > 0 ? (h.value / total) * 100 : 0,
+      target: total > 0 ? 100 / holdings.length : 0, // Equal-weight target
+      color: COLORS[i % COLORS.length],
+      value: h.value,
+    }));
+
+    // Compute Sharpe from actual returns
+    const returns = holdings.map(h => (h.price - h.buyPrice) / h.buyPrice);
+    const avgReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance = returns.reduce((s, r) => s + (r - avgReturn) ** 2, 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    const riskFreeRate = 0.065; // 6.5% India risk-free
+    const annualizedReturn = avgReturn * 252;
+    const annualizedVol = stdDev * Math.sqrt(252);
+    const computedSharpe = annualizedVol > 0 ? (annualizedReturn - riskFreeRate) / annualizedVol : 0;
+
+    // Max drawdown from buy prices
+    const drawdowns = holdings.map(h => ((h.price - h.buyPrice) / h.buyPrice) * 100);
+    const worstDrawdown = Math.min(...drawdowns, 0);
+
+    const drift = alloc.map(a => ({
+      name: a.name,
+      drift: +(a.weight - a.target).toFixed(1),
+      fill: a.weight > a.target ? "hsl(0, 62%, 50%)" : "hsl(145, 70%, 45%)",
+    }));
+
+    return { allocations: alloc, totalValue: total, sharpe: computedSharpe, maxDrawdown: worstDrawdown, driftData: drift };
+  }, [analyzed]);
+
+  if (analyzed.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <p className="text-muted-foreground">Analyze stocks in the Dashboard to see real portfolio construction data.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Total AUM</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹48.7 Cr</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Portfolio Value</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹{(totalValue / 100000).toFixed(1)} L</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Portfolio Sharpe</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">1.42</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sharpe Ratio</p>
+          <p className={`mt-1 font-mono text-2xl font-bold ${sharpe >= 1 ? "text-gain" : sharpe >= 0 ? "text-foreground" : "text-loss"}`}>
+            {sharpe.toFixed(2)}
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Max Drawdown</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-loss">-12.3%</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Max Drawdown</p>
+          <p className={`mt-1 font-mono text-2xl font-bold ${maxDrawdown < -10 ? "text-loss" : maxDrawdown < -5 ? "text-warning" : "text-gain"}`}>
+            {maxDrawdown.toFixed(1)}%
+          </p>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Allocation Pie */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-base font-semibold text-foreground mb-4">Current Allocation</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Current Allocation</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={ALLOCATIONS} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={90} strokeWidth={1} stroke="hsl(0,0%,3%)">
-                  {ALLOCATIONS.map((a, i) => <Cell key={i} fill={a.color} />)}
+                <Pie data={allocations} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={90} strokeWidth={1} stroke="hsl(0,0%,3%)">
+                  {allocations.map((a, i) => <Cell key={i} fill={a.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [`${v}%`, "Weight"]} />
+                <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [`${v.toFixed(1)}%`, "Weight"]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-2 space-y-1">
-            {ALLOCATIONS.map(a => (
+            {allocations.map(a => (
               <div key={a.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: a.color }} />
                   <span className="text-muted-foreground">{a.name}</span>
                 </div>
-                <span className="font-mono text-foreground">{a.weight}%</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-foreground">{a.weight.toFixed(1)}%</span>
+                  <span className="font-mono text-muted-foreground/50 text-[10px]">₹{(a.value / 100000).toFixed(1)}L</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Drift Chart */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-base font-semibold text-foreground mb-4">Allocation Drift vs Target</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Drift vs Equal-Weight Target</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={driftData} layout="vertical" margin={{ left: 80 }}>
@@ -93,19 +131,24 @@ const PortfolioConstructionModule = () => {
         </div>
       </div>
 
-      {/* Rebalance log */}
+      {/* Rebalance suggestions */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-base font-semibold text-foreground mb-4">Rebalance History</h3>
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Rebalance Suggestions</h3>
         <div className="space-y-2">
-          {REBALANCE_HISTORY.map((r, i) => (
-            <div key={i} className="flex items-center justify-between rounded-lg bg-surface-2 p-3 text-sm">
-              <div>
-                <span className="font-mono text-xs text-muted-foreground">{r.date}</span>
-                <p className="text-foreground">{r.action}</p>
+          {driftData.filter(d => Math.abs(d.drift) > 2).map(d => (
+            <div key={d.name} className="flex items-center justify-between rounded-lg bg-surface-2 p-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                <span className="text-foreground font-medium">{d.name}</span>
               </div>
-              <span className="font-mono text-xs text-muted-foreground">Drift: {r.drift}%</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {d.drift > 0 ? `Reduce by ${d.drift.toFixed(1)}%` : `Increase by ${Math.abs(d.drift).toFixed(1)}%`}
+              </span>
             </div>
           ))}
+          {driftData.filter(d => Math.abs(d.drift) > 2).length === 0 && (
+            <p className="text-sm text-muted-foreground">Portfolio is within tolerance. No rebalancing needed.</p>
+          )}
         </div>
       </div>
     </div>

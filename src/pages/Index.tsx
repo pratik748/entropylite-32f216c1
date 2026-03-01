@@ -255,7 +255,7 @@ const Index = () => {
         {activeTab === "market" && <MarketOverview />}
 
         {/* Augment Tab */}
-        {activeTab === "augment" && <AugmentDashboard />}
+        {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
 
         {/* Watchlist Tab */}
         {activeTab === "watchlist" && <Watchlist />}

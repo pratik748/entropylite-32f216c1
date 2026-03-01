@@ -7,6 +7,24 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function fetchYahooQuote(symbol: string) {
+  const t = Date.now();
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "application/json",
+      "Cache-Control": "no-cache, no-store",
+    },
+  });
+  const data = await res.json();
+  const meta = data?.chart?.result?.[0]?.meta;
+  if (!meta) return null;
+  const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+  const currentPrice = meta.regularMarketPrice || 0;
+  return { price: currentPrice, prevClose, change: currentPrice - prevClose, changePct: prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0 };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,41 +33,35 @@ serve(async (req) => {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    // Fetch major Indian indices from Yahoo Finance
-    const indices = [
+    // Fetch major Indian indices
+    const indexSymbols = [
       { symbol: "^NSEI", name: "NIFTY 50" },
       { symbol: "^BSESN", name: "SENSEX" },
       { symbol: "^NSEBANK", name: "BANK NIFTY" },
     ];
 
-    const indexData = [];
-    for (const idx of indices) {
-      try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(idx.symbol)}?interval=1d&range=5d`;
-        const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-        const data = await res.json();
-        const meta = data?.chart?.result?.[0]?.meta;
-        const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
-        const prevClose = meta?.chartPreviousClose || meta?.previousClose || 0;
-        const currentPrice = meta?.regularMarketPrice || 0;
-        const change = currentPrice - prevClose;
-        const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+    // Fetch indices + macro data (USD/INR, Crude, VIX) in parallel
+    const [indexResults, usdInrData, crudeData, vixData, goldData] = await Promise.all([
+      Promise.all(indexSymbols.map(async (idx) => {
+        try {
+          const q = await fetchYahooQuote(idx.symbol);
+          if (!q) return null;
+          return { symbol: idx.symbol, name: idx.name, price: q.price, change: q.change, changePct: q.changePct, prevClose: q.prevClose };
+        } catch (e) {
+          console.error(`Error ${idx.symbol}:`, e);
+          return null;
+        }
+      })),
+      fetchYahooQuote("USDINR=X").catch(() => null),
+      fetchYahooQuote("BZ=F").catch(() => null),
+      fetchYahooQuote("^INDIAVIX").catch(() => null),
+      fetchYahooQuote("GC=F").catch(() => null),
+    ]);
 
-        indexData.push({
-          symbol: idx.symbol,
-          name: idx.name,
-          price: currentPrice,
-          change,
-          changePct,
-          prevClose,
-        });
-      } catch (e) {
-        console.error(`Error fetching ${idx.symbol}:`, e);
-      }
-    }
+    const indexData = indexResults.filter(Boolean);
 
     // Fetch sector indices
-    const sectors = [
+    const sectorSymbols = [
       { symbol: "^CNXIT", name: "NIFTY IT" },
       { symbol: "^CNXPHARMA", name: "NIFTY Pharma" },
       { symbol: "^CNXFMCG", name: "NIFTY FMCG" },
@@ -58,33 +70,30 @@ serve(async (req) => {
       { symbol: "^CNXREALTY", name: "NIFTY Realty" },
     ];
 
-    const sectorData = [];
-    for (const sec of sectors) {
+    const sectorResults = await Promise.all(sectorSymbols.map(async (sec) => {
       try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sec.symbol)}?interval=1d&range=1d`;
-        const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-        const data = await res.json();
-        const meta = data?.chart?.result?.[0]?.meta;
-        const prevClose = meta?.chartPreviousClose || meta?.previousClose || 0;
-        const currentPrice = meta?.regularMarketPrice || 0;
-        const change = currentPrice - prevClose;
-        const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
-
-        sectorData.push({
-          name: sec.name,
-          price: currentPrice,
-          change,
-          changePct,
-        });
+        const q = await fetchYahooQuote(sec.symbol);
+        if (!q) return null;
+        return { name: sec.name, price: q.price, change: q.change, changePct: q.changePct };
       } catch (e) {
-        console.error(`Error fetching ${sec.symbol}:`, e);
+        console.error(`Error ${sec.symbol}:`, e);
+        return null;
       }
-    }
+    }));
 
-    // Use AI for macro summary
-    let macroSummary = null;
+    const sectorData = sectorResults.filter(Boolean);
+
+    // Build macro from REAL data
+    const realUsdInr = usdInrData?.price || 0;
+    const realCrude = crudeData?.price || 0;
+    const realVix = vixData?.price || 0;
+    const realGold = goldData?.price || 0;
+
+    // Use AI only for FII/DII flows and market mood (things we can't get from Yahoo)
+    let aiMacro: any = null;
     if (LOVABLE_API_KEY) {
       try {
+        const niftyChange = indexData.find(i => i?.name === "NIFTY 50")?.changePct || 0;
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -94,26 +103,25 @@ serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-2.5-flash-lite",
             messages: [
-              { role: "system", content: "You are an Indian market analyst. Return only valid JSON." },
+              { role: "system", content: "You are an Indian market analyst. Return ONLY valid JSON, no markdown." },
               {
                 role: "user",
-                content: `Today is ${new Date().toISOString().split("T")[0]}. Provide a brief Indian market overview as JSON:
+                content: `Today is ${new Date().toISOString().split("T")[0]}. NIFTY 50 changed ${niftyChange.toFixed(2)}%. USD/INR is at ${realUsdInr.toFixed(2)}. India VIX is ${realVix.toFixed(2)}. Brent crude is $${realCrude.toFixed(2)}.
+
+Based on these REAL numbers, provide ONLY:
 {
   "marketMood": "<Bullish | Bearish | Neutral | Cautious>",
   "moodScore": <number -100 to 100>,
-  "fiiFlow": "<string e.g. 'Net buyers ₹2,300 Cr'>",
-  "diiFlow": "<string e.g. 'Net buyers ₹1,800 Cr'>",
-  "vix": <number>,
-  "usdInr": <number>,
-  "crudeBrent": <number>,
+  "fiiFlow": "<today's estimated FII flow>",
+  "diiFlow": "<today's estimated DII flow>",
   "topMovers": [{"name": "<stock>", "change": <number %>}],
   "keyEvents": ["<event1>", "<event2>", "<event3>"],
-  "outlook": "<2 sentence market outlook>"
+  "outlook": "<2 sentence market outlook based on real data>"
 }`,
               },
             ],
-            temperature: 0.5,
-            max_tokens: 800,
+            temperature: 0.3,
+            max_tokens: 600,
           }),
         });
 
@@ -121,16 +129,31 @@ serve(async (req) => {
         if (aiData.choices?.[0]?.message?.content) {
           const raw = aiData.choices[0].message.content.trim();
           const jsonStr = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-          macroSummary = JSON.parse(jsonStr);
+          aiMacro = JSON.parse(jsonStr);
         }
       } catch (e) {
         console.error("AI macro error:", e);
       }
     }
 
+    // Merge real data with AI insights
+    const macro = {
+      marketMood: aiMacro?.marketMood || "Neutral",
+      moodScore: aiMacro?.moodScore || 0,
+      fiiFlow: aiMacro?.fiiFlow || "Data unavailable",
+      diiFlow: aiMacro?.diiFlow || "Data unavailable",
+      vix: realVix,
+      usdInr: realUsdInr,
+      crudeBrent: realCrude,
+      goldPrice: realGold,
+      topMovers: aiMacro?.topMovers || [],
+      keyEvents: aiMacro?.keyEvents || [],
+      outlook: aiMacro?.outlook || "",
+    };
+
     return new Response(
-      JSON.stringify({ indices: indexData, sectors: sectorData, macro: macroSummary }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } }
+      JSON.stringify({ indices: indexData, sectors: sectorData, macro, timestamp: Date.now() }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache" } }
     );
   } catch (error) {
     console.error("Error in market-data:", error);
