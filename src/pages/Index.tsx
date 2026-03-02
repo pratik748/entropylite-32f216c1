@@ -15,7 +15,7 @@ import PortfolioPanel from "@/components/PortfolioPanel";
 import PortfolioChart from "@/components/PortfolioChart";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
-import Watchlist from "@/components/Watchlist";
+import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import TradeJournal from "@/components/TradeJournal";
 import RiskDashboard from "@/components/RiskDashboard";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
@@ -24,13 +24,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-type Tab = "dashboard" | "market" | "watchlist" | "journal" | "risk" | "augment";
+type Tab = "dashboard" | "market" | "sandbox" | "journal" | "risk" | "augment";
 
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: "market", label: "Market", icon: <Globe className="h-4 w-4" /> },
+  { id: "sandbox", label: "Sandbox", icon: <Eye className="h-4 w-4" /> },
   { id: "augment", label: "Augment", icon: <Sparkles className="h-4 w-4" /> },
-  { id: "watchlist", label: "Watchlist", icon: <Eye className="h-4 w-4" /> },
   { id: "journal", label: "Trades", icon: <BookOpen className="h-4 w-4" /> },
   { id: "risk", label: "Risk", icon: <Shield className="h-4 w-4" /> },
 ];
@@ -257,8 +257,8 @@ const Index = () => {
         {/* Augment Tab */}
         {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
 
-        {/* Watchlist Tab */}
-        {activeTab === "watchlist" && <Watchlist />}
+        {/* Sandbox Tab */}
+        {activeTab === "sandbox" && <EntropySandbox stocks={stocks} />}
 
         {/* Trade Journal Tab */}
         {activeTab === "journal" && <TradeJournal />}
