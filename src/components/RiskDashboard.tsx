@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Shield, AlertTriangle, XOctagon } from "lucide-react";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -122,7 +123,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const hhiPct = Math.round(hhi * 10000);
   const concentrationLevel = hhiPct > 5000 ? "High" : hhiPct > 2500 ? "Medium" : "Low";
 
-  const [selectedRegime, setSelectedRegime] = React.useState<"bull" | "bear">("bull");
+  const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
 
   const corrColor = (v: number) => {
     if (v >= 0.8) return "bg-loss/40 text-loss";
