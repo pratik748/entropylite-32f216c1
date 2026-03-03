@@ -1,17 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Newspaper } from "lucide-react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
 interface MarketData {
@@ -33,7 +26,7 @@ interface MarketData {
   timestamp?: number;
 }
 
-const REFRESH_INTERVAL = 15_000; // 15 seconds
+const REFRESH_INTERVAL = 15_000;
 
 const MarketOverview = () => {
   const [data, setData] = useState<MarketData | null>(null);
@@ -66,7 +59,7 @@ const MarketOverview = () => {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <span className="ml-3 text-sm text-muted-foreground">Loading live market data...</span>
       </div>
     );
@@ -94,21 +87,21 @@ const MarketOverview = () => {
   const sectorChartData = data.sectors.map((s) => ({
     name: s.name.replace("NIFTY ", ""),
     value: s.changePct,
-    fill: s.changePct >= 0 ? "hsl(145, 70%, 50%)" : "hsl(0, 72%, 55%)",
+    fill: s.changePct >= 0 ? "hsl(152, 82%, 42%)" : "hsl(0, 84%, 55%)",
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Live indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
+          <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gain" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
           </span>
           <span className="text-[10px] text-muted-foreground font-mono tracking-wider">
-            LIVE · Auto-refresh 15s
-            {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
+            LIVE · 15s refresh
+            {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
           </span>
         </div>
         <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
@@ -120,10 +113,10 @@ const MarketOverview = () => {
       {/* Indices */}
       <div className="grid gap-3 md:grid-cols-3">
         {data.indices.map((idx) => (
-          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/20">
+          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20 hover:glow-primary">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{idx.name}</p>
             <p className="mt-1.5 font-mono text-2xl font-bold text-foreground tabular-nums">
-              {idx.price.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              {idx.price.toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </p>
             <div className={`mt-1.5 flex items-center gap-1.5 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
               {idx.change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
@@ -135,7 +128,7 @@ const MarketOverview = () => {
         ))}
       </div>
 
-      {/* Key Macro Metrics Bar */}
+      {/* Key Macro Metrics */}
       {data.macro && (
         <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
           <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `₹${data.macro.usdInr.toFixed(2)}` : "—"} />
@@ -180,7 +173,7 @@ const MarketOverview = () => {
             <div className="space-y-2 mb-4">
               {data.macro.keyEvents?.map((event, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
-                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-foreground/50" />
+                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary/50" />
                   {event}
                 </div>
               ))}
@@ -202,29 +195,10 @@ const MarketOverview = () => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 11 }}
-                  axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
-                  tickFormatter={(v) => `${v.toFixed(1)}%`}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 11 }}
-                  axisLine={{ stroke: "hsl(0, 0%, 14%)" }}
-                  width={55}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(0, 0%, 6%)",
-                    border: "1px solid hsl(0, 0%, 14%)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(v: number) => [`${v.toFixed(2)}%`, "Change"]}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 13%)" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "hsl(210, 8%, 45%)", fontSize: 11 }} axisLine={{ stroke: "hsl(220, 12%, 13%)" }} tickFormatter={(v) => `${v.toFixed(1)}%`} />
+                <YAxis dataKey="name" type="category" tick={{ fill: "hsl(210, 8%, 45%)", fontSize: 11 }} axisLine={{ stroke: "hsl(220, 12%, 13%)" }} width={55} />
+                <Tooltip contentStyle={{ background: "hsl(220, 14%, 7%)", border: "1px solid hsl(220, 12%, 13%)", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v.toFixed(2)}%`, "Change"]} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {sectorChartData.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
@@ -236,14 +210,14 @@ const MarketOverview = () => {
         </div>
       )}
 
-      {/* Live News Feed for entire market */}
+      {/* Live News Feed */}
       <LiveNewsFeed />
     </div>
   );
 };
 
 const MacroCard = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-  <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-foreground/20">
+  <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/20">
     <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
       {icon}
       <span className="text-[10px] uppercase tracking-wider">{label}</span>

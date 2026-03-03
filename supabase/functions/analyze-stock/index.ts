@@ -23,7 +23,6 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
     if (!LOVABLE_API_KEY) {
       return new Response(
         JSON.stringify({ error: "AI API key not configured" }),
@@ -31,17 +30,28 @@ serve(async (req) => {
       );
     }
 
-    // 1. Fetch current stock price from Yahoo Finance with cache busting
-    let currentPrice = 0;
-    const suffixes = [".NS", ".BO"];
-    const baseTicker = ticker.replace(".NS", "").replace(".BO", "").replace(".BSE", "");
+    // Determine asset type and Yahoo symbol
     const t = Date.now();
+    let currentPrice = 0;
+    let currency = "USD";
+    
+    // Detect asset class from ticker format
+    const isIndian = ticker.endsWith(".NS") || ticker.endsWith(".BO");
+    const isCrypto = ticker.includes("-USD") || ticker.includes("-EUR");
+    const isForex = ticker.includes("=X");
+    const isCommodity = ticker.includes("=F");
+    
+    if (isIndian) currency = "INR";
 
-    for (const suffix of suffixes) {
+    // Try fetching from Yahoo Finance — supports all global assets
+    const symbolsToTry = isIndian 
+      ? [ticker, ticker.replace(".NS", ".BO"), ticker.replace(".BO", ".NS")]
+      : [ticker];
+
+    for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
       try {
-        const symbol = `${baseTicker}${suffix}`;
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d&_t=${t}`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
         const yahooRes = await fetch(yahooUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -52,62 +62,70 @@ serve(async (req) => {
         const meta = yahooData?.chart?.result?.[0]?.meta;
         if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
           currentPrice = meta.regularMarketPrice;
+          currency = meta.currency || currency;
         }
       } catch (e) {
-        console.error(`Yahoo Finance error for ${baseTicker}${suffix}:`, e);
+        console.error(`Yahoo error for ${symbol}:`, e);
       }
     }
 
-    // 2. Use Lovable AI for comprehensive analysis
-    const prompt = `You are a senior Indian equity research analyst with access to the latest market data. Today's date is ${new Date().toISOString().split('T')[0]}. Analyze the stock "${ticker}" for an investor who bought at ₹${buyPrice} with ${quantity} shares.
-${currentPrice > 0 ? `The current market price is ₹${currentPrice}.` : "Current price data is unavailable — estimate based on your most recent knowledge."}
+    const currencySymbol = currency === "INR" ? "₹" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "$";
 
-IMPORTANT: Provide REAL analysis based on actual recent events, earnings, and macro conditions.
+    const prompt = `You are a senior global investment research analyst. Today is ${new Date().toISOString().split('T')[0]}. 
+Analyze the asset "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
+${currentPrice > 0 ? `Current market price: ${currencySymbol}${currentPrice}. Currency: ${currency}.` : "Price unavailable — use latest knowledge."}
 
-Return a JSON object with EXACTLY this structure (no markdown, no code fences, just raw JSON):
+Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity" : "Global equity"}
+
+IMPORTANT: Provide REAL analysis based on actual recent events, earnings, and macro conditions globally.
+
+Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
   "currentPrice": <number>,
+  "currency": "${currency}",
   "riskLevel": "<High | Medium | Low>",
-  "riskScore": <number 0-100>,
+  "riskScore": <0-100>,
   "riskBreakdown": {
-    "volatilityRisk": <number 0-100>,
-    "sectorRisk": <number 0-100>,
-    "regulatoryRisk": <number 0-100>,
-    "financialRisk": <number 0-100>,
-    "macroRisk": <number 0-100>
+    "volatilityRisk": <0-100>,
+    "sectorRisk": <0-100>,
+    "regulatoryRisk": <0-100>,
+    "financialRisk": <0-100>,
+    "macroRisk": <0-100>
   },
   "keyRisks": ["<risk1>", "<risk2>", "<risk3>", "<risk4>"],
   "bullRange": [<lower>, <upper>],
   "neutralRange": [<lower>, <upper>],
   "bearRange": [<lower>, <upper>],
   "suggestion": "<Hold | Add | Exit>",
-  "confidence": <number 0-100>,
+  "confidence": <0-100>,
   "confidenceReasoning": "<1-2 sentence explanation>",
   "summary": "<3-4 sentence analysis>",
   "macroFactors": ["<factor1>", "<factor2>"],
-  "overallSentiment": <number -100 to 100>,
+  "overallSentiment": <-100 to 100>,
   "totalPressure": <number>,
-  "sector": "<sector name like Financials, IT, Energy, Consumer, Pharma, Auto, Metals, Realty>",
-  "marketCap": "<Large Cap | Mid Cap | Small Cap>",
-  "pe": <number P/E ratio>,
-  "pbv": <number P/BV ratio>,
-  "dividendYield": <number %>,
+  "sector": "<sector name>",
+  "assetClass": "<Equity | Crypto | Forex | Commodity | ETF>",
+  "exchange": "<exchange name>",
+  "marketCap": "<Large Cap | Mid Cap | Small Cap | N/A>",
+  "pe": <number or null>,
+  "pbv": <number or null>,
+  "dividendYield": <number or null>,
   "beta": <number>,
-  "esgScore": <number 0-100 or null>,
+  "esgScore": <0-100 or null>,
   "news": [
     {
       "headline": "<real recent headline>",
       "category": "<Company | Sector | Macro | Competitor>",
-      "sentiment": <number -100 to 100>,
-      "shortTermImpact": <number %>,
-      "longTermImpact": <number %>,
-      "confidence": <number 0-100>,
+      "sentiment": <-100 to 100>,
+      "shortTermImpact": <% number>,
+      "longTermImpact": <% number>,
+      "confidence": <0-100>,
       "explanation": "<1 sentence>"
     }
   ]
 }
 
-Include 5-7 news items. Use REAL recent Indian market data. All prices in INR.`;
+Include 5-7 news items. Use REAL recent market data.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -121,8 +139,8 @@ Include 5-7 news items. Use REAL recent Indian market data. All prices in INR.`;
           { role: "system", content: "You are a financial analyst. Return only valid JSON, no markdown." },
           { role: "user", content: prompt },
         ],
-        temperature: 0.5,
-        max_tokens: 2500,
+        temperature: 0.4,
+        max_tokens: 3000,
       }),
     });
 
@@ -140,9 +158,11 @@ Include 5-7 news items. Use REAL recent Indian market data. All prices in INR.`;
     const jsonStr = rawContent.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
     const analysis = JSON.parse(jsonStr);
 
+    // Override with real Yahoo price
     if (currentPrice > 0) {
       analysis.currentPrice = currentPrice;
     }
+    analysis.currency = currency;
 
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },

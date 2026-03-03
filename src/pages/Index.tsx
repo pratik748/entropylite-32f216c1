@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Activity, LayoutDashboard, Eye, BookOpen, Shield, Globe, Sparkles } from "lucide-react";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
@@ -27,12 +27,12 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 type Tab = "dashboard" | "market" | "sandbox" | "journal" | "risk" | "augment";
 
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { id: "market", label: "Market", icon: <Globe className="h-4 w-4" /> },
-  { id: "sandbox", label: "Sandbox", icon: <Eye className="h-4 w-4" /> },
-  { id: "augment", label: "Augment", icon: <Sparkles className="h-4 w-4" /> },
-  { id: "journal", label: "Trades", icon: <BookOpen className="h-4 w-4" /> },
-  { id: "risk", label: "Risk", icon: <Shield className="h-4 w-4" /> },
+  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
+  { id: "market", label: "Market", icon: <Globe className="h-3.5 w-3.5" /> },
+  { id: "sandbox", label: "Sandbox", icon: <Eye className="h-3.5 w-3.5" /> },
+  { id: "augment", label: "Augment", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: "journal", label: "Trades", icon: <BookOpen className="h-3.5 w-3.5" /> },
+  { id: "risk", label: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
 ];
 
 const Index = () => {
@@ -40,10 +40,52 @@ const Index = () => {
   const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
+  const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
   const analysis = activeStock?.analysis ?? null;
+
+  // Real-time price streaming via polling every 10s
+  useEffect(() => {
+    const refreshPrices = async () => {
+      const analyzed = stocks.filter(s => s.analysis && !s.isLoading);
+      if (analyzed.length === 0) return;
+
+      const t = Date.now();
+      const updates: Record<string, number> = {};
+
+      await Promise.allSettled(
+        analyzed.map(async (stock) => {
+          try {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.ticker)}?interval=1d&range=1d&_t=${t}`;
+            const res = await fetch(url, {
+              headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" },
+            });
+            const data = await res.json();
+            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+            if (price && price > 0) {
+              updates[stock.id] = price;
+            }
+          } catch { /* silent */ }
+        })
+      );
+
+      if (Object.keys(updates).length > 0) {
+        setStocks(prev => prev.map(s => {
+          if (updates[s.id] && s.analysis) {
+            return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
+          }
+          return s;
+        }));
+      }
+    };
+
+    priceIntervalRef.current = setInterval(refreshPrices, 10000);
+    return () => {
+      if (priceIntervalRef.current) clearInterval(priceIntervalRef.current);
+    };
+  }, [stocks.length]);
 
   const analyzeStock = useCallback(
     async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
@@ -85,7 +127,7 @@ const Index = () => {
         );
         toast({
           title: "Analysis Failed",
-          description: err.message || "Could not analyze stock. Please try again.",
+          description: err.message || "Could not analyze. Please try again.",
           variant: "destructive",
         });
       }
@@ -129,30 +171,37 @@ const Index = () => {
       <Header />
 
       {/* Tab Navigation */}
-      <nav className="border-b border-border bg-surface-1 sticky top-0 z-30">
-        <div className="container flex items-center gap-1 overflow-x-auto py-1">
+      <nav className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30">
+        <div className="container flex items-center gap-0.5 overflow-x-auto py-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  ? "bg-primary/10 text-primary border border-primary/20"
+                  : "text-muted-foreground hover:bg-surface-2 hover:text-foreground border border-transparent"
               }`}
             >
               {tab.icon}
               {tab.label}
             </button>
           ))}
+          <div className="ml-auto flex items-center gap-2 pl-4">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
+            </span>
+            <span className="text-[9px] font-mono text-muted-foreground">LIVE · 10s tick</span>
+          </div>
         </div>
       </nav>
 
       <main className="container py-6">
         {/* Dashboard Tab */}
         {activeTab === "dashboard" && (
-          <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-            <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+            <div className="space-y-5">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
 
               {stocks.length > 0 && (
@@ -190,16 +239,16 @@ const Index = () => {
               <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-5">
               {!isLoading && !analysis && (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-24 animate-fade-in">
-                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2">
-                    <Activity className="h-8 w-8 text-foreground" />
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <Activity className="h-7 w-7 text-primary" />
                   </div>
-                  <h2 className="mb-2 text-lg font-semibold text-foreground">No Analysis Yet</h2>
-                  <p className="max-w-sm text-center text-sm text-muted-foreground">
-                    Enter an Indian stock ticker with your buy price and quantity to get
-                    AI-powered news analysis, risk assessment, and price simulations.
+                  <h2 className="mb-2 text-lg font-semibold text-foreground">Ready to Analyze</h2>
+                  <p className="max-w-md text-center text-sm text-muted-foreground">
+                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), 
+                    or commodities (GC=F) — for AI-powered deep analysis with real-time pricing.
                   </p>
                 </div>
               )}
@@ -230,7 +279,7 @@ const Index = () => {
 
                   <LiveNewsFeed ticker={analysis.ticker} />
 
-                  <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="grid gap-5 lg:grid-cols-2">
                     <SimulationTable
                       currentPrice={analysis.currentPrice}
                       bullRange={analysis.bullRange}
@@ -251,19 +300,10 @@ const Index = () => {
           </div>
         )}
 
-        {/* Market Overview Tab */}
         {activeTab === "market" && <MarketOverview />}
-
-        {/* Augment Tab */}
         {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
-
-        {/* Sandbox Tab */}
         {activeTab === "sandbox" && <EntropySandbox stocks={stocks} />}
-
-        {/* Trade Journal Tab */}
         {activeTab === "journal" && <TradeJournal />}
-
-        {/* Risk Dashboard Tab */}
         {activeTab === "risk" && <RiskDashboard stocks={stocks} />}
       </main>
     </div>
