@@ -720,11 +720,30 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
                     <MapPin className="h-2 w-2" /> {evt.nearTradeHub} ({evt.distanceKm}km)
                   </p>
                 )}
-                {selectedConflict?.name === evt.name && evt.affectedAssets?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border/30">
-                    {evt.affectedAssets.map(a => (
-                      <span key={a} className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss">{a}</span>
-                    ))}
+                {selectedConflict?.name === evt.name && (
+                  <div className="mt-2 pt-2 border-t border-border/30 space-y-1.5">
+                    {evt.escalationProb !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] text-muted-foreground">Escalation:</span>
+                        <div className="flex-1 h-1 rounded-full bg-surface-3 overflow-hidden">
+                          <div className="h-full rounded-full bg-loss" style={{ width: `${evt.escalationProb * 100}%` }} />
+                        </div>
+                        <span className="text-[8px] font-mono text-loss">{(evt.escalationProb * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                    {evt.actionableIntel && (
+                      <div className="rounded bg-primary/5 border border-primary/10 px-2 py-1.5">
+                        <p className="text-[8px] text-primary font-bold uppercase mb-0.5">Action</p>
+                        <p className="text-[9px] text-foreground">{evt.actionableIntel}</p>
+                      </div>
+                    )}
+                    {evt.affectedAssets?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {evt.affectedAssets.map(a => (
+                          <span key={a} className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss">{a}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
