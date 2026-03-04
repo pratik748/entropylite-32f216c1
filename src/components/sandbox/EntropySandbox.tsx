@@ -40,6 +40,7 @@ const EntropySandbox = ({ stocks }: Props) => {
     switch (activeSection) {
       case "strategy": return <StrategyLab stocks={stocks} />;
       case "montecarlo": return <MonteCarloEngine stocks={stocks} />;
+      case "causal": return <CausalEffectsEngine stocks={stocks} />;
       case "aftermath": return <AftermathMatrix stocks={stocks} />;
       case "intelligence": return <IntelligenceLayers stocks={stocks} />;
       case "crown": return <CrownLayer stocks={stocks} />;
