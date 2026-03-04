@@ -125,7 +125,7 @@ const Index = () => {
       <Header />
 
       {/* Tab Navigation — Apple aesthetic */}
-      <nav className="border-b border-border/30 sticky top-0 z-30 bg-background/80 backdrop-blur-2xl">
+      <nav className="border-b border-border/30 sticky top-0 z-30 glass-panel">
         <div className="container flex items-center gap-0.5 overflow-x-auto py-1.5 scrollbar-hide">
           {tabs.map((tab) => (
             <button
