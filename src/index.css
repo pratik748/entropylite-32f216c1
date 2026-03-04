@@ -121,7 +121,7 @@
     --glass-bg: 0 0% 6% / 0.65;
     --glass-border: 0 0% 100% / 0.1;
     --glass-highlight: 0 0% 100% / 0.12;
-    --glass-refraction: 30 70% 65% / 0.05;
+    --glass-refraction: 217 70% 65% / 0.05;
 
     --glow-primary: 0 0 35px hsl(30 100% 60% / 0.2);
     --glow-gain: 0 0 30px hsl(145 80% 50% / 0.18);
