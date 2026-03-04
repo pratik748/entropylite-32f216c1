@@ -124,30 +124,30 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Tab Navigation — mobile optimized */}
-      <nav className="border-b border-border glass-panel sticky top-0 z-30">
-        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
+      {/* Tab Navigation — Apple aesthetic */}
+      <nav className="border-b border-border/30 sticky top-0 z-30 glass-panel">
+        <div className="container flex items-center gap-0.5 overflow-x-auto py-1.5 scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-2 text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+              className={`group flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-300 whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
-                  ? "glass-subtle glass-glow-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground border border-transparent"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground/80"
               }`}
             >
-              {tab.icon}
+              <span className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-105'}`}>{tab.icon}</span>
               <span className="hidden sm:inline">{tab.label}</span>
               <span className="sm:hidden">{tab.shortLabel}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
+          <div className="ml-auto flex items-center gap-2 pl-3 flex-shrink-0">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gain" />
             </span>
-            <span className="text-[8px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
+            <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">LIVE</span>
           </div>
         </div>
       </nav>
@@ -169,13 +169,13 @@ const Index = () => {
             </div>
             <div className="space-y-4 sm:space-y-5">
               {!isLoading && !analysis && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 sm:py-24 animate-fade-in">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <Activity className="h-7 w-7 text-primary" />
+              <div className="flex flex-col items-center justify-center rounded-2xl glass-card py-20 sm:py-28 apple-appear">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/8 ring-1 ring-primary/10">
+                    <Activity className="h-7 w-7 text-primary/80" />
                   </div>
-                  <h2 className="mb-2 text-base sm:text-lg font-semibold text-foreground">Ready to Analyze</h2>
-                  <p className="max-w-md text-center text-xs sm:text-sm text-muted-foreground px-4">
-                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for deep analysis with real-time pricing.
+                  <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">Ready to Analyze</h2>
+                  <p className="max-w-sm text-center text-[13px] leading-relaxed text-muted-foreground px-6">
+                    Enter any global asset — stocks, crypto, forex, or commodities — for deep intelligence with real-time pricing.
                   </p>
                 </div>
               )}

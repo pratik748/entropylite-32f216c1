@@ -35,7 +35,7 @@ const StockInput = ({ onAnalyze, isLoading }: StockInputProps) => {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
+    <div className="glass-card rounded-2xl p-5 animate-slide-up">
       <div className="mb-4 flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
           <TrendingUp className="h-3.5 w-3.5 text-primary" />
