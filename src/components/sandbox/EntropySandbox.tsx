@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio,
+  Activity, TrendingUp, Layers, Radio, GitBranch,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StrategyLab from "./StrategyLab";
@@ -12,6 +12,7 @@ import ExecutionEngine from "./ExecutionEngine";
 import PortfolioCommandCenter from "./PortfolioCommandCenter";
 import ScarMemory from "./ScarMemory";
 import CrownLayer from "./CrownLayer";
+import CausalEffectsEngine from "./CausalEffectsEngine";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -20,6 +21,7 @@ interface Props {
 const sections = [
   { id: "strategy", label: "Strategy Lab", icon: Brain, desc: "Auto-generated strategies ranked by Sharpe, drawdown, reflexivity" },
   { id: "montecarlo", label: "Scenario Engine", icon: Activity, desc: "10K-path Monte Carlo with tail risk, CVaR, ruin probability" },
+  { id: "causal", label: "Causal Effects", icon: GitBranch, desc: "2nd & 3rd order effects engine with reflexivity feedback loops" },
   { id: "aftermath", label: "Aftermath Matrix", icon: Crosshair, desc: "Simulate your own market impact before execution" },
   { id: "intelligence", label: "Deep Intelligence", icon: Radio, desc: "Management DNA, Capital Flow, Narrative, Structural Risk" },
   { id: "crown", label: "Risk→Profit", icon: TrendingUp, desc: "Convert risk signals into actionable $$ opportunities" },
@@ -38,6 +40,7 @@ const EntropySandbox = ({ stocks }: Props) => {
     switch (activeSection) {
       case "strategy": return <StrategyLab stocks={stocks} />;
       case "montecarlo": return <MonteCarloEngine stocks={stocks} />;
+      case "causal": return <CausalEffectsEngine stocks={stocks} />;
       case "aftermath": return <AftermathMatrix stocks={stocks} />;
       case "intelligence": return <IntelligenceLayers stocks={stocks} />;
       case "crown": return <CrownLayer stocks={stocks} />;
@@ -50,10 +53,10 @@ const EntropySandbox = ({ stocks }: Props) => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground">
-            <Zap className="h-5 w-5 text-background" />
+      <div className="glass-panel rounded-xl p-5 relative">
+        <div className="flex items-center gap-3 mb-1 relative z-10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+            <Zap className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Entropy Simulation Sandbox</h2>
@@ -65,8 +68,8 @@ const EntropySandbox = ({ stocks }: Props) => {
       </div>
 
       {/* Section Selector */}
-      <div className="rounded-xl border border-border bg-card p-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+      <div className="glass-panel rounded-xl p-3 relative">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 relative z-10">
           {sections.map((s) => {
             const Icon = s.icon;
             const active = activeSection === s.id;
@@ -76,15 +79,15 @@ const EntropySandbox = ({ stocks }: Props) => {
                 onClick={() => setActiveSection(s.id)}
                 className={`group flex flex-col items-start rounded-lg px-3 py-2.5 text-left transition-all ${
                   active
-                    ? "bg-foreground text-background"
-                    : "bg-surface-2 text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    ? "glass-panel glass-glow-primary text-foreground"
+                    : "glass-subtle text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <Icon className="h-3.5 w-3.5" />
                   <span className="text-xs font-semibold">{s.label}</span>
                 </div>
-                <span className={`text-[9px] leading-tight ${active ? "text-background/70" : "text-muted-foreground/60"}`}>
+                <span className={`text-[9px] leading-tight ${active ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
                   {s.desc}
                 </span>
               </button>

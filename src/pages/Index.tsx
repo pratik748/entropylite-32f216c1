@@ -125,16 +125,16 @@ const Index = () => {
       <Header />
 
       {/* Tab Navigation — mobile optimized */}
-      <nav className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide">
+      <nav className="border-b border-border glass-panel sticky top-0 z-30">
+        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-2 text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "text-muted-foreground hover:bg-surface-2 hover:text-foreground border border-transparent"
+                  ? "glass-subtle glass-glow-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground border border-transparent"
               }`}
             >
               {tab.icon}
