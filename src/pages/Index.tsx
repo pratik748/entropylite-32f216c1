@@ -169,13 +169,13 @@ const Index = () => {
             </div>
             <div className="space-y-4 sm:space-y-5">
               {!isLoading && !analysis && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 sm:py-24 animate-fade-in">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <Activity className="h-7 w-7 text-primary" />
+              <div className="flex flex-col items-center justify-center rounded-2xl glass-card py-20 sm:py-28 apple-appear">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/8 ring-1 ring-primary/10">
+                    <Activity className="h-7 w-7 text-primary/80" />
                   </div>
-                  <h2 className="mb-2 text-base sm:text-lg font-semibold text-foreground">Ready to Analyze</h2>
-                  <p className="max-w-md text-center text-xs sm:text-sm text-muted-foreground px-4">
-                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for deep analysis with real-time pricing.
+                  <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">Ready to Analyze</h2>
+                  <p className="max-w-sm text-center text-[13px] leading-relaxed text-muted-foreground px-6">
+                    Enter any global asset — stocks, crypto, forex, or commodities — for deep intelligence with real-time pricing.
                   </p>
                 </div>
               )}
