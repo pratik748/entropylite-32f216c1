@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Activity, LayoutDashboard, Eye, BookOpen, Shield, Globe, Sparkles } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target } from "lucide-react";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import StockSummary from "@/components/StockSummary";
@@ -16,7 +16,8 @@ import PortfolioChart from "@/components/PortfolioChart";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
-import TradeJournal from "@/components/TradeJournal";
+import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
+import DesirableAssets from "@/components/DesirableAssets";
 import RiskDashboard from "@/components/RiskDashboard";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -24,14 +25,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-type Tab = "dashboard" | "market" | "sandbox" | "journal" | "risk" | "augment";
+type Tab = "dashboard" | "market" | "sandbox" | "augment" | "geopolitical" | "desirable" | "risk";
 
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { id: "market", label: "Market", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "augment", label: "Augment", icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { id: "journal", label: "Trades", icon: <BookOpen className="h-3.5 w-3.5" /> },
+  { id: "geopolitical", label: "Geopolitics", icon: <Globe className="h-3.5 w-3.5" /> },
+  { id: "desirable", label: "Desirable", icon: <Target className="h-3.5 w-3.5" /> },
   { id: "risk", label: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
 ];
 
@@ -51,85 +53,46 @@ const Index = () => {
     const refreshPrices = async () => {
       const analyzed = stocks.filter(s => s.analysis && !s.isLoading);
       if (analyzed.length === 0) return;
-
       const t = Date.now();
       const updates: Record<string, number> = {};
-
       await Promise.allSettled(
         analyzed.map(async (stock) => {
           try {
             const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.ticker)}?interval=1d&range=1d&_t=${t}`;
-            const res = await fetch(url, {
-              headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" },
-            });
+            const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" } });
             const data = await res.json();
             const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if (price && price > 0) {
-              updates[stock.id] = price;
-            }
+            if (price && price > 0) updates[stock.id] = price;
           } catch { /* silent */ }
         })
       );
-
       if (Object.keys(updates).length > 0) {
         setStocks(prev => prev.map(s => {
-          if (updates[s.id] && s.analysis) {
-            return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
-          }
+          if (updates[s.id] && s.analysis) return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
           return s;
         }));
       }
     };
-
     priceIntervalRef.current = setInterval(refreshPrices, 10000);
-    return () => {
-      if (priceIntervalRef.current) clearInterval(priceIntervalRef.current);
-    };
+    return () => { if (priceIntervalRef.current) clearInterval(priceIntervalRef.current); };
   }, [stocks.length]);
 
   const analyzeStock = useCallback(
     async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
-      setStocks((prev) =>
-        prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s))
-      );
-
+      setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s)));
       try {
-        const { data, error } = await supabase.functions.invoke("analyze-stock", {
-          body: { ticker, buyPrice, quantity },
-        });
-
+        const { data, error } = await supabase.functions.invoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
         if (error) throw error;
-
         const analysisData = { ...data, ticker, buyPrice, quantity };
-
-        setStocks((prev) =>
-          prev.map((s) =>
-            s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s
-          )
-        );
-
+        setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));
         setHistory((prev) => [
-          {
-            id: crypto.randomUUID(),
-            ticker,
-            timestamp: Date.now(),
-            suggestion: data.suggestion,
-            currentPrice: data.currentPrice,
-            buyPrice,
-            confidence: data.confidence,
-          },
+          { id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence },
           ...prev.slice(0, 49),
         ]);
       } catch (err: any) {
         console.error("Analysis error:", err);
-        setStocks((prev) =>
-          prev.map((s) => (s.id === stockId ? { ...s, isLoading: false } : s))
-        );
-        toast({
-          title: "Analysis Failed",
-          description: err.message || "Could not analyze. Please try again.",
-          variant: "destructive",
-        });
+        setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false } : s)));
+        toast({ title: "Analysis Failed", description: err.message || "Could not analyze.", variant: "destructive" });
       }
     },
     [setStocks, setHistory]
@@ -137,22 +100,13 @@ const Index = () => {
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
     const existing = stocks.find((s) => s.ticker === ticker.toUpperCase());
-
     if (existing) {
-      setStocks((prev) =>
-        prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s))
-      );
+      setStocks((prev) => prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s)));
       setActiveStockId(existing.id);
       analyzeStock(existing.id, ticker.toUpperCase(), buyPrice, quantity);
     } else {
       const newId = crypto.randomUUID();
-      const newStock: PortfolioStock = {
-        id: newId,
-        ticker: ticker.toUpperCase(),
-        buyPrice,
-        quantity,
-        isLoading: false,
-      };
+      const newStock: PortfolioStock = { id: newId, ticker: ticker.toUpperCase(), buyPrice, quantity, isLoading: false };
       setStocks((prev) => [...prev, newStock]);
       setActiveStockId(newId);
       analyzeStock(newId, ticker.toUpperCase(), buyPrice, quantity);
@@ -161,9 +115,7 @@ const Index = () => {
 
   const handleRemoveStock = (id: string) => {
     setStocks((prev) => prev.filter((s) => s.id !== id));
-    if (activeStockId === id) {
-      setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
-    }
+    if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
   };
 
   return (
@@ -198,47 +150,20 @@ const Index = () => {
       </nav>
 
       <main className="container py-6">
-        {/* Dashboard Tab */}
         {activeTab === "dashboard" && (
           <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
             <div className="space-y-5">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-
               {stocks.length > 0 && (
-                <PortfolioPanel
-                  stocks={stocks}
-                  activeStockId={activeStockId}
-                  onSelectStock={setActiveStockId}
-                  onRemoveStock={handleRemoveStock}
-                  onAddNew={() => setActiveStockId(null)}
-                />
+                <PortfolioPanel stocks={stocks} activeStockId={activeStockId} onSelectStock={setActiveStockId} onRemoveStock={handleRemoveStock} onAddNew={() => setActiveStockId(null)} />
               )}
-
-              {stocks.filter((s) => s.analysis).length > 1 && (
-                <PortfolioChart stocks={stocks} />
-              )}
-
+              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
+              {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
               {analysis && (
-                <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
+                <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
               )}
-
-              {analysis && (
-                <ProfitTaskbar
-                  ticker={analysis.ticker}
-                  currentPrice={analysis.currentPrice}
-                  buyPrice={analysis.buyPrice}
-                  quantity={analysis.quantity}
-                  suggestion={analysis.suggestion}
-                  confidence={analysis.confidence}
-                  bullRange={analysis.bullRange}
-                  bearRange={analysis.bearRange}
-                  riskLevel={analysis.riskLevel}
-                />
-              )}
-
               <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
             </div>
-
             <div className="space-y-5">
               {!isLoading && !analysis && (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-24 animate-fade-in">
@@ -247,52 +172,20 @@ const Index = () => {
                   </div>
                   <h2 className="mb-2 text-lg font-semibold text-foreground">Ready to Analyze</h2>
                   <p className="max-w-md text-center text-sm text-muted-foreground">
-                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), 
-                    or commodities (GC=F) — for AI-powered deep analysis with real-time pricing.
+                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for AI-powered deep analysis with real-time pricing.
                   </p>
                 </div>
               )}
-
               {isLoading && <LoadingState />}
-
               {analysis && !isLoading && (
                 <>
-                  <StockSummary
-                    ticker={analysis.ticker}
-                    currentPrice={analysis.currentPrice}
-                    buyPrice={analysis.buyPrice}
-                    quantity={analysis.quantity}
-                  />
-
-                  <MonteCarloChart
-                    currentPrice={analysis.currentPrice}
-                    bullRange={analysis.bullRange}
-                    bearRange={analysis.bearRange}
-                    ticker={analysis.ticker}
-                  />
-
-                  <NewsImpactTable
-                    news={analysis.news || []}
-                    overallSentiment={analysis.overallSentiment}
-                    totalPressure={analysis.totalPressure}
-                  />
-
+                  <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} />
+                  <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
+                  <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
                   <LiveNewsFeed ticker={analysis.ticker} />
-
                   <div className="grid gap-5 lg:grid-cols-2">
-                    <SimulationTable
-                      currentPrice={analysis.currentPrice}
-                      bullRange={analysis.bullRange}
-                      neutralRange={analysis.neutralRange}
-                      bearRange={analysis.bearRange}
-                    />
-                    <Recommendation
-                      summary={analysis.summary}
-                      suggestion={analysis.suggestion}
-                      confidence={analysis.confidence}
-                      confidenceReasoning={analysis.confidenceReasoning}
-                      macroFactors={analysis.macroFactors}
-                    />
+                    <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} />
+                    <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   </div>
                 </>
               )}
@@ -303,7 +196,8 @@ const Index = () => {
         {activeTab === "market" && <MarketOverview />}
         {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
         {activeTab === "sandbox" && <EntropySandbox stocks={stocks} />}
-        {activeTab === "journal" && <TradeJournal />}
+        {activeTab === "geopolitical" && <GeopoliticalGlobe stocks={stocks} />}
+        {activeTab === "desirable" && <DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} />}
         {activeTab === "risk" && <RiskDashboard stocks={stocks} />}
       </main>
     </div>
