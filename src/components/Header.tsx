@@ -23,8 +23,8 @@ const Header = () => {
   };
 
   return (
-    <header className="border-b border-border bg-background">
-      <div className="container flex h-14 items-center justify-between">
+    <header className="border-b border-border glass-panel relative">
+      <div className="container flex h-14 items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
           <img alt="Entropy" className="h-9 object-contain" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
           <div className="hidden md:flex items-center gap-3 ml-4">
