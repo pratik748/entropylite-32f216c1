@@ -6,7 +6,74 @@
 
 @layer base {
   :root {
-    /* Apple-inspired warm dark palette */
+    /* Light Mode — Clean Apple white */
+    --background: 0 0% 99%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 30 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 40%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 8%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 92%;
+    --ring: 30 100% 50%;
+
+    --radius: 1rem;
+
+    /* Custom tokens */
+    --gain: 145 72% 40%;
+    --loss: 0 78% 50%;
+    --warning: 38 92% 50%;
+    --info: 210 80% 55%;
+
+    --sentiment-positive: 145 72% 40%;
+    --sentiment-negative: 0 78% 50%;
+    --sentiment-neutral: 38 92% 50%;
+
+    --surface-1: 0 0% 97%;
+    --surface-2: 0 0% 94%;
+    --surface-3: 0 0% 90%;
+
+    /* Liquid Glass — light mode */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 0 0% 0% / 0.08;
+    --glass-highlight: 0 0% 100% / 0.9;
+    --glass-refraction: 30 60% 70% / 0.06;
+
+    --glow-primary: 0 0 30px hsl(30 100% 50% / 0.15);
+    --glow-gain: 0 0 25px hsl(145 72% 40% / 0.15);
+    --glow-loss: 0 0 25px hsl(0 78% 50% / 0.15);
+    --glow-glass: 0 0 60px hsl(30 80% 60% / 0.06), inset 0 0.5px 0 hsl(0 0% 100% / 0.8);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 40%;
+    --sidebar-primary: 30 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 30 100% 50%;
+  }
+
+  .dark {
+    /* Dark Mode — Vibrant Apple dark */
     --background: 0 0% 0%;
     --foreground: 0 0% 98%;
 
@@ -16,7 +83,7 @@
     --popover: 0 0% 6%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 30 100% 64%;
+    --primary: 30 100% 60%;
     --primary-foreground: 0 0% 2%;
 
     --secondary: 0 0% 10%;
@@ -31,45 +98,44 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 12%;
+    --border: 0 0% 14%;
     --input: 0 0% 9%;
-    --ring: 30 100% 64%;
+    --ring: 30 100% 60%;
 
     --radius: 1rem;
 
-    /* Custom tokens */
-    --gain: 145 72% 46%;
-    --loss: 0 78% 55%;
-    --warning: 38 92% 55%;
-    --info: 210 80% 62%;
+    --gain: 145 80% 50%;
+    --loss: 0 85% 58%;
+    --warning: 38 95% 58%;
+    --info: 210 85% 65%;
 
-    --sentiment-positive: 145 72% 46%;
-    --sentiment-negative: 0 78% 55%;
-    --sentiment-neutral: 38 92% 55%;
+    --sentiment-positive: 145 80% 50%;
+    --sentiment-negative: 0 85% 58%;
+    --sentiment-neutral: 38 95% 58%;
 
     --surface-1: 0 0% 6%;
     --surface-2: 0 0% 9%;
     --surface-3: 0 0% 13%;
 
-    /* Apple Liquid Glass — warm tones */
-    --glass-bg: 0 0% 6% / 0.72;
-    --glass-border: 0 0% 100% / 0.06;
-    --glass-highlight: 0 0% 100% / 0.08;
-    --glass-refraction: 30 60% 70% / 0.03;
+    /* Liquid Glass — dark vibrant */
+    --glass-bg: 0 0% 6% / 0.65;
+    --glass-border: 0 0% 100% / 0.1;
+    --glass-highlight: 0 0% 100% / 0.12;
+    --glass-refraction: 30 70% 65% / 0.05;
 
-    --glow-primary: 0 0 30px hsl(30 100% 64% / 0.12);
-    --glow-gain: 0 0 25px hsl(145 72% 46% / 0.12);
-    --glow-loss: 0 0 25px hsl(0 78% 55% / 0.12);
-    --glow-glass: 0 0 60px hsl(30 80% 60% / 0.04), inset 0 0.5px 0 hsl(0 0% 100% / 0.06);
+    --glow-primary: 0 0 35px hsl(30 100% 60% / 0.2);
+    --glow-gain: 0 0 30px hsl(145 80% 50% / 0.18);
+    --glow-loss: 0 0 30px hsl(0 85% 58% / 0.18);
+    --glow-glass: 0 0 80px hsl(30 90% 55% / 0.07), inset 0 0.5px 0 hsl(0 0% 100% / 0.1);
 
     --sidebar-background: 0 0% 2%;
     --sidebar-foreground: 0 0% 56%;
-    --sidebar-primary: 30 100% 64%;
+    --sidebar-primary: 30 100% 60%;
     --sidebar-primary-foreground: 0 0% 2%;
     --sidebar-accent: 0 0% 10%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 30 100% 64%;
+    --sidebar-border: 0 0% 14%;
+    --sidebar-ring: 30 100% 60%;
   }
 }
 
@@ -144,9 +210,14 @@
     border: 0.5px solid hsl(var(--glass-border));
     box-shadow:
       var(--glow-glass),
-      0 8px 40px hsl(0 0% 0% / 0.5);
+      0 8px 40px hsl(0 0% 0% / 0.12);
     position: relative;
     overflow: hidden;
+  }
+  .dark .glass-panel {
+    box-shadow:
+      var(--glow-glass),
+      0 8px 40px hsl(0 0% 0% / 0.5);
   }
   .glass-panel::before {
     content: '';
@@ -155,7 +226,7 @@
     left: 0;
     right: 0;
     height: 0.5px;
-    background: linear-gradient(90deg, transparent 0%, hsl(0 0% 100% / 0.1) 20%, hsl(0 0% 100% / 0.15) 50%, hsl(0 0% 100% / 0.1) 80%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 20%, hsl(var(--glass-highlight)) 50%, hsl(var(--glass-highlight)) 80%, transparent 100%);
     pointer-events: none;
   }
   .glass-panel::after {
@@ -165,23 +236,26 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(165deg, hsl(0 0% 100% / 0.03) 0%, transparent 30%, hsl(var(--glass-refraction)) 100%);
+    background: linear-gradient(165deg, hsl(var(--glass-highlight)) 0%, transparent 30%, hsl(var(--glass-refraction)) 100%);
     pointer-events: none;
   }
 
   .glass-card {
-    background: hsl(0 0% 5% / 0.8);
+    background: hsl(var(--card) / 0.85);
     backdrop-filter: blur(20px) saturate(1.6);
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 0.5px solid hsl(0 0% 100% / 0.05);
+    border: 0.5px solid hsl(var(--glass-border));
+    box-shadow: 0 2px 20px hsl(0 0% 0% / 0.08);
+  }
+  .dark .glass-card {
     box-shadow: 0 2px 20px hsl(0 0% 0% / 0.4);
   }
 
   .glass-subtle {
-    background: hsl(0 0% 8% / 0.6);
+    background: hsl(var(--muted) / 0.6);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 0.5px solid hsl(0 0% 100% / 0.04);
+    border: 0.5px solid hsl(var(--glass-border));
   }
 
   .glass-glow-primary {
