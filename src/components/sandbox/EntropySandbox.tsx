@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio,
+  Activity, TrendingUp, Layers, Radio, GitBranch,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StrategyLab from "./StrategyLab";
@@ -12,6 +12,7 @@ import ExecutionEngine from "./ExecutionEngine";
 import PortfolioCommandCenter from "./PortfolioCommandCenter";
 import ScarMemory from "./ScarMemory";
 import CrownLayer from "./CrownLayer";
+import CausalEffectsEngine from "./CausalEffectsEngine";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -20,6 +21,7 @@ interface Props {
 const sections = [
   { id: "strategy", label: "Strategy Lab", icon: Brain, desc: "Auto-generated strategies ranked by Sharpe, drawdown, reflexivity" },
   { id: "montecarlo", label: "Scenario Engine", icon: Activity, desc: "10K-path Monte Carlo with tail risk, CVaR, ruin probability" },
+  { id: "causal", label: "Causal Effects", icon: GitBranch, desc: "2nd & 3rd order effects engine with reflexivity feedback loops" },
   { id: "aftermath", label: "Aftermath Matrix", icon: Crosshair, desc: "Simulate your own market impact before execution" },
   { id: "intelligence", label: "Deep Intelligence", icon: Radio, desc: "Management DNA, Capital Flow, Narrative, Structural Risk" },
   { id: "crown", label: "Risk→Profit", icon: TrendingUp, desc: "Convert risk signals into actionable $$ opportunities" },
