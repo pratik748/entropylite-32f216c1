@@ -24,17 +24,18 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Tab = "dashboard" | "market" | "sandbox" | "augment" | "geopolitical" | "desirable" | "risk";
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
-  { id: "market", label: "Market", icon: <Globe className="h-3.5 w-3.5" /> },
-  { id: "sandbox", label: "Sandbox", icon: <Eye className="h-3.5 w-3.5" /> },
-  { id: "augment", label: "Augment", icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { id: "geopolitical", label: "Geopolitics", icon: <Globe className="h-3.5 w-3.5" /> },
-  { id: "desirable", label: "Desirable", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "risk", label: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
+const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+  { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
+  { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
+  { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
+  { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
+  { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
+  { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: "risk", label: "Risk", shortLabel: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
 ];
 
 const Index = () => {
@@ -43,6 +44,7 @@ const Index = () => {
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMobile = useIsMobile();
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
@@ -122,37 +124,38 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — mobile optimized */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="container flex items-center gap-0.5 overflow-x-auto py-1">
+        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-2 text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? "bg-primary/10 text-primary border border-primary/20"
                   : "text-muted-foreground hover:bg-surface-2 hover:text-foreground border border-transparent"
               }`}
             >
               {tab.icon}
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-2 pl-4">
+          <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
             </span>
-            <span className="text-[9px] font-mono text-muted-foreground">LIVE · 10s tick</span>
+            <span className="text-[8px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
           </div>
         </div>
       </nav>
 
-      <main className="container py-6">
+      <main className="container py-4 sm:py-6">
         {activeTab === "dashboard" && (
-          <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-            <div className="space-y-5">
+          <div className={`grid gap-4 sm:gap-6 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_1fr]"}`}>
+            <div className="space-y-4 sm:space-y-5">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {stocks.length > 0 && (
                 <PortfolioPanel stocks={stocks} activeStockId={activeStockId} onSelectStock={setActiveStockId} onRemoveStock={handleRemoveStock} onAddNew={() => setActiveStockId(null)} />
@@ -162,17 +165,17 @@ const Index = () => {
               {analysis && (
                 <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
               )}
-              <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
+              {!isMobile && <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />}
             </div>
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {!isLoading && !analysis && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-24 animate-fade-in">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 sm:py-24 animate-fade-in">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                     <Activity className="h-7 w-7 text-primary" />
                   </div>
-                  <h2 className="mb-2 text-lg font-semibold text-foreground">Ready to Analyze</h2>
-                  <p className="max-w-md text-center text-sm text-muted-foreground">
-                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for AI-powered deep analysis with real-time pricing.
+                  <h2 className="mb-2 text-base sm:text-lg font-semibold text-foreground">Ready to Analyze</h2>
+                  <p className="max-w-md text-center text-xs sm:text-sm text-muted-foreground px-4">
+                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for deep analysis with real-time pricing.
                   </p>
                 </div>
               )}
@@ -183,7 +186,7 @@ const Index = () => {
                   <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
                   <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
                   <LiveNewsFeed ticker={analysis.ticker} />
-                  <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="grid gap-4 sm:gap-5 grid-cols-1 lg:grid-cols-2">
                     <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} />
                     <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   </div>
