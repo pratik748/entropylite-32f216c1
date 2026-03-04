@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { AlertTriangle, Shield, Loader2, RefreshCw, Zap, MapPin, Radio, Satellite, Ship, Plane } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AlertTriangle, Shield, Loader2, RefreshCw, Zap, MapPin, Radio, Satellite, Ship, Plane, Crosshair, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
-import Globe from "react-globe.gl";
 
 interface ConflictEvent {
   name: string; lat: number; lng: number; severity: number; type: string;
@@ -34,19 +33,61 @@ const typeColors: Record<string, string> = {
   terrorism: "bg-red-600", trade_war: "bg-yellow-500", cyber: "bg-cyan-500", energy: "bg-orange-400",
 };
 
-const typeHexColors: Record<string, string> = {
-  war: "#ff3333", sanctions: "#ffaa00", unrest: "#ff7722",
-  terrorism: "#ff2222", trade_war: "#ffdd00", cyber: "#44ccff", energy: "#ff9900",
+// Mercator projection helpers
+const projectLat = (lat: number): number => {
+  const clampedLat = Math.max(-85, Math.min(85, lat));
+  const latRad = (clampedLat * Math.PI) / 180;
+  const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+  return 50 - (mercN / Math.PI) * 50;
 };
+const projectLng = (lng: number): number => ((lng + 180) / 360) * 100;
+
+// Animated overlay objects
+interface MovingObject {
+  id: string;
+  type: "ship" | "plane" | "satellite";
+  lat: number;
+  lng: number;
+  heading: number;
+  speed: number;
+  label: string;
+}
+
+const generateOverlayObjects = (): MovingObject[] => {
+  const ships: MovingObject[] = [
+    { id: "s1", type: "ship", lat: 1.3, lng: 103.8, heading: 220, speed: 0.002, label: "VLCC Tanker — Malacca" },
+    { id: "s2", type: "ship", lat: 30.0, lng: 32.5, heading: 180, speed: 0.001, label: "Container — Suez" },
+    { id: "s3", type: "ship", lat: 9.0, lng: -79.5, heading: 90, speed: 0.0015, label: "Bulk Carrier — Panama" },
+    { id: "s4", type: "ship", lat: 34.0, lng: 136.0, heading: 270, speed: 0.001, label: "LNG Carrier — Japan" },
+    { id: "s5", type: "ship", lat: 51.0, lng: 2.0, heading: 180, speed: 0.001, label: "Container — English Channel" },
+    { id: "s6", type: "ship", lat: -33.8, lng: 18.4, heading: 90, speed: 0.001, label: "Oil Tanker — Cape of Good Hope" },
+  ];
+  const planes: MovingObject[] = [
+    { id: "p1", type: "plane", lat: 40.6, lng: -73.8, heading: 45, speed: 0.01, label: "Cargo — JFK" },
+    { id: "p2", type: "plane", lat: 25.2, lng: 55.3, heading: 90, speed: 0.012, label: "Freight — Dubai" },
+    { id: "p3", type: "plane", lat: 51.5, lng: -0.1, heading: 270, speed: 0.011, label: "Cargo — Heathrow" },
+    { id: "p4", type: "plane", lat: 31.2, lng: 121.5, heading: 135, speed: 0.01, label: "Freight — Shanghai" },
+  ];
+  const sats: MovingObject[] = [
+    { id: "sat1", type: "satellite", lat: 0, lng: -30, heading: 90, speed: 0.05, label: "ISS" },
+    { id: "sat2", type: "satellite", lat: 60, lng: 80, heading: 200, speed: 0.03, label: "Sentinel-2" },
+    { id: "sat3", type: "satellite", lat: -20, lng: 150, heading: 320, speed: 0.04, label: "Starlink" },
+  ];
+  return [...ships, ...planes, ...sats];
+};
+
+// Simplified world map path (Natural Earth inspired)
+const WORLD_PATH = `M183,52l-2,1l-1,0l0,-1l1,-1l2,0zM191,53l1,1l-2,0l0,-1zM180,54l1,1l-2,0zM116,55l2,1l0,1l-2,0l-1,-1zM169,41l3,2l1,2l-1,1l-3,0l-2,-2l0,-2zM152,44l2,2l-1,2l-2,0l-1,-2zM141,45l1,1l-2,1l-1,-1zM80,34l4,1l2,2l0,3l-2,2l-4,0l-3,-2l-1,-3l1,-2zM71,37l2,1l0,2l-2,1l-2,-1l0,-2zM58,42l3,1l1,2l-1,2l-3,0l-2,-2l0,-2zM26,47l4,2l2,3l0,3l-2,2l-4,0l-3,-3l0,-4z`;
 
 const GeopoliticalGlobe = ({ stocks }: Props) => {
   const [data, setData] = useState<GeoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedConflict, setSelectedConflict] = useState<ConflictEvent | null>(null);
-  const [viewMode, setViewMode] = useState<"globe" | "threats" | "forex">("globe");
-  const globeRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 600, height: 450 });
+  const [viewMode, setViewMode] = useState<"map" | "threats" | "forex">("map");
+  const [overlayObjects, setOverlayObjects] = useState<MovingObject[]>(generateOverlayObjects);
+  const [hoveredObject, setHoveredObject] = useState<string | null>(null);
+  const [activeLayers, setActiveLayers] = useState({ conflicts: true, ships: true, planes: true, satellites: true, supplyChains: true, forex: true });
+  const animRef = useRef<number>();
 
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -60,89 +101,27 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
 
   useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 30000); return () => clearInterval(i); }, [fetchData]);
 
-  // Resize observer
+  // Animate overlay objects
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width } = entry.contentRect;
-        setDimensions({ width, height: Math.min(560, width * 0.75) });
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+    const animate = () => {
+      setOverlayObjects(prev => prev.map(obj => {
+        const rad = (obj.heading * Math.PI) / 180;
+        let newLng = obj.lng + Math.cos(rad) * obj.speed * 16;
+        let newLat = obj.lat - Math.sin(rad) * obj.speed * 16;
+        if (newLng > 180) newLng -= 360;
+        if (newLng < -180) newLng += 360;
+        newLat = Math.max(-85, Math.min(85, newLat));
+        return { ...obj, lat: newLat, lng: newLng };
+      }));
+      animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, []);
 
-  // Auto-rotate
-  useEffect(() => {
-    if (globeRef.current) {
-      globeRef.current.controls().autoRotate = true;
-      globeRef.current.controls().autoRotateSpeed = 0.4;
-      globeRef.current.pointOfView({ lat: 20, lng: 40, altitude: 2.2 });
-    }
-  }, [data]);
-
-  // Conflict points data
-  const pointsData = useMemo(() => {
-    if (!data) return [];
-    return data.conflictEvents.map(evt => ({
-      lat: evt.lat,
-      lng: evt.lng,
-      size: 0.3 + evt.severity * 0.7,
-      color: typeHexColors[evt.type] || "#ff3333",
-      label: evt.name,
-      evt,
-    }));
-  }, [data]);
-
-  // Rings for high-entropy zones
-  const ringsData = useMemo(() => {
-    if (!data) return [];
-    return data.highEntropyZones.map(zone => ({
-      lat: zone.lat,
-      lng: zone.lng,
-      maxR: 3 + zone.entropyScore / 20,
-      propagationSpeed: 2,
-      repeatPeriod: 800,
-      color: () => "rgba(255, 120, 0, 0.6)",
-    }));
-  }, [data]);
-
-  // Arcs for supply chain risks
-  const arcsData = useMemo(() => {
-    if (!data?.supplyChainRisks) return [];
-    return data.supplyChainRisks.map(risk => ({
-      startLat: risk.startLat,
-      startLng: risk.startLng,
-      endLat: risk.endLat,
-      endLng: risk.endLng,
-      color: risk.riskLevel === "high" ? ["rgba(255,60,60,0.6)", "rgba(255,60,60,0.1)"] : ["rgba(255,180,0,0.4)", "rgba(255,180,0,0.1)"],
-      stroke: 0.5,
-      dashLength: 0.4,
-      dashGap: 0.2,
-      dashAnimateTime: 2000,
-    }));
-  }, [data]);
-
-  // Forex stressed labels
-  const labelsData = useMemo(() => {
-    if (!data) return [];
-    return data.forexVolatility.filter(f => f.isStressed).map(fx => ({
-      lat: fx.lat,
-      lng: fx.lng,
-      text: `${fx.currency} ${fx.change24h > 0 ? "+" : ""}${fx.change24h.toFixed(1)}%`,
-      size: 0.8,
-      color: Math.abs(fx.change24h) > 3 ? "#ff5555" : "#ffcc00",
-    }));
-  }, [data]);
-
-  const exposedAssets = stocks.filter(s => {
-    if (!s.analysis || !data) return false;
-    return data.conflictEvents.some(c =>
-      c.affectedAssets?.some(a => s.ticker.includes(a) || a.includes(s.ticker.replace(".NS","").replace(".BO","")))
-    );
-  });
+  const toggleLayer = (layer: keyof typeof activeLayers) => {
+    setActiveLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
+  };
 
   if (loading && !data) {
     return (
@@ -183,15 +162,15 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
             <div>
               <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">God's Eye — Entropy Surveillance</h2>
               <p className="text-[9px] text-muted-foreground font-mono tracking-widest">
-                LIVE · {data.conflictEvents.length} CONFLICTS · REAL-TIME GLOBE
+                LIVE · {data.conflictEvents.length} CONFLICTS · {overlayObjects.filter(o => o.type === "ship").length} VESSELS · {overlayObjects.filter(o => o.type === "plane").length} AIRCRAFT
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {(["globe", "threats", "forex"] as const).map(m => (
+            {(["map", "threats", "forex"] as const).map(m => (
               <button key={m} onClick={() => setViewMode(m)}
                 className={`rounded-lg px-3 py-1.5 text-[10px] font-mono font-medium transition-all ${viewMode === m ? "glass-panel text-primary" : "glass-subtle text-muted-foreground hover:text-foreground"}`}>
-                {m === "globe" ? "🛰 Globe" : m === "threats" ? "⚠ Threats" : "💱 Forex"}
+                {m === "map" ? "🗺 Map" : m === "threats" ? "⚠ Threats" : "💱 Forex"}
               </button>
             ))}
             <Button size="sm" variant="ghost" onClick={() => fetchData(false)} className="h-7 gap-1 text-[10px]">
@@ -234,61 +213,230 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
         </div>
       )}
 
-      {/* Globe + Intel */}
-      {viewMode === "globe" && (
+      {/* Map View */}
+      {viewMode === "map" && (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div ref={containerRef} className="glass-card rounded-2xl overflow-hidden relative" style={{ minHeight: 400 }}>
-            <Globe
-              ref={globeRef}
-              width={dimensions.width}
-              height={dimensions.height}
-              globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-              bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-              backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-              atmosphereColor="hsl(217, 80%, 60%)"
-              atmosphereAltitude={0.2}
-              pointsData={pointsData}
-              pointLat="lat"
-              pointLng="lng"
-              pointAltitude="size"
-              pointColor="color"
-              pointRadius={0.4}
-              pointsMerge={false}
-              ringsData={ringsData}
-              ringLat="lat"
-              ringLng="lng"
-              ringMaxRadius="maxR"
-              ringPropagationSpeed="propagationSpeed"
-              ringRepeatPeriod="repeatPeriod"
-              ringColor="color"
-              arcsData={arcsData}
-              arcStartLat="startLat"
-              arcStartLng="startLng"
-              arcEndLat="endLat"
-              arcEndLng="endLng"
-              arcColor="color"
-              arcStroke="stroke"
-              arcDashLength="dashLength"
-              arcDashGap="dashGap"
-              arcDashAnimateTime="dashAnimateTime"
-              labelsData={labelsData}
-              labelLat="lat"
-              labelLng="lng"
-              labelText="text"
-              labelSize="size"
-              labelColor="color"
-              labelDotRadius={0.3}
-              labelAltitude={0.01}
-              onPointClick={(point: any) => {
-                const evt = point.evt as ConflictEvent;
-                setSelectedConflict(selectedConflict?.name === evt.name ? null : evt);
-              }}
-            />
+          {/* Interactive World Map */}
+          <div className="glass-card rounded-2xl overflow-hidden relative" style={{ minHeight: 420 }}>
+            {/* Layer Controls */}
+            <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1">
+              {([
+                { key: "conflicts" as const, icon: <Crosshair className="h-2.5 w-2.5" />, label: "Conflicts", color: "text-loss" },
+                { key: "ships" as const, icon: <Ship className="h-2.5 w-2.5" />, label: "Ships", color: "text-blue-400" },
+                { key: "planes" as const, icon: <Plane className="h-2.5 w-2.5" />, label: "Planes", color: "text-cyan-400" },
+                { key: "satellites" as const, icon: <Satellite className="h-2.5 w-2.5" />, label: "Sats", color: "text-violet-400" },
+                { key: "supplyChains" as const, icon: <Activity className="h-2.5 w-2.5" />, label: "Supply", color: "text-amber-400" },
+                { key: "forex" as const, icon: <span className="text-[8px] font-bold">FX</span>, label: "Forex", color: "text-emerald-400" },
+              ]).map(l => (
+                <button key={l.key} onClick={() => toggleLayer(l.key)}
+                  className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[8px] font-mono transition-all ${activeLayers[l.key] ? `glass-panel ${l.color}` : "glass-subtle text-muted-foreground/40 line-through"}`}>
+                  {l.icon} {l.label}
+                </button>
+              ))}
+            </div>
+
+            {/* SVG World Map */}
+            <svg viewBox="0 0 100 56" className="w-full h-full" style={{ minHeight: 420, background: "linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)/0.3) 100%)" }}>
+              <defs>
+                <radialGradient id="conflictGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="hsl(0, 80%, 50%)" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="hsl(0, 80%, 50%)" stopOpacity="0" />
+                </radialGradient>
+                <radialGradient id="entropyGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="hsl(30, 90%, 50%)" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="hsl(30, 90%, 50%)" stopOpacity="0" />
+                </radialGradient>
+                <filter id="mapGlow">
+                  <feGaussianBlur stdDeviation="0.15" result="blur" />
+                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+              </defs>
+
+              {/* Grid lines */}
+              {[-60, -30, 0, 30, 60].map(lat => (
+                <line key={`lat${lat}`} x1="0" y1={projectLat(lat)} x2="100" y2={projectLat(lat)}
+                  stroke="hsl(var(--border))" strokeWidth="0.08" strokeOpacity="0.3" strokeDasharray="0.5,0.5" />
+              ))}
+              {[-120, -60, 0, 60, 120].map(lng => (
+                <line key={`lng${lng}`} x1={projectLng(lng)} y1="0" x2={projectLng(lng)} y2="56"
+                  stroke="hsl(var(--border))" strokeWidth="0.08" strokeOpacity="0.3" strokeDasharray="0.5,0.5" />
+              ))}
+
+              {/* Simplified continent outlines */}
+              {/* North America */}
+              <polygon points="10,14 15,10 22,10 28,13 30,18 28,22 25,25 20,28 15,28 12,30 10,28 8,22 6,18" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* South America */}
+              <polygon points="22,32 26,30 30,32 32,36 30,42 28,48 24,50 20,46 18,40 20,36" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Europe */}
+              <polygon points="46,12 52,10 56,12 54,16 50,18 47,16" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Africa */}
+              <polygon points="46,22 52,20 58,22 60,28 58,36 54,42 48,42 44,38 42,30 44,24" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Asia */}
+              <polygon points="56,8 66,6 78,8 86,12 88,18 84,22 78,24 72,22 66,18 60,16 56,14" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Middle East */}
+              <polygon points="56,18 62,16 66,18 66,24 62,26 56,24" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* India */}
+              <polygon points="68,20 74,18 76,24 74,30 70,30 68,26" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Southeast Asia / Indonesia */}
+              <polygon points="78,24 84,22 88,26 86,30 80,30 78,28" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+              {/* Australia */}
+              <polygon points="82,34 90,32 94,36 92,42 86,44 80,40 80,36" 
+                fill="hsl(var(--muted))" fillOpacity="0.15" stroke="hsl(var(--border))" strokeWidth="0.12" strokeOpacity="0.5" />
+
+              {/* Supply Chain Arcs */}
+              {activeLayers.supplyChains && data.supplyChainRisks?.map((risk, i) => {
+                const x1 = projectLng(risk.startLng);
+                const y1 = projectLat(risk.startLat);
+                const x2 = projectLng(risk.endLng);
+                const y2 = projectLat(risk.endLat);
+                const midX = (x1 + x2) / 2;
+                const midY = Math.min(y1, y2) - Math.abs(x2 - x1) * 0.15;
+                const isHigh = risk.riskLevel === "high";
+                return (
+                  <path key={`arc${i}`}
+                    d={`M${x1},${y1} Q${midX},${midY} ${x2},${y2}`}
+                    fill="none"
+                    stroke={isHigh ? "hsl(0, 70%, 55%)" : "hsl(40, 80%, 50%)"}
+                    strokeWidth="0.12"
+                    strokeOpacity="0.5"
+                    strokeDasharray="0.4,0.3">
+                    <animate attributeName="stroke-dashoffset" from="0" to="-2" dur="3s" repeatCount="indefinite" />
+                  </path>
+                );
+              })}
+
+              {/* Trade Hubs */}
+              {data.tradeHubs?.map((hub, i) => {
+                const cx = projectLng(hub.lng);
+                const cy = projectLat(hub.lat);
+                return (
+                  <g key={`hub${i}`}>
+                    <circle cx={cx} cy={cy} r="0.5" fill="hsl(210, 70%, 50%)" fillOpacity="0.2" />
+                    <circle cx={cx} cy={cy} r="0.2" fill="hsl(210, 70%, 60%)" fillOpacity="0.6" />
+                  </g>
+                );
+              })}
+
+              {/* High Entropy Zones — pulsing rings */}
+              {activeLayers.conflicts && data.highEntropyZones.map((zone, i) => {
+                const cx = projectLng(zone.lng);
+                const cy = projectLat(zone.lat);
+                const r = 1 + zone.entropyScore / 30;
+                return (
+                  <g key={`ent${i}`}>
+                    <circle cx={cx} cy={cy} r={r} fill="url(#entropyGlow)" opacity="0.5">
+                      <animate attributeName="r" values={`${r * 0.7};${r * 1.3};${r * 0.7}`} dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.5;0.2;0.5" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  </g>
+                );
+              })}
+
+              {/* Conflict Points */}
+              {activeLayers.conflicts && data.conflictEvents.map((evt, i) => {
+                const cx = projectLng(evt.lng);
+                const cy = projectLat(evt.lat);
+                const isSelected = selectedConflict?.name === evt.name;
+                const r = 0.3 + evt.severity * 0.5;
+                return (
+                  <g key={`conf${i}`} onClick={() => setSelectedConflict(isSelected ? null : evt)} style={{ cursor: "pointer" }}>
+                    <circle cx={cx} cy={cy} r={r * 2.5} fill="url(#conflictGlow)" opacity={isSelected ? 0.8 : 0.4}>
+                      {evt.severity > 0.7 && <animate attributeName="opacity" values="0.4;0.8;0.4" dur="1.5s" repeatCount="indefinite" />}
+                    </circle>
+                    <circle cx={cx} cy={cy} r={r} fill="hsl(0, 80%, 50%)" stroke={isSelected ? "white" : "none"} strokeWidth="0.1" filter="url(#mapGlow)">
+                      {evt.severity > 0.7 && <animate attributeName="r" values={`${r};${r * 1.3};${r}`} dur="1.5s" repeatCount="indefinite" />}
+                    </circle>
+                    {isSelected && (
+                      <text x={cx} y={cy - r - 0.5} textAnchor="middle" fontSize="1" fill="hsl(var(--foreground))" fontFamily="monospace">{evt.name}</text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Forex Stress Markers */}
+              {activeLayers.forex && data.forexVolatility.filter(f => f.isStressed).map((fx, i) => {
+                const cx = projectLng(fx.lng);
+                const cy = projectLat(fx.lat);
+                const isNeg = fx.change24h < 0;
+                return (
+                  <g key={`fx${i}`}>
+                    <rect x={cx - 2} y={cy - 0.6} width="4" height="1.2" rx="0.3" fill="hsl(var(--background))" fillOpacity="0.7" stroke={isNeg ? "hsl(0,70%,50%)" : "hsl(120,50%,40%)"} strokeWidth="0.06" />
+                    <text x={cx} y={cy + 0.25} textAnchor="middle" fontSize="0.7" fill={isNeg ? "hsl(0,70%,55%)" : "hsl(120,50%,45%)"} fontFamily="monospace" fontWeight="bold">
+                      {fx.currency} {fx.change24h > 0 ? "+" : ""}{fx.change24h.toFixed(1)}%
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Ships */}
+              {activeLayers.ships && overlayObjects.filter(o => o.type === "ship").map(obj => {
+                const cx = projectLng(obj.lng);
+                const cy = projectLat(obj.lat);
+                const isHovered = hoveredObject === obj.id;
+                return (
+                  <g key={obj.id} onMouseEnter={() => setHoveredObject(obj.id)} onMouseLeave={() => setHoveredObject(null)}>
+                    <polygon points={`${cx},${cy - 0.4} ${cx + 0.25},${cy + 0.2} ${cx - 0.25},${cy + 0.2}`}
+                      fill="hsl(210, 80%, 60%)" fillOpacity="0.9" transform={`rotate(${obj.heading}, ${cx}, ${cy})`} />
+                    {isHovered && (
+                      <text x={cx} y={cy - 0.7} textAnchor="middle" fontSize="0.6" fill="hsl(210, 80%, 70%)" fontFamily="monospace">{obj.label}</text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Planes */}
+              {activeLayers.planes && overlayObjects.filter(o => o.type === "plane").map(obj => {
+                const cx = projectLng(obj.lng);
+                const cy = projectLat(obj.lat);
+                const isHovered = hoveredObject === obj.id;
+                return (
+                  <g key={obj.id} onMouseEnter={() => setHoveredObject(obj.id)} onMouseLeave={() => setHoveredObject(null)}>
+                    <polygon points={`${cx},${cy - 0.35} ${cx + 0.35},${cy + 0.15} ${cx},${cy} ${cx - 0.35},${cy + 0.15}`}
+                      fill="hsl(190, 80%, 55%)" fillOpacity="0.9" transform={`rotate(${obj.heading}, ${cx}, ${cy})`} />
+                    {isHovered && (
+                      <text x={cx} y={cy - 0.6} textAnchor="middle" fontSize="0.6" fill="hsl(190, 80%, 65%)" fontFamily="monospace">{obj.label}</text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Satellites */}
+              {activeLayers.satellites && overlayObjects.filter(o => o.type === "satellite").map(obj => {
+                const cx = projectLng(obj.lng);
+                const cy = projectLat(obj.lat);
+                const isHovered = hoveredObject === obj.id;
+                return (
+                  <g key={obj.id} onMouseEnter={() => setHoveredObject(obj.id)} onMouseLeave={() => setHoveredObject(null)}>
+                    <circle cx={cx} cy={cy} r="0.2" fill="hsl(270, 70%, 65%)" fillOpacity="0.9">
+                      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                    <circle cx={cx} cy={cy} r="0.5" fill="none" stroke="hsl(270, 70%, 65%)" strokeWidth="0.04" strokeOpacity="0.4">
+                      <animate attributeName="r" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite" />
+                    </circle>
+                    {isHovered && (
+                      <text x={cx} y={cy - 0.8} textAnchor="middle" fontSize="0.6" fill="hsl(270, 70%, 75%)" fontFamily="monospace">{obj.label}</text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Legend */}
             <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center gap-2 sm:gap-3 text-[8px] sm:text-[9px] text-muted-foreground glass-subtle rounded-lg px-2 sm:px-3 py-1.5 z-20">
               <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Conflict</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Entropy Zone</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Trade Hub</span>
-              <span className="flex items-center gap-1 ml-auto font-mono text-primary">react-globe.gl</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Entropy</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Vessel</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-400" /> Aircraft</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> Satellite</span>
+              <span className="flex items-center gap-1 ml-auto font-mono text-primary">ENTROPY MAP</span>
             </div>
           </div>
 
@@ -299,11 +447,11 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
             </h3>
             {data.conflictEvents.map((evt, i) => (
               <div key={i} onClick={() => setSelectedConflict(selectedConflict?.name === evt.name ? null : evt)}
-                className={`glass-card rounded-lg p-2.5 sm:p-3 cursor-pointer transition-all ${selectedConflict?.name === evt.name ? "glass-glow-loss border-loss/30" : "hover:border-primary/20"}`}>
+                className={`glass-card rounded-lg p-2.5 sm:p-3 cursor-pointer transition-all ${selectedConflict?.name === evt.name ? "ring-1 ring-loss/30" : "hover:ring-1 hover:ring-primary/20"}`}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`h-2 w-2 rounded-full ${typeColors[evt.type] || "bg-red-500"} ${evt.severity > 0.7 ? "animate-pulse" : ""}`} />
                   <span className="text-[11px] font-bold text-foreground truncate">{evt.name}</span>
-                  <span className="ml-auto rounded bg-surface-3 px-1.5 py-0.5 text-[8px] font-mono text-muted-foreground">
+                  <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[8px] font-mono text-muted-foreground">
                     {(evt.severity * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -318,7 +466,7 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
                     {evt.escalationProb !== undefined && (
                       <div className="flex items-center gap-2">
                         <span className="text-[8px] text-muted-foreground">Escalation:</span>
-                        <div className="flex-1 h-1 rounded-full bg-surface-3 overflow-hidden">
+                        <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
                           <div className="h-full rounded-full bg-loss" style={{ width: `${evt.escalationProb * 100}%` }} />
                         </div>
                         <span className="text-[8px] font-mono text-loss">{(evt.escalationProb * 100).toFixed(0)}%</span>
@@ -373,32 +521,31 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
                   <div key={i} className="glass-card rounded-lg p-3 sm:p-4 border-loss/20">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs sm:text-sm font-bold text-foreground">{zone.name}</span>
-                      <span className="rounded bg-loss/20 px-2 py-0.5 text-[9px] font-mono font-bold text-loss">⚡{zone.entropyScore.toFixed(0)}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono font-bold ${zone.isHighEntropy ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"}`}>
+                        {zone.entropyScore.toFixed(0)}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><p className="text-[8px] text-muted-foreground uppercase">Severity</p><p className="font-mono font-bold text-loss">{(zone.severity*100).toFixed(0)}%</p></div>
-                      <div><p className="text-[8px] text-muted-foreground uppercase">FX Stress</p><p className="font-mono font-bold text-warning">{zone.currencyStress.toFixed(1)}%</p></div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] text-muted-foreground">Severity</span>
+                        <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-loss" style={{ width: `${zone.severity * 100}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] text-muted-foreground">FX Stress</span>
+                        <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-warning" style={{ width: `${zone.currencyStress * 100}%` }} />
+                        </div>
+                      </div>
                     </div>
-                    {zone.affectedCurrencies.length > 0 && (
-                      <div className="flex gap-1 mt-2">
-                        {zone.affectedCurrencies.map(c => <span key={c} className="rounded bg-warning/10 px-1.5 py-0.5 text-[8px] font-mono text-warning">{c}</span>)}
+                    {zone.affectedCurrencies?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {zone.affectedCurrencies.map(c => (
+                          <span key={c} className="rounded bg-warning/10 px-1 py-0.5 text-[7px] font-mono text-warning">{c}</span>
+                        ))}
                       </div>
                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {exposedAssets.length > 0 && (
-            <div className="glass-card rounded-2xl p-4 sm:p-5">
-              <h3 className="text-[10px] font-bold text-warning uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Shield className="h-3.5 w-3.5" /> Portfolio Exposure
-              </h3>
-              <div className="space-y-2">
-                {exposedAssets.map(s => (
-                  <div key={s.id} className="flex items-center justify-between glass-subtle rounded-lg p-3">
-                    <span className="font-mono text-sm font-bold text-foreground">{s.ticker}</span>
-                    <span className="text-[10px] text-warning font-mono">EXPOSED</span>
                   </div>
                 ))}
               </div>
@@ -410,20 +557,53 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
       {/* Forex View */}
       {viewMode === "forex" && (
         <div className="glass-card rounded-2xl p-4 sm:p-5">
-          <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3">Global Currency Volatility</h3>
-          <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
+            💱 Live Forex Volatility
+          </h3>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {data.forexVolatility.map((fx, i) => (
-              <div key={i} className={`glass-card rounded-lg p-3 transition-all ${fx.isStressed ? "glass-glow-loss border-loss/20" : ""}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold text-foreground">{fx.currency}</span>
-                  <span className="text-[8px] text-muted-foreground">{fx.country}</span>
+              <div key={i} className={`glass-card rounded-lg p-3 ${fx.isStressed ? "ring-1 ring-loss/20" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground">{fx.currency}</span>
+                  <span className={`font-mono text-xs font-bold ${fx.change24h < 0 ? "text-loss" : "text-gain"}`}>
+                    {fx.change24h > 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
+                  </span>
                 </div>
-                <p className="font-mono text-sm font-bold text-foreground">{fx.rate.toLocaleString()}</p>
-                <p className={`font-mono text-[10px] font-semibold ${fx.change24h > 0 ? "text-loss" : "text-gain"}`}>
-                  {fx.change24h > 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
-                </p>
+                <p className="text-[9px] text-muted-foreground mt-1">{fx.country} · {fx.symbol}</p>
+                {fx.isStressed && <span className="text-[7px] text-loss font-mono uppercase">⚠ STRESSED</span>}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio Exposure */}
+      {stocks.filter(s => s.analysis).length > 0 && data.conflictEvents.length > 0 && (
+        <div className="glass-card rounded-2xl p-4 sm:p-5">
+          <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Shield className="h-3.5 w-3.5 text-primary" /> Portfolio Geopolitical Exposure
+          </h3>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {stocks.filter(s => s.analysis).map(stock => {
+              const exposed = data.conflictEvents.filter(c =>
+                c.affectedAssets?.some(a => stock.ticker.includes(a) || a.includes(stock.ticker.replace(".NS","").replace(".BO","")))
+              );
+              return (
+                <div key={stock.id} className={`glass-card rounded-lg p-3 ${exposed.length > 0 ? "ring-1 ring-loss/20" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">{stock.ticker}</span>
+                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${exposed.length > 0 ? "bg-loss/10 text-loss" : "bg-gain/10 text-gain"}`}>
+                      {exposed.length > 0 ? `${exposed.length} THREAT${exposed.length > 1 ? "S" : ""}` : "CLEAR"}
+                    </span>
+                  </div>
+                  {exposed.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {exposed.map(e => <span key={e.name} className="text-[7px] text-muted-foreground">{e.name}</span>)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
