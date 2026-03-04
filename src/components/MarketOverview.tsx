@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
@@ -7,8 +7,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 
+interface IndexData {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePct: number;
+  region?: string;
+  currency?: string;
+}
+
 interface MarketData {
-  indices: { symbol: string; name: string; price: number; change: number; changePct: number }[];
+  indices: IndexData[];
   sectors: { name: string; price: number; change: number; changePct: number }[];
   macro: {
     marketMood: string;
@@ -19,6 +29,9 @@ interface MarketData {
     usdInr: number;
     crudeBrent: number;
     goldPrice?: number;
+    eurUsd?: number;
+    gbpUsd?: number;
+    btcUsd?: number;
     topMovers: { name: string; change: number }[];
     keyEvents: string[];
     outlook: string;
@@ -27,11 +40,14 @@ interface MarketData {
 }
 
 const REFRESH_INTERVAL = 15_000;
+const regions = ["All", "US", "Europe", "Asia", "India"] as const;
+type Region = typeof regions[number];
 
 const MarketOverview = () => {
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [region, setRegion] = useState<Region>("All");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMarketData = async (showLoading = true) => {
@@ -51,16 +67,14 @@ const MarketOverview = () => {
   useEffect(() => {
     fetchMarketData();
     intervalRef.current = setInterval(() => fetchMarketData(false), REFRESH_INTERVAL);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-3 text-sm text-muted-foreground">Loading live market data...</span>
+        <span className="ml-3 text-sm text-muted-foreground">Loading global market data...</span>
       </div>
     );
   }
@@ -80,20 +94,26 @@ const MarketOverview = () => {
     Neutral: { color: "text-warning", bg: "bg-warning/10" },
     Cautious: { color: "text-warning", bg: "bg-warning/10" },
   };
-
   const mood = data.macro?.marketMood || "Neutral";
   const moodStyle = moodConfig[mood] || moodConfig.Neutral;
 
+  const filteredIndices = region === "All" ? data.indices : data.indices.filter(i => i.region === region);
+
   const sectorChartData = data.sectors.map((s) => ({
-    name: s.name.replace("NIFTY ", ""),
+    name: s.name,
     value: s.changePct,
     fill: s.changePct >= 0 ? "hsl(152, 82%, 42%)" : "hsl(0, 84%, 55%)",
   }));
 
+  const getCurrencySymbol = (currency?: string) => {
+    const map: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥", HKD: "HK$", CNY: "¥" };
+    return map[currency || "USD"] || "";
+  };
+
   return (
     <div className="space-y-5">
-      {/* Live indicator */}
-      <div className="flex items-center justify-between">
+      {/* Live indicator + Region selector */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
@@ -104,24 +124,34 @@ const MarketOverview = () => {
             {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
           </span>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-1">
+          {regions.map(r => (
+            <button key={r} onClick={() => setRegion(r)}
+              className={`rounded-lg px-2.5 py-1 text-[10px] font-medium transition-all ${region === r ? "bg-foreground text-background" : "bg-surface-2 text-muted-foreground hover:text-foreground"}`}>
+              {r}
+            </button>
+          ))}
+          <Button size="sm" variant="ghost" onClick={() => fetchMarketData(false)} className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground ml-2">
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Indices */}
-      <div className="grid gap-3 md:grid-cols-3">
-        {data.indices.map((idx) => (
-          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20 hover:glow-primary">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{idx.name}</p>
-            <p className="mt-1.5 font-mono text-2xl font-bold text-foreground tabular-nums">
-              {idx.price.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      {/* Indices Grid */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {filteredIndices.map((idx) => (
+          <div key={idx.symbol} className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/20">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{idx.name}</p>
+              {idx.region && <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[8px] font-mono text-muted-foreground">{idx.region}</span>}
+            </div>
+            <p className="font-mono text-xl font-bold text-foreground tabular-nums">
+              {getCurrencySymbol(idx.currency)}{idx.price.toLocaleString("en-US", { maximumFractionDigits: idx.price > 1000 ? 0 : 2 })}
             </p>
-            <div className={`mt-1.5 flex items-center gap-1.5 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
-              {idx.change >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              <span className="font-mono font-semibold tabular-nums">
-                {idx.change >= 0 ? "+" : ""}{idx.change.toFixed(0)} ({idx.changePct >= 0 ? "+" : ""}{idx.changePct.toFixed(2)}%)
+            <div className={`mt-1 flex items-center gap-1.5 text-sm ${idx.change >= 0 ? "text-gain" : "text-loss"}`}>
+              {idx.change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              <span className="font-mono font-semibold tabular-nums text-xs">
+                {idx.change >= 0 ? "+" : ""}{idx.change.toFixed(idx.price > 1000 ? 0 : 2)} ({idx.changePct >= 0 ? "+" : ""}{idx.changePct.toFixed(2)}%)
               </span>
             </div>
           </div>
@@ -130,12 +160,15 @@ const MarketOverview = () => {
 
       {/* Key Macro Metrics */}
       {data.macro && (
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+          <MacroCard icon={<Activity className="h-4 w-4" />} label="VIX" value={data.macro.vix > 0 ? data.macro.vix.toFixed(2) : "—"} />
           <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `₹${data.macro.usdInr.toFixed(2)}` : "—"} />
+          <MacroCard icon={<DollarSign className="h-4 w-4" />} label="EUR/USD" value={data.macro.eurUsd ? `$${data.macro.eurUsd.toFixed(4)}` : "—"} />
+          <MacroCard icon={<DollarSign className="h-4 w-4" />} label="GBP/USD" value={data.macro.gbpUsd ? `$${data.macro.gbpUsd.toFixed(4)}` : "—"} />
           <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={data.macro.crudeBrent > 0 ? `$${data.macro.crudeBrent.toFixed(2)}` : "—"} />
-          <MacroCard icon={<Activity className="h-4 w-4" />} label="India VIX" value={data.macro.vix > 0 ? data.macro.vix.toFixed(2) : "—"} />
+          <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Gold" value={data.macro.goldPrice ? `$${data.macro.goldPrice.toFixed(0)}` : "—"} />
+          <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Bitcoin" value={data.macro.btcUsd ? `$${data.macro.btcUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"} />
           <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
-          <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="DII Flow" value={data.macro.diiFlow} />
         </div>
       )}
 
@@ -152,7 +185,6 @@ const MarketOverview = () => {
                 )}
               </span>
             </div>
-
             {data.macro.topMovers?.length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Movers</p>
@@ -180,7 +212,7 @@ const MarketOverview = () => {
             </div>
             {data.macro.outlook && (
               <div className="rounded-lg bg-surface-2 p-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Outlook</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Global Outlook</p>
                 <p className="text-sm leading-relaxed text-secondary-foreground">{data.macro.outlook}</p>
               </div>
             )}
@@ -191,18 +223,16 @@ const MarketOverview = () => {
       {/* Sector Performance */}
       {sectorChartData.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Sector Performance</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Global Sector Performance (S&P 500 Sectors)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
+              <BarChart data={sectorChartData} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 12%, 13%)" horizontal={false} />
                 <XAxis type="number" tick={{ fill: "hsl(210, 8%, 45%)", fontSize: 11 }} axisLine={{ stroke: "hsl(220, 12%, 13%)" }} tickFormatter={(v) => `${v.toFixed(1)}%`} />
-                <YAxis dataKey="name" type="category" tick={{ fill: "hsl(210, 8%, 45%)", fontSize: 11 }} axisLine={{ stroke: "hsl(220, 12%, 13%)" }} width={55} />
+                <YAxis dataKey="name" type="category" tick={{ fill: "hsl(210, 8%, 45%)", fontSize: 11 }} axisLine={{ stroke: "hsl(220, 12%, 13%)" }} width={75} />
                 <Tooltip contentStyle={{ background: "hsl(220, 14%, 7%)", border: "1px solid hsl(220, 12%, 13%)", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`${v.toFixed(2)}%`, "Change"]} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {sectorChartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
-                  ))}
+                  {sectorChartData.map((entry, i) => <Cell key={i} fill={entry.fill} fillOpacity={0.85} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -217,12 +247,12 @@ const MarketOverview = () => {
 };
 
 const MacroCard = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-  <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/20">
+  <div className="rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/20">
     <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
       {icon}
-      <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-[9px] uppercase tracking-wider">{label}</span>
     </div>
-    <p className="font-mono text-base font-bold text-foreground tabular-nums">{value}</p>
+    <p className="font-mono text-sm font-bold text-foreground tabular-nums">{value}</p>
   </div>
 );
 

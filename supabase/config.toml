@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.fetch-news]
 verify_jwt = false
+
+[functions.geopolitical-data]
+verify_jwt = false
+
+[functions.desirable-assets]
+verify_jwt = false
