@@ -14,6 +14,8 @@ interface ConflictEvent {
   summary: string;
   nearTradeHub?: string;
   distanceKm?: number;
+  escalationProb?: number;
+  actionableIntel?: string;
 }
 
 interface ForexEntry {
