@@ -132,4 +132,11 @@
   .gradient-border {
     border-image: linear-gradient(135deg, hsl(210 100% 60% / 0.3), hsl(220 12% 13%)) 1;
   }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
