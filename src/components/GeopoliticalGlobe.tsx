@@ -60,6 +60,8 @@ interface GeoData {
   regimeSignal: string;
   keyThreats: string[];
   capitalFlowDirection: string;
+  safeHavenDemand?: string;
+  intelligenceSummary?: string;
   timestamp: number;
 }
 
