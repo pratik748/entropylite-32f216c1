@@ -29,12 +29,16 @@ interface MarketData {
     usdInr: number;
     crudeBrent: number;
     goldPrice?: number;
+    silverPrice?: number;
     eurUsd?: number;
     gbpUsd?: number;
     btcUsd?: number;
+    ethUsd?: number;
     topMovers: { name: string; change: number }[];
     keyEvents: string[];
     outlook: string;
+    sectorRotation?: string;
+    riskAppetite?: string;
   } | null;
   timestamp?: number;
 }
