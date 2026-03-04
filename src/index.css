@@ -306,4 +306,9 @@
   .apple-appear {
     animation: apple-appear 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
+
+  @keyframes moveBackground {
+    from { background-position: 0% 0%; }
+    to { background-position: 0% -1000%; }
+  }
 }
