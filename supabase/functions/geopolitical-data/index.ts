@@ -61,7 +61,7 @@ serve(async (req) => {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    // 1. Fetch real forex volatility
+    // 1. Fetch real forex volatility in parallel
     const forexResults = await Promise.all(
       forexPairs.map(async (pair) => {
         const quote = await fetchYahooQuote(pair.symbol);
@@ -74,47 +74,72 @@ serve(async (req) => {
       })
     );
 
-    // 2. Use AI for current geopolitical hotspots
+    // 2. Use AI for current geopolitical intelligence with DEEP analysis
     let conflictEvents: any[] = [];
     let geopoliticalInsights: any = {};
     
     if (LOVABLE_API_KEY) {
       try {
+        const stressedCurrencies = forexResults.filter(f => f.isStressed).map(f => `${f.currency}: ${f.change24h > 0 ? "+" : ""}${f.change24h.toFixed(2)}%`).join(", ");
+        
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "google/gemini-3-flash-preview",
             messages: [
-              { role: "system", content: "You are a geopolitical intelligence analyst. Return ONLY valid JSON." },
-              { role: "user", content: `Today is ${new Date().toISOString().split("T")[0]}. Provide current geopolitical conflict zones and crisis areas affecting global markets.
+              { role: "system", content: "You are a geopolitical intelligence analyst at a sovereign wealth fund. You assess conflicts, sanctions, trade disruptions, and their PRECISE impact on capital markets. Return ONLY valid JSON." },
+              { role: "user", content: `Today is ${new Date().toISOString().split("T")[0]}. 
+
+REAL-TIME FOREX STRESS: ${stressedCurrencies || "No currencies stressed >2%"}
+
+Provide DEEP geopolitical intelligence covering:
+1. Active armed conflicts with precise coordinates and severity
+2. Sanctions regimes and trade restrictions currently in force
+3. Political instability and regime change risks
+4. Supply chain disruption hotspots (shipping lanes, chokepoints)
+5. Cyber and hybrid warfare threats to financial infrastructure
+6. Energy supply disruption risks
+7. Food security and commodity supply threats
+
+For each conflict, assess:
+- DIRECT impact on nearby trade hubs (with km distance)
+- Which specific asset classes and tickers are affected
+- Probability of escalation in next 30 days
+- Capital flow implications (where money is moving)
 
 Return JSON:
 {
   "conflicts": [
-    { "name": "<conflict/crisis name>", "lat": <number>, "lng": <number>, "severity": <0.1-1.0>, "type": "<war|sanctions|unrest|terrorism|trade_war>", "affectedAssets": ["<ticker1>"], "summary": "<1 sentence>", "nearTradeHub": "<name or null>", "distanceKm": <number or null> }
+    { "name": "<conflict/crisis name>", "lat": <number>, "lng": <number>, "severity": <0.1-1.0>, "type": "<war|sanctions|unrest|terrorism|trade_war|cyber|energy>", "affectedAssets": ["<ticker1>", "<ticker2>"], "summary": "<2 sentence intelligence brief>", "nearTradeHub": "<name or null>", "distanceKm": <number or null>, "escalationProb": <0-1>, "actionableIntel": "<1 sentence what to do>" }
   ],
   "supplyChainRisks": [
-    { "route": "<trade route>", "startLat": <num>, "startLng": <num>, "endLat": <num>, "endLng": <num>, "riskLevel": "<high|medium|low>", "reason": "<1 sentence>" }
+    { "route": "<trade route>", "startLat": <num>, "startLng": <num>, "endLat": <num>, "endLng": <num>, "riskLevel": "<high|medium|low>", "reason": "<1 sentence>", "affectedCommodities": ["<commodity1>"] }
   ],
   "globalRiskScore": <0-100>,
   "regimeSignal": "<stable|transition|crisis>",
-  "keyThreats": ["<threat1>", "<threat2>", "<threat3>"],
-  "capitalFlowDirection": "<risk-on|risk-off|mixed>"
+  "keyThreats": ["<threat with specific detail>", "<threat2>", "<threat3>", "<threat4>", "<threat5>"],
+  "capitalFlowDirection": "<risk-on|risk-off|mixed>",
+  "safeHavenDemand": "<low|moderate|high|extreme>",
+  "intelligenceSummary": "<3-4 sentence executive briefing on global risk landscape>"
 }
 
-Include 8-12 REAL current conflicts/crises. Use accurate coordinates.` },
+Include 10-15 REAL current conflicts/crises with accurate coordinates. Be specific, not generic.` },
             ],
-            temperature: 0.3,
-            max_tokens: 2000,
+            temperature: 0.25,
+            max_tokens: 3000,
           }),
         });
 
-        const aiData = await aiRes.json();
-        if (aiData.choices?.[0]?.message?.content) {
-          const raw = aiData.choices[0].message.content.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-          geopoliticalInsights = JSON.parse(raw);
-          conflictEvents = geopoliticalInsights.conflicts || [];
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          if (aiData.choices?.[0]?.message?.content) {
+            const raw = aiData.choices[0].message.content.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+            geopoliticalInsights = JSON.parse(raw);
+            conflictEvents = geopoliticalInsights.conflicts || [];
+          }
+        } else {
+          console.error("AI geo error:", aiRes.status);
         }
       } catch (e) { console.error("AI geo error:", e); }
     }
@@ -125,10 +150,10 @@ Include 8-12 REAL current conflicts/crises. Use accurate coordinates.` },
       .map((conflict: any) => {
         const nearbyForex = forexResults.filter(f => {
           const dist = Math.sqrt(Math.pow(f.lat - conflict.lat, 2) + Math.pow(f.lng - conflict.lng, 2));
-          return dist < 20; // rough proximity
+          return dist < 20;
         });
         const currencyStress = nearbyForex.reduce((max, f) => Math.max(max, Math.abs(f.change24h)), 0);
-        const entropyScore = (conflict.severity * 50) + (currencyStress * 10);
+        const entropyScore = (conflict.severity * 50) + (currencyStress * 10) + ((conflict.escalationProb || 0) * 20);
         return {
           ...conflict,
           currencyStress,
@@ -149,6 +174,8 @@ Include 8-12 REAL current conflicts/crises. Use accurate coordinates.` },
       regimeSignal: geopoliticalInsights.regimeSignal || "stable",
       keyThreats: geopoliticalInsights.keyThreats || [],
       capitalFlowDirection: geopoliticalInsights.capitalFlowDirection || "mixed",
+      safeHavenDemand: geopoliticalInsights.safeHavenDemand || "moderate",
+      intelligenceSummary: geopoliticalInsights.intelligenceSummary || "",
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },

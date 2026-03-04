@@ -29,12 +29,16 @@ interface MarketData {
     usdInr: number;
     crudeBrent: number;
     goldPrice?: number;
+    silverPrice?: number;
     eurUsd?: number;
     gbpUsd?: number;
     btcUsd?: number;
+    ethUsd?: number;
     topMovers: { name: string; change: number }[];
     keyEvents: string[];
     outlook: string;
+    sectorRotation?: string;
+    riskAppetite?: string;
   } | null;
   timestamp?: number;
 }
@@ -160,14 +164,16 @@ const MarketOverview = () => {
 
       {/* Key Macro Metrics */}
       {data.macro && (
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10">
           <MacroCard icon={<Activity className="h-4 w-4" />} label="VIX" value={data.macro.vix > 0 ? data.macro.vix.toFixed(2) : "—"} />
           <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `₹${data.macro.usdInr.toFixed(2)}` : "—"} />
           <MacroCard icon={<DollarSign className="h-4 w-4" />} label="EUR/USD" value={data.macro.eurUsd ? `$${data.macro.eurUsd.toFixed(4)}` : "—"} />
           <MacroCard icon={<DollarSign className="h-4 w-4" />} label="GBP/USD" value={data.macro.gbpUsd ? `$${data.macro.gbpUsd.toFixed(4)}` : "—"} />
           <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={data.macro.crudeBrent > 0 ? `$${data.macro.crudeBrent.toFixed(2)}` : "—"} />
           <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Gold" value={data.macro.goldPrice ? `$${data.macro.goldPrice.toFixed(0)}` : "—"} />
+          <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Silver" value={data.macro.silverPrice ? `$${data.macro.silverPrice.toFixed(2)}` : "—"} />
           <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Bitcoin" value={data.macro.btcUsd ? `$${data.macro.btcUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"} />
+          <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Ethereum" value={data.macro.ethUsd ? `$${data.macro.ethUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"} />
           <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
         </div>
       )}
@@ -214,6 +220,18 @@ const MarketOverview = () => {
               <div className="rounded-lg bg-surface-2 p-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Global Outlook</p>
                 <p className="text-sm leading-relaxed text-secondary-foreground">{data.macro.outlook}</p>
+              </div>
+            )}
+            {data.macro.sectorRotation && (
+              <div className="rounded-lg bg-surface-2 p-3 mt-2">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Sector Rotation</p>
+                <p className="text-xs leading-relaxed text-secondary-foreground">{data.macro.sectorRotation}</p>
+              </div>
+            )}
+            {data.macro.riskAppetite && (
+              <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 mt-2">
+                <p className="text-[10px] uppercase tracking-wider text-primary/70 mb-1">Risk Appetite</p>
+                <p className="text-xs leading-relaxed text-foreground">{data.macro.riskAppetite}</p>
               </div>
             )}
           </div>
