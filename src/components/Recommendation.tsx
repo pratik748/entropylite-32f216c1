@@ -18,7 +18,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
   const config = suggestionConfig[suggestion];
 
   return (
-    <div className="glass-card rounded-2xl p-6 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-5 flex items-center gap-2">
         <Brain className="h-5 w-5 text-primary" />
         <h2 className="text-base font-semibold text-foreground">AI Recommendation</h2>

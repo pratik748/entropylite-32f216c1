@@ -25,7 +25,7 @@ const categoryColors: Record<string, string> = {
 
 const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTableProps) => {
   return (
-    <div className="glass-card rounded-2xl p-6 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="h-5 w-5 text-primary" />

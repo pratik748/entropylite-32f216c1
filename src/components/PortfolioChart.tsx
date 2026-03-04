@@ -27,7 +27,7 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
   if (data.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-2xl p-5 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
       <h3 className="mb-4 text-sm font-semibold text-foreground">Allocation</h3>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">

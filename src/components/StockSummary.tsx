@@ -15,7 +15,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity }: StockSummary
   const isProfit = pnl >= 0;
 
   return (
-    <div className="glass-card rounded-2xl p-6 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="font-mono text-xl font-bold text-foreground">{ticker}</p>

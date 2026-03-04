@@ -37,7 +37,7 @@ const RiskIndicator = ({ level, keyRisks }: RiskIndicatorProps) => {
   const Icon = config.icon;
 
   return (
-    <div className={`glass-card rounded-2xl border ${config.border} p-6 animate-slide-up`}>
+    <div className={`rounded-xl border ${config.border} ${config.bg} p-6 animate-slide-up`}>
       <div className="mb-4 flex items-center gap-2">
         <Icon className={`h-5 w-5 ${config.color}`} />
         <h2 className="text-base font-semibold text-foreground">Risk Level</h2>

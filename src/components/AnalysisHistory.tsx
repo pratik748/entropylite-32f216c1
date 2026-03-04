@@ -21,7 +21,7 @@ const AnalysisHistory = ({ entries, onClear, onSelect }: AnalysisHistoryProps) =
   if (entries.length === 0) return null;
 
   return (
-    <div className="glass-card rounded-2xl p-5 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
