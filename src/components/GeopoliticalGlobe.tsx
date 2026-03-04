@@ -659,6 +659,22 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
         </div>
       </div>
 
+      {/* Intelligence Summary Banner */}
+      {data.intelligenceSummary && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Radio className="h-3 w-3 text-primary animate-pulse" />
+            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Intelligence Brief</span>
+            {data.safeHavenDemand && (
+              <span className={`ml-auto rounded px-2 py-0.5 text-[8px] font-mono font-bold uppercase ${
+                data.safeHavenDemand === "extreme" || data.safeHavenDemand === "high" ? "bg-loss/10 text-loss" : "bg-surface-3 text-muted-foreground"
+              }`}>Safe Haven: {data.safeHavenDemand}</span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-foreground leading-relaxed">{data.intelligenceSummary}</p>
+        </div>
+      )}
+
       {/* Globe + Intel Sidebar */}
       {viewMode === "globe" && (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
