@@ -269,7 +269,7 @@
   }
 
   .gradient-border {
-    border-image: linear-gradient(135deg, hsl(30 100% 64% / 0.2), hsl(0 0% 12%)) 1;
+    border-image: linear-gradient(135deg, hsl(217 91% 60% / 0.2), hsl(0 0% 12%)) 1;
   }
   .scrollbar-hide {
     -ms-overflow-style: none;
