@@ -39,7 +39,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
   const totalPnLPct = primaryCur.invested > 0 ? (totalPnL / primaryCur.invested) * 100 : 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
+    <div className="glass-card rounded-2xl p-5 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />

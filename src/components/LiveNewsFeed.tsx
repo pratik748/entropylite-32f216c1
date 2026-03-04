@@ -51,7 +51,7 @@ const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
   }, [ticker]);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
+    <div className="glass-card rounded-2xl p-6 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="h-5 w-5 text-foreground" />
