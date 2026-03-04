@@ -125,7 +125,7 @@ const ProfitTaskbar = ({
   }
 
   return (
-    <div className="glass-card rounded-2xl p-6 animate-slide-up">
+    <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center gap-2">
         <Target className="h-5 w-5 text-foreground" />
         <h2 className="text-base font-semibold text-foreground">Action Plan</h2>
