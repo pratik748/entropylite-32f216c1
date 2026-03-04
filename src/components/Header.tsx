@@ -1,12 +1,39 @@
 import { useState, useEffect } from "react";
+import { Sun, Moon } from "lucide-react";
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      return document.documentElement.classList.contains("dark");
+    }
+    return true;
+  });
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    // Default to dark on first load if no preference
+    const stored = localStorage.getItem("entropy-theme");
+    if (!stored) {
+      document.documentElement.classList.add("dark");
+      setIsDark(true);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("entropy-theme", next ? "dark" : "light");
+  };
 
   const markets = [
     { name: "NYSE", tz: "America/New_York", open: 9.5, close: 16 },
@@ -42,10 +69,17 @@ const Header = () => {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-4">
           <span className="font-mono text-[10px] text-muted-foreground/60 tabular-nums tracking-wider">
             {time.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </span>
+          <button
+            onClick={toggleTheme}
+            className="flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300 hover:bg-accent active:scale-95 text-muted-foreground hover:text-foreground"
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
           <span className="text-[9px] text-muted-foreground/30 tracking-widest uppercase hidden sm:inline">
             Entropy Lite
           </span>
