@@ -93,6 +93,14 @@ serve(async (req) => {
 
 REAL-TIME FOREX STRESS: ${stressedCurrencies || "No currencies stressed >2%"}
 
+MANDATORY COVERAGE — You MUST include intelligence on ALL of these regions:
+- West Asia / Middle East: Iran-Israel tensions, Yemen/Houthi disruptions, Iraq instability, Syria, Lebanon-Hezbollah
+- Ukraine-Russia war: frontlines, energy infrastructure, sanctions impact
+- East Asia: China-Taiwan, South China Sea, North Korea
+- South Asia: India-Pakistan, India-China border
+- Africa: Sahel conflicts, Sudan, Ethiopia
+- Americas: Venezuela, US-Mexico border, drug cartel disruptions
+
 Provide DEEP geopolitical intelligence covering:
 1. Active armed conflicts with precise coordinates and severity
 2. Sanctions regimes and trade restrictions currently in force
@@ -101,12 +109,6 @@ Provide DEEP geopolitical intelligence covering:
 5. Cyber and hybrid warfare threats to financial infrastructure
 6. Energy supply disruption risks
 7. Food security and commodity supply threats
-
-For each conflict, assess:
-- DIRECT impact on nearby trade hubs (with km distance)
-- Which specific asset classes and tickers are affected
-- Probability of escalation in next 30 days
-- Capital flow implications (where money is moving)
 
 Return JSON:
 {
@@ -124,7 +126,7 @@ Return JSON:
   "intelligenceSummary": "<3-4 sentence executive briefing on global risk landscape>"
 }
 
-Include 10-15 REAL current conflicts/crises with accurate coordinates. Be specific, not generic.` },
+Include 12-18 REAL current conflicts/crises. You MUST include Iran/Israel, Houthis/Red Sea, Ukraine-Russia, and China-Taiwan. Be specific with coordinates, not generic.` },
             ],
             temperature: 0.25,
             max_tokens: 3000,
