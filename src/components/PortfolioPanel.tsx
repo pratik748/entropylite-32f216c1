@@ -1,6 +1,7 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrencySymbol, formatCurrency, formatCompact, getPortfolioCurrency, isMultiCurrency } from "@/lib/currency";
+import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 
 export interface PortfolioStock {
   id: string;
@@ -20,23 +21,24 @@ interface PortfolioPanelProps {
 }
 
 const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew }: PortfolioPanelProps) => {
+  const { baseCurrency, setBaseCurrency, convertToBase } = useFX();
   const analyzed = stocks.filter(s => s.analysis);
-  const baseCurrency = getPortfolioCurrency(analyzed);
   const multi = isMultiCurrency(analyzed);
-  const sym = getCurrencySymbol(baseCurrency);
+  const baseSym = getCurrencySymbol(baseCurrency);
 
-  // Group by currency for accurate totals
-  const byCurrency: Record<string, { invested: number; current: number }> = {};
+  // Normalize all to base currency
+  let totalInvested = 0;
+  let totalCurrent = 0;
   stocks.forEach(s => {
-    const cur = s.analysis?.currency || baseCurrency;
-    if (!byCurrency[cur]) byCurrency[cur] = { invested: 0, current: 0 };
-    byCurrency[cur].invested += s.buyPrice * s.quantity;
-    byCurrency[cur].current += (s.analysis?.currentPrice ?? s.buyPrice) * s.quantity;
+    const cur = s.analysis?.currency || "USD";
+    const invested = s.buyPrice * s.quantity;
+    const current = (s.analysis?.currentPrice ?? s.buyPrice) * s.quantity;
+    totalInvested += convertToBase(invested, cur);
+    totalCurrent += convertToBase(current, cur);
   });
 
-  const primaryCur = byCurrency[baseCurrency] || { invested: 0, current: 0 };
-  const totalPnL = primaryCur.current - primaryCur.invested;
-  const totalPnLPct = primaryCur.invested > 0 ? (totalPnL / primaryCur.invested) * 100 : 0;
+  const totalPnL = totalCurrent - totalInvested;
+  const totalPnLPct = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
@@ -47,46 +49,54 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           <span className="rounded-md bg-surface-3 px-2 py-0.5 font-mono text-xs text-muted-foreground">
             {stocks.length} assets
           </span>
-          {multi && <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[9px] text-warning font-mono">MULTI-CCY</span>}
         </div>
-        <Button size="sm" variant="outline" onClick={onAddNew} className="h-8 gap-1.5 text-xs">
-          <Plus className="h-3.5 w-3.5" /> Add
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {/* Base currency selector */}
+          <select
+            value={baseCurrency}
+            onChange={(e) => setBaseCurrency(e.target.value)}
+            className="h-7 rounded-md bg-surface-2 border border-border px-1.5 text-[10px] font-mono text-muted-foreground focus:text-foreground focus:ring-1 focus:ring-primary/30 outline-none cursor-pointer"
+          >
+            {SUPPORTED_CURRENCIES.map(c => (
+              <option key={c} value={c}>{getCurrencySymbol(c)} {c}</option>
+            ))}
+          </select>
+          <Button size="sm" variant="outline" onClick={onAddNew} className="h-7 gap-1.5 text-xs">
+            <Plus className="h-3.5 w-3.5" /> Add
+          </Button>
+        </div>
       </div>
 
       {analyzed.length > 0 && (
         <div className="mb-4 rounded-lg bg-surface-2 p-3">
-          {multi ? (
-            <div className="space-y-1.5">
-              {Object.entries(byCurrency).map(([cur, data]) => {
-                const pnl = data.current - data.invested;
-                const pct = data.invested > 0 ? (pnl / data.invested) * 100 : 0;
-                const s = getCurrencySymbol(cur);
-                return (
-                  <div key={cur} className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground font-mono">{cur} {s}{data.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                    <span className={`font-mono font-semibold ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                      {pnl >= 0 ? "+" : ""}{s}{Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 0 })} ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Portfolio Value ({baseCurrency})</span>
+            <span>P&L</span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="font-mono text-sm font-semibold text-foreground">
+              {baseSym}{totalCurrent.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </span>
+            <span className={`font-mono text-sm font-semibold ${totalPnL >= 0 ? "text-gain" : "text-loss"}`}>
+              {totalPnL >= 0 ? "+" : ""}{baseSym}{Math.abs(totalPnL).toLocaleString(undefined, { maximumFractionDigits: 0 })} ({totalPnLPct >= 0 ? "+" : ""}{totalPnLPct.toFixed(1)}%)
+            </span>
+          </div>
+          {multi && (
+            <div className="mt-2 pt-2 border-t border-border/30">
+              <div className="flex flex-wrap gap-1">
+                {Array.from(new Set(stocks.filter(s => s.analysis?.currency).map(s => s.analysis.currency))).map(cur => {
+                  const curStocks = stocks.filter(s => s.analysis?.currency === cur);
+                  const curVal = curStocks.reduce((sum, s) => sum + (s.analysis?.currentPrice ?? s.buyPrice) * s.quantity, 0);
+                  const curValBase = convertToBase(curVal, cur);
+                  const pct = totalCurrent > 0 ? (curValBase / totalCurrent * 100) : 0;
+                  return (
+                    <span key={cur} className="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-mono text-primary">
+                      {cur} {pct.toFixed(0)}%
                     </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Portfolio Value</span>
-                <span>P&L</span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="font-mono text-sm font-semibold text-foreground">
-                  {sym}{primaryCur.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                </span>
-                <span className={`font-mono text-sm font-semibold ${totalPnL >= 0 ? "text-gain" : "text-loss"}`}>
-                  {totalPnL >= 0 ? "+" : ""}{sym}{Math.abs(totalPnL).toLocaleString(undefined, { maximumFractionDigits: 0 })} ({totalPnLPct >= 0 ? "+" : ""}{totalPnLPct.toFixed(1)}%)
-                </span>
-              </div>
-            </>
           )}
         </div>
       )}
@@ -98,6 +108,9 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           const pnl = stock.analysis ? (stock.analysis.currentPrice - stock.buyPrice) * stock.quantity : 0;
           const pnlPct = stock.analysis ? ((stock.analysis.currentPrice - stock.buyPrice) / stock.buyPrice) * 100 : 0;
           const isActive = stock.id === activeStockId;
+
+          // Show base-currency P&L if different from native
+          const pnlBase = cur && cur !== baseCurrency ? convertToBase(pnl, cur) : null;
 
           return (
             <div
@@ -117,7 +130,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                       stock.analysis.suggestion === "Exit" ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"
                     }`}>{stock.analysis.suggestion}</span>
                   )}
-                  {cur && cur !== "USD" && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
+                  {cur && cur !== baseCurrency && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                   <span>{stock.quantity} qty</span>
@@ -136,6 +149,11 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {s}{stock.analysis.currentPrice.toLocaleString()}
                     </span>
+                    {pnlBase !== null && (
+                      <span className={`block font-mono text-[8px] ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
+                        {pnlBase >= 0 ? "+" : ""}{baseSym}{Math.abs(pnlBase).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
                   </div>
                 )}
                 <button

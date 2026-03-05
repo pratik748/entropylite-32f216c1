@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.causal-effects]
 verify_jwt = false
+
+[functions.fx-rates]
+verify_jwt = false

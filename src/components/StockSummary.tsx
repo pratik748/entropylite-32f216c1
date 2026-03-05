@@ -1,25 +1,28 @@
-import { ArrowUpRight, ArrowDownRight, IndianRupee } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 
 interface StockSummaryProps {
   ticker: string;
   currentPrice: number;
   buyPrice: number;
   quantity: number;
+  currency?: string;
 }
 
-const StockSummary = ({ ticker, currentPrice, buyPrice, quantity }: StockSummaryProps) => {
+const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: StockSummaryProps) => {
   const invested = buyPrice * quantity;
   const currentValue = currentPrice * quantity;
   const pnl = currentValue - invested;
   const pnlPercent = ((pnl / invested) * 100);
   const isProfit = pnl >= 0;
+  const sym = getCurrencySymbol(currency);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="font-mono text-xl font-bold text-foreground">{ticker}</p>
-          <p className="text-sm text-muted-foreground">NSE</p>
+          <p className="text-sm text-muted-foreground">{currency || "USD"}</p>
         </div>
         <div className={`flex items-center gap-1 rounded-lg px-3 py-1.5 ${isProfit ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
           {isProfit ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
@@ -30,16 +33,16 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity }: StockSummary
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard label="Current Price" value={`₹${currentPrice.toLocaleString("en-IN")}`} />
-        <MetricCard label="Buy Price" value={`₹${buyPrice.toLocaleString("en-IN")}`} />
+        <MetricCard label="Current Price" value={formatCurrency(currentPrice, currency)} />
+        <MetricCard label="Buy Price" value={formatCurrency(buyPrice, currency)} />
         <MetricCard
           label="P&L"
-          value={`${isProfit ? "+" : ""}₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}
+          value={`${isProfit ? "+" : ""}${formatCurrency(Math.abs(pnl), currency)}`}
           highlight={isProfit ? "gain" : "loss"}
         />
         <MetricCard
           label="Portfolio Value"
-          value={`₹${currentValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}
+          value={formatCurrency(currentValue, currency)}
         />
       </div>
     </div>
