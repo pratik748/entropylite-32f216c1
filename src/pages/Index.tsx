@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { FXProvider } from "@/hooks/useFX";
 
 type Tab = "dashboard" | "market" | "sandbox" | "augment" | "geopolitical" | "desirable" | "risk";
 
@@ -38,7 +39,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "risk", label: "Risk", shortLabel: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
 ];
 
-const Index = () => {
+const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
@@ -124,7 +125,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Tab Navigation — mobile optimized */}
+      {/* Tab Navigation */}
       <nav className="border-b border-border glass-panel sticky top-0 z-30">
         <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
           {tabs.map((tab) => (
@@ -182,7 +183,7 @@ const Index = () => {
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
                 <>
-                  <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} />
+                  <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} currency={analysis.currency} />
                   <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
                   <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
                   <LiveNewsFeed ticker={analysis.ticker} />
@@ -206,5 +207,11 @@ const Index = () => {
     </div>
   );
 };
+
+const Index = () => (
+  <FXProvider>
+    <IndexContent />
+  </FXProvider>
+);
 
 export default Index;
