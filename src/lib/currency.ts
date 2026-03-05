@@ -26,6 +26,11 @@ export const formatCompact = (value: number, currency?: string): string => {
   return `${sign}${sym}${abs.toFixed(2)}`;
 };
 
+/** Format in a specific base currency with proper symbol */
+export const formatInBase = (value: number, baseCurrency: string): string => {
+  return formatCurrency(value, baseCurrency);
+};
+
 export const getPortfolioCurrency = (stocks: { analysis?: { currency?: string } }[]): string => {
   const currencies = stocks.filter(s => s.analysis?.currency).map(s => s.analysis!.currency!);
   if (currencies.length === 0) return "USD";
