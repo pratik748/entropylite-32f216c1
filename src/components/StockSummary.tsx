@@ -1,5 +1,6 @@
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { useFX } from "@/hooks/useFX";
 
 interface StockSummaryProps {
   ticker: string;
@@ -10,12 +11,19 @@ interface StockSummaryProps {
 }
 
 const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: StockSummaryProps) => {
+  const { baseCurrency, convertToBase } = useFX();
   const invested = buyPrice * quantity;
   const currentValue = currentPrice * quantity;
   const pnl = currentValue - invested;
   const pnlPercent = ((pnl / invested) * 100);
   const isProfit = pnl >= 0;
   const sym = getCurrencySymbol(currency);
+
+  const showConverted = currency && currency !== baseCurrency;
+  const baseSym = getCurrencySymbol(baseCurrency);
+  const convertedPrice = showConverted ? convertToBase(currentPrice, currency) : null;
+  const convertedValue = showConverted ? convertToBase(currentValue, currency) : null;
+  const convertedPnl = showConverted ? convertToBase(pnl, currency) : null;
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
@@ -33,17 +41,32 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard label="Current Price" value={formatCurrency(currentPrice, currency)} />
+        <div className="rounded-lg bg-surface-2 p-3">
+          <p className="text-xs text-muted-foreground">Current Price</p>
+          <p className="mt-1 font-mono text-lg font-semibold text-foreground">{formatCurrency(currentPrice, currency)}</p>
+          {convertedPrice !== null && (
+            <p className="font-mono text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          )}
+        </div>
         <MetricCard label="Buy Price" value={formatCurrency(buyPrice, currency)} />
-        <MetricCard
-          label="P&L"
-          value={`${isProfit ? "+" : ""}${formatCurrency(Math.abs(pnl), currency)}`}
-          highlight={isProfit ? "gain" : "loss"}
-        />
-        <MetricCard
-          label="Portfolio Value"
-          value={formatCurrency(currentValue, currency)}
-        />
+        <div className="rounded-lg bg-surface-2 p-3">
+          <p className="text-xs text-muted-foreground">P&L</p>
+          <p className={`mt-1 font-mono text-lg font-semibold ${isProfit ? "text-gain" : "text-loss"}`}>
+            {isProfit ? "+" : ""}{formatCurrency(Math.abs(pnl), currency)}
+          </p>
+          {convertedPnl !== null && (
+            <p className={`font-mono text-[10px] mt-0.5 ${isProfit ? "text-gain/60" : "text-loss/60"}`}>
+              ≈ {isProfit ? "+" : "-"}{baseSym}{Math.abs(convertedPnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </p>
+          )}
+        </div>
+        <div className="rounded-lg bg-surface-2 p-3">
+          <p className="text-xs text-muted-foreground">Portfolio Value</p>
+          <p className="mt-1 font-mono text-lg font-semibold text-foreground">{formatCurrency(currentValue, currency)}</p>
+          {convertedValue !== null && (
+            <p className="font-mono text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+          )}
+        </div>
       </div>
     </div>
   );

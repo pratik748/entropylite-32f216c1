@@ -220,3 +220,60 @@
     animation: data-stream 4s linear infinite;
   }
 }
+
+/* Leaflet dark theme overrides */
+.leaflet-container {
+  background: hsl(220, 15%, 4%) !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+.leaflet-control-zoom a {
+  background: hsl(220, 14%, 10%) !important;
+  color: hsl(210, 20%, 70%) !important;
+  border-color: hsl(220, 12%, 16%) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: hsl(220, 14%, 16%) !important;
+  color: hsl(210, 20%, 95%) !important;
+}
+.entropy-tooltip {
+  background: hsl(220, 14%, 8%) !important;
+  border: 1px solid hsl(220, 12%, 20%) !important;
+  color: hsl(210, 20%, 85%) !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 9px !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+.entropy-tooltip::before {
+  border-right-color: hsl(220, 12%, 20%) !important;
+}
+.portfolio-tooltip {
+  color: hsl(210, 100%, 65%) !important;
+  font-weight: 700 !important;
+}
+.entropy-popup .leaflet-popup-content-wrapper {
+  background: hsl(220, 14%, 8%) !important;
+  color: hsl(210, 20%, 85%) !important;
+  border: 1px solid hsl(220, 12%, 20%) !important;
+  border-radius: 8px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 10px !important;
+}
+.leaflet-popup-content-wrapper {
+  background: hsl(220, 14%, 8%) !important;
+  color: hsl(210, 20%, 85%) !important;
+  border: 1px solid hsl(220, 12%, 20%) !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+}
+.leaflet-popup-tip {
+  background: hsl(220, 14%, 8%) !important;
+}
+.leaflet-popup-close-button {
+  color: hsl(210, 8%, 45%) !important;
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.15); }
+}

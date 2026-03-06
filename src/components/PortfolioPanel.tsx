@@ -1,7 +1,8 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Globe } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getCurrencySymbol, formatCurrency, formatCompact, getPortfolioCurrency, isMultiCurrency } from "@/lib/currency";
+import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
+import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
 
 export interface PortfolioStock {
   id: string;
@@ -18,9 +19,35 @@ interface PortfolioPanelProps {
   onSelectStock: (id: string) => void;
   onRemoveStock: (id: string) => void;
   onAddNew: () => void;
+  priceStatus?: PriceStatusMap;
 }
 
-const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew }: PortfolioPanelProps) => {
+const FreshnessIndicator = ({ status }: { status?: PriceFreshness }) => {
+  if (!status || status === "LIVE") {
+    return (
+      <span className="flex items-center gap-0.5 text-[7px] font-mono text-gain" title="Real-time price feed active">
+        <Wifi className="h-2 w-2" />
+        <span>LIVE</span>
+      </span>
+    );
+  }
+  if (status === "DELAYED") {
+    return (
+      <span className="flex items-center gap-0.5 text-[7px] font-mono text-warning" title="Price update delayed">
+        <Clock className="h-2 w-2" />
+        <span>DELAY</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-0.5 text-[7px] font-mono text-loss" title="Price feed disconnected">
+      <WifiOff className="h-2 w-2" />
+      <span>OFF</span>
+    </span>
+  );
+};
+
+const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew, priceStatus }: PortfolioPanelProps) => {
   const { baseCurrency, setBaseCurrency, convertToBase } = useFX();
   const analyzed = stocks.filter(s => s.analysis);
   const multi = isMultiCurrency(analyzed);
@@ -51,7 +78,6 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {/* Base currency selector */}
           <select
             value={baseCurrency}
             onChange={(e) => setBaseCurrency(e.target.value)}
@@ -108,9 +134,13 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           const pnl = stock.analysis ? (stock.analysis.currentPrice - stock.buyPrice) * stock.quantity : 0;
           const pnlPct = stock.analysis ? ((stock.analysis.currentPrice - stock.buyPrice) / stock.buyPrice) * 100 : 0;
           const isActive = stock.id === activeStockId;
-
-          // Show base-currency P&L if different from native
           const pnlBase = cur && cur !== baseCurrency ? convertToBase(pnl, cur) : null;
+          const freshness = priceStatus?.[stock.id]?.status;
+
+          // Dual currency: show converted price if asset currency differs from base
+          const convertedPrice = stock.analysis && cur && cur !== baseCurrency
+            ? convertToBase(stock.analysis.currentPrice, cur)
+            : null;
 
           return (
             <div
@@ -131,6 +161,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                     }`}>{stock.analysis.suggestion}</span>
                   )}
                   {cur && cur !== baseCurrency && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
+                  {stock.analysis && <FreshnessIndicator status={freshness} />}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                   <span>{stock.quantity} qty</span>
@@ -149,6 +180,11 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {s}{stock.analysis.currentPrice.toLocaleString()}
                     </span>
+                    {convertedPrice !== null && (
+                      <span className="block font-mono text-[8px] text-muted-foreground/70">
+                        ≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
                     {pnlBase !== null && (
                       <span className={`block font-mono text-[8px] ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
                         {pnlBase >= 0 ? "+" : ""}{baseSym}{Math.abs(pnlBase).toLocaleString(undefined, { maximumFractionDigits: 0 })}

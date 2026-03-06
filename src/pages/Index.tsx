@@ -29,6 +29,9 @@ import { FXProvider } from "@/hooks/useFX";
 
 type Tab = "dashboard" | "market" | "sandbox" | "augment" | "geopolitical" | "desirable" | "risk";
 
+export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
+export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
+
 const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
@@ -44,40 +47,85 @@ const IndexContent = () => {
   const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
-  const priceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
+  const stocksRef = useRef(stocks);
   const isMobile = useIsMobile();
+
+  // Keep ref in sync
+  useEffect(() => { stocksRef.current = stocks; }, [stocks]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
   const analysis = activeStock?.analysis ?? null;
 
-  // Real-time price streaming via polling every 10s
+  // Persistent real-time price subscription via polling every 8s
   useEffect(() => {
+    let alive = true;
+
     const refreshPrices = async () => {
-      const analyzed = stocks.filter(s => s.analysis && !s.isLoading);
+      const current = stocksRef.current;
+      const analyzed = current.filter(s => s.analysis && !s.isLoading);
       if (analyzed.length === 0) return;
+
       const t = Date.now();
       const updates: Record<string, number> = {};
+      const statusUpdates: PriceStatusMap = {};
+
       await Promise.allSettled(
         analyzed.map(async (stock) => {
           try {
             const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.ticker)}?interval=1d&range=1d&_t=${t}`;
-            const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" } });
+            const res = await fetch(url, {
+              headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" },
+              signal: AbortSignal.timeout(8000),
+            });
             const data = await res.json();
             const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if (price && price > 0) updates[stock.id] = price;
-          } catch { /* silent */ }
+            if (price && price > 0) {
+              updates[stock.id] = price;
+              statusUpdates[stock.id] = { lastUpdate: t, status: "LIVE", failCount: 0 };
+            } else {
+              const prev = priceStatus[stock.id];
+              statusUpdates[stock.id] = {
+                lastUpdate: prev?.lastUpdate || 0,
+                status: "DELAYED",
+                failCount: (prev?.failCount || 0) + 1,
+              };
+            }
+          } catch {
+            const prev = priceStatus[stock.id];
+            const failCount = (prev?.failCount || 0) + 1;
+            statusUpdates[stock.id] = {
+              lastUpdate: prev?.lastUpdate || 0,
+              status: failCount >= 3 ? "DISCONNECTED" : "DELAYED",
+              failCount,
+            };
+          }
         })
       );
+
+      if (!alive) return;
+
       if (Object.keys(updates).length > 0) {
         setStocks(prev => prev.map(s => {
-          if (updates[s.id] && s.analysis) return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
+          if (updates[s.id] && s.analysis) {
+            return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
+          }
           return s;
         }));
       }
+
+      setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
     };
-    priceIntervalRef.current = setInterval(refreshPrices, 10000);
-    return () => { if (priceIntervalRef.current) clearInterval(priceIntervalRef.current); };
+
+    // Immediate first fetch
+    refreshPrices();
+    const interval = setInterval(refreshPrices, 8000);
+
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
   }, [stocks.length]);
 
   const analyzeStock = useCallback(
@@ -88,6 +136,7 @@ const IndexContent = () => {
         if (error) throw error;
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));
+        setPriceStatus(prev => ({ ...prev, [stockId]: { lastUpdate: Date.now(), status: "LIVE", failCount: 0 } }));
         setHistory((prev) => [
           { id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence },
           ...prev.slice(0, 49),
@@ -159,7 +208,7 @@ const IndexContent = () => {
             <div className="space-y-4 sm:space-y-5">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {stocks.length > 0 && (
-                <PortfolioPanel stocks={stocks} activeStockId={activeStockId} onSelectStock={setActiveStockId} onRemoveStock={handleRemoveStock} onAddNew={() => setActiveStockId(null)} />
+                <PortfolioPanel stocks={stocks} activeStockId={activeStockId} onSelectStock={setActiveStockId} onRemoveStock={handleRemoveStock} onAddNew={() => setActiveStockId(null)} priceStatus={priceStatus} />
               )}
               {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
               {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
