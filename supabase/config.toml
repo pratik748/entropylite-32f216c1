@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.fx-rates]
 verify_jwt = false
+
+[functions.price-feed]
+verify_jwt = false

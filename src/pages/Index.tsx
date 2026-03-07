@@ -58,7 +58,7 @@ const IndexContent = () => {
   const isLoading = activeStock?.isLoading ?? false;
   const analysis = activeStock?.analysis ?? null;
 
-  // Persistent real-time price subscription via polling every 8s
+  // Persistent real-time price subscription via server-side proxy (avoids CORS)
   useEffect(() => {
     let alive = true;
 
@@ -68,57 +68,57 @@ const IndexContent = () => {
       if (analyzed.length === 0) return;
 
       const t = Date.now();
-      const updates: Record<string, number> = {};
-      const statusUpdates: PriceStatusMap = {};
+      const tickers = analyzed.map(s => s.ticker);
 
-      await Promise.allSettled(
-        analyzed.map(async (stock) => {
-          try {
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(stock.ticker)}?interval=1d&range=1d&_t=${t}`;
-            const res = await fetch(url, {
-              headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" },
-              signal: AbortSignal.timeout(8000),
-            });
-            const data = await res.json();
-            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if (price && price > 0) {
-              updates[stock.id] = price;
-              statusUpdates[stock.id] = { lastUpdate: t, status: "LIVE", failCount: 0 };
-            } else {
-              const prev = priceStatus[stock.id];
-              statusUpdates[stock.id] = {
-                lastUpdate: prev?.lastUpdate || 0,
-                status: "DELAYED",
-                failCount: (prev?.failCount || 0) + 1,
-              };
-            }
-          } catch {
+      try {
+        const { data, error } = await supabase.functions.invoke("price-feed", {
+          body: { tickers },
+        });
+
+        if (!alive) return;
+
+        if (error || !data?.prices) {
+          // Mark all as delayed on error
+          const statusUpdates: PriceStatusMap = {};
+          analyzed.forEach(stock => {
             const prev = priceStatus[stock.id];
             const failCount = (prev?.failCount || 0) + 1;
-            statusUpdates[stock.id] = {
-              lastUpdate: prev?.lastUpdate || 0,
-              status: failCount >= 3 ? "DISCONNECTED" : "DELAYED",
-              failCount,
-            };
-          }
-        })
-      );
+            statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
+          });
+          setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
+          return;
+        }
 
-      if (!alive) return;
+        const updates: Record<string, number> = {};
+        const statusUpdates: PriceStatusMap = {};
 
-      if (Object.keys(updates).length > 0) {
-        setStocks(prev => prev.map(s => {
-          if (updates[s.id] && s.analysis) {
-            return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
+        analyzed.forEach(stock => {
+          const priceData = data.prices[stock.ticker];
+          if (priceData?.price && priceData.price > 0) {
+            updates[stock.id] = priceData.price;
+            statusUpdates[stock.id] = { lastUpdate: t, status: "LIVE", failCount: 0 };
+          } else {
+            const prev = priceStatus[stock.id];
+            const failCount = (prev?.failCount || 0) + 1;
+            statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           }
-          return s;
-        }));
+        });
+
+        if (Object.keys(updates).length > 0) {
+          setStocks(prev => prev.map(s => {
+            if (updates[s.id] && s.analysis) {
+              return { ...s, analysis: { ...s.analysis, currentPrice: updates[s.id] } };
+            }
+            return s;
+          }));
+        }
+
+        setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
+      } catch {
+        // Silent fail — status indicators handle visibility
       }
-
-      setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
     };
 
-    // Immediate first fetch
     refreshPrices();
     const interval = setInterval(refreshPrices, 8000);
 
