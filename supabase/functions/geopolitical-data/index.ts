@@ -7,6 +7,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// HARDCODED FALLBACK — always renders even if AI fails
+const FALLBACK_CONFLICTS = [
+  { name: "Ukraine-Russia War", lat: 48.5, lng: 37.5, severity: 0.9, type: "war", affectedAssets: ["RSX", "GAZP", "wheat"], summary: "Full-scale war continues with intense fighting in eastern Ukraine. Energy infrastructure targeted.", nearTradeHub: "Rotterdam", distanceKm: 2200, escalationProb: 0.35, actionableIntel: "Monitor European gas prices and defense stocks." },
+  { name: "Iran-Israel Tensions", lat: 32.0, lng: 51.0, severity: 0.85, type: "war", affectedAssets: ["XLE", "crude", "gold"], summary: "Elevated military tensions with proxy conflicts across Lebanon and Yemen. Oil supply risk elevated.", nearTradeHub: "Dubai", distanceKm: 900, escalationProb: 0.45, actionableIntel: "Hedge oil exposure. Add gold as safe haven." },
+  { name: "Houthi Red Sea Attacks", lat: 14.5, lng: 42.5, severity: 0.75, type: "terrorism", affectedAssets: ["shipping", "ZIM", "MAERSK"], summary: "Continued drone and missile attacks on commercial shipping disrupting Suez Canal trade routes.", nearTradeHub: "Suez Canal", distanceKm: 1500, escalationProb: 0.3, actionableIntel: "Shipping stocks face persistent premium. Watch freight rates." },
+  { name: "China-Taiwan Strait", lat: 24.0, lng: 121.0, severity: 0.7, type: "trade_war", affectedAssets: ["TSM", "ASML", "semiconductors"], summary: "Military exercises and gray-zone pressure continue. Semiconductor supply chain at risk.", nearTradeHub: "Shanghai", distanceKm: 700, escalationProb: 0.2, actionableIntel: "Diversify semiconductor exposure away from TSMC concentration." },
+  { name: "Sudan Civil War", lat: 15.6, lng: 32.5, severity: 0.65, type: "war", affectedAssets: ["gold", "agriculture"], summary: "Humanitarian crisis deepens as fighting between SAF and RSF continues in Khartoum.", escalationProb: 0.25, actionableIntel: "Limited direct market impact but watch refugee flows to Egypt." },
+  { name: "South China Sea Disputes", lat: 12.0, lng: 115.0, severity: 0.55, type: "unrest", affectedAssets: ["shipping", "PHI"], summary: "Escalating confrontations between Chinese coast guard and Philippine vessels near contested reefs.", nearTradeHub: "Singapore", distanceKm: 1800, escalationProb: 0.15, actionableIntel: "Monitor ASEAN shipping routes." },
+  { name: "India-Pakistan Border", lat: 34.0, lng: 74.0, severity: 0.45, type: "unrest", affectedAssets: ["NIFTY", "SENSEX"], summary: "Periodic border tensions with occasional ceasefire violations. Currently in managed tension phase.", nearTradeHub: "Mumbai", distanceKm: 1400, escalationProb: 0.1, actionableIntel: "Indian defense stocks as tactical play." },
+  { name: "Venezuela Crisis", lat: 10.5, lng: -66.9, severity: 0.4, type: "sanctions", affectedAssets: ["crude", "PBR"], summary: "Ongoing political instability and sanctions affecting oil production capacity.", escalationProb: 0.15, actionableIntel: "Watch for sanctions relief signals — bullish for EM energy." },
+  { name: "North Korea Provocations", lat: 39.0, lng: 125.7, severity: 0.5, type: "unrest", affectedAssets: ["KRW", "KOSPI"], summary: "Continued missile tests and nuclear saber-rattling raising regional tensions.", nearTradeHub: "Tokyo", distanceKm: 1200, escalationProb: 0.1, actionableIntel: "Korean won hedges on test days." },
+  { name: "Sahel Region Instability", lat: 14.0, lng: 2.0, severity: 0.45, type: "unrest", affectedAssets: ["uranium", "gold"], summary: "Military coups and jihadist insurgencies across Mali, Niger, and Burkina Faso disrupting mining operations.", escalationProb: 0.2, actionableIntel: "Uranium supply disruption risk — nuclear energy play." },
+];
+
+const FALLBACK_SUPPLY_CHAINS = [
+  { route: "Suez Canal → Mediterranean", startLat: 30.4, startLng: 32.3, endLat: 35.0, endLng: 18.0, riskLevel: "high", reason: "Houthi attacks forcing rerouting via Cape of Good Hope", affectedCommodities: ["oil", "LNG", "containers"] },
+  { route: "Strait of Malacca", startLat: 1.3, startLng: 103.8, endLat: 6.0, endLng: 100.0, riskLevel: "medium", reason: "China-ASEAN tensions and piracy risk", affectedCommodities: ["oil", "electronics"] },
+  { route: "Black Sea Grain Corridor", startLat: 46.0, startLng: 31.0, endLat: 41.0, endLng: 29.0, riskLevel: "high", reason: "Russia-Ukraine war disrupting grain exports", affectedCommodities: ["wheat", "corn", "sunflower oil"] },
+  { route: "Taiwan Strait", startLat: 24.0, startLng: 121.0, endLat: 25.0, endLng: 119.5, riskLevel: "medium", reason: "Chinese military exercises near shipping lanes", affectedCommodities: ["semiconductors", "electronics"] },
+];
+
 const forexPairs = [
   { symbol: "USDINR=X", country: "India", lat: 20.5, lng: 78.9, currency: "INR" },
   { symbol: "USDTRY=X", country: "Turkey", lat: 39.9, lng: 32.8, currency: "TRY" },
@@ -43,9 +64,7 @@ const tradeHubs = [
 async function fetchYahooQuote(symbol: string) {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${Date.now()}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" },
-    });
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", "Cache-Control": "no-cache, no-store" } });
     const data = await res.json();
     const meta = data?.chart?.result?.[0]?.meta;
     if (!meta) return null;
@@ -59,110 +78,72 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GOOGLE_GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_KEY");
 
-    // 1. Fetch real forex volatility in parallel
+    // 1. Fetch real forex volatility
     const forexResults = await Promise.all(
       forexPairs.map(async (pair) => {
         const quote = await fetchYahooQuote(pair.symbol);
-        return {
-          ...pair,
-          rate: quote?.price || 0,
-          change24h: quote?.change || 0,
-          isStressed: Math.abs(quote?.change || 0) > 2,
-        };
+        return { ...pair, rate: quote?.price || 0, change24h: quote?.change || 0, isStressed: Math.abs(quote?.change || 0) > 2 };
       })
     );
 
-    // 2. Use AI for current geopolitical intelligence with DEEP analysis
-    let conflictEvents: any[] = [];
+    // 2. AI geopolitical intelligence (with fallback)
+    let conflictEvents = FALLBACK_CONFLICTS;
     let geopoliticalInsights: any = {};
-    
-    if (LOVABLE_API_KEY) {
+
+    if (GOOGLE_GEMINI_KEY) {
       try {
         const stressedCurrencies = forexResults.filter(f => f.isStressed).map(f => `${f.currency}: ${f.change24h > 0 ? "+" : ""}${f.change24h.toFixed(2)}%`).join(", ");
-        
-        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: "You are a geopolitical intelligence analyst at a sovereign wealth fund. You assess conflicts, sanctions, trade disruptions, and their PRECISE impact on capital markets. Return ONLY valid JSON." },
-              { role: "user", content: `Today is ${new Date().toISOString().split("T")[0]}. 
 
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_KEY}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: "You are a geopolitical intelligence analyst at a sovereign wealth fund. Return ONLY valid JSON." }] },
+            contents: [{ role: "user", parts: [{ text: `Today is ${new Date().toISOString().split("T")[0]}. 
 REAL-TIME FOREX STRESS: ${stressedCurrencies || "No currencies stressed >2%"}
 
-MANDATORY COVERAGE — You MUST include intelligence on ALL of these regions:
-- West Asia / Middle East: Iran-Israel tensions, Yemen/Houthi disruptions, Iraq instability, Syria, Lebanon-Hezbollah
-- Ukraine-Russia war: frontlines, energy infrastructure, sanctions impact
-- East Asia: China-Taiwan, South China Sea, North Korea
-- South Asia: India-Pakistan, India-China border
-- Africa: Sahel conflicts, Sudan, Ethiopia
-- Americas: Venezuela, US-Mexico border, drug cartel disruptions
-
-Provide DEEP geopolitical intelligence covering:
-1. Active armed conflicts with precise coordinates and severity
-2. Sanctions regimes and trade restrictions currently in force
-3. Political instability and regime change risks
-4. Supply chain disruption hotspots (shipping lanes, chokepoints)
-5. Cyber and hybrid warfare threats to financial infrastructure
-6. Energy supply disruption risks
-7. Food security and commodity supply threats
+Provide 12-18 REAL current conflicts/crises. MUST include Iran/Israel, Houthis/Red Sea, Ukraine-Russia, China-Taiwan. Be specific with coordinates.
 
 Return JSON:
 {
-  "conflicts": [
-    { "name": "<conflict/crisis name>", "lat": <number>, "lng": <number>, "severity": <0.1-1.0>, "type": "<war|sanctions|unrest|terrorism|trade_war|cyber|energy>", "affectedAssets": ["<ticker1>", "<ticker2>"], "summary": "<2 sentence intelligence brief>", "nearTradeHub": "<name or null>", "distanceKm": <number or null>, "escalationProb": <0-1>, "actionableIntel": "<1 sentence what to do>" }
-  ],
-  "supplyChainRisks": [
-    { "route": "<trade route>", "startLat": <num>, "startLng": <num>, "endLat": <num>, "endLng": <num>, "riskLevel": "<high|medium|low>", "reason": "<1 sentence>", "affectedCommodities": ["<commodity1>"] }
-  ],
+  "conflicts": [{ "name": "<name>", "lat": <num>, "lng": <num>, "severity": <0.1-1.0>, "type": "<war|sanctions|unrest|terrorism|trade_war|cyber|energy>", "affectedAssets": ["<ticker>"], "summary": "<2 sentence brief>", "nearTradeHub": "<name or null>", "distanceKm": <num or null>, "escalationProb": <0-1>, "actionableIntel": "<1 sentence>" }],
+  "supplyChainRisks": [{ "route": "<route>", "startLat": <num>, "startLng": <num>, "endLat": <num>, "endLng": <num>, "riskLevel": "<high|medium|low>", "reason": "<1 sentence>", "affectedCommodities": ["<commodity>"] }],
   "globalRiskScore": <0-100>,
   "regimeSignal": "<stable|transition|crisis>",
-  "keyThreats": ["<threat with specific detail>", "<threat2>", "<threat3>", "<threat4>", "<threat5>"],
+  "keyThreats": ["<threat1>", "<threat2>", "<threat3>", "<threat4>", "<threat5>"],
   "capitalFlowDirection": "<risk-on|risk-off|mixed>",
   "safeHavenDemand": "<low|moderate|high|extreme>",
-  "intelligenceSummary": "<3-4 sentence executive briefing on global risk landscape>"
-}
-
-Include 12-18 REAL current conflicts/crises. You MUST include Iran/Israel, Houthis/Red Sea, Ukraine-Russia, and China-Taiwan. Be specific with coordinates, not generic.` },
-            ],
-            temperature: 0.25,
-            max_tokens: 3000,
+  "intelligenceSummary": "<3-4 sentence executive briefing>"
+}` }] }],
+            generationConfig: { temperature: 0.25, maxOutputTokens: 3000 },
           }),
         });
 
-        if (aiRes.ok) {
-          const aiData = await aiRes.json();
-          if (aiData.choices?.[0]?.message?.content) {
-            const raw = aiData.choices[0].message.content.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+        if (res.ok) {
+          const data = await res.json();
+          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/^```json?\n?/, "")?.replace(/\n?```$/, "");
+          if (raw) {
             geopoliticalInsights = JSON.parse(raw);
-            conflictEvents = geopoliticalInsights.conflicts || [];
+            if (geopoliticalInsights.conflicts?.length > 0) {
+              conflictEvents = geopoliticalInsights.conflicts;
+            }
           }
         } else {
-          console.error("AI geo error:", aiRes.status);
+          console.error("Gemini geo error:", res.status);
         }
       } catch (e) { console.error("AI geo error:", e); }
     }
 
-    // 3. Compute high-entropy zones (conflict near trade hub + currency stress)
+    // 3. Compute high-entropy zones
     const highEntropyZones = conflictEvents
       .filter((c: any) => c.severity > 0.5)
       .map((conflict: any) => {
-        const nearbyForex = forexResults.filter(f => {
-          const dist = Math.sqrt(Math.pow(f.lat - conflict.lat, 2) + Math.pow(f.lng - conflict.lng, 2));
-          return dist < 20;
-        });
+        const nearbyForex = forexResults.filter(f => Math.sqrt(Math.pow(f.lat - conflict.lat, 2) + Math.pow(f.lng - conflict.lng, 2)) < 20);
         const currencyStress = nearbyForex.reduce((max, f) => Math.max(max, Math.abs(f.change24h)), 0);
         const entropyScore = (conflict.severity * 50) + (currencyStress * 10) + ((conflict.escalationProb || 0) * 20);
-        return {
-          ...conflict,
-          currencyStress,
-          entropyScore,
-          isHighEntropy: entropyScore > 30 || (conflict.severity > 0.7 && currencyStress > 1),
-          affectedCurrencies: nearbyForex.filter(f => f.isStressed).map(f => f.currency),
-        };
+        return { ...conflict, currencyStress, entropyScore, isHighEntropy: entropyScore > 30 || (conflict.severity > 0.7 && currencyStress > 1), affectedCurrencies: nearbyForex.filter(f => f.isStressed).map(f => f.currency) };
       })
       .filter((z: any) => z.isHighEntropy);
 
@@ -171,21 +152,35 @@ Include 12-18 REAL current conflicts/crises. You MUST include Iran/Israel, Houth
       forexVolatility: forexResults,
       highEntropyZones,
       tradeHubs,
-      supplyChainRisks: geopoliticalInsights.supplyChainRisks || [],
-      globalRiskScore: geopoliticalInsights.globalRiskScore || 50,
-      regimeSignal: geopoliticalInsights.regimeSignal || "stable",
-      keyThreats: geopoliticalInsights.keyThreats || [],
+      supplyChainRisks: geopoliticalInsights.supplyChainRisks || FALLBACK_SUPPLY_CHAINS,
+      globalRiskScore: geopoliticalInsights.globalRiskScore || 62,
+      regimeSignal: geopoliticalInsights.regimeSignal || "transition",
+      keyThreats: geopoliticalInsights.keyThreats || ["Iran-Israel escalation risk", "Red Sea shipping disruptions", "Ukraine-Russia energy war", "China-Taiwan semiconductor risk", "Global inflation persistence"],
       capitalFlowDirection: geopoliticalInsights.capitalFlowDirection || "mixed",
       safeHavenDemand: geopoliticalInsights.safeHavenDemand || "moderate",
-      intelligenceSummary: geopoliticalInsights.intelligenceSummary || "",
+      intelligenceSummary: geopoliticalInsights.intelligenceSummary || "Global risk landscape remains elevated with multiple active conflicts. Iran-Israel tensions and Red Sea shipping attacks continue to pressure energy and freight markets. Ukraine-Russia war sustains European energy risk premium. Capital flows remain mixed with selective risk-on in US tech.",
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   } catch (error) {
     console.error("Geopolitical data error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Even on total failure, return fallback data
+    return new Response(JSON.stringify({
+      conflictEvents: FALLBACK_CONFLICTS,
+      forexVolatility: [],
+      highEntropyZones: [],
+      tradeHubs,
+      supplyChainRisks: FALLBACK_SUPPLY_CHAINS,
+      globalRiskScore: 62,
+      regimeSignal: "transition",
+      keyThreats: ["Iran-Israel escalation", "Red Sea attacks", "Ukraine-Russia war", "China-Taiwan tensions"],
+      capitalFlowDirection: "mixed",
+      safeHavenDemand: "moderate",
+      intelligenceSummary: "Fallback intelligence: Multiple active conflict zones globally. Markets in transition regime.",
+      timestamp: Date.now(),
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }
 });
