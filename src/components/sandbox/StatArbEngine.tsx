@@ -13,7 +13,7 @@ interface Props { stocks: PortfolioStock[]; }
 const TABS = [
   "Price Dynamics", "Portfolio Risk", "Optimization", "Time Series",
   "Factor Model", "Liquidity", "Monte Carlo", "Stress Test",
-  "Structural Flow", "Real-Time",
+  "Structural Flow", "Mean Reversion", "Real-Time",
 ] as const;
 type Tab = typeof TABS[number];
 
