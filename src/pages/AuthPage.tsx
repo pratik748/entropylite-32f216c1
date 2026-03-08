@@ -3,6 +3,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import entropyLogo from "@/assets/entropy-logo-auth.jpeg";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -17,21 +18,30 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground font-mono">
-            ENTROPY LITE
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to access the terminal
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle radial glow behind logo */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[600px] h-[600px] rounded-full bg-foreground/[0.02] blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-sm space-y-8 relative z-10">
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-4">
+          <img
+            src={entropyLogo}
+            alt="Entropy"
+            className="h-24 object-contain invert"
+          />
+          <p className="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-[0.3em]">
+            Financial Intelligence Terminal
           </p>
         </div>
 
-        <div className="space-y-3 border border-border rounded-lg p-6 bg-card">
+        {/* Auth buttons */}
+        <div className="space-y-3 border border-border rounded-md p-6 bg-card/50 backdrop-blur-sm">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border hover:bg-accent"
             onClick={() => handleOAuth("google")}
             disabled={!!loading}
           >
@@ -50,7 +60,7 @@ export default function AuthPage() {
 
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border hover:bg-accent"
             onClick={() => handleOAuth("apple")}
             disabled={!!loading}
           >
@@ -64,6 +74,10 @@ export default function AuthPage() {
             Continue with Apple
           </Button>
         </div>
+
+        <p className="text-center font-mono text-[9px] text-muted-foreground/30 uppercase tracking-[0.2em]">
+          Secure authentication required
+        </p>
       </div>
     </div>
   );
