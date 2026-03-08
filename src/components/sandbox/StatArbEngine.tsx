@@ -32,7 +32,7 @@ const StatArbEngine = ({ stocks }: Props) => {
     return holdings.map(h => {
       const vol = (h.risk / 100) * 0.3;
       const mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
-      const price = h.currentPrice;
+      const price = h.price;
       const weight = totalValue > 0 ? h.value / totalValue : 1 / (holdings.length || 1);
       return { ticker: h.ticker, price, vol, mu, weight, risk: h.risk, beta: h.beta, value: h.value };
     });
