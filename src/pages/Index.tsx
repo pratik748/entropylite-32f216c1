@@ -236,6 +236,7 @@ const IndexContent = () => {
                     onAnalyze={handleAnalyze}
                     isLoading={isLoading}
                     priceStatus={priceStatus}
+                    tickerThreats={tickerThreats}
                   />
                 </PanelWrapper>
               </ResizablePanel>
