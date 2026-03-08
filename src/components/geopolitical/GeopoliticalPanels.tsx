@@ -1,4 +1,6 @@
 import { AlertTriangle, Shield, Zap, MapPin, Radio } from "lucide-react";
+import ForexVolChart from "@/components/charts/ForexVolChart";
+import RiskGauge from "@/components/charts/RiskGauge";
 import type { ConflictEvent, ForexEntry, HighEntropyZone } from "./GeopoliticalMap";
 
 interface GeoData {
