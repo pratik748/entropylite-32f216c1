@@ -111,7 +111,7 @@ const IndexContent = () => {
       } catch { /* silent */ }
     };
     refreshPrices();
-    const interval = setInterval(refreshPrices, 8000);
+    const interval = setInterval(refreshPrices, 15000); // Slowed from 8s, governor caches
     return () => { alive = false; clearInterval(interval); };
   }, [stocks.length]);
 
