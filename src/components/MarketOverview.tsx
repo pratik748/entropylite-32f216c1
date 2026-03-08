@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity,
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
+import VixGauge from "@/components/charts/VixGauge";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
