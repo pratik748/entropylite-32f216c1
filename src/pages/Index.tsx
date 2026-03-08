@@ -19,6 +19,7 @@ import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
+import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import RiskDashboard from "@/components/RiskDashboard";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import TickerStrip from "@/components/terminal/TickerStrip";
