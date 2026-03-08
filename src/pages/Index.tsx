@@ -133,7 +133,7 @@ const IndexContent = () => {
         toast({ title: "Analysis Failed", description: err.message || "Could not analyze.", variant: "destructive" });
       }
     },
-    [setStocks, setHistory]
+    [setStocks, addHistoryEntry]
   );
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
