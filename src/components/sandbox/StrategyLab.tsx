@@ -6,7 +6,7 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "sonner";
 
 interface Props { stocks: PortfolioStock[]; }
