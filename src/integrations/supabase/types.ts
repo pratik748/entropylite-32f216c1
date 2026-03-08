@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      clank_activation_events: {
+        Row: {
+          activated_at: string
+          activation_probability: number
+          clank_score_at_activation: number
+          constraint_id: string
+          id: string
+          notes: string | null
+          observed_price_impact: number | null
+          observed_vol_change: number | null
+          observed_volume_impact: number | null
+          outcome_accuracy: number | null
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string
+          activation_probability?: number
+          clank_score_at_activation?: number
+          constraint_id: string
+          id?: string
+          notes?: string | null
+          observed_price_impact?: number | null
+          observed_vol_change?: number | null
+          observed_volume_impact?: number | null
+          outcome_accuracy?: number | null
+          user_id: string
+        }
+        Update: {
+          activated_at?: string
+          activation_probability?: number
+          clank_score_at_activation?: number
+          constraint_id?: string
+          id?: string
+          notes?: string | null
+          observed_price_impact?: number | null
+          observed_vol_change?: number | null
+          observed_volume_impact?: number | null
+          outcome_accuracy?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      clank_confidence_overrides: {
+        Row: {
+          adjusted_confidence: number
+          constraint_id: string
+          id: string
+          last_updated: string
+          sample_count: number
+          user_id: string
+        }
+        Insert: {
+          adjusted_confidence?: number
+          constraint_id: string
+          id?: string
+          last_updated?: string
+          sample_count?: number
+          user_id: string
+        }
+        Update: {
+          adjusted_confidence?: number
+          constraint_id?: string
+          id?: string
+          last_updated?: string
+          sample_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_analysis_history: {
         Row: {
           buy_price: number

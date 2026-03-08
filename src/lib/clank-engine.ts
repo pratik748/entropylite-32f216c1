@@ -155,7 +155,7 @@ export interface ConstraintStatus {
  * In production this would consume live VIX, gamma exposure, etc.
  * Here we derive from portfolio risk characteristics.
  */
-export function evaluateConstraints(stocks: PortfolioStock[]): ConstraintStatus[] {
+export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverrides?: Record<string, number>): ConstraintStatus[] {
   const analyzed = stocks.filter(s => s.analysis);
   if (analyzed.length === 0) return CONSTRAINT_REGISTRY.map(c => defaultStatus(c));
 
@@ -173,6 +173,7 @@ export function evaluateConstraints(stocks: PortfolioStock[]): ConstraintStatus[
   }, 0) / analyzed.length;
 
   return CONSTRAINT_REGISTRY.map(c => {
+    const conf = confidenceOverrides?.[c.id] ?? c.confidenceScore;
     let prob = 0;
     let proximity = 0;
     let triggerDist = "";
@@ -180,21 +181,21 @@ export function evaluateConstraints(stocks: PortfolioStock[]): ConstraintStatus[
     switch (c.id) {
       case "vol-control": {
         proximity = Math.min(impliedVix / 30, 1);
-        prob = proximity > 0.7 ? proximity * c.confidenceScore : proximity * 0.5 * c.confidenceScore;
+        prob = proximity > 0.7 ? proximity * conf : proximity * 0.5 * conf;
         triggerDist = `VIX ~${impliedVix.toFixed(0)} (trigger: 25)`;
         break;
       }
       case "cta-trend": {
         const trendBreak = avgRisk > 50 ? 0.7 : avgRisk > 35 ? 0.4 : 0.15;
         proximity = trendBreak;
-        prob = trendBreak * c.confidenceScore;
+        prob = trendBreak * conf;
         triggerDist = `Trend strength: ${(1 - trendBreak).toFixed(2)}`;
         break;
       }
       case "gamma-hedge": {
         const gammaFlip = impliedVix > 20 ? 0.6 + (impliedVix - 20) * 0.02 : 0.2;
         proximity = Math.min(gammaFlip, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Net gamma: ${proximity > 0.5 ? "negative" : "positive"}`;
         break;
       }
@@ -202,34 +203,34 @@ export function evaluateConstraints(stocks: PortfolioStock[]): ConstraintStatus[
         const dayOfMonth = new Date().getDate();
         const monthEnd = dayOfMonth > 20;
         proximity = monthEnd ? 0.5 + (dayOfMonth - 20) / 20 : 0.1;
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = monthEnd ? `${30 - dayOfMonth} days to rebal` : "Next quarter-end";
         break;
       }
       case "margin-call": {
         const marginStress = Math.abs(drawdownProxy) * 5;
         proximity = Math.min(marginStress, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Drawdown proxy: ${(drawdownProxy * 100).toFixed(1)}%`;
         break;
       }
       case "reg-capital": {
         const bankExposure = analyzed.some(s => ["JPM", "GS", "MS", "BAC", "C"].includes(s.ticker)) ? 0.4 : 0.15;
         proximity = bankExposure + avgRisk * 0.003;
-        prob = Math.min(proximity, 1) * c.confidenceScore;
+        prob = Math.min(proximity, 1) * conf;
         triggerDist = `Capital buffer est: ${((1 - proximity) * 100).toFixed(0)}%`;
         break;
       }
       case "index-inclusion": {
         proximity = 0.1;
-        prob = 0.1 * c.confidenceScore;
+        prob = 0.1 * conf;
         triggerDist = "No pending changes detected";
         break;
       }
       case "liquidity-threshold": {
         const liqStress = impliedVix > 22 ? 0.5 + (impliedVix - 22) * 0.03 : 0.1;
         proximity = Math.min(liqStress, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Spread est: ${proximity > 0.5 ? ">2σ" : "normal"}`;
         break;
       }
