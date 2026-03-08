@@ -278,13 +278,13 @@
   font-size: 9px !important;
   padding: 2px 6px !important;
   border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
 }
 .entropy-tooltip::before {
-  border-right-color: hsl(220, 12%, 20%) !important;
+  border-right-color: hsl(0, 0%, 18%) !important;
 }
 .portfolio-tooltip {
-  color: hsl(210, 100%, 65%) !important;
+  color: hsl(0, 0%, 92%) !important;
   font-weight: 700 !important;
 }
 .entropy-popup .leaflet-popup-content-wrapper {
