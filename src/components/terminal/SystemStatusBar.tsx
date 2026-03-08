@@ -82,4 +82,4 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   );
 };
 
-export default SystemStatusBar;
+export default memo(SystemStatusBar);
