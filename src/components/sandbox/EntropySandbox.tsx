@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio, GitBranch,
+  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StrategyLab from "./StrategyLab";
@@ -13,6 +13,7 @@ import PortfolioCommandCenter from "./PortfolioCommandCenter";
 import ScarMemory from "./ScarMemory";
 import CrownLayer from "./CrownLayer";
 import CausalEffectsEngine from "./CausalEffectsEngine";
+import StatArbEngine from "./StatArbEngine";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -21,6 +22,7 @@ interface Props {
 const sections = [
   { id: "strategy", label: "Strategy Lab", icon: Brain, desc: "Auto-generated strategies ranked by Sharpe, drawdown, reflexivity" },
   { id: "montecarlo", label: "Scenario Engine", icon: Activity, desc: "10K-path Monte Carlo with tail risk, CVaR, ruin probability" },
+  { id: "statarb", label: "Stat Arb", icon: ScatterChart, desc: "Pure math: GBM, GARCH, Cholesky, Markowitz, Kalman, VaR" },
   { id: "causal", label: "Causal Effects", icon: GitBranch, desc: "2nd & 3rd order effects engine with reflexivity feedback loops" },
   { id: "aftermath", label: "Aftermath Matrix", icon: Crosshair, desc: "Simulate your own market impact before execution" },
   { id: "intelligence", label: "Deep Intelligence", icon: Radio, desc: "Management DNA, Capital Flow, Narrative, Structural Risk" },
@@ -40,6 +42,7 @@ const EntropySandbox = ({ stocks }: Props) => {
     switch (activeSection) {
       case "strategy": return <StrategyLab stocks={stocks} />;
       case "montecarlo": return <MonteCarloEngine stocks={stocks} />;
+      case "statarb": return <StatArbEngine stocks={stocks} />;
       case "causal": return <CausalEffectsEngine stocks={stocks} />;
       case "aftermath": return <AftermathMatrix stocks={stocks} />;
       case "intelligence": return <IntelligenceLayers stocks={stocks} />;
