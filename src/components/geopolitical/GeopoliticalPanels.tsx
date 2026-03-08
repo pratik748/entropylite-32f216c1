@@ -28,25 +28,84 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 export function RiskStrip({ data }: { data: GeoData }) {
+  const riskHigh = data.globalRiskScore >= 55;
+  const riskMid = data.globalRiskScore >= 30;
+
   const items = [
-    { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : (data.regimeSignal === "transition" && data.globalRiskScore >= 50) ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
-    { label: "Capital Flow", value: data.capitalFlowDirection, color: data.capitalFlowDirection === "risk-off" ? "text-loss" : data.capitalFlowDirection === "risk-on" ? "text-gain" : "text-warning" },
-    { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: data.highEntropyZones.length >= 3 ? "text-loss" : "text-warning" },
+    {
+      label: "Regime",
+      value: data.regimeSignal,
+      icon: "◆",
+      color: data.regimeSignal === "crisis" ? "text-loss" : (data.regimeSignal === "transition" && data.globalRiskScore >= 50) ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain",
+      bg: data.regimeSignal === "crisis" ? "bg-loss/5 border-loss/20" : data.regimeSignal === "transition" ? "bg-warning/5 border-warning/20" : "bg-gain/5 border-gain/20",
+    },
+    {
+      label: "Capital Flow",
+      value: data.capitalFlowDirection,
+      icon: data.capitalFlowDirection === "risk-off" ? "↓" : data.capitalFlowDirection === "risk-on" ? "↑" : "→",
+      color: data.capitalFlowDirection === "risk-off" ? "text-loss" : data.capitalFlowDirection === "risk-on" ? "text-gain" : "text-warning",
+      bg: data.capitalFlowDirection === "risk-off" ? "bg-loss/5 border-loss/20" : data.capitalFlowDirection === "risk-on" ? "bg-gain/5 border-gain/20" : "bg-warning/5 border-warning/20",
+    },
+    {
+      label: "Entropy Zones",
+      value: data.highEntropyZones.length,
+      suffix: " active",
+      icon: "⚡",
+      color: data.highEntropyZones.length >= 3 ? "text-loss" : "text-warning",
+      bg: data.highEntropyZones.length >= 3 ? "bg-loss/5 border-loss/20" : "bg-warning/5 border-warning/20",
+    },
+    {
+      label: "Conflicts",
+      value: data.conflictEvents.length,
+      suffix: " tracked",
+      icon: "⊘",
+      color: data.conflictEvents.filter(e => e.severity > 0.7).length > 2 ? "text-loss" : "text-warning",
+      bg: data.conflictEvents.filter(e => e.severity > 0.7).length > 2 ? "bg-loss/5 border-loss/20" : "bg-warning/5 border-warning/20",
+    },
   ];
+
   return (
-    <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-      {/* Risk Gauge */}
-      <div className="glass-card rounded-xl p-3 sm:p-4 relative z-10 flex items-center justify-center">
-        <RiskGauge score={data.globalRiskScore} />
-      </div>
-      {items.map((item, i) => (
-        <div key={i} className="glass-card rounded-xl p-3 sm:p-4 relative z-10">
-          <p className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
-          <p className={`font-mono text-lg sm:text-xl font-black uppercase mt-1 ${item.color}`}>
-            {item.value}{item.suffix && <span className="text-[9px] text-muted-foreground ml-1">{item.suffix}</span>}
-          </p>
+    <div className={`glass-panel rounded-xl p-3 sm:p-4 relative transition-all ${riskHigh ? "glass-glow-loss" : ""}`}>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-[auto_1fr]">
+        {/* Left: Gauge */}
+        <div className="flex items-center justify-center sm:border-r sm:border-border/30 sm:pr-4">
+          <RiskGauge score={data.globalRiskScore} size={150} />
         </div>
-      ))}
+
+        {/* Right: Metric cards */}
+        <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+          {items.map((item, i) => (
+            <div key={i} className={`rounded-lg border p-2.5 sm:p-3 transition-all ${item.bg}`}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className={`text-[10px] ${item.color}`}>{item.icon}</span>
+                <p className="text-[8px] sm:text-[9px] uppercase tracking-widest text-muted-foreground font-medium">{item.label}</p>
+              </div>
+              <p className={`font-mono text-base sm:text-lg font-black uppercase leading-none ${item.color}`}>
+                {item.value}
+                {item.suffix && <span className="text-[8px] text-muted-foreground font-normal ml-1">{item.suffix}</span>}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom severity bar */}
+      <div className="mt-3 pt-2 border-t border-border/20">
+        <div className="flex items-center gap-2">
+          <span className="text-[8px] text-muted-foreground uppercase tracking-widest">Severity</span>
+          <div className="flex-1 h-1.5 rounded-full bg-surface-3 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${
+                riskHigh ? "bg-loss" : riskMid ? "bg-warning" : "bg-gain"
+              }`}
+              style={{ width: `${data.globalRiskScore}%` }}
+            />
+          </div>
+          <span className={`text-[9px] font-mono font-bold ${riskHigh ? "text-loss" : riskMid ? "text-warning" : "text-gain"}`}>
+            {data.globalRiskScore}/100
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
