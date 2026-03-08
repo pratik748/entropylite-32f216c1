@@ -59,7 +59,9 @@ const IndexContent = () => {
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
 
+  const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
+  useEffect(() => { priceStatusRef.current = priceStatus; }, [priceStatus]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
