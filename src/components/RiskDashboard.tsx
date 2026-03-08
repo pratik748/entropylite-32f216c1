@@ -399,6 +399,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };
