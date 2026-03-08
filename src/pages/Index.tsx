@@ -251,6 +251,7 @@ const IndexContent = () => {
         {activeTab === "market" && <MarketOverview />}
         {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
         {activeTab === "sandbox" && <EntropySandbox stocks={stocks} />}
+        {activeTab === "statarb" && <StatArbEngine stocks={stocks} />}
         {activeTab === "geopolitical" && <GeopoliticalGlobe stocks={stocks} />}
         {activeTab === "desirable" && <DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} />}
         {activeTab === "risk" && <RiskDashboard stocks={stocks} />}
