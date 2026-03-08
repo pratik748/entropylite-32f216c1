@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import {
