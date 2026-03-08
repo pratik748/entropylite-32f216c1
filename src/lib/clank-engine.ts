@@ -195,7 +195,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       case "gamma-hedge": {
         const gammaFlip = impliedVix > 20 ? 0.6 + (impliedVix - 20) * 0.02 : 0.2;
         proximity = Math.min(gammaFlip, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Net gamma: ${proximity > 0.5 ? "negative" : "positive"}`;
         break;
       }
