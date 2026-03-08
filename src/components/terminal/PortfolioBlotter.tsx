@@ -91,11 +91,11 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                 <tr
                   key={s.id}
                   onClick={() => onSelectStock(s.id)}
-                  className={`border-b border-border/30 cursor-pointer transition-colors h-6
+                  className={`border-b border-border/30 cursor-pointer transition-colors h-6 group/row
                     ${isActive ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"}
                     ${flash === "gain" ? "flash-green" : flash === "loss" ? "flash-red" : ""}`}
                 >
-                  <td className="px-2 py-0.5 flex items-center group/row">
+                  <td className="px-2 py-0.5 flex items-center">
                     <span className="font-semibold text-foreground">{s.ticker}</span>
                     {ccy !== baseCurrency && (
                       <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
