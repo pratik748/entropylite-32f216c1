@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 export type RegimeType =
   | "Trending Bull"
@@ -77,7 +77,7 @@ export function useMarketRegime(pollIntervalMs = 15000): MarketRegime | null {
 
   const fetchData = useCallback(async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("market-data", {
+      const { data, error } = await governedInvoke("market-data", {
         body: {
           tickers: ["^GSPC", "^IXIC", "^DJI", "^N225", "^STOXX50E", "^HSI", "GC=F", "CL=F", "BTC-USD", "ETH-USD", "^TNX", "DX-Y.NYB", "SI=F", "EURUSD=X", "^FTSE"],
         },

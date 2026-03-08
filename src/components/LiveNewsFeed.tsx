@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 
 interface NewsArticle {
@@ -19,7 +19,7 @@ interface LiveNewsFeedProps {
   compact?: boolean;
 }
 
-const NEWS_REFRESH_INTERVAL = 60_000;
+const NEWS_REFRESH_INTERVAL = 600_000; // 10 minutes — governor caches
 
 const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
@@ -30,7 +30,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-news", {
+      const { data, error } = await governedInvoke("fetch-news", {
         body: { ticker: ticker || "", category: "business" },
       });
       if (error) throw error;

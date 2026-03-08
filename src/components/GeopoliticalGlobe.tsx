@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Satellite, RefreshCw, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,14 +57,14 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("geopolitical-data");
+      const { data: result, error } = await governedInvoke("geopolitical-data");
       if (error) throw error;
       setData(result);
     } catch (e) { console.error("Geo fetch error:", e); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 30000); return () => clearInterval(i); }, [fetchData]);
+  useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 600_000); return () => clearInterval(i); }, [fetchData]);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {

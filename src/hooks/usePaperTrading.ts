@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 export interface PaperTrade {
   id: string;
@@ -57,7 +57,7 @@ export function usePaperTrading() {
       const tickers = [...new Set(activeTrades.map(t => t.ticker))];
 
       // Fire and forget price update
-      supabase.functions.invoke("price-feed", { body: { tickers } }).then(({ data }) => {
+      governedInvoke("price-feed", { body: { tickers } }).then(({ data }) => {
         if (!data?.prices) return;
         setTrades(current =>
           current.map(t => {

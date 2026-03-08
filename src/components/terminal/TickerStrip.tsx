@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 
@@ -64,7 +64,7 @@ const TickerStrip = () => {
     let alive = true;
     const fetchPrices = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("market-data", {
+        const { data, error } = await governedInvoke("market-data", {
           body: { tickers: GLOBAL_TICKERS.map(t => t.symbol) },
         });
         if (!alive || error) return;

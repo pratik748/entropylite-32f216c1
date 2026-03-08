@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import {
@@ -54,10 +54,10 @@ const MarketOverview = () => {
   const [region, setRegion] = useState<Region>("All");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchMarketData = async (showLoading = true) => {
+  const fetchMarketData = async (showLoading = true, force = false) => {
     if (showLoading) setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("market-data");
+      const { data: result, error } = await governedInvoke("market-data", { force });
       if (error) throw error;
       setData(result);
       setLastUpdate(new Date());

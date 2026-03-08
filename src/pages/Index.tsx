@@ -28,6 +28,7 @@ import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -74,7 +75,7 @@ const IndexContent = () => {
       const t = Date.now();
       const tickers = analyzed.map(s => s.ticker);
       try {
-        const { data, error } = await supabase.functions.invoke("price-feed", { body: { tickers } });
+        const { data, error } = await governedInvoke("price-feed", { body: { tickers } });
         if (!alive) return;
         if (error || !data?.prices) {
           const statusUpdates: PriceStatusMap = {};
@@ -111,7 +112,7 @@ const IndexContent = () => {
       } catch { /* silent */ }
     };
     refreshPrices();
-    const interval = setInterval(refreshPrices, 8000);
+    const interval = setInterval(refreshPrices, 15000); // Slowed from 8s, governor caches
     return () => { alive = false; clearInterval(interval); };
   }, [stocks.length]);
 
@@ -119,7 +120,7 @@ const IndexContent = () => {
     async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
       setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s)));
       try {
-        const { data, error } = await supabase.functions.invoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
+        const { data, error } = await governedInvoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
         if (error) throw error;
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));

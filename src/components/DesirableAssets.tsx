@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -65,7 +65,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) { setLoading(true); setError(null); }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
-      const { data, error: fnError } = await supabase.functions.invoke("desirable-assets", {
+      const { data, error: fnError } = await governedInvoke("desirable-assets", {
         body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000 },
       });
 
@@ -113,7 +113,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   useEffect(() => {
     fetchRecommendations();
-    const interval = setInterval(() => fetchRecommendations(false), 60000);
+    const interval = setInterval(() => fetchRecommendations(false), 600_000); // 10 min
     return () => clearInterval(interval);
   }, [fetchRecommendations]);
 

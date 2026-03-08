@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
 
@@ -86,7 +86,7 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
     waveProgressRef.current = 0;
     try {
       const portfolio = stocks.filter(s => s.analysis).map(s => `${s.ticker} (${s.quantity} @ ${s.analysis?.currentPrice})`).join(", ");
-      const { data: result, error } = await supabase.functions.invoke("causal-effects", {
+      const { data: result, error } = await governedInvoke("causal-effects", {
         body: { event: eventText, portfolio },
       });
       if (error) throw error;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface FXRates {
   rates: Record<string, number>; // 1 unit of currency = X USD
@@ -43,7 +43,7 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
 
   const fetchRates = useCallback(async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("fx-rates");
+      const { data, error } = await governedInvoke("fx-rates");
       if (error) throw error;
       if (data?.rates) {
         setRates(data.rates);

@@ -6,7 +6,7 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "sonner";
 
 interface Props { stocks: PortfolioStock[]; }
@@ -54,7 +54,7 @@ const StrategyLab = ({ stocks }: Props) => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("strategy-generate", {
+      const { data, error } = await governedInvoke("strategy-generate", {
         body: {
           regime: regime.regime,
           vix: regime.vix,
