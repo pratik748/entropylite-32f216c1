@@ -210,7 +210,7 @@ const IndexContent = () => {
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
-            <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-130px)]">
+            <ResizablePanelGroup direction="horizontal" className="h-full">
               {/* Left: Portfolio Blotter */}
               <ResizablePanel defaultSize={22} minSize={15} maxSize={35}>
                 <PanelWrapper title="Portfolio" icon={<LayoutDashboard className="h-3 w-3" />} noPad>
