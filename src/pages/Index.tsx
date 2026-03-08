@@ -158,11 +158,11 @@ const IndexContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header />
 
       {/* Tab Navigation */}
-      <nav className="border-b border-border glass-panel sticky top-0 z-30">
+      <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
         <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
           {tabs.map((tab) => (
             <button
@@ -192,8 +192,8 @@ const IndexContent = () => {
       {/* Global Ticker Strip */}
       <TickerStrip />
 
-      {/* Main Content — fills remaining height, with bottom bar padding */}
-      <main className="flex-1 pb-6" style={{ paddingBottom: "28px" }}>
+      {/* Main Content — fills all remaining space, above the status bar */}
+      <main className="flex-1 min-h-0 pb-6">
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
@@ -210,7 +210,7 @@ const IndexContent = () => {
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
-            <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-130px)]">
+            <ResizablePanelGroup direction="horizontal" className="h-full">
               {/* Left: Portfolio Blotter */}
               <ResizablePanel defaultSize={22} minSize={15} maxSize={35}>
                 <PanelWrapper title="Portfolio" icon={<LayoutDashboard className="h-3 w-3" />} noPad>
