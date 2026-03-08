@@ -105,7 +105,7 @@ const StrategyLab = ({ stocks }: Props) => {
             openTrade({
               strategyId: s.id,
               ticker: holding.ticker,
-              entryPrice: holding.currentPrice,
+              entryPrice: holding.price,
               positionSizePct: s.position_size_pct,
               stopLossPct: s.stop_loss_pct,
               takeProfitPct: s.take_profit_pct,
