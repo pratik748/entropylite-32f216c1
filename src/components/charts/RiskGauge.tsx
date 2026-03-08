@@ -25,7 +25,7 @@ const RiskGauge = ({ score, label = "Global Risk", size = 120 }: Props) => {
   const bgEndX = cx + radius * Math.cos(endAngle);
   const bgEndY = cy - radius * Math.sin(endAngle);
 
-  const color = clampedScore >= 70 ? "hsl(var(--loss))" : clampedScore >= 40 ? "hsl(var(--warning))" : "hsl(var(--gain))";
+  const color = clampedScore >= 55 ? "hsl(var(--loss))" : clampedScore >= 30 ? "hsl(var(--warning))" : "hsl(var(--gain))";
 
   return (
     <div className="flex flex-col items-center">

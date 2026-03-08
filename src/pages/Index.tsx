@@ -15,7 +15,7 @@ import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioChart from "@/components/PortfolioChart";
 import PnLWaterfall from "@/components/charts/PnLWaterfall";
-import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
+import type { HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
@@ -298,14 +298,12 @@ const IndexContent = () => {
 
                   <ResizableHandle withHandle />
 
-                  {/* Bottom center: History (collapsible) */}
-                  {history.length > 0 && (
-                    <ResizablePanel defaultSize={35} minSize={15}>
-                      <PanelWrapper title="Analysis History" noPad collapsible defaultCollapsed>
-                        <AnalysisHistory entries={history} onClear={clearHistory} onSelect={() => {}} />
-                      </PanelWrapper>
-                    </ResizablePanel>
-                  )}
+                  {/* Bottom center: Sentiment Intel */}
+                  <ResizablePanel defaultSize={35} minSize={15}>
+                    <PanelWrapper title="Sentiment Intel" icon={<Brain className="h-3 w-3" />} noPad collapsible>
+                      <SentimentDashboard ticker={analysis?.ticker} compact />
+                    </PanelWrapper>
+                  </ResizablePanel>
                 </ResizablePanelGroup>
               </ResizablePanel>
 

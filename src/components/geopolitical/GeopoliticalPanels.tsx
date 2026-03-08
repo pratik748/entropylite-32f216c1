@@ -29,9 +29,9 @@ const TYPE_BADGE: Record<string, string> = {
 
 export function RiskStrip({ data }: { data: GeoData }) {
   const items = [
-    { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
+    { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : (data.regimeSignal === "transition" && data.globalRiskScore >= 50) ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
     { label: "Capital Flow", value: data.capitalFlowDirection, color: data.capitalFlowDirection === "risk-off" ? "text-loss" : data.capitalFlowDirection === "risk-on" ? "text-gain" : "text-warning" },
-    { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: "text-warning" },
+    { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: data.highEntropyZones.length >= 3 ? "text-loss" : "text-warning" },
   ];
   return (
     <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
@@ -133,12 +133,12 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
       {data.keyThreats.length > 0 && (
         <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
           <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 flex items-center gap-2 relative z-10">
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Key Global Threats
+            <AlertTriangle className="h-3.5 w-3.5 text-loss" /> Key Global Threats
           </h3>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
             {data.keyThreats.map((threat, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs sm:text-sm text-secondary-foreground glass-subtle rounded-lg p-3">
-                <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning" />
+              <div key={i} className="flex items-start gap-2 text-xs sm:text-sm text-secondary-foreground glass-subtle rounded-lg p-3 border border-loss/10">
+                <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-loss animate-pulse" />
                 {threat}
               </div>
             ))}
@@ -152,7 +152,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
           </h3>
           <div className="grid gap-3 sm:grid-cols-2 relative z-10">
             {data.highEntropyZones.map((zone, i) => (
-              <div key={i} className="glass-card rounded-lg p-3 sm:p-4 border-loss/20">
+              <div key={i} className={`glass-card rounded-lg p-3 sm:p-4 border-loss/20 ${zone.severity > 0.6 ? "glass-glow-loss animate-pulse-subtle" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs sm:text-sm font-bold text-foreground">{zone.name}</span>
                   <span className="rounded bg-loss/20 px-2 py-0.5 text-[9px] font-mono font-bold text-loss">⚡{zone.entropyScore.toFixed(0)}</span>
@@ -174,13 +174,13 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
       {exposedTickers.length > 0 && (
         <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
           <h3 className="text-[10px] font-bold text-warning uppercase tracking-widest mb-3 flex items-center gap-2 relative z-10">
-            <Shield className="h-3.5 w-3.5" /> Portfolio Exposure
+            <Shield className="h-3.5 w-3.5 text-loss" /> Portfolio Exposure
           </h3>
           <div className="space-y-2 relative z-10">
             {exposedTickers.map(t => (
               <div key={t} className="flex items-center justify-between glass-subtle rounded-lg p-3">
                 <span className="font-mono text-sm font-bold text-foreground">{t}</span>
-                <span className="text-[10px] text-warning font-mono">EXPOSED</span>
+                <span className="text-[10px] text-loss font-mono font-bold animate-pulse">⚠ EXPOSED</span>
               </div>
             ))}
           </div>
