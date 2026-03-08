@@ -170,6 +170,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
                 )}
                 <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                  {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{t.label}</Badge> : null; })()}
                   <span className="font-medium">{article.source}</span>
                   <span>·</span>
                   <span>{new Date(article.pubDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
