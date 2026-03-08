@@ -13,7 +13,7 @@ interface Props { stocks: PortfolioStock[]; }
 const TABS = [
   "Price Dynamics", "Portfolio Risk", "Optimization", "Time Series",
   "Factor Model", "Liquidity", "Monte Carlo", "Stress Test",
-  "Structural Flow", "Real-Time",
+  "Structural Flow", "Mean Reversion", "Real-Time",
 ] as const;
 type Tab = typeof TABS[number];
 
@@ -45,18 +45,18 @@ const StatArbEngine = ({ stocks }: Props) => {
   }, [assetData]);
 
   return (
-    <div className="space-y-4">
-      {/* Tab bar */}
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-2">
+    <div className="space-y-3 sm:space-y-4">
+      {/* Tab bar — scrollable on mobile */}
+      <div className="flex gap-1 rounded-xl border border-border bg-card p-1.5 sm:p-2 overflow-x-auto scrollbar-hide">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
             {t}
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-3 sm:p-5">
         {tab === "Price Dynamics" && <PriceDynamicsPanel assets={assetData} fmt={fmt} />}
         {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} />}
         {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} />}
@@ -66,6 +66,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {tab === "Monte Carlo" && <MonteCarloPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} />}
         {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} />}
         {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} />}
+        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
     </div>
@@ -96,16 +97,16 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   if (!asset) return <EmptyMsg />;
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
-      <p className="text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
+    <div className="space-y-4 sm:space-y-5">
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
+      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
 
-      <div className="h-64">
+      <div className="h-48 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
-            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={65} />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={55} />
             <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
             <Line dataKey="gbm" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="GBM" />
             <Line dataKey="jump" stroke="hsl(var(--loss))" strokeWidth={1} dot={false} name="Jump Diffusion" strokeDasharray="3 3" />
@@ -113,10 +114,10 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <p className="text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
-          <div className="h-32">
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
+          <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.garchChart}>
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
@@ -127,8 +128,8 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
-          <div className="h-32">
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
+          <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.regimeChart} stackOffset="expand">
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
@@ -163,9 +164,9 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
   if (!data || assets.length === 0) return <EmptyMsg />;
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Risk Engine</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="space-y-4 sm:space-y-5">
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Risk Engine</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <MetricCard label="VaR 95% (10d)" value={fmt(data.hVar95)} color="text-loss" />
         <MetricCard label="VaR 99% (10d)" value={fmt(data.hVar99)} color="text-loss" />
         <MetricCard label="MC VaR 95%" value={fmt(data.mcVar.var)} color="text-loss" />
@@ -202,8 +203,8 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
 
       {/* VaR Distribution */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Loss Distribution (MC 5K paths)</p>
-        <div className="h-40">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Loss Distribution (MC 5K paths)</p>
+        <div className="h-32 sm:h-40">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={(() => {
               const d = data.mcVar.distribution;
@@ -255,12 +256,12 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
   if (!data) return <EmptyMsg msg="Need 2+ assets for optimization" />;
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Optimization</h3>
+    <div className="space-y-4 sm:space-y-5">
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Optimization</h3>
 
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Efficient Frontier (Markowitz)</p>
-        <div className="h-56">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Efficient Frontier (Markowitz)</p>
+        <div className="h-40 sm:h-56">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart>
               <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
@@ -273,7 +274,7 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <p className="text-[10px] font-bold text-foreground uppercase mb-2">Risk Parity vs Current</p>
           <div className="h-40">
@@ -482,7 +483,7 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths</h3>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths</h3>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <MetricCard label="Expected Return" value={`${(mc.expectedReturn * 100).toFixed(1)}%`} color={mc.expectedReturn > 0 ? "text-gain" : "text-loss"} />
         <MetricCard label="VaR 95%" value={`${(mc.var95 * 100).toFixed(1)}%`} color="text-loss" />
@@ -491,7 +492,7 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
         <MetricCard label="Avg Max DD" value={`${(SA.mean(mc.maxDrawdownDist) * 100).toFixed(1)}%`} color="text-loss" />
       </div>
 
-      <div className="h-[360px]">
+      <div className="h-[240px] sm:h-[360px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
@@ -529,13 +530,13 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Stress Testing</h3>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Stress Testing</h3>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={results} layout="vertical">
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis type="number" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `${(v * 100).toFixed(0)}%`} />
-            <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={110} />
+            <YAxis dataKey="name" type="category" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={80} />
             <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [`${(v * 100).toFixed(1)}%  (${fmt(v * totalValue)})`, "Impact"]} />
             <Bar dataKey="impact" radius={[0, 3, 3, 0]}>
               {results.map((r, i) => <Cell key={i} fill={r.impact < -0.1 ? "hsl(var(--loss))" : r.impact < -0.03 ? "hsl(var(--warning))" : "hsl(var(--gain))"} fillOpacity={0.7} />)}
@@ -543,7 +544,7 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {results.map(r => (
           <div key={r.name} className="rounded-lg border border-border p-2 text-center">
             <p className="text-[9px] text-muted-foreground">{r.name}</p>
@@ -615,6 +616,164 @@ function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfol
           <p>• Cholesky decomposition for correlated multi-asset simulations</p>
           <p>• Kalman filter updates on every price tick</p>
           <p>• Heavy MC (10K paths) computed synchronously in ~50ms</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mean Reversion SnapBack Panel ──────────────────────────────────
+
+function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+  const asset = assets[0];
+  const data = useMemo(() => {
+    if (!asset) return null;
+
+    // Generate synthetic historical prices
+    const prices: number[] = [asset.price];
+    for (let i = 1; i < 120; i++) {
+      prices.unshift(prices[0] / Math.exp((asset.mu / 252) + (asset.vol / Math.sqrt(252)) * SA.gaussianRandom()));
+    }
+
+    const ou = SA.estimateOU(prices);
+    const halfLife = SA.meanReversionHalfLife(ou.theta);
+    const hurst = SA.hurstExponent(prices);
+    const z = SA.zScore(asset.price, prices);
+    const bands = SA.meanReversionBands(prices, 20, 2);
+    const snapProb = SA.snapBackProbability(asset.price, ou, 20);
+    const expectedSnap = ou.mu + (asset.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
+
+    // Sim paths from current price
+    const simPaths = SA.ouSimPaths(asset.price, ou, 60, 20);
+    const simChart = Array.from({ length: 61 }, (_, d) => {
+      const point: Record<string, number> = { day: d, mean: ou.mu };
+      simPaths.forEach((path, i) => { point[`p${i}`] = path[d]; });
+      return point;
+    });
+
+    // Price + bands chart
+    const bandsChart = prices.map((p, i) => ({
+      day: i, price: p, sma: bands.mean[i], upper: bands.upper[i], lower: bands.lower[i],
+    }));
+
+    // Z-score history
+    const zHistory = prices.map((_, i) => {
+      const slice = prices.slice(0, i + 1);
+      return { day: i, z: SA.zScore(prices[i], slice.slice(Math.max(0, slice.length - 20))) };
+    });
+
+    return {
+      ou, halfLife, hurst, z, snapProb, expectedSnap,
+      isStationary: hurst < 0.5,
+      bandsChart, simChart, zHistory,
+      meanPrice: ou.mu,
+    };
+  }, [asset]);
+
+  if (!data || !asset) return <EmptyMsg />;
+
+  const snapColor = data.snapProb > 0.6 ? "text-gain" : data.snapProb > 0.4 ? "text-warning" : "text-loss";
+  const hurstColor = data.hurst < 0.45 ? "text-gain" : data.hurst < 0.55 ? "text-warning" : "text-loss";
+
+  return (
+    <div className="space-y-4 sm:space-y-5">
+      <div>
+        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Mean Reversion SnapBack — {asset.ticker}</h3>
+        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">Ornstein-Uhlenbeck: dX = θ(μ - X)dt + σdW | Half-life = ln(2)/θ</p>
+      </div>
+
+      {/* Key metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+        <MetricCard label="Z-Score" value={data.z.toFixed(2)} color={Math.abs(data.z) > 2 ? "text-loss" : Math.abs(data.z) > 1 ? "text-warning" : "text-gain"} />
+        <MetricCard label="Half-Life" value={`${data.halfLife.toFixed(1)}d`} color={data.halfLife < 20 ? "text-gain" : "text-muted-foreground"} />
+        <MetricCard label="Hurst Exp" value={data.hurst.toFixed(3)} color={hurstColor} />
+        <MetricCard label="SnapBack Prob" value={`${(data.snapProb * 100).toFixed(0)}%`} color={snapColor} />
+        <MetricCard label="OU θ" value={data.ou.theta.toFixed(3)} color="text-primary" />
+        <MetricCard label="Expected Price" value={fmt(data.expectedSnap)} color={data.expectedSnap > asset.price ? "text-gain" : "text-loss"} />
+      </div>
+
+      {/* Regime indicator */}
+      <div className={`rounded-lg border p-3 ${data.isStationary ? "border-gain/30 bg-gain/5" : "border-warning/30 bg-warning/5"}`}>
+        <div className="flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full ${data.isStationary ? "bg-gain animate-pulse" : "bg-warning"}`} />
+          <span className="text-[10px] sm:text-xs font-bold text-foreground">
+            {data.isStationary ? "MEAN-REVERTING REGIME DETECTED" : "TRENDING / NON-STATIONARY REGIME"}
+          </span>
+        </div>
+        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">
+          Hurst = {data.hurst.toFixed(3)} {data.isStationary ? "(< 0.5 → anti-persistent)" : "(≥ 0.5 → persistent/trending)"} 
+          | Mean = {fmt(data.meanPrice)} | Current deviation: {((asset.price - data.meanPrice) / data.meanPrice * 100).toFixed(1)}%
+        </p>
+      </div>
+
+      {/* Price with Bollinger bands */}
+      <div>
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Price vs Mean-Reversion Bands (2σ)</p>
+        <div className="h-48 sm:h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data.bandsChart}>
+              <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
+              <Line dataKey="upper" stroke="hsl(var(--loss))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Upper Band" />
+              <Line dataKey="sma" stroke="hsl(var(--muted-foreground))" strokeWidth={1} dot={false} name="SMA(20)" />
+              <Line dataKey="lower" stroke="hsl(var(--gain))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Lower Band" />
+              <Line dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Price" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {/* Z-Score history */}
+        <div>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Z-Score History</p>
+          <div className="h-32 sm:h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.zHistory}>
+                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={30} />
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.5} />
+                <ReferenceLine y={2} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.5} />
+                <ReferenceLine y={-2} stroke="hsl(var(--gain))" strokeDasharray="3 3" strokeOpacity={0.5} />
+                <Area dataKey="z" fill="hsl(var(--primary))" fillOpacity={0.15} stroke="hsl(var(--primary))" strokeWidth={1.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* OU Simulation paths */}
+        <div>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">OU SnapBack Simulation (60d, 20 paths)</p>
+          <div className="h-32 sm:h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.simChart}>
+                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
+                <ReferenceLine y={data.meanPrice} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.6} label={{ value: "μ", position: "right", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                {Array.from({ length: 20 }, (_, i) => (
+                  <Line key={i} dataKey={`p${i}`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={0.7} dot={false} strokeOpacity={0.5} isAnimationActive={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Trade signal summary */}
+      <div className="rounded-lg border border-border p-3 sm:p-4">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">SnapBack Trade Signal</p>
+        <div className="space-y-1 text-[10px] sm:text-[11px] text-muted-foreground font-mono">
+          <p>• Z-Score: <span className={Math.abs(data.z) > 2 ? "text-loss font-bold" : "text-foreground"}>{data.z.toFixed(3)}</span> — {Math.abs(data.z) > 2 ? "EXTREME deviation" : Math.abs(data.z) > 1 ? "Moderate deviation" : "Within normal range"}</p>
+          <p>• Half-life: <span className="text-foreground">{data.halfLife.toFixed(1)} days</span> — {data.halfLife < 10 ? "Fast reversion" : data.halfLife < 30 ? "Moderate speed" : "Slow reversion"}</p>
+          <p>• SnapBack probability (20d): <span className={snapColor + " font-bold"}>{(data.snapProb * 100).toFixed(1)}%</span></p>
+          <p>• Expected price in 20d: <span className="text-foreground">{fmt(data.expectedSnap)}</span> ({((data.expectedSnap - asset.price) / asset.price * 100).toFixed(2)}%)</p>
+          <p>• Signal: <span className={`font-bold ${Math.abs(data.z) > 1.5 && data.isStationary ? "text-gain" : "text-muted-foreground"}`}>
+            {Math.abs(data.z) > 2 && data.isStationary ? "STRONG SNAPBACK" : Math.abs(data.z) > 1.5 && data.isStationary ? "MODERATE SNAPBACK" : "NO SIGNAL"}
+          </span> {data.z > 1.5 ? "(SHORT bias)" : data.z < -1.5 ? "(LONG bias)" : ""}</p>
         </div>
       </div>
     </div>
