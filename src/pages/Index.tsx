@@ -52,8 +52,8 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
-  const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
+  const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
+  const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
