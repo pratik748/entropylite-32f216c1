@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, Brain } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
