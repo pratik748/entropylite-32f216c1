@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 
 interface NewsArticle {
