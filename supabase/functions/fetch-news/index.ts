@@ -68,7 +68,7 @@ serve(async (req) => {
     // If we have a ticker, search for it specifically; otherwise use broad financial keywords
     const query = cleanTicker
       ? `${cleanTicker} stock market`
-      : "stock market OR federal reserve OR inflation OR oil prices OR earnings OR Wall Street OR global economy";
+      : "stock market OR earnings OR inflation";
 
     // Fetch from global sources, not just India
     const url = `https://newsdata.io/api/1/latest?apikey=${NEWSDATA_API_KEY}&q=${encodeURIComponent(query)}&language=en&category=business`;
