@@ -65,7 +65,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) { setLoading(true); setError(null); }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
-      const { data, error: fnError } = await supabase.functions.invoke("desirable-assets", {
+      const { data, error: fnError } = await governedInvoke("desirable-assets", {
         body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000 },
       });
 
