@@ -9,9 +9,9 @@ const LIFECYCLE_STAGES = [
 ];
 
 const TRADE_LOG = [
-  { id: "TRD-9841", ticker: "RELIANCE", action: "BUY 200 @ ₹2,485", preCheck: "PASS", execution: "FILLED", clearing: "NETTED", settlement: "T+1 PENDING", postTrade: "PENDING" },
-  { id: "TRD-9840", ticker: "TCS", action: "SELL 50 @ ₹3,820", preCheck: "PASS", execution: "FILLED", clearing: "CONFIRMED", settlement: "SETTLED", postTrade: "BOOKED" },
-  { id: "TRD-9839", ticker: "INFY", action: "BUY 300 @ ₹1,542", preCheck: "PASS", execution: "PARTIAL", clearing: "PENDING", settlement: "PENDING", postTrade: "PENDING" },
+  { id: "TRD-9841", ticker: "RELIANCE", action: "BUY 200 @ 2,485", preCheck: "PASS", execution: "FILLED", clearing: "NETTED", settlement: "T+1 PENDING", postTrade: "PENDING" },
+  { id: "TRD-9840", ticker: "TCS", action: "SELL 50 @ 3,820", preCheck: "PASS", execution: "FILLED", clearing: "CONFIRMED", settlement: "SETTLED", postTrade: "BOOKED" },
+  { id: "TRD-9839", ticker: "INFY", action: "BUY 300 @ 1,542", preCheck: "PASS", execution: "PARTIAL", clearing: "PENDING", settlement: "PENDING", postTrade: "PENDING" },
 ];
 
 const stageIcon = (status: string) => {
@@ -22,7 +22,6 @@ const stageIcon = (status: string) => {
 
 const TradeLifecycleModule = () => (
   <div className="space-y-6">
-    {/* Lifecycle pipeline */}
     <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-6">Trade Lifecycle Pipeline</h3>
       <div className="flex items-start gap-2 overflow-x-auto pb-2">
@@ -49,7 +48,6 @@ const TradeLifecycleModule = () => (
       </div>
     </div>
 
-    {/* Trade log */}
     <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-4">Trade Lifecycle Tracker</h3>
       <div className="overflow-x-auto">

@@ -1,38 +1,28 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const ClientReportingModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, totalInvested, totalPnl, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const { summary, totalValue, totalPnl, avgReturn } = useMemo(() => {
-    if (analyzed.length === 0) return { summary: [], totalValue: 0, totalPnl: 0, avgReturn: 0 };
+  const { summary, avgReturn } = useMemo(() => {
+    if (holdings.length === 0) return { summary: [], avgReturn: 0 };
+    const ret = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+    const h = holdings.map(h => ({
+      ticker: h.ticker,
+      value: fmt(h.value),
+      weight: `${(h.value / totalValue * 100).toFixed(1)}%`,
+      pnl: `${h.pnl >= 0 ? "+" : ""}${fmt(h.pnl)}`,
+      ret: `${h.pnlPct >= 0 ? "+" : ""}${h.pnlPct.toFixed(1)}%`,
+      suggestion: h.suggestion,
+      pnlSign: h.pnl >= 0,
+    }));
+    return { summary: h, avgReturn: ret };
+  }, [holdings, totalValue, totalInvested, totalPnl, fmt]);
 
-    const total = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-    const invested = analyzed.reduce((s, st) => s + st.buyPrice * st.quantity, 0);
-    const pnl = total - invested;
-    const ret = invested > 0 ? (pnl / invested) * 100 : 0;
-
-    const holdings = analyzed.map(s => {
-      const val = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
-      const stockPnl = ((s.analysis.currentPrice || s.buyPrice) - s.buyPrice) * s.quantity;
-      const stockRet = ((s.analysis.currentPrice || s.buyPrice) - s.buyPrice) / s.buyPrice * 100;
-      return {
-        ticker: s.ticker.replace(".NS", "").replace(".BO", ""),
-        value: `₹${(val / 100000).toFixed(1)} L`,
-        weight: `${(val / total * 100).toFixed(1)}%`,
-        pnl: `${stockPnl >= 0 ? "+" : ""}₹${(stockPnl / 100000).toFixed(1)} L`,
-        ret: `${stockRet >= 0 ? "+" : ""}${stockRet.toFixed(1)}%`,
-        suggestion: s.analysis.suggestion || "Hold",
-        pnlSign: stockPnl >= 0,
-      };
-    });
-
-    return { summary: holdings, totalValue: total, totalPnl: pnl, avgReturn: ret };
-  }, [analyzed]);
-
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to generate client reports.</p>
@@ -45,12 +35,12 @@ const ClientReportingModule = ({ stocks }: Props) => {
       <div className="grid gap-3 md:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio NAV</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹{(totalValue / 100000).toFixed(1)} L</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{fmt(totalValue)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total P&L</p>
           <p className={`mt-1 font-mono text-2xl font-bold ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-            {totalPnl >= 0 ? "+" : ""}₹{(totalPnl / 100000).toFixed(1)} L
+            {totalPnl >= 0 ? "+" : ""}{fmt(totalPnl)}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -61,7 +51,7 @@ const ClientReportingModule = ({ stocks }: Props) => {
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Holdings</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{analyzed.length}</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{holdings.length}</p>
         </div>
       </div>
 

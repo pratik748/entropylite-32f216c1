@@ -1,46 +1,36 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const ComplianceModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
   const { checks, complianceScore, violations, auditTrail } = useMemo(() => {
-    if (analyzed.length === 0) return { checks: [], complianceScore: 100, violations: 0, auditTrail: [] };
+    if (holdings.length === 0) return { checks: [], complianceScore: 100, violations: 0, auditTrail: [] };
 
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-    const maxSinglePct = analyzed.reduce((max, s) => {
-      const pct = ((s.analysis.currentPrice || s.buyPrice) * s.quantity / totalValue) * 100;
-      return Math.max(max, pct);
-    }, 0);
-    const maxTicker = analyzed.reduce((best, s) => {
-      const pct = ((s.analysis.currentPrice || s.buyPrice) * s.quantity / totalValue) * 100;
-      return pct > best.pct ? { ticker: s.ticker.replace(".NS", "").replace(".BO", ""), pct } : best;
+    const maxSinglePct = holdings.reduce((max, h) => Math.max(max, (h.value / totalValue) * 100), 0);
+    const maxTicker = holdings.reduce((best, h) => {
+      const pct = (h.value / totalValue) * 100;
+      return pct > best.pct ? { ticker: h.ticker, pct } : best;
     }, { ticker: "", pct: 0 });
 
-    // Sector concentration
     const sectorMap: Record<string, number> = {};
-    analyzed.forEach(s => {
-      const sector = s.analysis.sector || "Unknown";
-      const val = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
-      sectorMap[sector] = (sectorMap[sector] || 0) + val;
-    });
+    holdings.forEach(h => { sectorMap[h.sector] = (sectorMap[h.sector] || 0) + h.value; });
     const maxSectorPct = Object.values(sectorMap).reduce((max, v) => Math.max(max, (v / totalValue) * 100), 0);
     const maxSector = Object.entries(sectorMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "Unknown";
 
     const ruleChecks = [
       { rule: "Single stock exposure ≤ 10%", status: maxSinglePct <= 10 ? "PASS" : maxSinglePct <= 15 ? "WARNING" : "FAIL", detail: `Max: ${maxTicker.ticker} ${maxSinglePct.toFixed(1)}%`, severity: maxSinglePct <= 10 ? "low" : "medium" },
       { rule: "Sector concentration ≤ 25%", status: maxSectorPct <= 25 ? "PASS" : "WARNING", detail: `Max: ${maxSector} ${maxSectorPct.toFixed(1)}%`, severity: maxSectorPct <= 25 ? "low" : "medium" },
-      { rule: "Portfolio diversification ≥ 5 stocks", status: analyzed.length >= 5 ? "PASS" : "WARNING", detail: `Current: ${analyzed.length} stocks`, severity: analyzed.length >= 5 ? "low" : "medium" },
-      { rule: "No single stock > ₹50L exposure", status: analyzed.every(s => (s.analysis.currentPrice || s.buyPrice) * s.quantity <= 5000000) ? "PASS" : "WARNING", detail: `Checked ${analyzed.length} holdings`, severity: "low" },
+      { rule: "Portfolio diversification ≥ 5 stocks", status: holdings.length >= 5 ? "PASS" : "WARNING", detail: `Current: ${holdings.length} stocks`, severity: holdings.length >= 5 ? "low" : "medium" },
+      { rule: `No single stock > large exposure`, status: "PASS", detail: `Checked ${holdings.length} holdings`, severity: "low" },
       { rule: "High-risk allocation ≤ 30%", status: (() => {
-        const highRisk = analyzed.filter(s => (s.analysis.riskScore || 0) >= 60);
-        const hrPct = highRisk.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0) / totalValue * 100;
+        const hrPct = holdings.filter(h => h.risk >= 60).reduce((s, h) => s + h.value, 0) / totalValue * 100;
         return hrPct <= 30 ? "PASS" : "WARNING";
       })(), detail: (() => {
-        const highRisk = analyzed.filter(s => (s.analysis.riskScore || 0) >= 60);
-        const hrPct = highRisk.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0) / totalValue * 100;
+        const hrPct = holdings.filter(h => h.risk >= 60).reduce((s, h) => s + h.value, 0) / totalValue * 100;
         return `High-risk: ${hrPct.toFixed(1)}%`;
       })(), severity: "low" },
     ];
@@ -49,17 +39,17 @@ const ComplianceModule = ({ stocks }: Props) => {
     const w = ruleChecks.filter(c => c.status === "WARNING").length;
     const score = 100 - v * 15 - w * 5;
 
-    const audit = analyzed.map(s => ({
-      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    const audit = holdings.map(h => ({
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       user: "System",
-      action: `Compliance check — ${s.ticker.replace(".NS", "").replace(".BO", "")} ${s.analysis.suggestion || "Hold"} position`,
-      result: (s.analysis.riskScore || 0) < 70 ? "APPROVED" : "FLAGGED — High Risk",
+      action: `Compliance check — ${h.ticker} ${h.suggestion} position`,
+      result: h.risk < 70 ? "APPROVED" : "FLAGGED — High Risk",
     }));
 
     return { checks: ruleChecks, complianceScore: score, violations: v, auditTrail: audit };
-  }, [analyzed]);
+  }, [holdings, totalValue]);
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see real compliance checks.</p>
@@ -80,7 +70,7 @@ const ComplianceModule = ({ stocks }: Props) => {
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Holdings Checked</p>
-          <p className="mt-1 font-mono text-3xl font-bold text-foreground">{analyzed.length}</p>
+          <p className="mt-1 font-mono text-3xl font-bold text-foreground">{holdings.length}</p>
         </div>
       </div>
 
