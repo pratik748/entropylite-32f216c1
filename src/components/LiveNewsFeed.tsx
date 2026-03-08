@@ -96,6 +96,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
                 {new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
               </span>
               <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${getSentimentDot(article.sentiment)}`} />
+              {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[6px] px-0.5 py-0 h-2.5 rounded leading-none`}>{t.label}</Badge> : null; })()}
               <span className="text-[8px] text-muted-foreground/60 w-12 flex-shrink-0 truncate">{article.source}</span>
               <span className="text-foreground truncate flex-1 group-hover:text-primary transition-colors">{article.title}</span>
             </a>
