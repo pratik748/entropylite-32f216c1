@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Shield, AlertTriangle } from "lucide-react";
+import { Shield, AlertTriangle, Zap } from "lucide-react";
+import ClankEngine from "@/components/risk/ClankEngine";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
@@ -122,6 +123,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const concentrationLevel = hhiPct > 5000 ? "High" : hhiPct > 2500 ? "Medium" : "Low";
 
   const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
+  const [riskTab, setRiskTab] = useState<"analytics" | "clank">("analytics");
 
   const CORR_LABELS = analyzed.length > 0 
     ? analyzed.slice(0, 5).map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
@@ -151,9 +153,33 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {/* Risk Sub-tabs */}
+      <div className="flex items-center gap-1 border-b border-border pb-2">
+        {([
+          { id: "analytics" as const, label: "Risk Analytics", icon: <Shield className="h-3.5 w-3.5" /> },
+          { id: "clank" as const, label: "CLANK Engine", icon: <Zap className="h-3.5 w-3.5" /> },
+        ]).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setRiskTab(t.id)}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all ${
+              riskTab === t.id
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:text-foreground border border-transparent"
+            }`}
+          >
+            {t.icon}
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {riskTab === "clank" && <ClankEngine stocks={stocks} />}
+
+      {riskTab === "analytics" && <>
       {/* VaR Stats */}
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {[
           { label: "VaR (95%)", value: vars.var95 },
           { label: "VaR (99%)", value: vars.var99 },
@@ -373,6 +399,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };
