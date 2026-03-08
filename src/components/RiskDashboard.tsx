@@ -123,6 +123,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const concentrationLevel = hhiPct > 5000 ? "High" : hhiPct > 2500 ? "Medium" : "Low";
 
   const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
+  const [riskTab, setRiskTab] = useState<"analytics" | "clank">("analytics");
 
   const CORR_LABELS = analyzed.length > 0 
     ? analyzed.slice(0, 5).map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
