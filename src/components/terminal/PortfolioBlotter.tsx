@@ -109,6 +109,12 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     {ccy !== baseCurrency && (
                       <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
                     )}
+                    {tickerThreats?.[s.ticker] && tickerThreats[s.ticker].threatLevel !== "none" && (
+                      <span className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0 text-[7px] font-bold uppercase ${THREAT_COLORS[tickerThreats[s.ticker].threatLevel] || ""}`} title={tickerThreats[s.ticker].threats.join(", ")}>
+                        <AlertTriangle className="h-2 w-2" />
+                        {tickerThreats[s.ticker].threatLevel === "critical" ? "⚠" : tickerThreats[s.ticker].score}
+                      </span>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemoveStock(s.id); }}
                       className="ml-auto opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-loss/10 hover:text-loss text-muted-foreground"
