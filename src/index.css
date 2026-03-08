@@ -258,7 +258,7 @@
 
 /* Leaflet dark theme overrides */
 .leaflet-container {
-  background: hsl(220, 15%, 4%) !important;
+  background: hsl(0, 0%, 2%) !important;
   font-family: 'JetBrains Mono', monospace;
 }
 .leaflet-control-zoom a {
