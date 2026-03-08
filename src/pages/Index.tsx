@@ -126,10 +126,7 @@ const IndexContent = () => {
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));
         setPriceStatus(prev => ({ ...prev, [stockId]: { lastUpdate: Date.now(), status: "LIVE", failCount: 0 } }));
-        setHistory((prev) => [
-          { id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence },
-          ...prev.slice(0, 49),
-        ]);
+        addHistoryEntry({ id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence });
       } catch (err: any) {
         console.error("Analysis error:", err);
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false } : s)));
