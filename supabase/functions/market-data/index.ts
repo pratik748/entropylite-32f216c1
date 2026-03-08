@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,8 +26,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const GOOGLE_GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_KEY");
-
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
@@ -94,17 +93,13 @@ serve(async (req) => {
     const realSilver = silverData?.price || 0;
 
     let aiMacro: any = null;
-    if (GOOGLE_GEMINI_KEY) {
-      try {
-        const sp500 = indexData.find(i => i?.name === "S&P 500");
-        const nifty = indexData.find(i => i?.name === "NIFTY 50");
+    try {
+      const sp500 = indexData.find(i => i?.name === "S&P 500");
+      const nifty = indexData.find(i => i?.name === "NIFTY 50");
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: "You are a global macro strategist. Return ONLY valid JSON, no markdown." }] },
-            contents: [{ role: "user", parts: [{ text: `Today is ${new Date().toISOString().split("T")[0]}. S&P 500: ${sp500?.changePct?.toFixed(2) || "N/A"}%, NIFTY: ${nifty?.changePct?.toFixed(2) || "N/A"}%, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}
+      const result = await callAI({
+        systemPrompt: "You are a global macro strategist. Return ONLY valid JSON, no markdown.",
+        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. S&P 500: ${sp500?.changePct?.toFixed(2) || "N/A"}%, NIFTY: ${nifty?.changePct?.toFixed(2) || "N/A"}%, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}
 
 Provide:
 {
@@ -117,18 +112,15 @@ Provide:
   "outlook": "<3 sentence global market outlook>",
   "sectorRotation": "<inflows vs outflows>",
   "riskAppetite": "<1 sentence>"
-}` }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
-          }),
-        });
+}`,
+        maxTokens: 800,
+        temperature: 0.3,
+        preferredProvider: "openrouter",
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/^```json?\n?/, "")?.replace(/\n?```$/, "");
-          if (raw) aiMacro = JSON.parse(raw);
-        }
-      } catch (e) { console.error("AI macro error:", e); }
-    }
+      console.log(`market-data used provider: ${result.provider}`);
+      aiMacro = JSON.parse(result.text);
+    } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {
       marketMood: aiMacro?.marketMood || "Neutral",

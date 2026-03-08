@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,15 +13,10 @@ serve(async (req) => {
 
   try {
     const { event, portfolio } = await req.json();
-    const GOOGLE_GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_KEY");
-    if (!GOOGLE_GEMINI_KEY) throw new Error("GOOGLE_GEMINI_KEY not configured");
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: "You are a macro-strategist at a sovereign wealth fund. Model second and third-order causal effects of geopolitical and economic events. Return ONLY valid JSON." }] },
-        contents: [{ role: "user", parts: [{ text: `Event: "${event}"
+    const result = await callAI({
+      systemPrompt: "You are a macro-strategist at a sovereign wealth fund. Model second and third-order causal effects of geopolitical and economic events. Return ONLY valid JSON.",
+      userPrompt: `Event: "${event}"
 Portfolio: ${portfolio || "No portfolio loaded"}
 Date: ${new Date().toISOString().split("T")[0]}
 
@@ -40,23 +36,18 @@ Return JSON:
   ],
   "reflexivity_score": <0-100>,
   "scar_tag": "<pattern tag>"
-}` }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 3000 },
-      }),
+}`,
+      maxTokens: 3000,
+      temperature: 0.3,
     });
 
-    if (!res.ok) {
-      if (res.status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw new Error(`Gemini error: ${res.status}`);
-    }
+    console.log(`causal-effects used provider: ${result.provider}`);
+    const parsed = JSON.parse(result.text);
 
-    const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/^```json?\n?/, "")?.replace(/\n?```$/, "") || "{}";
-    const result = JSON.parse(raw);
-
-    return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (error) {
+    return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } catch (error: any) {
     console.error("Causal effects error:", error);
+    if (error.status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

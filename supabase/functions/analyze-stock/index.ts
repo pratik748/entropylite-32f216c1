@@ -1,36 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-async function callGemini(systemPrompt: string, userPrompt: string, maxTokens = 4000, temperature = 0.3) {
-  const key = Deno.env.get("GOOGLE_GEMINI_KEY");
-  if (!key) throw new Error("GOOGLE_GEMINI_KEY not configured");
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature, maxOutputTokens: maxTokens },
-    }),
-  });
-  if (!res.ok) {
-    const status = res.status;
-    const text = await res.text();
-    console.error("Gemini error:", status, text);
-    if (status === 429) throw { status: 429, message: "Rate limited" };
-    throw new Error(`Gemini error: ${status}`);
-  }
-  const data = await res.json();
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!raw) throw new Error("Empty Gemini response");
-  return raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -138,10 +114,12 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
 
     let jsonStr: string;
     try {
-      jsonStr = await callGemini(
-        "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders.",
-        prompt
-      );
+      const result = await callAI({
+        systemPrompt: "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders.",
+        userPrompt: prompt,
+      });
+      jsonStr = result.text;
+      console.log(`analyze-stock used provider: ${result.provider}`);
     } catch (e: any) {
       if (e.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
