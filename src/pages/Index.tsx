@@ -97,7 +97,7 @@ const IndexContent = () => {
             updates[stock.id] = priceData.price;
             statusUpdates[stock.id] = { lastUpdate: t, status: "LIVE", failCount: 0 };
           } else {
-            const prev = priceStatus[stock.id];
+            const prev = priceStatusRef.current[stock.id];
             const failCount = (prev?.failCount || 0) + 1;
             statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           }
