@@ -166,28 +166,29 @@ const IndexContent = () => {
 
       {/* Tab Navigation */}
       <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
-        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
+        <div className="px-1 sm:container flex items-center gap-0 overflow-x-auto py-0.5 sm:py-1 scrollbar-hide relative z-10">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-2 text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? "glass-subtle glass-glow-primary text-primary"
                   : "text-muted-foreground hover:text-foreground border border-transparent"
               }`}
             >
-              {tab.icon}
+              <span className="sm:hidden">{React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}</span>
+              <span className="hidden sm:block">{tab.icon}</span>
               <span className="hidden sm:inline">{tab.label}</span>
               <span className="sm:hidden">{tab.shortLabel}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0">
-            <span className="relative flex h-2 w-2">
+          <div className="ml-auto flex items-center gap-1 pl-1 flex-shrink-0">
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
+              <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-gain" />
             </span>
-            <span className="text-[8px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
+            <span className="text-[7px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
           </div>
         </div>
       </nav>
