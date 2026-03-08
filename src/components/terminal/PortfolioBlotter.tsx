@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { type PriceStatusMap } from "@/pages/Index";
+import { type TickerThreat } from "@/hooks/useGeoIntelligence";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
@@ -14,9 +15,17 @@ interface PortfolioBlotterProps {
   onAnalyze: (ticker: string, buyPrice: number, quantity: number) => void;
   isLoading: boolean;
   priceStatus: PriceStatusMap;
+  tickerThreats?: Record<string, TickerThreat>;
 }
 
-const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus }: PortfolioBlotterProps) => {
+const THREAT_COLORS: Record<string, string> = {
+  critical: "text-loss bg-loss/15",
+  high: "text-warning bg-warning/15",
+  medium: "text-warning/70 bg-warning/10",
+  low: "text-muted-foreground bg-surface-3",
+};
+
+const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus, tickerThreats }: PortfolioBlotterProps) => {
   const { baseCurrency, convertToBase } = useFX();
   const [flashMap, setFlashMap] = useState<Record<string, "gain" | "loss">>({});
   const prevPrices = useRef<Record<string, number>>({});
@@ -99,6 +108,12 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     <span className="font-semibold text-foreground">{s.ticker}</span>
                     {ccy !== baseCurrency && (
                       <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
+                    )}
+                    {tickerThreats?.[s.ticker] && tickerThreats[s.ticker].threatLevel !== "none" && (
+                      <span className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0 text-[7px] font-bold uppercase ${THREAT_COLORS[tickerThreats[s.ticker].threatLevel] || ""}`} title={tickerThreats[s.ticker].threats.join(", ")}>
+                        <AlertTriangle className="h-2 w-2" />
+                        {tickerThreats[s.ticker].threatLevel === "critical" ? "⚠" : tickerThreats[s.ticker].score}
+                      </span>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemoveStock(s.id); }}

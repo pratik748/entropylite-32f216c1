@@ -1,25 +1,21 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Satellite, RefreshCw, Loader2 } from "lucide-react";
-import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import GeopoliticalMap from "@/components/geopolitical/GeopoliticalMap";
-import type { ConflictEvent, MapData } from "@/components/geopolitical/GeopoliticalMap";
+import type { ConflictEvent } from "@/components/geopolitical/GeopoliticalMap";
 import { RiskStrip, IntelligenceBrief, ThreatFeed, ThreatsView, ForexView } from "@/components/geopolitical/GeopoliticalPanels";
+import type { GeoData, TickerThreat } from "@/hooks/useGeoIntelligence";
 
-interface GeoData extends MapData {
-  globalRiskScore: number;
-  regimeSignal: string;
-  capitalFlowDirection: string;
-  safeHavenDemand?: string;
-  intelligenceSummary?: string;
-  keyThreats: string[];
-  timestamp: number;
+interface Props {
+  stocks: PortfolioStock[];
+  geoData: GeoData | null;
+  geoLoading: boolean;
+  exposedTickers: string[];
+  tickerThreats: Record<string, TickerThreat>;
+  onRefresh: (showLoading?: boolean) => void;
 }
-
-interface Props { stocks: PortfolioStock[]; }
 
 function getTickerGeo(ticker: string): { lat: number; lng: number } | null {
   const t = ticker.toUpperCase();
@@ -37,34 +33,16 @@ function getTickerGeo(ticker: string): { lat: number; lng: number } | null {
 }
 
 const LAYER_LABELS: Record<string, string> = {
-  conflicts: "Conflicts",
-  tradeHubs: "Trade Hubs",
-  supplyChains: "Supply Routes",
-  entropy: "Entropy Zones",
-  forex: "FX Stress",
-  portfolio: "Portfolio",
+  conflicts: "Conflicts", tradeHubs: "Trade Hubs", supplyChains: "Supply Routes",
+  entropy: "Entropy Zones", forex: "FX Stress", portfolio: "Portfolio",
 };
 
-const GeopoliticalGlobe = ({ stocks }: Props) => {
-  const [data, setData] = useState<GeoData | null>(null);
-  const [loading, setLoading] = useState(true);
+const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposedTickers, tickerThreats, onRefresh }: Props) => {
   const [selectedConflict, setSelectedConflict] = useState<ConflictEvent | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "threats" | "forex">("map");
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
     conflicts: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
   });
-
-  const fetchData = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    try {
-      const { data: result, error } = await governedInvoke("geopolitical-data");
-      if (error) throw error;
-      setData(result);
-    } catch (e) { console.error("Geo fetch error:", e); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 600_000); return () => clearInterval(i); }, [fetchData]);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -73,13 +51,6 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
     }).filter(Boolean) as { ticker: string; lat: number; lng: number }[],
     [stocks]
   );
-
-  const exposedTickers = useMemo(() => {
-    if (!data) return [];
-    return stocks.filter(s => s.analysis && data.conflictEvents.some(c =>
-      c.affectedAssets?.some(a => s.ticker.includes(a) || a.includes(s.ticker.replace(".NS", "").replace(".BO", "")))
-    )).map(s => s.ticker);
-  }, [stocks, data]);
 
   const toggleLayer = (key: string) => setVisibleLayers(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -99,7 +70,7 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
     return (
       <div className="text-center py-20 text-muted-foreground">
         Failed to load geopolitical data.
-        <Button variant="ghost" size="sm" onClick={() => fetchData()} className="ml-2">Retry</Button>
+        <Button variant="ghost" size="sm" onClick={() => onRefresh()} className="ml-2">Retry</Button>
       </div>
     );
   }
@@ -122,7 +93,8 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
             <div>
               <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">God's Eye — Global Intelligence Map</h2>
               <p className="text-[9px] text-muted-foreground font-mono tracking-widest">
-                LIVE · {data.conflictEvents.length} CONFLICTS · {data.timestamp ? `${Math.round((Date.now() - data.timestamp) / 1000)}s ago` : ""}
+                LIVE 60s · {data.conflictEvents.length} CONFLICTS · {data.timestamp ? `${Math.round((Date.now() - data.timestamp) / 1000)}s ago` : ""}
+                {exposedTickers.length > 0 && <span className="text-loss ml-2">⚠ {exposedTickers.length} HOLDINGS EXPOSED</span>}
               </p>
             </div>
           </div>
@@ -133,19 +105,45 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
                 {m === "map" ? "🗺 Map" : m === "threats" ? "⚠ Threats" : "💱 Forex"}
               </button>
             ))}
-            <Button size="sm" variant="ghost" onClick={() => fetchData(false)} className="h-7 gap-1 text-[10px]">
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> 30s
+            <Button size="sm" variant="ghost" onClick={() => onRefresh(false)} className="h-7 gap-1 text-[10px]">
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> 60s
             </Button>
           </div>
         </div>
       </div>
 
       <RiskStrip data={data} />
+
+      {/* Portfolio Exposure Alert Banner */}
+      {exposedTickers.length > 0 && (
+        <div className="glass-panel glass-glow-loss rounded-xl p-3 sm:p-4 border border-loss/30 animate-pulse-subtle">
+          <div className="flex items-center gap-2 mb-2 relative z-10">
+            <span className="flex h-2 w-2"><span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-loss opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-loss" /></span>
+            <span className="text-[10px] font-bold text-loss uppercase tracking-widest">Portfolio Under Threat</span>
+          </div>
+          <div className="flex flex-wrap gap-2 relative z-10">
+            {exposedTickers.map(t => {
+              const threat = tickerThreats[t];
+              return (
+                <div key={t} className="flex items-center gap-1.5 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-1.5">
+                  <span className="font-mono text-xs font-bold text-loss">{t}</span>
+                  {threat && (
+                    <>
+                      <span className="text-[8px] font-mono text-loss/80">Score: {threat.score}</span>
+                      {threat.topConflict && <span className="text-[8px] text-loss/60">· {threat.topConflict}</span>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <IntelligenceBrief data={data} />
 
       {viewMode === "map" && (
         <>
-          {/* Layer toggles */}
           <div className="flex flex-wrap gap-3 glass-subtle rounded-lg px-3 py-2">
             {Object.entries(LAYER_LABELS).map(([key, label]) => (
               <label key={key} className="flex items-center gap-1.5 cursor-pointer">
@@ -156,12 +154,7 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 500 }}>
-              <GeopoliticalMap
-                data={data}
-                portfolioMarkers={portfolioMarkers}
-                onSelectConflict={setSelectedConflict}
-                visibleLayers={visibleLayers}
-              />
+              <GeopoliticalMap data={data} portfolioMarkers={portfolioMarkers} onSelectConflict={setSelectedConflict} visibleLayers={visibleLayers} />
             </div>
             <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
           </div>
