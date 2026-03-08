@@ -221,7 +221,12 @@ const IndexContent = () => {
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
-              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
+              {stocks.filter((s) => s.analysis).length > 1 && (
+                <>
+                  <PortfolioChart stocks={stocks} />
+                  <PnLWaterfall stocks={stocks} />
+                </>
+              )}
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
