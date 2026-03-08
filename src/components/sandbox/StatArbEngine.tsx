@@ -166,7 +166,7 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
   return (
     <div className="space-y-4 sm:space-y-5">
       <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Risk Engine</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <MetricCard label="VaR 95% (10d)" value={fmt(data.hVar95)} color="text-loss" />
         <MetricCard label="VaR 99% (10d)" value={fmt(data.hVar99)} color="text-loss" />
         <MetricCard label="MC VaR 95%" value={fmt(data.mcVar.var)} color="text-loss" />
