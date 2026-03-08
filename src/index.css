@@ -152,7 +152,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 30%, hsl(210 100% 80% / 0.12) 50%, hsl(var(--glass-highlight)) 70%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 30%, hsl(0 0% 80% / 0.1) 50%, hsl(var(--glass-highlight)) 70%, transparent 100%);
     pointer-events: none;
   }
   .glass-panel::after {
