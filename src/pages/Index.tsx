@@ -54,7 +54,6 @@ const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
-  const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
