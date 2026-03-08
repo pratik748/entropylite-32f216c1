@@ -268,12 +268,14 @@ const IndexContent = () => {
 
                   <ResizableHandle withHandle />
 
-                  {/* Bottom center: History */}
-                  <ResizablePanel defaultSize={35} minSize={15}>
-                    <PanelWrapper title="Analysis History" noPad>
-                      <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
-                    </PanelWrapper>
-                  </ResizablePanel>
+                  {/* Bottom center: History (collapsible) */}
+                  {history.length > 0 && (
+                    <ResizablePanel defaultSize={35} minSize={15}>
+                      <PanelWrapper title="Analysis History" noPad collapsible defaultCollapsed>
+                        <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
+                      </PanelWrapper>
+                    </ResizablePanel>
+                  )}
                 </ResizablePanelGroup>
               </ResizablePanel>
 
