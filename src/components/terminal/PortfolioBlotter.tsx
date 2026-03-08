@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { type PriceStatusMap } from "@/pages/Index";
+import { useFX } from "@/hooks/useFX";
+import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
 
 interface PortfolioBlotterProps {
@@ -14,10 +16,11 @@ interface PortfolioBlotterProps {
 }
 
 const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus }: PortfolioBlotterProps) => {
+  const { baseCurrency, convertToBase } = useFX();
   const [flashMap, setFlashMap] = useState<Record<string, "gain" | "loss">>({});
   const prevPrices = useRef<Record<string, number>>({});
+  const baseSym = getCurrencySymbol(baseCurrency);
 
-  // Flash on price change
   useEffect(() => {
     const newFlash: Record<string, "gain" | "loss"> = {};
     stocks.forEach(s => {
@@ -37,12 +40,23 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
   }, [stocks]);
 
   const analyzed = stocks.filter(s => s.analysis);
-  const totalValue = analyzed.reduce((sum, s) => sum + (s.analysis!.currentPrice * s.quantity), 0);
+
+  // Compute total value in base currency
+  const totalValue = analyzed.reduce((sum, s) => {
+    const ccy = s.analysis!.currency || "USD";
+    return sum + convertToBase(s.analysis!.currentPrice * s.quantity, ccy);
+  }, 0);
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 border-b border-border">
         <StockInput onAnalyze={onAnalyze} isLoading={isLoading} compact />
+      </div>
+
+      {/* Base currency indicator */}
+      <div className="px-2 py-1 border-b border-border/50 flex items-center justify-between">
+        <span className="font-mono text-[8px] text-muted-foreground">BASE</span>
+        <span className="font-mono text-[9px] text-primary font-semibold">{baseCurrency} {baseSym}</span>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -60,9 +74,13 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
           <tbody>
             {analyzed.map(s => {
               const a = s.analysis!;
-              const pnl = (a.currentPrice - s.buyPrice) * s.quantity;
-              const pnlPct = ((a.currentPrice - s.buyPrice) / s.buyPrice) * 100;
-              const weight = totalValue > 0 ? ((a.currentPrice * s.quantity) / totalValue) * 100 : 0;
+              const ccy = a.currency || "USD";
+              const priceInBase = convertToBase(a.currentPrice, ccy);
+              const buyInBase = convertToBase(s.buyPrice, ccy);
+              const pnl = (priceInBase - buyInBase) * s.quantity;
+              const pnlPct = buyInBase > 0 ? ((priceInBase - buyInBase) / buyInBase) * 100 : 0;
+              const posValue = priceInBase * s.quantity;
+              const weight = totalValue > 0 ? (posValue / totalValue) * 100 : 0;
               const flash = flashMap[s.id];
               const isActive = s.id === activeStockId;
 
@@ -74,14 +92,21 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     ${isActive ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"}
                     ${flash === "gain" ? "flash-green" : flash === "loss" ? "flash-red" : ""}`}
                 >
-                  <td className="px-2 py-0.5 font-semibold text-foreground">{s.ticker}</td>
-                  <td className="px-2 py-0.5 text-right text-foreground tabular-nums">{a.currentPrice.toFixed(2)}</td>
+                  <td className="px-2 py-0.5">
+                    <span className="font-semibold text-foreground">{s.ticker}</span>
+                    {ccy !== baseCurrency && (
+                      <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-0.5 text-right text-foreground tabular-nums">
+                    {baseSym}{priceInBase.toFixed(2)}
+                  </td>
                   <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
                     {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
                   </td>
                   <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{s.quantity}</td>
                   <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                    {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}
+                    {pnl >= 0 ? "+" : ""}{baseSym}{Math.abs(pnl).toFixed(0)}
                   </td>
                   <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{weight.toFixed(1)}%</td>
                 </tr>
@@ -100,8 +125,10 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
 
       {analyzed.length > 0 && (
         <div className="border-t border-border px-2 py-1.5 font-mono text-[9px] flex justify-between text-muted-foreground">
-          <span>TOTAL VALUE</span>
-          <span className="text-foreground font-semibold tabular-nums">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          <span>TOTAL ({baseCurrency})</span>
+          <span className="text-foreground font-semibold tabular-nums">
+            {baseSym}{totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </span>
         </div>
       )}
     </div>

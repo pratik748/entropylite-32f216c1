@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
+import { getCurrencySymbol } from "@/lib/currency";
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
+  const { baseCurrency, setBaseCurrency } = useFX();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -23,7 +26,7 @@ const Header = () => {
   };
 
   return (
-    <header className="border-b border-border glass-panel relative">
+    <header className="border-b border-border glass-panel relative shrink-0">
       <div className="container flex h-14 items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
           <img alt="Entropy" className="h-9 object-contain" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
@@ -40,6 +43,21 @@ const Header = () => {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Base Currency Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9px] text-muted-foreground/60">BASE</span>
+            <select
+              value={baseCurrency}
+              onChange={(e) => setBaseCurrency(e.target.value)}
+              className="bg-surface-2 border border-border rounded px-1.5 py-0.5 font-mono text-[10px] text-primary font-semibold cursor-pointer hover:border-primary/40 transition-colors appearance-none"
+              style={{ minWidth: 52 }}
+            >
+              {SUPPORTED_CURRENCIES.map(c => (
+                <option key={c} value={c}>{getCurrencySymbol(c)} {c}</option>
+              ))}
+            </select>
+          </div>
+
           <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
             {time.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })} UTC{time.getTimezoneOffset() > 0 ? "-" : "+"}{Math.abs(time.getTimezoneOffset() / 60)}
           </span>
