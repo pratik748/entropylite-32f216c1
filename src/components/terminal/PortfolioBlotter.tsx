@@ -95,11 +95,18 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     ${isActive ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"}
                     ${flash === "gain" ? "flash-green" : flash === "loss" ? "flash-red" : ""}`}
                 >
-                  <td className="px-2 py-0.5">
+                  <td className="px-2 py-0.5 flex items-center group/row">
                     <span className="font-semibold text-foreground">{s.ticker}</span>
                     {ccy !== baseCurrency && (
                       <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRemoveStock(s.id); }}
+                      className="ml-auto opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-loss/10 hover:text-loss text-muted-foreground"
+                      title="Remove"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </td>
                   <td className="px-2 py-0.5 text-right text-foreground tabular-nums">
                     <span>{nativeSym}{nativePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
