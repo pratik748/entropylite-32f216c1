@@ -544,7 +544,7 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {results.map(r => (
           <div key={r.name} className="rounded-lg border border-border p-2 text-center">
             <p className="text-[9px] text-muted-foreground">{r.name}</p>
