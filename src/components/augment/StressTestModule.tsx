@@ -1,55 +1,51 @@
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
-const SCENARIO_IMPACTS: Record<string, { portfolioMultiplier: number; niftyImpact: number; recovery: string }> = {
-  "2008 GFC Replay": { portfolioMultiplier: -0.325, niftyImpact: -52.0, recovery: "18 months" },
-  "COVID-19 Crash": { portfolioMultiplier: -0.241, niftyImpact: -38.0, recovery: "5 months" },
-  "RBI Rate +150bps": { portfolioMultiplier: -0.082, niftyImpact: -12.5, recovery: "6 months" },
-  "Crude Oil $120/bbl": { portfolioMultiplier: -0.114, niftyImpact: -15.2, recovery: "4 months" },
-  "INR Depreciation 10%": { portfolioMultiplier: -0.058, niftyImpact: -8.1, recovery: "3 months" },
-  "FII Outflow ₹50K Cr": { portfolioMultiplier: -0.142, niftyImpact: -18.5, recovery: "8 months" },
-  "Earnings Miss 15%": { portfolioMultiplier: -0.187, niftyImpact: -22.0, recovery: "9 months" },
+const SCENARIO_IMPACTS: Record<string, { portfolioMultiplier: number; benchmarkImpact: number; recovery: string }> = {
+  "2008 GFC Replay": { portfolioMultiplier: -0.325, benchmarkImpact: -52.0, recovery: "18 months" },
+  "COVID-19 Crash": { portfolioMultiplier: -0.241, benchmarkImpact: -38.0, recovery: "5 months" },
+  "Rate Hike +150bps": { portfolioMultiplier: -0.082, benchmarkImpact: -12.5, recovery: "6 months" },
+  "Crude Oil $120/bbl": { portfolioMultiplier: -0.114, benchmarkImpact: -15.2, recovery: "4 months" },
+  "Currency Depreciation 10%": { portfolioMultiplier: -0.058, benchmarkImpact: -8.1, recovery: "3 months" },
+  "Large FII Outflow": { portfolioMultiplier: -0.142, benchmarkImpact: -18.5, recovery: "8 months" },
+  "Earnings Miss 15%": { portfolioMultiplier: -0.187, benchmarkImpact: -22.0, recovery: "9 months" },
 };
 
 const StressTestModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const { totalValue, scenarios, sensitivity } = useMemo(() => {
-    const total = analyzed.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
-    const avgRisk = analyzed.length > 0
-      ? analyzed.reduce((s, st) => s + (st.analysis?.riskScore || 40), 0) / analyzed.length
-      : 40;
+  const { scenarios, sensitivity } = useMemo(() => {
+    const avgRisk = holdings.length > 0
+      ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
+    const avgBeta = holdings.length > 0
+      ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
-    // Risk-adjust scenario impacts
-    const riskMultiplier = avgRisk / 50; // normalize around 50
+    const riskMultiplier = avgRisk / 50;
     const scenarioData = Object.entries(SCENARIO_IMPACTS).map(([name, s]) => ({
       name,
       portfolioImpact: +(s.portfolioMultiplier * riskMultiplier * 100).toFixed(1),
-      niftyImpact: s.niftyImpact,
+      benchmarkImpact: s.benchmarkImpact,
       recovery: s.recovery,
-      pnlLoss: total * Math.abs(s.portfolioMultiplier * riskMultiplier),
+      pnlLoss: totalValue * Math.abs(s.portfolioMultiplier * riskMultiplier),
     }));
 
-    // Sensitivity from real portfolio
-    const avgBeta = analyzed.length > 0
-      ? analyzed.reduce((s, st) => s + (st.analysis?.beta || 1), 0) / analyzed.length
-      : 1;
     const sensitivityData = [
-      { factor: "Equity β", shock: "+1σ", pnl: `₹${(total * 0.037 * avgBeta / 100000).toFixed(1)} L`, pct: `${(-3.7 * avgBeta).toFixed(1)}%` },
-      { factor: "Interest Rate", shock: "+50bps", pnl: `₹${(total * 0.018 / 100000).toFixed(1)} L`, pct: "-1.8%" },
-      { factor: "Credit Spread", shock: "+100bps", pnl: `₹${(total * 0.010 / 100000).toFixed(1)} L`, pct: "-1.0%" },
-      { factor: "FX (USD/INR)", shock: "+5%", pnl: `₹${(total * 0.008 / 100000).toFixed(1)} L`, pct: "-0.8%" },
-      { factor: "Crude Oil", shock: "+20%", pnl: `₹${(total * 0.014 / 100000).toFixed(1)} L`, pct: "-1.4%" },
-      { factor: "VIX Spike", shock: "+10pts", pnl: `₹${(total * 0.025 / 100000).toFixed(1)} L`, pct: "-2.5%" },
+      { factor: "Equity β", shock: "+1σ", pnl: fmt(totalValue * 0.037 * avgBeta), pct: `${(-3.7 * avgBeta).toFixed(1)}%` },
+      { factor: "Interest Rate", shock: "+50bps", pnl: fmt(totalValue * 0.018), pct: "-1.8%" },
+      { factor: "Credit Spread", shock: "+100bps", pnl: fmt(totalValue * 0.010), pct: "-1.0%" },
+      { factor: "FX", shock: "+5%", pnl: fmt(totalValue * 0.008), pct: "-0.8%" },
+      { factor: "Crude Oil", shock: "+20%", pnl: fmt(totalValue * 0.014), pct: "-1.4%" },
+      { factor: "VIX Spike", shock: "+10pts", pnl: fmt(totalValue * 0.025), pct: "-2.5%" },
     ];
 
-    return { totalValue: total, scenarios: scenarioData, sensitivity: sensitivityData };
-  }, [analyzed]);
+    return { scenarios: scenarioData, sensitivity: sensitivityData };
+  }, [holdings, totalValue, fmt]);
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to run stress tests on your actual portfolio.</p>
@@ -57,7 +53,7 @@ const StressTestModule = ({ stocks }: Props) => {
     );
   }
 
-  const chartData = scenarios.map(s => ({ name: s.name, portfolio: s.portfolioImpact, benchmark: s.niftyImpact }));
+  const chartData = scenarios.map(s => ({ name: s.name, portfolio: s.portfolioImpact, benchmark: s.benchmarkImpact }));
 
   return (
     <div className="space-y-6">
@@ -66,13 +62,13 @@ const StressTestModule = ({ stocks }: Props) => {
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ left: 120 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" horizontal={false} />
-              <XAxis type="number" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v}%`} />
-              <YAxis dataKey="name" type="category" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} width={115} />
-              <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+              <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} tickFormatter={v => `${v}%`} />
+              <YAxis dataKey="name" type="category" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} width={115} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 11 }} />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="portfolio" fill="hsl(0,0%,100%)" fillOpacity={0.8} radius={[0, 4, 4, 0]} name="Your Portfolio" />
-              <Bar dataKey="benchmark" fill="hsl(0,0%,40%)" fillOpacity={0.6} radius={[0, 4, 4, 0]} name="NIFTY 50" />
+              <Bar dataKey="portfolio" fill="hsl(var(--foreground))" fillOpacity={0.8} radius={[0, 4, 4, 0]} name="Your Portfolio" />
+              <Bar dataKey="benchmark" fill="hsl(var(--muted-foreground))" fillOpacity={0.6} radius={[0, 4, 4, 0]} name="Benchmark" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -90,7 +86,7 @@ const StressTestModule = ({ stocks }: Props) => {
                 </div>
                 <div className="text-right">
                   <p className="font-mono text-sm font-bold text-loss">{s.portfolioImpact}%</p>
-                  <p className="font-mono text-[10px] text-loss">-₹{(s.pnlLoss / 100000).toFixed(1)} L</p>
+                  <p className="font-mono text-[10px] text-loss">-{fmt(s.pnlLoss)}</p>
                 </div>
               </div>
             ))}

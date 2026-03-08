@@ -1,42 +1,33 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const MultiAssetModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, totalPnl, holdings, fmt, sym } = useNormalizedPortfolio(stocks);
 
-  const { assetBreakdown, totalValue, dayPnl } = useMemo(() => {
-    if (analyzed.length === 0) return { assetBreakdown: [], totalValue: 0, dayPnl: 0 };
-
-    // Group by market cap / sector as proxy for asset class
+  const assetBreakdown = useMemo(() => {
+    if (holdings.length === 0) return [];
     const sectorMap: Record<string, { value: number; pnl: number }> = {};
-    analyzed.forEach(s => {
-      const sector = s.analysis.sector || s.analysis.marketCap || "Equity";
-      const val = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
-      const pnl = ((s.analysis.currentPrice || s.buyPrice) - s.buyPrice) * s.quantity;
+    holdings.forEach(h => {
+      const sector = h.analysis?.sector || h.analysis?.marketCap || "Equity";
       if (!sectorMap[sector]) sectorMap[sector] = { value: 0, pnl: 0 };
-      sectorMap[sector].value += val;
-      sectorMap[sector].pnl += pnl;
+      sectorMap[sector].value += h.value;
+      sectorMap[sector].pnl += h.pnl;
     });
-
-    const total = Object.values(sectorMap).reduce((s, v) => s + v.value, 0);
-    const totalPnl = Object.values(sectorMap).reduce((s, v) => s + v.pnl, 0);
-
-    const breakdown = Object.entries(sectorMap)
+    return Object.entries(sectorMap)
       .map(([asset, data]) => ({
         asset,
-        nav: `₹${(data.value / 100000).toFixed(1)} L`,
-        weight: `${(data.value / total * 100).toFixed(1)}%`,
-        dayPnl: `${data.pnl >= 0 ? "+" : ""}₹${(data.pnl / 100000).toFixed(1)} L`,
+        nav: fmt(data.value),
+        weight: `${(data.value / totalValue * 100).toFixed(1)}%`,
+        dayPnl: `${data.pnl >= 0 ? "+" : ""}${fmt(data.pnl)}`,
         pnlSign: data.pnl >= 0,
       }))
       .sort((a, b) => parseFloat(b.weight) - parseFloat(a.weight));
+  }, [holdings, totalValue, fmt]);
 
-    return { assetBreakdown: breakdown, totalValue: total, dayPnl: totalPnl };
-  }, [analyzed]);
-
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see multi-asset breakdown.</p>
@@ -49,7 +40,7 @@ const MultiAssetModule = ({ stocks }: Props) => {
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total NAV</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹{(totalValue / 100000).toFixed(1)} L</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{fmt(totalValue)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Asset Classes</p>
@@ -57,8 +48,8 @@ const MultiAssetModule = ({ stocks }: Props) => {
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total P&L</p>
-          <p className={`mt-1 font-mono text-2xl font-bold ${dayPnl >= 0 ? "text-gain" : "text-loss"}`}>
-            {dayPnl >= 0 ? "+" : ""}₹{(dayPnl / 100000).toFixed(1)} L
+          <p className={`mt-1 font-mono text-2xl font-bold ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
+            {totalPnl >= 0 ? "+" : ""}{fmt(totalPnl)}
           </p>
         </div>
       </div>

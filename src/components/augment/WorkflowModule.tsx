@@ -1,79 +1,51 @@
 import { useMemo } from "react";
 import { ArrowRight, CheckCircle2, Clock } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const WorkflowModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, totalPnl, holdings, fmt } = useNormalizedPortfolio(stocks);
 
   const workflowStages = useMemo(() => {
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
-    const totalPnl = analyzed.reduce((s, st) => s + ((st.analysis?.currentPrice || st.buyPrice) - st.buyPrice) * st.quantity, 0);
-    const avgRisk = analyzed.length > 0 ? analyzed.reduce((s, st) => s + (st.analysis?.riskScore || 40), 0) / analyzed.length : 0;
+    const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 0;
+    const avgConf = holdings.length > 0 ? holdings.reduce((s, h) => s + (h.analysis?.confidence || 0), 0) / holdings.length : 0;
 
     return [
       {
-        stage: "Research",
-        status: analyzed.length > 0 ? "complete" : "active",
+        stage: "Research", status: holdings.length > 0 ? "complete" : "active",
         description: "AI-powered analysis, news sentiment, risk scoring",
-        metrics: [
-          { label: "Stocks Analyzed", value: analyzed.length.toString() },
-          { label: "Avg Confidence", value: analyzed.length > 0 ? `${(analyzed.reduce((s, st) => s + (st.analysis?.confidence || 0), 0) / analyzed.length).toFixed(0)}%` : "—" },
-        ],
+        metrics: [{ label: "Stocks Analyzed", value: holdings.length.toString() }, { label: "Avg Confidence", value: holdings.length > 0 ? `${avgConf.toFixed(0)}%` : "—" }],
       },
       {
-        stage: "Portfolio",
-        status: analyzed.length > 0 ? "complete" : "pending",
+        stage: "Portfolio", status: holdings.length > 0 ? "complete" : "pending",
         description: "Construction, allocation, optimization",
-        metrics: [
-          { label: "Positions", value: analyzed.length.toString() },
-          { label: "Total Value", value: `₹${(totalValue / 100000).toFixed(1)}L` },
-        ],
+        metrics: [{ label: "Positions", value: holdings.length.toString() }, { label: "Total Value", value: fmt(totalValue) }],
       },
       {
-        stage: "Trade",
-        status: analyzed.length > 0 ? "active" : "pending",
+        stage: "Trade", status: holdings.length > 0 ? "active" : "pending",
         description: "Order generation, execution",
-        metrics: [
-          { label: "Suggestions", value: analyzed.filter(s => s.analysis?.suggestion).length.toString() },
-          { label: "Actions", value: `${analyzed.filter(s => s.analysis?.suggestion === "Add").length} Add, ${analyzed.filter(s => s.analysis?.suggestion === "Exit").length} Exit` },
-        ],
+        metrics: [{ label: "Suggestions", value: holdings.filter(h => h.suggestion).length.toString() }, { label: "Actions", value: `${holdings.filter(h => h.suggestion === "Add").length} Add, ${holdings.filter(h => h.suggestion === "Exit").length} Exit` }],
       },
+      { stage: "Settlement", status: "active", description: "Clearing, reconciliation", metrics: [{ label: "Status", value: "Real-time" }] },
       {
-        stage: "Settlement",
-        status: "active",
-        description: "Clearing, reconciliation",
-        metrics: [
-          { label: "Status", value: "Real-time" },
-        ],
-      },
-      {
-        stage: "Reporting",
-        status: analyzed.length > 0 ? "active" : "pending",
+        stage: "Reporting", status: holdings.length > 0 ? "active" : "pending",
         description: "NAV, P&L attribution, client reports",
-        metrics: [
-          { label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}₹${(totalPnl / 100000).toFixed(1)}L` },
-        ],
+        metrics: [{ label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}` }],
       },
       {
-        stage: "Compliance",
-        status: analyzed.length > 0 ? "active" : "pending",
+        stage: "Compliance", status: holdings.length > 0 ? "active" : "pending",
         description: "Mandate checks, regulatory",
-        metrics: [
-          { label: "Risk Score", value: `${avgRisk.toFixed(0)}/100` },
-        ],
+        metrics: [{ label: "Risk Score", value: `${avgRisk.toFixed(0)}/100` }],
       },
       {
-        stage: "Client",
-        status: analyzed.length > 0 ? "active" : "pending",
+        stage: "Client", status: holdings.length > 0 ? "active" : "pending",
         description: "Performance review, reporting",
-        metrics: [
-          { label: "Holdings", value: analyzed.length.toString() },
-        ],
+        metrics: [{ label: "Holdings", value: holdings.length.toString() }],
       },
     ];
-  }, [analyzed]);
+  }, [holdings, totalValue, totalPnl, fmt]);
 
   const stageIcon = (status: string) => {
     if (status === "complete") return <CheckCircle2 className="h-5 w-5 text-gain" />;
@@ -86,7 +58,6 @@ const WorkflowModule = ({ stocks }: Props) => {
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">End-to-End Investment Workflow</h3>
         <p className="text-xs text-muted-foreground mb-6">Research → Portfolio → Trade → Settlement → Reporting → Compliance → Client</p>
-
         <div className="flex items-start gap-1 overflow-x-auto pb-4">
           {workflowStages.map((s, i) => (
             <div key={s.stage} className="flex items-start gap-1">
@@ -105,9 +76,7 @@ const WorkflowModule = ({ stocks }: Props) => {
                   ))}
                 </div>
               </div>
-              {i < workflowStages.length - 1 && (
-                <ArrowRight className="h-5 w-5 text-muted-foreground/30 mt-8 flex-shrink-0" />
-              )}
+              {i < workflowStages.length - 1 && <ArrowRight className="h-5 w-5 text-muted-foreground/30 mt-8 flex-shrink-0" />}
             </div>
           ))}
         </div>
@@ -116,25 +85,16 @@ const WorkflowModule = ({ stocks }: Props) => {
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">System Status</h3>
         <div className="grid gap-3 md:grid-cols-4">
-          {[
-            { system: "Market Data Feed", status: "LIVE" },
-            { system: "AI Analysis Engine", status: "LIVE" },
-            { system: "Risk Engine", status: "LIVE" },
-            { system: "Compliance Engine", status: "LIVE" },
-            { system: "News Aggregation", status: "LIVE" },
-            { system: "Reporting Engine", status: "LIVE" },
-            { system: "Portfolio Optimizer", status: "LIVE" },
-            { system: "Audit Logger", status: "LIVE" },
-          ].map(s => (
-            <div key={s.system} className="rounded-lg bg-surface-2 p-3">
+          {["Market Data Feed", "AI Analysis Engine", "Risk Engine", "Compliance Engine", "News Aggregation", "Reporting Engine", "Portfolio Optimizer", "Audit Logger"].map(sys => (
+            <div key={sys} className="rounded-lg bg-surface-2 p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
                 </span>
-                <span className="text-xs font-medium text-foreground">{s.system}</span>
+                <span className="text-xs font-medium text-foreground">{sys}</span>
               </div>
-              <span className="font-mono text-[10px] text-gain">{s.status}</span>
+              <span className="font-mono text-[10px] text-gain">LIVE</span>
             </div>
           ))}
         </div>

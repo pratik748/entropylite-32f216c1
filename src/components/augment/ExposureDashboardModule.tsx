@@ -1,37 +1,32 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const ExposureDashboardModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const { sectorExposure, totalValue, hhi, grossExposure, netExposure, riskHeatmap } = useMemo(() => {
-    if (analyzed.length === 0) return { sectorExposure: [], totalValue: 0, hhi: 0, grossExposure: 0, netExposure: 0, riskHeatmap: [] };
+  const { sectorExposure, hhi, riskHeatmap } = useMemo(() => {
+    if (holdings.length === 0) return { sectorExposure: [], hhi: 0, riskHeatmap: [] };
 
-    const total = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-
-    // Sector exposure from actual holdings
     const sectorMap: Record<string, number> = {};
-    analyzed.forEach(s => {
-      const sector = s.analysis.sector || "Unknown";
-      const val = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
-      sectorMap[sector] = (sectorMap[sector] || 0) + val;
+    holdings.forEach(h => {
+      const sector = h.sector || "Unknown";
+      sectorMap[sector] = (sectorMap[sector] || 0) + h.value;
     });
 
     const sectors = Object.entries(sectorMap)
-      .map(([sector, val]) => ({ sector, long: (val / total) * 100, short: 0, net: (val / total) * 100 }))
+      .map(([sector, val]) => ({ sector, long: (val / totalValue) * 100, short: 0, net: (val / totalValue) * 100 }))
       .sort((a, b) => b.net - a.net);
 
-    // HHI concentration
     const weights = sectors.map(s => s.net / 100);
     const hhiVal = weights.reduce((s, w) => s + w * w, 0) * 10000;
 
-    // Risk heatmap from actual risk scores
-    const avgVolatility = analyzed.reduce((s, st) => s + (st.analysis.riskBreakdown?.volatilityRisk || 40), 0) / analyzed.length;
-    const avgCredit = analyzed.reduce((s, st) => s + (st.analysis.riskBreakdown?.financialRisk || 30), 0) / analyzed.length;
-    const avgLiquidity = analyzed.reduce((s, st) => s + (st.analysis.riskBreakdown?.sectorRisk || 25), 0) / analyzed.length;
-    const avgFx = analyzed.reduce((s, st) => s + (st.analysis.riskBreakdown?.macroRisk || 20), 0) / analyzed.length;
+    const avgVolatility = holdings.reduce((s, h) => s + (h.analysis?.riskBreakdown?.volatilityRisk || 40), 0) / holdings.length;
+    const avgCredit = holdings.reduce((s, h) => s + (h.analysis?.riskBreakdown?.financialRisk || 30), 0) / holdings.length;
+    const avgLiquidity = holdings.reduce((s, h) => s + (h.analysis?.riskBreakdown?.sectorRisk || 25), 0) / holdings.length;
+    const avgFx = holdings.reduce((s, h) => s + (h.analysis?.riskBreakdown?.macroRisk || 20), 0) / holdings.length;
     const concentration = hhiVal > 5000 ? 70 : hhiVal > 2500 ? 50 : 30;
 
     const heatmap = [
@@ -42,8 +37,8 @@ const ExposureDashboardModule = ({ stocks }: Props) => {
       { factor: "Concentration", current: Math.round(concentration) },
     ];
 
-    return { sectorExposure: sectors, totalValue: total, hhi: Math.round(hhiVal), grossExposure: 100, netExposure: 100, riskHeatmap: heatmap };
-  }, [analyzed]);
+    return { sectorExposure: sectors, hhi: Math.round(hhiVal), riskHeatmap: heatmap };
+  }, [holdings, totalValue]);
 
   const heatColor = (v: number) => {
     if (v >= 60) return "bg-loss/30 text-loss";
@@ -51,7 +46,7 @@ const ExposureDashboardModule = ({ stocks }: Props) => {
     return "bg-gain/10 text-gain";
   };
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see real exposure data.</p>
@@ -63,10 +58,10 @@ const ExposureDashboardModule = ({ stocks }: Props) => {
     <div className="space-y-6">
       <div className="grid gap-3 md:grid-cols-4">
         {[
-          { label: "Portfolio Value", value: `₹${(totalValue / 100000).toFixed(1)} L` },
+          { label: "Portfolio Value", value: fmt(totalValue) },
           { label: "HHI Concentration", value: hhi.toString() },
           { label: "Sectors", value: sectorExposure.length.toString() },
-          { label: "Holdings", value: analyzed.length.toString() },
+          { label: "Holdings", value: holdings.length.toString() },
         ].map(s => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>

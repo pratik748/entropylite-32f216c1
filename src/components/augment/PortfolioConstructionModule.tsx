@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -10,41 +11,31 @@ const COLORS = [
 ];
 
 const PortfolioConstructionModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const { allocations, totalValue, sharpe, maxDrawdown, driftData } = useMemo(() => {
-    if (analyzed.length === 0) {
-      return { allocations: [], totalValue: 0, sharpe: 0, maxDrawdown: 0, driftData: [] };
+  const { allocations, sharpe, maxDrawdown, driftData } = useMemo(() => {
+    if (holdings.length === 0) {
+      return { allocations: [], sharpe: 0, maxDrawdown: 0, driftData: [] };
     }
 
-    const holdings = analyzed.map(s => {
-      const price = s.analysis.currentPrice || s.buyPrice;
-      const value = price * s.quantity;
-      const sector = s.analysis.sector || s.ticker.replace(".NS", "").replace(".BO", "");
-      return { name: s.ticker.replace(".NS", "").replace(".BO", ""), value, sector, price, buyPrice: s.buyPrice };
-    });
-
-    const total = holdings.reduce((sum, h) => sum + h.value, 0);
     const alloc = holdings.map((h, i) => ({
-      name: h.name,
-      weight: total > 0 ? (h.value / total) * 100 : 0,
-      target: total > 0 ? 100 / holdings.length : 0, // Equal-weight target
+      name: h.ticker,
+      weight: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
+      target: totalValue > 0 ? 100 / holdings.length : 0,
       color: COLORS[i % COLORS.length],
       value: h.value,
     }));
 
-    // Compute Sharpe from actual returns
-    const returns = holdings.map(h => (h.price - h.buyPrice) / h.buyPrice);
+    const returns = holdings.map(h => h.pnlPct / 100);
     const avgReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
     const variance = returns.reduce((s, r) => s + (r - avgReturn) ** 2, 0) / returns.length;
     const stdDev = Math.sqrt(variance);
-    const riskFreeRate = 0.065; // 6.5% India risk-free
+    const riskFreeRate = 0.065;
     const annualizedReturn = avgReturn * 252;
     const annualizedVol = stdDev * Math.sqrt(252);
     const computedSharpe = annualizedVol > 0 ? (annualizedReturn - riskFreeRate) / annualizedVol : 0;
 
-    // Max drawdown from buy prices
-    const drawdowns = holdings.map(h => ((h.price - h.buyPrice) / h.buyPrice) * 100);
+    const drawdowns = holdings.map(h => h.pnlPct);
     const worstDrawdown = Math.min(...drawdowns, 0);
 
     const drift = alloc.map(a => ({
@@ -53,10 +44,10 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       fill: a.weight > a.target ? "hsl(0, 62%, 50%)" : "hsl(145, 70%, 45%)",
     }));
 
-    return { allocations: alloc, totalValue: total, sharpe: computedSharpe, maxDrawdown: worstDrawdown, driftData: drift };
-  }, [analyzed]);
+    return { allocations: alloc, sharpe: computedSharpe, maxDrawdown: worstDrawdown, driftData: drift };
+  }, [holdings, totalValue]);
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks in the Dashboard to see real portfolio construction data.</p>
@@ -69,7 +60,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Portfolio Value</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-foreground">₹{(totalValue / 100000).toFixed(1)} L</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{fmt(totalValue)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sharpe Ratio</p>
@@ -91,10 +82,10 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={allocations} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={90} strokeWidth={1} stroke="hsl(0,0%,3%)">
+                <Pie data={allocations} dataKey="weight" nameKey="name" cx="50%" cy="50%" outerRadius={90} strokeWidth={1} stroke="hsl(var(--background))">
                   {allocations.map((a, i) => <Cell key={i} fill={a.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [`${v.toFixed(1)}%`, "Weight"]} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [`${v.toFixed(1)}%`, "Weight"]} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -107,7 +98,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-foreground">{a.weight.toFixed(1)}%</span>
-                  <span className="font-mono text-muted-foreground/50 text-[10px]">₹{(a.value / 100000).toFixed(1)}L</span>
+                  <span className="font-mono text-muted-foreground/50 text-[10px]">{fmt(a.value)}</span>
                 </div>
               </div>
             ))}
@@ -119,9 +110,9 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={driftData} layout="vertical" margin={{ left: 80 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" horizontal={false} />
-                <XAxis type="number" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v > 0 ? "+" : ""}${v}%`} />
-                <YAxis dataKey="name" type="category" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} width={75} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} tickFormatter={v => `${v > 0 ? "+" : ""}${v}%`} />
+                <YAxis dataKey="name" type="category" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} width={75} />
                 <Bar dataKey="drift" radius={[0, 4, 4, 0]}>
                   {driftData.map((d, i) => <Cell key={i} fill={d.fill} fillOpacity={0.8} />)}
                 </Bar>
@@ -131,7 +122,6 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* Rebalance suggestions */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Rebalance Suggestions</h3>
         <div className="space-y-2">
