@@ -53,6 +53,7 @@ serve(async (req) => {
   }
 
   try {
+    await requireAuth(req, corsHeaders);
     const { ticker, category } = await req.json();
     const NEWSDATA_API_KEY = Deno.env.get("NEWSDATA_API_KEY");
 

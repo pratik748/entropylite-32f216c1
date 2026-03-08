@@ -118,6 +118,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await requireAuth(req, corsHeaders);
     // 1. Fetch real forex volatility
     const forexResults = await Promise.all(
       forexPairs.map(async (pair) => {

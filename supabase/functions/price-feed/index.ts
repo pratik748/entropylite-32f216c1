@@ -11,6 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await requireAuth(req, corsHeaders);
     const { tickers } = await req.json();
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
       return new Response(JSON.stringify({ error: "tickers array required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

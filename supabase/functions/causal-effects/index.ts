@@ -13,6 +13,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await requireAuth(req, corsHeaders);
     const { event, portfolio } = await req.json();
 
     const result = await callAI({

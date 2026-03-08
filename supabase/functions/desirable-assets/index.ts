@@ -32,6 +32,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
     const portfolioTickers = body.portfolioTickers || [];
     const portfolioValue = body.portfolioValue || 100000;
