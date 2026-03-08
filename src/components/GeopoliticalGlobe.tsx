@@ -93,7 +93,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             <div>
               <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">God's Eye — Global Intelligence Map</h2>
               <p className="text-[9px] text-muted-foreground font-mono tracking-widest">
-                LIVE 60s · {data.conflictEvents.length} CONFLICTS · {data.timestamp ? `${Math.round((Date.now() - data.timestamp) / 1000)}s ago` : ""}
+                LIVE 20s · {data.conflictEvents.length} CONFLICTS · {data.timestamp ? `${Math.round((Date.now() - data.timestamp) / 1000)}s ago` : ""}
                 {exposedTickers.length > 0 && <span className="text-loss ml-2">⚠ {exposedTickers.length} HOLDINGS EXPOSED</span>}
               </p>
             </div>
