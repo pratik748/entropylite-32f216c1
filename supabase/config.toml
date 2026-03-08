@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.price-feed]
 verify_jwt = false
+
+[functions.strategy-generate]
+verify_jwt = false
