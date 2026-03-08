@@ -10,42 +10,49 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { regime, vix, moodScore, sectors, holdings, keyEvents, outlook } = await req.json();
+    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const sectorSummary = (sectors || [])
-      .slice(0, 6)
+      .slice(0, 10)
       .map((s: any) => `${s.name}: ${s.changePct > 0 ? "+" : ""}${s.changePct.toFixed(1)}%`)
       .join(", ");
 
-    const holdingSummary = (holdings || [])
-      .slice(0, 8)
-      .map((h: any) => `${h.ticker} (${h.pnlPct > 0 ? "+" : ""}${h.pnlPct.toFixed(1)}%, beta=${h.beta.toFixed(2)})`)
-      .join(", ");
+    // Build detailed portfolio context
+    const portfolioLines = (portfolio || []).map((p: any) =>
+      `${p.ticker}: ${p.quantity} shares @ $${p.currentPrice.toFixed(2)} (bought $${p.buyPrice.toFixed(2)}, PnL ${p.pnlPct > 0 ? "+" : ""}${p.pnlPct.toFixed(1)}%, weight ${p.weightPct.toFixed(1)}%)`
+    ).join("\n");
 
-    const systemPrompt = `You are an elite quantitative strategist at a top-tier hedge fund. You generate adaptive trading strategies based on LIVE market conditions. You never use static templates. Every strategy must be born from the current market regime and data.
+    const totalValue = (portfolio || []).reduce((s: number, p: any) => s + p.currentPrice * p.quantity, 0);
 
-Rules:
-- Generate exactly 4 strategies suited to the CURRENT regime
-- Each strategy must have specific, actionable entry/exit rules
-- Include position sizing as % of portfolio
-- Include stop-loss and take-profit levels
-- Explain WHY this strategy fits the current conditions
-- Strategies must cover different approaches (e.g. directional, hedged, momentum, mean-reversion)
-- Be specific about asset classes and instruments`;
+    const systemPrompt = `You are an elite portfolio strategist managing a live portfolio. You produce EXACT, EXECUTABLE trade instructions — not generic advice.
 
-    const userPrompt = `CURRENT MARKET STATE:
+CRITICAL RULES:
+1. Every instruction must specify: exact ticker, exact action (BUY/SELL/HEDGE/HOLD/TRIM), exact quantity or dollar amount, exact entry price or price range, exact stop-loss price, exact take-profit price
+2. Reference the user's ACTUAL positions by ticker, current PnL, and weight
+3. Consider position concentration risk — if any position is >25% weight, flag it
+4. For hedges, specify exact instruments (e.g. "Buy 2 SPY $540 puts expiring Mar 21")
+5. For new entries, specify exact entry zone, position size in dollars AND shares
+6. Include time horizon for each trade (intraday, swing 2-5 days, position 1-4 weeks)
+7. Explain the EXACT market condition driving each recommendation
+8. If portfolio is empty, recommend 4-6 specific new positions to build a balanced portfolio
+9. All prices must be realistic based on current market data provided
+10. Generate 4-6 trade instructions covering: position management, hedging, new opportunities`;
+
+    const userPrompt = `LIVE MARKET STATE:
 Regime: ${regime}
 VIX: ${vix}
 Mood Score: ${moodScore}/100
 Key Events: ${(keyEvents || []).join("; ")}
 Outlook: ${outlook || "N/A"}
 Sector Performance: ${sectorSummary || "N/A"}
-Portfolio Holdings: ${holdingSummary || "None"}
 
-Generate 4 adaptive strategies for this exact market environment.`;
+CURRENT PORTFOLIO (Total Value: $${totalValue.toFixed(0)}):
+${portfolioLines || "EMPTY — No positions. Recommend initial portfolio construction."}
+
+Generate exact trade instructions for this portfolio in this market environment.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -63,41 +70,51 @@ Generate 4 adaptive strategies for this exact market environment.`;
           {
             type: "function",
             function: {
-              name: "generate_strategies",
-              description: "Return 4 market-adaptive trading strategies",
+              name: "generate_trade_instructions",
+              description: "Return 4-6 exact, executable trade instructions",
               parameters: {
                 type: "object",
                 properties: {
-                  strategies: {
+                  portfolio_assessment: {
+                    type: "string",
+                    description: "2-3 sentence assessment of the current portfolio's health, risk exposure, and key concerns given market conditions",
+                  },
+                  instructions: {
                     type: "array",
                     items: {
                       type: "object",
                       properties: {
-                        name: { type: "string", description: "Strategy name" },
-                        type: { type: "string", description: "e.g. Momentum, Mean-Reversion, Hedged, Tactical" },
-                        regime_fit: { type: "string", description: "Which regime this strategy fits best" },
-                        rationale: { type: "string", description: "Why this strategy suits current conditions (2-3 sentences)" },
-                        entry_rule: { type: "string", description: "Specific entry condition" },
-                        exit_rule: { type: "string", description: "Specific exit condition" },
-                        stop_loss_pct: { type: "number", description: "Stop loss as negative percentage e.g. -3" },
-                        take_profit_pct: { type: "number", description: "Take profit as positive percentage e.g. 8" },
-                        position_size_pct: { type: "number", description: "Position size as % of portfolio e.g. 15" },
-                        instruments: { type: "array", items: { type: "string" }, description: "Specific tickers or asset classes" },
+                        action: { type: "string", enum: ["BUY", "SELL", "TRIM", "ADD", "HEDGE", "HOLD", "CLOSE"], description: "Trade action" },
+                        ticker: { type: "string", description: "Exact ticker symbol e.g. AAPL, SPY, GLD" },
+                        is_existing_position: { type: "boolean", description: "True if this ticker is already in the portfolio" },
+                        urgency: { type: "string", enum: ["IMMEDIATE", "TODAY", "THIS_WEEK", "WHEN_TRIGGERED"], description: "When to execute" },
+                        quantity: { type: "number", description: "Number of shares/contracts" },
+                        dollar_amount: { type: "number", description: "Dollar amount of the trade" },
+                        entry_price: { type: "number", description: "Target entry price" },
+                        entry_zone_low: { type: "number", description: "Lower bound of entry zone" },
+                        entry_zone_high: { type: "number", description: "Upper bound of entry zone" },
+                        stop_loss_price: { type: "number", description: "Exact stop-loss price" },
+                        take_profit_price: { type: "number", description: "Exact take-profit price" },
+                        time_horizon: { type: "string", description: "e.g. Intraday, Swing 2-5 days, Position 1-4 weeks" },
+                        rationale: { type: "string", description: "2-3 sentences explaining WHY this trade, referencing specific market conditions" },
+                        risk_reward: { type: "string", description: "Risk/reward ratio e.g. 1:2.5" },
+                        category: { type: "string", enum: ["POSITION_MGMT", "HEDGE", "NEW_ENTRY", "REBALANCE", "RISK_REDUCTION"], description: "Type of instruction" },
+                        priority: { type: "number", description: "1=highest priority, 6=lowest" },
                         confidence: { type: "number", description: "Confidence score 0-100" },
                       },
-                      required: ["name", "type", "regime_fit", "rationale", "entry_rule", "exit_rule", "stop_loss_pct", "take_profit_pct", "position_size_pct", "instruments", "confidence"],
+                      required: ["action", "ticker", "is_existing_position", "urgency", "rationale", "category", "priority", "confidence", "time_horizon", "risk_reward"],
                       additionalProperties: false,
                     },
                   },
                 },
-                required: ["strategies"],
+                required: ["portfolio_assessment", "instructions"],
                 additionalProperties: false,
               },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "generate_strategies" } },
-        temperature: 0.4,
+        tool_choice: { type: "function", function: { name: "generate_trade_instructions" } },
+        temperature: 0.3,
       }),
     });
 
@@ -123,7 +140,17 @@ Generate 4 adaptive strategies for this exact market environment.`;
 
     const parsed = JSON.parse(toolCall.function.arguments);
 
-    return new Response(JSON.stringify({ strategies: parsed.strategies, regime, timestamp: Date.now() }), {
+    // Sort instructions by priority
+    if (parsed.instructions) {
+      parsed.instructions.sort((a: any, b: any) => (a.priority || 99) - (b.priority || 99));
+    }
+
+    return new Response(JSON.stringify({
+      portfolio_assessment: parsed.portfolio_assessment,
+      instructions: parsed.instructions,
+      regime,
+      timestamp: Date.now(),
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
