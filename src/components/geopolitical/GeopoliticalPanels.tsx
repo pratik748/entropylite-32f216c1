@@ -192,22 +192,33 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
 
 export function ForexView({ data }: { data: GeoData }) {
   return (
-    <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
-      <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 relative z-10">Global Currency Volatility</h3>
-      <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 relative z-10">
-        {data.forexVolatility.map((fx, i) => (
-          <div key={i} className={`glass-card rounded-lg p-3 transition-all ${fx.isStressed ? "glass-glow-loss border-loss/20" : ""}`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-bold text-foreground">{fx.currency}</span>
-              <span className="text-[8px] text-muted-foreground">{fx.country}</span>
+    <div className="space-y-4">
+      {/* Forex Volatility Bar Chart */}
+      <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
+        <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 relative z-10">24h Currency Movement</h3>
+        <div className="relative z-10">
+          <ForexVolChart data={data.forexVolatility} />
+        </div>
+      </div>
+
+      {/* Currency Cards */}
+      <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
+        <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 relative z-10">Global Currency Volatility</h3>
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 relative z-10">
+          {data.forexVolatility.map((fx, i) => (
+            <div key={i} className={`glass-card rounded-lg p-3 transition-all ${fx.isStressed ? "glass-glow-loss border-loss/20" : ""}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-foreground">{fx.currency}</span>
+                <span className="text-[8px] text-muted-foreground">{fx.country}</span>
+              </div>
+              <p className="font-mono text-sm font-bold text-foreground">{fx.rate > 0 ? fx.rate.toFixed(fx.rate > 100 ? 0 : 2) : "—"}</p>
+              <p className={`font-mono text-xs font-semibold ${fx.change24h >= 0 ? "text-gain" : "text-loss"}`}>
+                {fx.change24h >= 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
+              </p>
+              {fx.isStressed && <span className="text-[8px] text-loss font-mono mt-1 block">⚠ STRESSED</span>}
             </div>
-            <p className="font-mono text-sm font-bold text-foreground">{fx.rate > 0 ? fx.rate.toFixed(fx.rate > 100 ? 0 : 2) : "—"}</p>
-            <p className={`font-mono text-xs font-semibold ${fx.change24h >= 0 ? "text-gain" : "text-loss"}`}>
-              {fx.change24h >= 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
-            </p>
-            {fx.isStressed && <span className="text-[8px] text-loss font-mono mt-1 block">⚠ STRESSED</span>}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
