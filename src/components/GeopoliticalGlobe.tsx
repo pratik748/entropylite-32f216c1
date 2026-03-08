@@ -106,7 +106,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
               </button>
             ))}
             <Button size="sm" variant="ghost" onClick={() => onRefresh(false)} className="h-7 gap-1 text-[10px]">
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> 60s
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> 20s
             </Button>
           </div>
         </div>
