@@ -1,30 +1,33 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useFX } from "@/hooks/useFX";
+import { getCurrencySymbol } from "@/lib/currency";
 
 interface TickerData {
   symbol: string;
   name: string;
   price: number;
+  nativeCurrency: string;
   change: number;
   history: number[];
 }
 
 const GLOBAL_TICKERS = [
-  { symbol: "^GSPC", name: "S&P 500" },
-  { symbol: "^IXIC", name: "NASDAQ" },
-  { symbol: "^DJI", name: "DOW" },
-  { symbol: "^N225", name: "NIKKEI" },
-  { symbol: "^STOXX50E", name: "EURO STOXX" },
-  { symbol: "^HSI", name: "HANG SENG" },
-  { symbol: "GC=F", name: "GOLD" },
-  { symbol: "CL=F", name: "OIL" },
-  { symbol: "BTC-USD", name: "BTC" },
-  { symbol: "ETH-USD", name: "ETH" },
-  { symbol: "^TNX", name: "US 10Y" },
-  { symbol: "DX-Y.NYB", name: "DXY" },
-  { symbol: "SI=F", name: "SILVER" },
-  { symbol: "EURUSD=X", name: "EUR/USD" },
-  { symbol: "^FTSE", name: "FTSE" },
+  { symbol: "^GSPC", name: "S&P 500", currency: "USD" },
+  { symbol: "^IXIC", name: "NASDAQ", currency: "USD" },
+  { symbol: "^DJI", name: "DOW", currency: "USD" },
+  { symbol: "^N225", name: "NIKKEI", currency: "JPY" },
+  { symbol: "^STOXX50E", name: "EURO STOXX", currency: "EUR" },
+  { symbol: "^HSI", name: "HANG SENG", currency: "HKD" },
+  { symbol: "GC=F", name: "GOLD", currency: "USD" },
+  { symbol: "CL=F", name: "OIL", currency: "USD" },
+  { symbol: "BTC-USD", name: "BTC", currency: "USD" },
+  { symbol: "ETH-USD", name: "ETH", currency: "USD" },
+  { symbol: "^TNX", name: "US 10Y", currency: "USD" },
+  { symbol: "DX-Y.NYB", name: "DXY", currency: "USD" },
+  { symbol: "SI=F", name: "SILVER", currency: "USD" },
+  { symbol: "EURUSD=X", name: "EUR/USD", currency: "USD" },
+  { symbol: "^FTSE", name: "FTSE", currency: "GBP" },
 ];
 
 const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }) => {
@@ -50,8 +53,9 @@ const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }
 };
 
 const TickerStrip = () => {
+  const { baseCurrency, convertToBase } = useFX();
   const [tickers, setTickers] = useState<TickerData[]>(() =>
-    GLOBAL_TICKERS.map(t => ({ ...t, price: 0, change: 0, history: [] }))
+    GLOBAL_TICKERS.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] }))
   );
   const [paused, setPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -65,21 +69,19 @@ const TickerStrip = () => {
         });
         if (!alive || error) return;
 
-        // Build lookup from indices array (symbol → {price, changePct})
-        const lookup: Record<string, { price: number; changePct: number }> = {};
+        const lookup: Record<string, { price: number; changePct: number; currency: string }> = {};
         if (data?.indices) {
           for (const idx of data.indices) {
-            lookup[idx.symbol] = { price: idx.price, changePct: idx.changePct ?? 0 };
+            lookup[idx.symbol] = { price: idx.price, changePct: idx.changePct ?? 0, currency: idx.currency || "USD" };
           }
         }
-        // Also check macro for specific tickers
         if (data?.macro) {
-          if (data.macro.goldPrice) lookup["GC=F"] = { price: data.macro.goldPrice, changePct: 0 };
-          if (data.macro.crudeBrent) lookup["CL=F"] = { price: data.macro.crudeBrent, changePct: 0 };
-          if (data.macro.btcUsd) lookup["BTC-USD"] = { price: data.macro.btcUsd, changePct: 0 };
-          if (data.macro.ethUsd) lookup["ETH-USD"] = { price: data.macro.ethUsd, changePct: 0 };
-          if (data.macro.silverPrice) lookup["SI=F"] = { price: data.macro.silverPrice, changePct: 0 };
-          if (data.macro.eurUsd) lookup["EURUSD=X"] = { price: data.macro.eurUsd, changePct: 0 };
+          if (data.macro.goldPrice) lookup["GC=F"] = { price: data.macro.goldPrice, changePct: 0, currency: "USD" };
+          if (data.macro.crudeBrent) lookup["CL=F"] = { price: data.macro.crudeBrent, changePct: 0, currency: "USD" };
+          if (data.macro.btcUsd) lookup["BTC-USD"] = { price: data.macro.btcUsd, changePct: 0, currency: "USD" };
+          if (data.macro.ethUsd) lookup["ETH-USD"] = { price: data.macro.ethUsd, changePct: 0, currency: "USD" };
+          if (data.macro.silverPrice) lookup["SI=F"] = { price: data.macro.silverPrice, changePct: 0, currency: "USD" };
+          if (data.macro.eurUsd) lookup["EURUSD=X"] = { price: data.macro.eurUsd, changePct: 0, currency: "USD" };
         }
 
         setTickers(prev =>
@@ -87,7 +89,7 @@ const TickerStrip = () => {
             const d = lookup[t.symbol];
             if (!d) return t;
             const newHistory = [...t.history.slice(-19), d.price];
-            return { ...t, price: d.price, change: d.changePct, history: newHistory };
+            return { ...t, price: d.price, nativeCurrency: d.currency, change: d.changePct, history: newHistory };
           })
         );
       } catch { /* silent */ }
@@ -97,12 +99,15 @@ const TickerStrip = () => {
     return () => { alive = false; clearInterval(iv); };
   }, []);
 
-  // Duplicate items for seamless scroll
   const items = [...tickers, ...tickers];
+  const baseSym = getCurrencySymbol(baseCurrency);
+
+  // Some tickers are ratios/indices — don't convert those
+  const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX"].includes(sym);
 
   return (
     <div
-      className="border-b border-border bg-surface-1 overflow-hidden relative"
+      className="border-b border-border bg-surface-1 overflow-hidden relative shrink-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -113,6 +118,13 @@ const TickerStrip = () => {
       >
         {items.map((t, i) => {
           const positive = t.change >= 0;
+          const displayPrice = t.price > 0
+            ? isRatio(t.symbol)
+              ? t.price
+              : convertToBase(t.price, t.nativeCurrency)
+            : 0;
+          const priceSymbol = isRatio(t.symbol) ? "" : baseSym;
+
           return (
             <div
               key={`${t.symbol}-${i}`}
@@ -120,7 +132,7 @@ const TickerStrip = () => {
             >
               <span className="font-mono text-[9px] text-muted-foreground font-semibold">{t.name}</span>
               <span className="font-mono text-[10px] text-foreground font-medium tabular-nums">
-                {t.price > 0 ? t.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </span>
               <span className={`font-mono text-[9px] font-semibold tabular-nums ${positive ? "text-gain" : "text-loss"}`}>
                 {positive ? "+" : ""}{t.change.toFixed(2)}%
