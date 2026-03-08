@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
+import { useFX } from "@/hooks/useFX";
+import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 
 export interface WatchlistItem {
   id: string;
@@ -14,6 +16,7 @@ export interface WatchlistItem {
   alertBelow?: number;
   lastPrice?: number;
   lastChecked?: number;
+  currency?: string;
 }
 
 const Watchlist = () => {
@@ -22,6 +25,13 @@ const Watchlist = () => {
   const [alertAbove, setAlertAbove] = useState("");
   const [alertBelow, setAlertBelow] = useState("");
   const [refreshing, setRefreshing] = useState<string | null>(null);
+  const { baseCurrency, convertToBase } = useFX();
+  const sym = getCurrencySymbol(baseCurrency);
+
+  const fmt = (value: number, fromCurrency?: string) => {
+    const converted = fromCurrency ? convertToBase(value, fromCurrency) : value;
+    return formatCurrency(converted, baseCurrency);
+  };
 
   const handleAdd = () => {
     if (!newTicker.trim()) return;
@@ -58,18 +68,20 @@ const Watchlist = () => {
       if (error) throw error;
 
       const price = data.currentPrice;
+      const currency = data.currency || "USD";
       setItems((prev) =>
         prev.map((i) =>
-          i.id === item.id ? { ...i, lastPrice: price, lastChecked: Date.now() } : i
+          i.id === item.id ? { ...i, lastPrice: price, lastChecked: Date.now(), currency } : i
         )
       );
 
-      // Check alerts
-      if (item.alertAbove && price >= item.alertAbove) {
-        toast({ title: `${item.ticker} above ₹${item.alertAbove}!`, description: `Current: ₹${price}` });
+      // Check alerts (compare in base currency)
+      const basePrice = convertToBase(price, currency);
+      if (item.alertAbove && basePrice >= item.alertAbove) {
+        toast({ title: `${item.ticker} above ${fmt(item.alertAbove)}!`, description: `Current: ${fmt(price, currency)}` });
       }
-      if (item.alertBelow && price <= item.alertBelow) {
-        toast({ title: `${item.ticker} below ₹${item.alertBelow}!`, description: `Current: ₹${price}`, variant: "destructive" });
+      if (item.alertBelow && basePrice <= item.alertBelow) {
+        toast({ title: `${item.ticker} below ${fmt(item.alertBelow)}!`, description: `Current: ${fmt(price, currency)}`, variant: "destructive" });
       }
     } catch (e) {
       console.error(e);
@@ -78,53 +90,24 @@ const Watchlist = () => {
     }
   };
 
-  const toggleAlert = (id: string) => {
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? { ...i, alertAbove: i.alertAbove ? undefined : 0, alertBelow: i.alertBelow ? undefined : 0 }
-          : i
-      )
-    );
-  };
-
   return (
     <div className="space-y-6">
-      {/* Add to watchlist */}
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Eye className="h-5 w-5 text-primary" />
           <h2 className="text-base font-semibold text-foreground">Add to Watchlist</h2>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <Input
-            placeholder="Ticker e.g. TCS.NS"
-            value={newTicker}
-            onChange={(e) => setNewTicker(e.target.value)}
-            className="bg-surface-2 border-border font-mono text-sm w-40"
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          />
-          <Input
-            placeholder="Alert above ₹"
-            type="number"
-            value={alertAbove}
-            onChange={(e) => setAlertAbove(e.target.value)}
-            className="bg-surface-2 border-border font-mono text-sm w-32"
-          />
-          <Input
-            placeholder="Alert below ₹"
-            type="number"
-            value={alertBelow}
-            onChange={(e) => setAlertBelow(e.target.value)}
-            className="bg-surface-2 border-border font-mono text-sm w-32"
-          />
-          <Button onClick={handleAdd} size="sm" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Add
-          </Button>
+          <Input placeholder="Ticker e.g. AAPL" value={newTicker} onChange={(e) => setNewTicker(e.target.value)}
+            className="bg-surface-2 border-border font-mono text-sm w-40" onKeyDown={(e) => e.key === "Enter" && handleAdd()} />
+          <Input placeholder={`Alert above ${sym}`} type="number" value={alertAbove} onChange={(e) => setAlertAbove(e.target.value)}
+            className="bg-surface-2 border-border font-mono text-sm w-32" />
+          <Input placeholder={`Alert below ${sym}`} type="number" value={alertBelow} onChange={(e) => setAlertBelow(e.target.value)}
+            className="bg-surface-2 border-border font-mono text-sm w-32" />
+          <Button onClick={handleAdd} size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Add</Button>
         </div>
       </div>
 
-      {/* Watchlist items */}
       {items.length === 0 ? (
         <div className="rounded-xl border border-border bg-card py-16 text-center">
           <Eye className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
@@ -136,55 +119,37 @@ const Watchlist = () => {
           <h3 className="text-base font-semibold text-foreground mb-4">Watching {items.length} stocks</h3>
           <div className="space-y-2">
             {items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-lg border border-border/50 bg-surface-2 p-4 transition-colors hover:bg-surface-3"
-              >
+              <div key={item.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-surface-2 p-4 transition-colors hover:bg-surface-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-foreground">{item.ticker}</span>
                     {item.lastPrice && (
                       <span className="font-mono text-sm text-muted-foreground">
-                        ₹{item.lastPrice.toLocaleString("en-IN")}
+                        {fmt(item.lastPrice, item.currency || "USD")}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                     {item.alertAbove ? (
                       <span className="flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3 text-gain" /> Above ₹{item.alertAbove}
+                        <TrendingUp className="h-3 w-3 text-gain" /> Above {sym}{item.alertAbove}
                       </span>
                     ) : null}
                     {item.alertBelow ? (
                       <span className="flex items-center gap-1">
-                        <TrendingDown className="h-3 w-3 text-loss" /> Below ₹{item.alertBelow}
+                        <TrendingDown className="h-3 w-3 text-loss" /> Below {sym}{item.alertBelow}
                       </span>
                     ) : null}
                     {item.lastChecked && (
-                      <span>
-                        Checked {new Date(item.lastChecked).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
+                      <span>Checked {new Date(item.lastChecked).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleRefreshPrice(item)}
-                    disabled={refreshing === item.id}
-                    className="h-8 text-xs"
-                  >
-                    {refreshing === item.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      "Refresh"
-                    )}
+                  <Button size="sm" variant="ghost" onClick={() => handleRefreshPrice(item)} disabled={refreshing === item.id} className="h-8 text-xs">
+                    {refreshing === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Refresh"}
                   </Button>
-                  <button
-                    onClick={() => handleRemove(item.id)}
-                    className="rounded p-1.5 hover:bg-loss/10 hover:text-loss transition-colors"
-                  >
+                  <button onClick={() => handleRemove(item.id)} className="rounded p-1.5 hover:bg-loss/10 hover:text-loss transition-colors">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
