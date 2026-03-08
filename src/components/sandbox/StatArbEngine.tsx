@@ -256,8 +256,8 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
   if (!data) return <EmptyMsg msg="Need 2+ assets for optimization" />;
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Optimization</h3>
+    <div className="space-y-4 sm:space-y-5">
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Optimization</h3>
 
       <div>
         <p className="text-[10px] font-bold text-foreground uppercase mb-2">Efficient Frontier (Markowitz)</p>
