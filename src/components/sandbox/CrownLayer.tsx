@@ -60,12 +60,13 @@ const CrownLayer = ({ stocks }: Props) => {
       // Volatility spike → options positioning
       if (risk > 50) {
         const impliedVol = risk * 0.4;
+        const premiumEst = (st.analysis.currentPrice * st.quantity * 0.02) / 1000;
         opps.push({
           type: "Vol Spike",
           signal: `Implied vol elevated (~${impliedVol.toFixed(0)}%) on ${ticker}`,
           asset: ticker,
           action: "Sell iron condor or put credit spread for premium collection",
-          expectedEdge: `₹${((st.analysis.currentPrice * st.quantity * 0.02) / 1000).toFixed(0)}k premium`,
+          expectedEdge: `~${premiumEst.toFixed(0)}k premium`,
           confidence: Math.round(55 + (risk - 50) * 0.5),
           urgency: "Medium",
           riskReward: "1:1.5",

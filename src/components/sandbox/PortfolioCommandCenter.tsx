@@ -1,55 +1,47 @@
 import { useMemo } from "react";
 import { Layers } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const PortfolioCommandCenter = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
 
   const data = useMemo(() => {
-    if (analyzed.length === 0) return null;
+    if (holdings.length === 0) return null;
 
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
+    const assets = holdings.map(h => {
+      const weight = (h.value / totalValue) * 100;
+      const risk = h.risk;
+      const beta = h.beta;
 
-    const assets = analyzed.map(st => {
-      const currentValue = (st.analysis.currentPrice || st.buyPrice) * st.quantity;
-      const pnl = (st.analysis.currentPrice - st.buyPrice) * st.quantity;
-      const pnlPct = ((st.analysis.currentPrice - st.buyPrice) / st.buyPrice) * 100;
-      const weight = (currentValue / totalValue) * 100;
-      const risk = st.analysis.riskScore || 40;
-      const beta = st.analysis.beta || 1;
-
-      // Flow pressure (derived from beta and market cap)
       const flowPressure = Math.min(100, Math.round(beta * 35 + (100 - risk) * 0.4));
-      // Reflexivity risk
       const reflexivity = Math.min(100, Math.round(risk * 0.6 + beta * 15));
-      // Structural risk
-      const structural = Math.round((st.analysis.riskBreakdown?.macroRisk || risk * 0.3) + (st.analysis.riskBreakdown?.regulatoryRisk || risk * 0.2));
+      const structural = Math.round(risk * 0.5);
 
-      // Worst case loss (2.5 sigma)
       const dailyVol = (risk / 100) * 0.02;
-      const worstCase = -(currentValue * dailyVol * 2.5 * Math.sqrt(21)); // 1 month horizon
+      const worstCase = -(h.value * dailyVol * 2.5 * Math.sqrt(21));
 
       return {
-        ticker: st.ticker.replace(".NS", "").replace(".BO", ""),
-        currentValue,
+        ticker: h.ticker,
+        currentValue: h.value,
         weight,
-        pnl,
-        pnlPct,
+        pnl: h.pnl,
+        pnlPct: h.pnlPct,
         risk,
         beta,
-        expectedReturn: pnlPct, // annualize later
+        expectedReturn: h.pnlPct,
         worstCase,
         flowPressure,
         reflexivity,
         structural,
-        suggestion: st.analysis.suggestion || "Hold",
+        suggestion: h.suggestion,
       };
     }).sort((a, b) => b.weight - a.weight);
 
     return { assets, totalValue };
-  }, [analyzed]);
+  }, [holdings, totalValue]);
 
   if (!data) return null;
 

@@ -92,10 +92,19 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
 
     mapRef.current = map;
 
-    // Force resize after mount
+    // Force resize after mount + continuous resize observer
     setTimeout(() => map.invalidateSize(), 100);
+    setTimeout(() => map.invalidateSize(), 500);
+    setTimeout(() => map.invalidateSize(), 1500);
+
+    // ResizeObserver to handle container visibility changes
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    });
+    if (mapContainerRef.current) resizeObserver.observe(mapContainerRef.current);
 
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       layersRef.current = {};

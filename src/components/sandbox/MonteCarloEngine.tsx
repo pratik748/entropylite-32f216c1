@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart, BarChart, Bar } from "recharts";
 import { Activity, Lightbulb } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
-import { formatCompact, getPortfolioCurrency, getCurrencySymbol } from "@/lib/currency";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -36,13 +36,10 @@ const scenarioParams: Record<string, { drift: number; volMult: number; jumpProb:
 
 const MonteCarloEngine = ({ stocks }: Props) => {
   const [scenario, setScenario] = useState<string>("base");
-  const analyzed = stocks.filter(s => s.analysis);
-  const baseCurrency = getPortfolioCurrency(analyzed);
-  const sym = getCurrencySymbol(baseCurrency);
+  const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
 
-  const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-  const avgRisk = analyzed.length > 0 ? analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / analyzed.length : 40;
-  const avgBeta = analyzed.length > 0 ? analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length : 1;
+  const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
+  const avgBeta = holdings.length > 0 ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
   const params = scenarioParams[scenario];
   const dailyVol = (avgRisk / 100) * 0.018 * params.volMult;
@@ -107,9 +104,8 @@ const MonteCarloEngine = ({ stocks }: Props) => {
     if (worstDD < 0) recoveryDays = Math.round(Math.abs(worstDD) * NUM_DAYS * 2);
 
     return { mean, var95, var99, cvar95, profitProb, ruinProb, worstDD, recoveryDays, median: percentile(sortedFinals, 50), p5: percentile(sortedFinals, 5), p95: percentile(sortedFinals, 95), chartData, histogram };
-  }, [analyzed, scenario, totalValue, dailyVol, params]);
+  }, [holdings, scenario, totalValue, dailyVol, params]);
 
-  // Generate real-time action suggestions per scenario
   const suggestions = useMemo(() => {
     const actions: { label: string; type: "protect" | "opportunity" | "wait"; detail: string }[] = [];
     const lossAt95 = totalValue - results.var95;
@@ -118,43 +114,34 @@ const MonteCarloEngine = ({ stocks }: Props) => {
     if (scenario === "base") {
       if (results.profitProb > 0.6) actions.push({ label: "Hold current positions", type: "wait", detail: `${(results.profitProb * 100).toFixed(0)}% probability of profit. Portfolio is well-positioned.` });
       if (avgBeta > 1.3) actions.push({ label: "Reduce beta exposure", type: "protect", detail: `Portfolio beta ${avgBeta.toFixed(2)} is elevated. Consider selling high-beta positions or buying index puts.` });
-      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${formatCompact(lossAt95, baseCurrency)} is significant. Buy OTM puts on largest positions.` });
+      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${fmt(lossAt95)} is significant. Buy OTM puts on largest positions.` });
     } else if (scenario === "rate_shock") {
       actions.push({ label: "Rotate out of growth stocks", type: "protect", detail: "High-duration growth stocks lose most in rate shocks. Shift to value/dividend names." });
       actions.push({ label: "Consider floating-rate bonds", type: "opportunity", detail: "Floating-rate instruments benefit from rising rates." });
-      if (analyzed.some(s => s.analysis?.sector?.includes("Tech"))) {
-        actions.push({ label: "Hedge tech exposure", type: "protect", detail: "Tech sector is most rate-sensitive. Buy QQQ puts or short NASDAQ futures." });
-      }
     } else if (scenario === "fx_shock") {
       actions.push({ label: "Increase USD-denominated holdings", type: "protect", detail: "USD strengthens during FX crises. Shift allocation toward US assets." });
       actions.push({ label: "Add gold position", type: "opportunity", detail: "Gold acts as safe haven during currency turmoil. Target 5-10% allocation via GLD or GC=F." });
     } else if (scenario === "liquidity_freeze") {
       actions.push({ label: "Move to large-cap liquid names", type: "protect", detail: "Small/mid-cap stocks suffer most in liquidity crunches. Rotate to top-50 large caps." });
-      actions.push({ label: "Increase cash buffer to 20%", type: "protect", detail: `Max drawdown of ${(results.worstDD * 100).toFixed(0)}% requires significant dry powder. Trim positions.` });
-      actions.push({ label: "Prepare distressed buy list", type: "opportunity", detail: "Liquidity crises create generational buying opportunities. Pre-identify targets." });
+      actions.push({ label: "Increase cash buffer to 20%", type: "protect", detail: `Max drawdown of ${(results.worstDD * 100).toFixed(0)}% requires significant dry powder.` });
     } else if (scenario === "black_swan") {
       actions.push({ label: "Activate full hedging protocol", type: "protect", detail: `Ruin probability ${(results.ruinProb * 100).toFixed(1)}%. Buy deep OTM puts, reduce leverage to zero.` });
-      actions.push({ label: "Diversify across geographies", type: "protect", detail: "Concentrate in uncorrelated markets. Add emerging market bonds, physical gold." });
     } else if (scenario === "war") {
-      actions.push({ label: "Exit geopolitically exposed assets", type: "protect", detail: "Sell stocks with supply chains in conflict zones. Reduce EM exposure." });
+      actions.push({ label: "Exit geopolitically exposed assets", type: "protect", detail: "Sell stocks with supply chains in conflict zones." });
       actions.push({ label: "Long energy & defense", type: "opportunity", detail: "Energy and defense stocks historically outperform during conflicts." });
-      actions.push({ label: "Add volatility exposure", type: "opportunity", detail: "Buy VIX calls or long straddles on major indices to profit from spike." });
     }
 
     if (results.ruinProb > 0.1) {
-      actions.push({ label: "CRITICAL: Position sizing too aggressive", type: "protect", detail: `${(results.ruinProb * 100).toFixed(1)}% ruin probability exceeds institutional limits. Reduce position sizes by 30-50%.` });
+      actions.push({ label: "CRITICAL: Position sizing too aggressive", type: "protect", detail: `${(results.ruinProb * 100).toFixed(1)}% ruin probability exceeds institutional limits.` });
     }
 
     return actions;
-  }, [scenario, results, avgBeta, totalValue, baseCurrency, analyzed]);
+  }, [scenario, results, avgBeta, totalValue, fmt]);
 
-  const fmt = (v: number) => formatCompact(v, baseCurrency);
   const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
-  const fmtAxis = (v: number) => formatCompact(v, baseCurrency);
 
   return (
     <div className="space-y-5">
-      {/* Scenario Selector */}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="h-4 w-4 text-foreground" />
@@ -163,13 +150,8 @@ const MonteCarloEngine = ({ stocks }: Props) => {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(scenarioParams).map(([key, val]) => (
-            <button
-              key={key}
-              onClick={() => setScenario(key)}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${
-                scenario === key ? "bg-foreground text-background" : "bg-surface-2 text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <button key={key} onClick={() => setScenario(key)}
+              className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${scenario === key ? "bg-foreground text-background" : "bg-surface-2 text-muted-foreground hover:text-foreground"}`}>
               {val.label}
             </button>
           ))}
@@ -177,7 +159,6 @@ const MonteCarloEngine = ({ stocks }: Props) => {
         <p className="mt-2 text-[10px] text-muted-foreground">{params.desc}</p>
       </div>
 
-      {/* Key Metrics */}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
         <StatCard label="Portfolio Value" value={fmt(totalValue)} color="text-foreground" />
         <StatCard label="Median Final" value={fmt(results.median)} color={results.median >= totalValue ? "text-gain" : "text-loss"} />
@@ -189,7 +170,6 @@ const MonteCarloEngine = ({ stocks }: Props) => {
         <StatCard label="Recovery" value={`~${results.recoveryDays}d`} color="text-foreground" />
       </div>
 
-      {/* ACTION SUGGESTIONS */}
       {suggestions.length > 0 && (
         <div className="rounded-xl border border-primary/20 bg-card p-5">
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -197,17 +177,9 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           </h3>
           <div className="space-y-2">
             {suggestions.map((s, i) => (
-              <div key={i} className={`rounded-lg border p-3 ${
-                s.type === "protect" ? "border-loss/20 bg-loss/5" :
-                s.type === "opportunity" ? "border-gain/20 bg-gain/5" :
-                "border-border bg-surface-2"
-              }`}>
+              <div key={i} className={`rounded-lg border p-3 ${s.type === "protect" ? "border-loss/20 bg-loss/5" : s.type === "opportunity" ? "border-gain/20 bg-gain/5" : "border-border bg-surface-2"}`}>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase ${
-                    s.type === "protect" ? "bg-loss/20 text-loss" :
-                    s.type === "opportunity" ? "bg-gain/20 text-gain" :
-                    "bg-surface-3 text-muted-foreground"
-                  }`}>{s.type}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase ${s.type === "protect" ? "bg-loss/20 text-loss" : s.type === "opportunity" ? "bg-gain/20 text-gain" : "bg-surface-3 text-muted-foreground"}`}>{s.type}</span>
                   <span className="text-sm font-semibold text-foreground">{s.label}</span>
                 </div>
                 <p className="text-[11px] text-secondary-foreground leading-relaxed">{s.detail}</p>
@@ -217,7 +189,6 @@ const MonteCarloEngine = ({ stocks }: Props) => {
         </div>
       )}
 
-      {/* Confidence Band Chart */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Portfolio Value Projection — {params.label}</h3>
         <div className="h-72">
@@ -225,8 +196,8 @@ const MonteCarloEngine = ({ stocks }: Props) => {
             <AreaChart data={results.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" />
               <XAxis dataKey="day" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} label={{ value: "Days", position: "insideBottom", offset: -2, fill: "hsl(0,0%,45%)", fontSize: 10 }} />
-              <YAxis tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={fmtAxis} width={65} />
-              <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [formatCompact(v, baseCurrency), ""]} />
+              <YAxis tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => fmt(v)} width={65} />
+              <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} formatter={(v: number) => [fmt(v), ""]} />
               <ReferenceLine y={totalValue} stroke="hsl(0,0%,40%)" strokeDasharray="4 4" />
               <Area type="monotone" dataKey="p5" stackId="band" fill="none" stroke="hsl(0, 62%, 50%)" strokeWidth={1} strokeDasharray="3 3" />
               <Area type="monotone" dataKey="p25" stackId="band2" fill="none" stroke="hsl(0,0%,35%)" strokeWidth={1} />
@@ -236,21 +207,15 @@ const MonteCarloEngine = ({ stocks }: Props) => {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1"><span className="h-px w-4 bg-loss inline-block" /> 5th %ile</span>
-          <span className="flex items-center gap-1"><span className="h-px w-4 bg-foreground inline-block" /> Median</span>
-          <span className="flex items-center gap-1"><span className="h-px w-4 bg-gain inline-block" /> 95th %ile</span>
-        </div>
       </div>
 
-      {/* Distribution */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Final Value Distribution ({NUM_PATHS.toLocaleString()} paths)</h3>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={results.histogram} margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" />
-              <XAxis dataKey="value" tick={{ fill: "hsl(0,0%,45%)", fontSize: 9 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={fmtAxis} />
+              <XAxis dataKey="value" tick={{ fill: "hsl(0,0%,45%)", fontSize: 9 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => fmt(v)} />
               <YAxis tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v.toFixed(1)}%`} />
               <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
               <ReferenceLine x={totalValue} stroke="hsl(0,0%,60%)" strokeDasharray="4 4" />

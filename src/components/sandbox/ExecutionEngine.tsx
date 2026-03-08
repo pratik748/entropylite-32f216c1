@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -10,12 +11,10 @@ type AlgoType = "VWAP" | "TWAP" | "POV" | "Adaptive";
 const ExecutionEngine = ({ stocks }: Props) => {
   const [algo, setAlgo] = useState<AlgoType>("VWAP");
   const [participation, setParticipation] = useState(10);
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
   const results = useMemo(() => {
-    if (analyzed.length === 0) return null;
-
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
+    if (holdings.length === 0) return null;
 
     // Simulate execution across time slices
     const slices = 20;
@@ -28,8 +27,8 @@ const ExecutionEngine = ({ stocks }: Props) => {
     });
     const totalWeight = vwapWeights.reduce((s, w) => s + w, 0);
 
-    const avgBeta = analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length;
-    const avgRisk = analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / analyzed.length;
+    const avgBeta = holdings.reduce((s, h) => s + h.beta, 0) / holdings.length;
+    const avgRisk = holdings.reduce((s, h) => s + h.risk, 0) / holdings.length;
     const dailyVol = (avgRisk / 100) * 0.018;
 
     let cumFilled = 0;
@@ -68,7 +67,7 @@ const ExecutionEngine = ({ stocks }: Props) => {
     const completionTime = algo === "POV" ? `${(100 / participation * 6.25 / 60).toFixed(1)} hours` : "6.25 hours";
 
     return { executionPath, totalSlippage, avgImpact, completionTime, totalValue };
-  }, [analyzed, algo, participation]);
+  }, [holdings, algo, participation, totalValue]);
 
   if (!results) return null;
 
