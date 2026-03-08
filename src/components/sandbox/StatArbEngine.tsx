@@ -260,8 +260,8 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
       <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Optimization</h3>
 
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Efficient Frontier (Markowitz)</p>
-        <div className="h-56">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Efficient Frontier (Markowitz)</p>
+        <div className="h-40 sm:h-56">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart>
               <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
