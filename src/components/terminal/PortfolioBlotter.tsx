@@ -75,6 +75,8 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
             {analyzed.map(s => {
               const a = s.analysis!;
               const ccy = a.currency || "USD";
+              const nativeSym = getCurrencySymbol(ccy);
+              const nativePrice = a.currentPrice;
               const priceInBase = convertToBase(a.currentPrice, ccy);
               const buyInBase = convertToBase(s.buyPrice, ccy);
               const pnl = (priceInBase - buyInBase) * s.quantity;
@@ -99,7 +101,10 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     )}
                   </td>
                   <td className="px-2 py-0.5 text-right text-foreground tabular-nums">
-                    {baseSym}{priceInBase.toFixed(2)}
+                    <span>{nativeSym}{nativePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    {ccy !== baseCurrency && (
+                      <span className="text-[7px] text-muted-foreground/50 ml-0.5">≈{baseSym}{priceInBase.toFixed(2)}</span>
+                    )}
                   </td>
                   <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
                     {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
