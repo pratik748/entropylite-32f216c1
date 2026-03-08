@@ -133,7 +133,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
       {data.keyThreats.length > 0 && (
         <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
           <h3 className="text-[10px] font-bold text-foreground uppercase tracking-widest mb-3 flex items-center gap-2 relative z-10">
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" /> Key Global Threats
+            <AlertTriangle className="h-3.5 w-3.5 text-loss" /> Key Global Threats
           </h3>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
             {data.keyThreats.map((threat, i) => (
