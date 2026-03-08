@@ -57,7 +57,7 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
   const fetchData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("geopolitical-data");
+      const { data: result, error } = await governedInvoke("geopolitical-data");
       if (error) throw error;
       setData(result);
     } catch (e) { console.error("Geo fetch error:", e); }
