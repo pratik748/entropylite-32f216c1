@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
