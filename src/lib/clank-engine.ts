@@ -155,7 +155,7 @@ export interface ConstraintStatus {
  * In production this would consume live VIX, gamma exposure, etc.
  * Here we derive from portfolio risk characteristics.
  */
-export function evaluateConstraints(stocks: PortfolioStock[]): ConstraintStatus[] {
+export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverrides?: Record<string, number>): ConstraintStatus[] {
   const analyzed = stocks.filter(s => s.analysis);
   if (analyzed.length === 0) return CONSTRAINT_REGISTRY.map(c => defaultStatus(c));
 
