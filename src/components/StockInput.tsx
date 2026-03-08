@@ -72,13 +72,13 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-          <TrendingUp className="h-3.5 w-3.5 text-primary" />
+    <div className="rounded-xl border border-border bg-card p-3 sm:p-5 animate-slide-up">
+      <div className="mb-3 sm:mb-4 flex items-center gap-2">
+        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-primary/10">
+          <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
         </div>
-        <h2 className="text-sm font-semibold text-foreground">Analyze Asset</h2>
-        <span className="ml-auto text-[9px] text-muted-foreground/60 font-mono">GLOBAL · ALL MARKETS</span>
+        <h2 className="text-xs sm:text-sm font-semibold text-foreground">Analyze Asset</h2>
+        <span className="ml-auto text-[8px] sm:text-[9px] text-muted-foreground/60 font-mono">GLOBAL · ALL MARKETS</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
