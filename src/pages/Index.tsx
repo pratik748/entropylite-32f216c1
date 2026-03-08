@@ -56,7 +56,7 @@ const IndexContent = () => {
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
-  const stocksRef = useRef(stocks);
+  const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
 
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
