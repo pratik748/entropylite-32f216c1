@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Shield, AlertTriangle } from "lucide-react";
+import { Shield, AlertTriangle, Zap } from "lucide-react";
+import ClankEngine from "@/components/risk/ClankEngine";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
