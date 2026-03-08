@@ -13,6 +13,7 @@ import LiveNewsFeed from "@/components/LiveNewsFeed";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioChart from "@/components/PortfolioChart";
+import PnLWaterfall from "@/components/charts/PnLWaterfall";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
@@ -220,7 +221,12 @@ const IndexContent = () => {
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
-              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
+              {stocks.filter((s) => s.analysis).length > 1 && (
+                <>
+                  <PortfolioChart stocks={stocks} />
+                  <PnLWaterfall stocks={stocks} />
+                </>
+              )}
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
@@ -272,7 +278,12 @@ const IndexContent = () => {
                           </div>
                         </>
                       )}
-                      {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
+                      {stocks.filter((s) => s.analysis).length > 1 && (
+                        <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+                          <PortfolioChart stocks={stocks} />
+                          <PnLWaterfall stocks={stocks} />
+                        </div>
+                      )}
                       {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
                       {analysis && (
                         <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />

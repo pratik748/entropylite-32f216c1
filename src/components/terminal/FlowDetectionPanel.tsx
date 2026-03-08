@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import FlowRadarChart from "@/components/charts/FlowRadarChart";
 
 interface FlowDetectionPanelProps {
   stocks: PortfolioStock[];
@@ -44,8 +45,28 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
     return "text-muted-foreground";
   };
 
+  const [showRadar, setShowRadar] = useState(true);
+
   return (
     <div className="flex flex-col h-full font-mono text-[10px]">
+      {/* Radar toggle */}
+      <div className="px-2 py-1 border-b border-border/30 flex items-center justify-between">
+        <span className="text-[8px] text-muted-foreground uppercase tracking-wider">Flow Signals</span>
+        <button onClick={() => setShowRadar(!showRadar)} className="text-[8px] text-primary hover:text-primary/80 transition-colors">
+          {showRadar ? "List" : "Radar"}
+        </button>
+      </div>
+
+      {showRadar && (
+        <div className="border-b border-border/30">
+          <FlowRadarChart signals={signals} />
+          <div className="flex justify-center gap-3 pb-1.5 text-[7px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-primary" /> Intensity</span>
+            <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-loss" /> Impact</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-0.5 flex-1 overflow-auto">
         {signals.map(s => (
           <div key={s.name} className="flex items-center gap-1.5 px-2 py-1 hover:bg-surface-2 transition-colors border-b border-border/20">
