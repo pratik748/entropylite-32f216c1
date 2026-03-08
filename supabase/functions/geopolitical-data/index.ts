@@ -114,36 +114,75 @@ function safeParseJSON(raw: string): any {
   return null;
 }
 
+/** Fetch live market signals to inject into geo prompt */
+async function fetchMarketContext(): Promise<string> {
+  try {
+    const symbols = ["^VIX", "GC=F", "CL=F", "DX-Y.NYB", "^GSPC"];
+    const results = await Promise.all(symbols.map(s => fetchYahooQuote(s)));
+    const labels = ["VIX", "Gold", "Crude", "DXY", "S&P500"];
+    const parts: string[] = [];
+    results.forEach((r, i) => {
+      if (r) parts.push(`${labels[i]}: ${r.price.toFixed(2)} (${r.change >= 0 ? "+" : ""}${r.change.toFixed(2)}%)`);
+    });
+    return parts.length > 0 ? parts.join(", ") : "Market data unavailable";
+  } catch { return "Market data unavailable"; }
+}
+
+/** Fetch recent GDELT headlines for real-time context */
+async function fetchGDELTHeadlines(): Promise<string> {
+  try {
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=conflict%20OR%20war%20OR%20sanctions%20OR%20crisis&mode=artlist&maxrecords=8&format=json&sort=datedesc&_t=${Date.now()}`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const data = await res.json();
+    const articles = data?.articles?.slice(0, 8) || [];
+    return articles.map((a: any) => a.title).filter(Boolean).join(" | ") || "No recent headlines";
+  } catch { return "Headlines unavailable"; }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     await requireAuth(req, corsHeaders);
-    // 1. Fetch real forex volatility
-    const forexResults = await Promise.all(
-      forexPairs.map(async (pair) => {
-        const quote = await fetchYahooQuote(pair.symbol);
-        return { ...pair, rate: quote?.price || 0, change24h: quote?.change || 0, isStressed: Math.abs(quote?.change || 0) > 2 };
-      })
-    );
 
-    // 2. AI geopolitical intelligence (with robust fallback)
+    // 1. Fetch real forex volatility + market context + headlines in parallel
+    const [forexResults, marketContext, headlines] = await Promise.all([
+      Promise.all(
+        forexPairs.map(async (pair) => {
+          const quote = await fetchYahooQuote(pair.symbol);
+          return { ...pair, rate: quote?.price || 0, change24h: quote?.change || 0, isStressed: Math.abs(quote?.change || 0) > 2 };
+        })
+      ),
+      fetchMarketContext(),
+      fetchGDELTHeadlines(),
+    ]);
+
+    // 2. AI geopolitical intelligence with LIVE context
     let conflictEvents = FALLBACK_CONFLICTS;
     let geopoliticalInsights: any = {};
 
     try {
       const stressedCurrencies = forexResults.filter(f => f.isStressed).map(f => `${f.currency}: ${f.change24h > 0 ? "+" : ""}${f.change24h.toFixed(2)}%`).join(", ");
+      const now = new Date();
+      const timeStr = now.toISOString();
 
       const result = await callAI({
-        systemPrompt: "You are a geopolitical intelligence analyst. Return ONLY valid JSON, no markdown.",
-        userPrompt: `Date: ${new Date().toISOString().split("T")[0]}. Forex stress: ${stressedCurrencies || "None >2%"}.
+        systemPrompt: "You are a real-time geopolitical intelligence analyst for an institutional trading desk. Assess current global threats using the LIVE market data and news headlines provided. Your analysis must reflect the EXACT current conditions — not generic boilerplate. Return ONLY valid JSON, no markdown.",
+        userPrompt: `TIMESTAMP: ${timeStr}
+LIVE MARKET DATA: ${marketContext}
+FOREX STRESS: ${stressedCurrencies || "None >2%"}
+RECENT HEADLINES: ${headlines}
 
-Return 8-10 current conflicts as JSON. MUST include Ukraine-Russia, Iran-Israel, Houthi Red Sea, China-Taiwan.
+Based on these REAL-TIME signals, provide your current geopolitical threat assessment.
+- If VIX is elevated (>25), risk score should reflect that
+- If gold/crude are surging, factor in safe-haven flows
+- If specific currencies are stressed, identify the geopolitical driver
+- Update conflict severity based on what headlines actually say RIGHT NOW
 
-JSON format:
-{"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.5,"type":"war","affectedAssets":["X"],"summary":"short","nearTradeHub":"str","distanceKm":0,"escalationProb":0.2,"actionableIntel":"str"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":60,"regimeSignal":"transition","keyThreats":["t1","t2","t3"],"capitalFlowDirection":"mixed","safeHavenDemand":"moderate","intelligenceSummary":"3 sentences max"}`,
-        maxTokens: 1500,
-        temperature: 0.2,
+Return 8-12 current conflicts as JSON:
+{"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.0-1.0,"type":"war|sanctions|unrest|terrorism|trade_war|cyber|energy","affectedAssets":["X"],"summary":"1-2 sentences reflecting CURRENT situation","nearTradeHub":"str","distanceKm":0,"escalationProb":0.0-1.0,"actionableIntel":"specific trading action"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high|medium|low","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":0-100,"regimeSignal":"stable|transition|crisis","keyThreats":["t1","t2","t3","t4"],"capitalFlowDirection":"risk-on|risk-off|mixed","safeHavenDemand":"low|moderate|high|extreme","intelligenceSummary":"3 sentences reflecting CURRENT market+geopolitical state"}`,
+        maxTokens: 2000,
+        temperature: 0.4,
       });
 
       console.log(`geopolitical-data used provider: ${result.provider}`);
@@ -178,7 +217,7 @@ JSON format:
       keyThreats: geopoliticalInsights.keyThreats || ["Iran-Israel escalation", "Red Sea shipping", "Ukraine-Russia energy war", "China-Taiwan semiconductor risk"],
       capitalFlowDirection: geopoliticalInsights.capitalFlowDirection || "mixed",
       safeHavenDemand: geopoliticalInsights.safeHavenDemand || "moderate",
-      intelligenceSummary: geopoliticalInsights.intelligenceSummary || "Global risk landscape remains elevated with multiple active conflicts. Energy and freight markets under persistent pressure from Red Sea disruptions and Ukraine war. Capital flows mixed with selective risk-on in US tech.",
+      intelligenceSummary: geopoliticalInsights.intelligenceSummary || "Global risk landscape remains elevated with multiple active conflicts.",
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
