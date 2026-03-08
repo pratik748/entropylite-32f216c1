@@ -29,9 +29,9 @@ const TYPE_BADGE: Record<string, string> = {
 
 export function RiskStrip({ data }: { data: GeoData }) {
   const items = [
-    { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
+    { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : (data.regimeSignal === "transition" && data.globalRiskScore >= 50) ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
     { label: "Capital Flow", value: data.capitalFlowDirection, color: data.capitalFlowDirection === "risk-off" ? "text-loss" : data.capitalFlowDirection === "risk-on" ? "text-gain" : "text-warning" },
-    { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: "text-warning" },
+    { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: data.highEntropyZones.length >= 3 ? "text-loss" : "text-warning" },
   ];
   return (
     <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
