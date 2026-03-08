@@ -52,7 +52,7 @@ const Watchlist = () => {
   const handleRefreshPrice = async (item: WatchlistItem) => {
     setRefreshing(item.id);
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-stock", {
+      const { data, error } = await governedInvoke("analyze-stock", {
         body: { ticker: item.ticker, buyPrice: 1, quantity: 1 },
       });
       if (error) throw error;

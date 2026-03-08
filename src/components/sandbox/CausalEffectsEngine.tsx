@@ -86,7 +86,7 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
     waveProgressRef.current = 0;
     try {
       const portfolio = stocks.filter(s => s.analysis).map(s => `${s.ticker} (${s.quantity} @ ${s.analysis?.currentPrice})`).join(", ");
-      const { data: result, error } = await supabase.functions.invoke("causal-effects", {
+      const { data: result, error } = await governedInvoke("causal-effects", {
         body: { event: eventText, portfolio },
       });
       if (error) throw error;

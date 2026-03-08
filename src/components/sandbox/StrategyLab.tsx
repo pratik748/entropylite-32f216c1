@@ -54,7 +54,7 @@ const StrategyLab = ({ stocks }: Props) => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("strategy-generate", {
+      const { data, error } = await governedInvoke("strategy-generate", {
         body: {
           regime: regime.regime,
           vix: regime.vix,
