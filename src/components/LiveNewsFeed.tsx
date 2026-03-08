@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface NewsArticle {
   title: string;
@@ -12,6 +13,18 @@ interface NewsArticle {
   imageUrl: string | null;
   category: string;
   sentiment: string | null;
+}
+
+const TIER_1 = ["reuters", "associated press", "ap", "bloomberg"];
+const TIER_2 = ["cnbc", "wall street journal", "wsj", "financial times", "ft", "economist"];
+const TIER_3 = ["marketwatch", "seeking alpha", "investopedia", "yahoo finance", "barrons"];
+
+function getSourceTier(source: string): { tier: number; label: string; className: string } {
+  const s = source.toLowerCase();
+  for (const t of TIER_1) if (s.includes(t)) return { tier: 1, label: "T1", className: "bg-primary text-primary-foreground" };
+  for (const t of TIER_2) if (s.includes(t)) return { tier: 2, label: "T2", className: "bg-accent text-accent-foreground" };
+  for (const t of TIER_3) if (s.includes(t)) return { tier: 3, label: "T3", className: "bg-muted text-muted-foreground" };
+  return { tier: 4, label: "", className: "" };
 }
 
 interface LiveNewsFeedProps {
