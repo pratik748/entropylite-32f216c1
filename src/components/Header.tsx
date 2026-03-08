@@ -67,6 +67,13 @@ const Header = () => {
           <span className="text-[10px] text-muted-foreground/50 font-mono tracking-wider hidden sm:inline">
             by <span className="text-muted-foreground font-medium">Pratik Sehwag</span>
           </span>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </header>
