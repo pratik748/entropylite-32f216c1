@@ -1,24 +1,20 @@
 import { useMemo } from "react";
 import { Layers } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const PortfolioCommandCenter = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
 
   const data = useMemo(() => {
-    if (analyzed.length === 0) return null;
+    if (holdings.length === 0) return null;
 
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-
-    const assets = analyzed.map(st => {
-      const currentValue = (st.analysis.currentPrice || st.buyPrice) * st.quantity;
-      const pnl = (st.analysis.currentPrice - st.buyPrice) * st.quantity;
-      const pnlPct = ((st.analysis.currentPrice - st.buyPrice) / st.buyPrice) * 100;
-      const weight = (currentValue / totalValue) * 100;
-      const risk = st.analysis.riskScore || 40;
-      const beta = st.analysis.beta || 1;
+    const assets = holdings.map(h => {
+      const weight = (h.value / totalValue) * 100;
+      const risk = h.risk;
+      const beta = h.beta;
 
       // Flow pressure (derived from beta and market cap)
       const flowPressure = Math.min(100, Math.round(beta * 35 + (100 - risk) * 0.4));

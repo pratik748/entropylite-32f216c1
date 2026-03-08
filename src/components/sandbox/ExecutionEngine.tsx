@@ -27,8 +27,8 @@ const ExecutionEngine = ({ stocks }: Props) => {
     });
     const totalWeight = vwapWeights.reduce((s, w) => s + w, 0);
 
-    const avgBeta = analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length;
-    const avgRisk = analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / analyzed.length;
+    const avgBeta = holdings.reduce((s, h) => s + h.beta, 0) / holdings.length;
+    const avgRisk = holdings.reduce((s, h) => s + h.risk, 0) / holdings.length;
     const dailyVol = (avgRisk / 100) * 0.018;
 
     let cumFilled = 0;
