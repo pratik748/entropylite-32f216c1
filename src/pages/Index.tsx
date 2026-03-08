@@ -13,6 +13,7 @@ import LiveNewsFeed from "@/components/LiveNewsFeed";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioChart from "@/components/PortfolioChart";
+import PnLWaterfall from "@/components/charts/PnLWaterfall";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
