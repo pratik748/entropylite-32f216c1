@@ -152,7 +152,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
           </h3>
           <div className="grid gap-3 sm:grid-cols-2 relative z-10">
             {data.highEntropyZones.map((zone, i) => (
-              <div key={i} className="glass-card rounded-lg p-3 sm:p-4 border-loss/20">
+              <div key={i} className={`glass-card rounded-lg p-3 sm:p-4 border-loss/20 ${zone.severity > 0.6 ? "glass-glow-loss animate-pulse-subtle" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs sm:text-sm font-bold text-foreground">{zone.name}</span>
                   <span className="rounded bg-loss/20 px-2 py-0.5 text-[9px] font-mono font-bold text-loss">⚡{zone.entropyScore.toFixed(0)}</span>
