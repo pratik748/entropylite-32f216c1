@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import StockSummary from "@/components/StockSummary";
@@ -11,7 +12,6 @@ import ProfitTaskbar from "@/components/ProfitTaskbar";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
-import PortfolioPanel from "@/components/PortfolioPanel";
 import PortfolioChart from "@/components/PortfolioChart";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
@@ -21,6 +21,11 @@ import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
 import RiskDashboard from "@/components/RiskDashboard";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
+import TickerStrip from "@/components/terminal/TickerStrip";
+import SystemStatusBar from "@/components/terminal/SystemStatusBar";
+import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
+import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
+import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -53,34 +58,25 @@ const IndexContent = () => {
   const stocksRef = useRef(stocks);
   const isMobile = useIsMobile();
 
-  // Keep ref in sync
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
   const analysis = activeStock?.analysis ?? null;
 
-  // Persistent real-time price subscription via server-side proxy (avoids CORS)
+  // Real-time price subscription
   useEffect(() => {
     let alive = true;
-
     const refreshPrices = async () => {
       const current = stocksRef.current;
       const analyzed = current.filter(s => s.analysis && !s.isLoading);
       if (analyzed.length === 0) return;
-
       const t = Date.now();
       const tickers = analyzed.map(s => s.ticker);
-
       try {
-        const { data, error } = await supabase.functions.invoke("price-feed", {
-          body: { tickers },
-        });
-
+        const { data, error } = await supabase.functions.invoke("price-feed", { body: { tickers } });
         if (!alive) return;
-
         if (error || !data?.prices) {
-          // Mark all as delayed on error
           const statusUpdates: PriceStatusMap = {};
           analyzed.forEach(stock => {
             const prev = priceStatus[stock.id];
@@ -90,10 +86,8 @@ const IndexContent = () => {
           setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
           return;
         }
-
         const updates: Record<string, number> = {};
         const statusUpdates: PriceStatusMap = {};
-
         analyzed.forEach(stock => {
           const priceData = data.prices[stock.ticker];
           if (priceData?.price && priceData.price > 0) {
@@ -105,7 +99,6 @@ const IndexContent = () => {
             statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           }
         });
-
         if (Object.keys(updates).length > 0) {
           setStocks(prev => prev.map(s => {
             if (updates[s.id] && s.analysis) {
@@ -114,20 +107,12 @@ const IndexContent = () => {
             return s;
           }));
         }
-
         setPriceStatus(prev => ({ ...prev, ...statusUpdates }));
-      } catch {
-        // Silent fail — status indicators handle visibility
-      }
+      } catch { /* silent */ }
     };
-
     refreshPrices();
     const interval = setInterval(refreshPrices, 8000);
-
-    return () => {
-      alive = false;
-      clearInterval(interval);
-    };
+    return () => { alive = false; clearInterval(interval); };
   }, [stocks.length]);
 
   const analyzeStock = useCallback(
@@ -173,7 +158,7 @@ const IndexContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
       {/* Tab Navigation */}
@@ -204,58 +189,128 @@ const IndexContent = () => {
         </div>
       </nav>
 
-      <main className="container py-4 sm:py-6">
+      {/* Global Ticker Strip */}
+      <TickerStrip />
+
+      {/* Main Content — fills remaining height, with bottom bar padding */}
+      <main className="flex-1 pb-6" style={{ paddingBottom: "28px" }}>
         {activeTab === "dashboard" && (
-          <div className={`grid gap-4 sm:gap-6 ${isMobile ? "grid-cols-1" : "lg:grid-cols-[340px_1fr]"}`}>
-            <div className="space-y-4 sm:space-y-5">
+          isMobile ? (
+            /* Mobile: stacked layout */
+            <div className="p-3 space-y-3">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-              {stocks.length > 0 && (
-                <PortfolioPanel stocks={stocks} activeStockId={activeStockId} onSelectStock={setActiveStockId} onRemoveStock={handleRemoveStock} onAddNew={() => setActiveStockId(null)} priceStatus={priceStatus} />
-              )}
-              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
-              {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
-              {analysis && (
-                <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
-              )}
-              {!isMobile && <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />}
-            </div>
-            <div className="space-y-4 sm:space-y-5">
-              {!isLoading && !analysis && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 sm:py-24 animate-fade-in">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <Activity className="h-7 w-7 text-primary" />
-                  </div>
-                  <h2 className="mb-2 text-base sm:text-lg font-semibold text-foreground">Ready to Analyze</h2>
-                  <p className="max-w-md text-center text-xs sm:text-sm text-muted-foreground px-4">
-                    Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for deep analysis with real-time pricing.
-                  </p>
-                </div>
-              )}
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
                 <>
                   <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} currency={analysis.currency} />
                   <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
-                  <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
-                  <LiveNewsFeed ticker={analysis.ticker} />
-                  <div className="grid gap-4 sm:gap-5 grid-cols-1 lg:grid-cols-2">
-                    <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} />
-                    <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
-                  </div>
+                  <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
             </div>
-          </div>
+          ) : (
+            /* Desktop: Bloomberg-style resizable 3-column layout */
+            <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-130px)]">
+              {/* Left: Portfolio Blotter */}
+              <ResizablePanel defaultSize={22} minSize={15} maxSize={35}>
+                <PanelWrapper title="Portfolio" icon={<LayoutDashboard className="h-3 w-3" />} noPad>
+                  <PortfolioBlotter
+                    stocks={stocks}
+                    activeStockId={activeStockId}
+                    onSelectStock={setActiveStockId}
+                    onRemoveStock={handleRemoveStock}
+                    onAnalyze={handleAnalyze}
+                    isLoading={isLoading}
+                    priceStatus={priceStatus}
+                  />
+                </PanelWrapper>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* Center: Analysis + Charts */}
+              <ResizablePanel defaultSize={55} minSize={30}>
+                <ResizablePanelGroup direction="vertical">
+                  {/* Top center: Main analysis */}
+                  <ResizablePanel defaultSize={65} minSize={30}>
+                    <div className="h-full overflow-auto p-3 space-y-3">
+                      {!isLoading && !analysis && (
+                        <div className="flex flex-col items-center justify-center rounded border border-border bg-card py-16 animate-fade-in">
+                          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                            <Activity className="h-7 w-7 text-primary" />
+                          </div>
+                          <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
+                          <p className="max-w-md text-center text-xs text-muted-foreground px-4">
+                            Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or commodities (GC=F) — for deep analysis with real-time pricing.
+                          </p>
+                        </div>
+                      )}
+                      {isLoading && <LoadingState />}
+                      {analysis && !isLoading && (
+                        <>
+                          <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} currency={analysis.currency} />
+                          <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
+                          <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
+                          <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
+                            <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} />
+                            <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
+                          </div>
+                        </>
+                      )}
+                      {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
+                      {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
+                      {analysis && (
+                        <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
+                      )}
+                    </div>
+                  </ResizablePanel>
+
+                  <ResizableHandle withHandle />
+
+                  {/* Bottom center: History */}
+                  <ResizablePanel defaultSize={35} minSize={15}>
+                    <PanelWrapper title="Analysis History" noPad>
+                      <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
+                    </PanelWrapper>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* Right: News + Flow Detection */}
+              <ResizablePanel defaultSize={23} minSize={15} maxSize={35}>
+                <ResizablePanelGroup direction="vertical">
+                  <ResizablePanel defaultSize={55} minSize={20}>
+                    <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
+                      <LiveNewsFeed ticker={analysis?.ticker} compact />
+                    </PanelWrapper>
+                  </ResizablePanel>
+
+                  <ResizableHandle withHandle />
+
+                  <ResizablePanel defaultSize={45} minSize={20}>
+                    <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad>
+                      <FlowDetectionPanel stocks={stocks} />
+                    </PanelWrapper>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          )
         )}
 
-        {activeTab === "market" && <MarketOverview />}
-        {activeTab === "augment" && <AugmentDashboard stocks={stocks} />}
-        {activeTab === "sandbox" && <EntropySandbox stocks={stocks} />}
-        {activeTab === "statarb" && <StatArbEngine stocks={stocks} />}
-        {activeTab === "geopolitical" && <GeopoliticalGlobe stocks={stocks} />}
-        {activeTab === "desirable" && <DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} />}
-        {activeTab === "risk" && <RiskDashboard stocks={stocks} />}
+        {activeTab === "market" && <div className="container py-4"><MarketOverview /></div>}
+        {activeTab === "augment" && <div className="container py-4"><AugmentDashboard stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="container py-4"><EntropySandbox stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="container py-4"><StatArbEngine stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="container py-4"><GeopoliticalGlobe stocks={stocks} /></div>}
+        {activeTab === "desirable" && <div className="container py-4"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
+        {activeTab === "risk" && <div className="container py-4"><RiskDashboard stocks={stocks} /></div>}
       </main>
+
+      {/* System Status Bar */}
+      <SystemStatusBar stockCount={stocks.filter(s => s.analysis).length} />
     </div>
   );
 };

@@ -211,6 +211,40 @@
     animation: liquid-pulse 3s ease-in-out infinite;
   }
 
+  /* Terminal flash animations */
+  @keyframes flash-green-kf {
+    0% { background-color: hsl(152 82% 42% / 0.25); }
+    100% { background-color: transparent; }
+  }
+  @keyframes flash-red-kf {
+    0% { background-color: hsl(0 84% 55% / 0.25); }
+    100% { background-color: transparent; }
+  }
+  .flash-green {
+    animation: flash-green-kf 0.6s ease-out;
+  }
+  .flash-red {
+    animation: flash-red-kf 0.6s ease-out;
+  }
+
+  /* Ticker strip marquee */
+  @keyframes ticker-marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-scroll {
+    animation: ticker-marquee 60s linear infinite;
+  }
+  .ticker-paused {
+    animation-play-state: paused;
+  }
+
+  /* Terminal row density */
+  .terminal-row {
+    height: 24px;
+    line-height: 24px;
+  }
+
   @keyframes data-stream {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
