@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
