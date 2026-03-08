@@ -50,6 +50,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "analyze-stock":     "ai",
   "strategy-generate": "ai",
   "causal-effects":    "ai",
+  "sentiment-intel":   "slow",
 };
 
 // Rough cost weights for monitoring (relative units)

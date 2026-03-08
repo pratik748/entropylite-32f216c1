@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface NewsArticle {
   title: string;
@@ -12,6 +13,18 @@ interface NewsArticle {
   imageUrl: string | null;
   category: string;
   sentiment: string | null;
+}
+
+const TIER_1 = ["reuters", "associated press", "ap", "bloomberg"];
+const TIER_2 = ["cnbc", "wall street journal", "wsj", "financial times", "ft", "economist"];
+const TIER_3 = ["marketwatch", "seeking alpha", "investopedia", "yahoo finance", "barrons"];
+
+function getSourceTier(source: string): { tier: number; label: string; className: string } {
+  const s = source.toLowerCase();
+  for (const t of TIER_1) if (s.includes(t)) return { tier: 1, label: "T1", className: "bg-primary text-primary-foreground" };
+  for (const t of TIER_2) if (s.includes(t)) return { tier: 2, label: "T2", className: "bg-accent text-accent-foreground" };
+  for (const t of TIER_3) if (s.includes(t)) return { tier: 3, label: "T3", className: "bg-muted text-muted-foreground" };
+  return { tier: 4, label: "", className: "" };
 }
 
 interface LiveNewsFeedProps {
@@ -83,6 +96,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
                 {new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
               </span>
               <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${getSentimentDot(article.sentiment)}`} />
+              {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[6px] px-0.5 py-0 h-2.5 rounded leading-none`}>{t.label}</Badge> : null; })()}
               <span className="text-[8px] text-muted-foreground/60 w-12 flex-shrink-0 truncate">{article.source}</span>
               <span className="text-foreground truncate flex-1 group-hover:text-primary transition-colors">{article.title}</span>
             </a>
@@ -156,6 +170,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
                   <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
                 )}
                 <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                  {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{t.label}</Badge> : null; })()}
                   <span className="font-medium">{article.source}</span>
                   <span>·</span>
                   <span>{new Date(article.pubDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
