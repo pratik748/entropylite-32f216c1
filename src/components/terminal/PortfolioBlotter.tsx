@@ -6,6 +6,7 @@ import { type TickerThreat } from "@/hooks/useGeoIntelligence";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
+import PortfolioSparkline from "@/components/charts/PortfolioSparkline";
 
 interface PortfolioBlotterProps {
   stocks: PortfolioStock[];
