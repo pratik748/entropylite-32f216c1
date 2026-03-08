@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Activity, Wifi, Cpu, Clock, Zap, BarChart3, ShieldCheck } from "lucide-react";
 import { getGovernorMetrics } from "@/lib/apiGovernor";
 
@@ -82,4 +82,4 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   );
 };
 
-export default SystemStatusBar;
+export default memo(SystemStatusBar);

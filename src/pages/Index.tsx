@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
@@ -56,10 +56,12 @@ const IndexContent = () => {
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
-  const stocksRef = useRef(stocks);
+  const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
 
+  const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
+  useEffect(() => { priceStatusRef.current = priceStatus; }, [priceStatus]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
@@ -80,7 +82,7 @@ const IndexContent = () => {
         if (error || !data?.prices) {
           const statusUpdates: PriceStatusMap = {};
           analyzed.forEach(stock => {
-            const prev = priceStatus[stock.id];
+            const prev = priceStatusRef.current[stock.id];
             const failCount = (prev?.failCount || 0) + 1;
             statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           });
@@ -95,7 +97,7 @@ const IndexContent = () => {
             updates[stock.id] = priceData.price;
             statusUpdates[stock.id] = { lastUpdate: t, status: "LIVE", failCount: 0 };
           } else {
-            const prev = priceStatus[stock.id];
+            const prev = priceStatusRef.current[stock.id];
             const failCount = (prev?.failCount || 0) + 1;
             statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           }
