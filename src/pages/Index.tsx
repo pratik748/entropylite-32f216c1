@@ -30,7 +30,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
 
