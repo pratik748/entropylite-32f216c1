@@ -173,6 +173,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
   }, 0) / analyzed.length;
 
   return CONSTRAINT_REGISTRY.map(c => {
+    const conf = confidenceOverrides?.[c.id] ?? c.confidenceScore;
     let prob = 0;
     let proximity = 0;
     let triggerDist = "";
