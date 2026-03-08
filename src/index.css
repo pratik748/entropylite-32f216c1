@@ -303,10 +303,10 @@
   font-size: 11px !important;
 }
 .leaflet-popup-tip {
-  background: hsl(220, 14%, 8%) !important;
+  background: hsl(0, 0%, 5%) !important;
 }
 .leaflet-popup-close-button {
-  color: hsl(210, 8%, 45%) !important;
+  color: hsl(0, 0%, 42%) !important;
 }
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.3; transform: scale(1); }

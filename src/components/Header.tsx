@@ -30,6 +30,7 @@ const Header = () => {
       <div className="container flex h-14 items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
           <img alt="Entropy" className="h-9 object-contain" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+          <span className="hidden lg:inline font-mono text-[8px] text-muted-foreground/40 uppercase tracking-[0.2em] leading-tight max-w-[220px]">Economic Neural Trading &amp; Risk Optimisation via Predictive Yield</span>
           <div className="hidden md:flex items-center gap-3 ml-4">
             {markets.map(m => {
               const open = isMarketOpen(m.tz, m.open, m.close);
