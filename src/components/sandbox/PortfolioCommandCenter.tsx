@@ -16,36 +16,32 @@ const PortfolioCommandCenter = ({ stocks }: Props) => {
       const risk = h.risk;
       const beta = h.beta;
 
-      // Flow pressure (derived from beta and market cap)
       const flowPressure = Math.min(100, Math.round(beta * 35 + (100 - risk) * 0.4));
-      // Reflexivity risk
       const reflexivity = Math.min(100, Math.round(risk * 0.6 + beta * 15));
-      // Structural risk
-      const structural = Math.round((st.analysis.riskBreakdown?.macroRisk || risk * 0.3) + (st.analysis.riskBreakdown?.regulatoryRisk || risk * 0.2));
+      const structural = Math.round(risk * 0.5);
 
-      // Worst case loss (2.5 sigma)
       const dailyVol = (risk / 100) * 0.02;
-      const worstCase = -(currentValue * dailyVol * 2.5 * Math.sqrt(21)); // 1 month horizon
+      const worstCase = -(h.value * dailyVol * 2.5 * Math.sqrt(21));
 
       return {
-        ticker: st.ticker.replace(".NS", "").replace(".BO", ""),
-        currentValue,
+        ticker: h.ticker,
+        currentValue: h.value,
         weight,
-        pnl,
-        pnlPct,
+        pnl: h.pnl,
+        pnlPct: h.pnlPct,
         risk,
         beta,
-        expectedReturn: pnlPct, // annualize later
+        expectedReturn: h.pnlPct,
         worstCase,
         flowPressure,
         reflexivity,
         structural,
-        suggestion: st.analysis.suggestion || "Hold",
+        suggestion: h.suggestion,
       };
     }).sort((a, b) => b.weight - a.weight);
 
     return { assets, totalValue };
-  }, [analyzed]);
+  }, [holdings, totalValue]);
 
   if (!data) return null;
 

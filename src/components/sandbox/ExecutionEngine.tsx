@@ -67,7 +67,7 @@ const ExecutionEngine = ({ stocks }: Props) => {
     const completionTime = algo === "POV" ? `${(100 / participation * 6.25 / 60).toFixed(1)} hours` : "6.25 hours";
 
     return { executionPath, totalSlippage, avgImpact, completionTime, totalValue };
-  }, [analyzed, algo, participation]);
+  }, [holdings, algo, participation, totalValue]);
 
   if (!results) return null;
 
