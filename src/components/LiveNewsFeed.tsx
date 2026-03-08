@@ -30,7 +30,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-news", {
+      const { data, error } = await governedInvoke("fetch-news", {
         body: { ticker: ticker || "", category: "business" },
       });
       if (error) throw error;
