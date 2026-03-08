@@ -276,7 +276,7 @@ const IndexContent = () => {
                   {history.length > 0 && (
                     <ResizablePanel defaultSize={35} minSize={15}>
                       <PanelWrapper title="Analysis History" noPad collapsible defaultCollapsed>
-                        <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
+                        <AnalysisHistory entries={history} onClear={clearHistory} onSelect={() => {}} />
                       </PanelWrapper>
                     </ResizablePanel>
                   )}
