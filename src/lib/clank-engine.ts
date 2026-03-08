@@ -230,7 +230,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       case "liquidity-threshold": {
         const liqStress = impliedVix > 22 ? 0.5 + (impliedVix - 22) * 0.03 : 0.1;
         proximity = Math.min(liqStress, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Spread est: ${proximity > 0.5 ? ">2σ" : "normal"}`;
         break;
       }
