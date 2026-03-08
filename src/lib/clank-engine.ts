@@ -223,7 +223,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       }
       case "index-inclusion": {
         proximity = 0.1;
-        prob = 0.1 * c.confidenceScore;
+        prob = 0.1 * conf;
         triggerDist = "No pending changes detected";
         break;
       }
