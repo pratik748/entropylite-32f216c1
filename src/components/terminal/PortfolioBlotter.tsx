@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { type PriceStatusMap } from "@/pages/Index";
+import { type TickerThreat } from "@/hooks/useGeoIntelligence";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
@@ -14,9 +15,17 @@ interface PortfolioBlotterProps {
   onAnalyze: (ticker: string, buyPrice: number, quantity: number) => void;
   isLoading: boolean;
   priceStatus: PriceStatusMap;
+  tickerThreats?: Record<string, TickerThreat>;
 }
 
-const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus }: PortfolioBlotterProps) => {
+const THREAT_COLORS: Record<string, string> = {
+  critical: "text-loss bg-loss/15",
+  high: "text-warning bg-warning/15",
+  medium: "text-warning/70 bg-warning/10",
+  low: "text-muted-foreground bg-surface-3",
+};
+
+const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus, tickerThreats }: PortfolioBlotterProps) => {
   const { baseCurrency, convertToBase } = useFX();
   const [flashMap, setFlashMap] = useState<Record<string, "gain" | "loss">>({});
   const prevPrices = useRef<Record<string, number>>({});
