@@ -82,7 +82,7 @@ const IndexContent = () => {
         if (error || !data?.prices) {
           const statusUpdates: PriceStatusMap = {};
           analyzed.forEach(stock => {
-            const prev = priceStatus[stock.id];
+            const prev = priceStatusRef.current[stock.id];
             const failCount = (prev?.failCount || 0) + 1;
             statusUpdates[stock.id] = { lastUpdate: prev?.lastUpdate || 0, status: failCount >= 3 ? "DISCONNECTED" : "DELAYED", failCount };
           });
