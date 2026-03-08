@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,17 +35,9 @@ serve(async (req) => {
     const portfolioTickers = body.portfolioTickers || [];
     const portfolioValue = body.portfolioValue || 100000;
 
-    const GOOGLE_GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_KEY");
-    if (!GOOGLE_GEMINI_KEY) {
-      return new Response(JSON.stringify({ error: "AI not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: "You are an elite portfolio strategist at a $50B+ asset manager. Return ONLY valid JSON." }] },
-        contents: [{ role: "user", parts: [{ text: `Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Existing tickers: ${portfolioTickers.join(", ") || "none"}.
+    const result = await callAI({
+      systemPrompt: "You are an elite portfolio strategist at a $50B+ asset manager. Return ONLY valid JSON.",
+      userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Existing tickers: ${portfolioTickers.join(", ") || "none"}.
 
 Recommend 8-10 BEST assets to buy RIGHT NOW. Include global equities, ETFs, crypto, commodities, defensive positions. DO NOT repeat existing tickers: ${portfolioTickers.join(", ")}
 
@@ -74,37 +67,29 @@ Return JSON:
     "correlationToPortfolio": "<low|medium|high>",
     "maxDrawdownEstimate": <% number>
   }]
-}` }] }],
-        generationConfig: { temperature: 0.35, maxOutputTokens: 4000 },
-      }),
+}`,
+      maxTokens: 4000,
+      temperature: 0.35,
+      preferredProvider: "openrouter",
     });
 
-    if (!res.ok) {
-      if (res.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errText = await res.text();
-      console.error("Gemini error:", res.status, errText);
-      return new Response(JSON.stringify({ error: "AI analysis failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/^```json?\n?/, "")?.replace(/\n?```$/, "");
-    if (!raw) return new Response(JSON.stringify({ error: "Empty AI response" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    const result = JSON.parse(raw);
+    console.log(`desirable-assets used provider: ${result.provider}`);
+    const parsed = JSON.parse(result.text);
 
     // Validate prices with real Yahoo data
     const enriched = await Promise.all(
-      (result.recommendations || []).map(async (rec: any) => {
+      (parsed.recommendations || []).map(async (rec: any) => {
         const real = await fetchYahooPrice(rec.ticker);
         return { ...rec, realPrice: real?.price || rec.currentEstPrice, realCurrency: real?.currency || rec.currency, priceChange24h: real?.change || 0, priceVerified: !!real, realVolume: real?.volume || 0, fiftyTwoHigh: real?.fiftyTwoHigh || 0, fiftyTwoLow: real?.fiftyTwoLow || 0 };
       })
     );
 
-    return new Response(JSON.stringify({ marketCondition: result.marketCondition, regimeType: result.regimeType || "transition", recommendations: enriched, timestamp: Date.now() }), {
+    return new Response(JSON.stringify({ marketCondition: parsed.marketCondition, regimeType: parsed.regimeType || "transition", recommendations: enriched, timestamp: Date.now() }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Desirable assets error:", error);
+    if (error.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

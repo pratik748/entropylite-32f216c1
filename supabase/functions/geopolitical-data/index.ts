@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,8 +79,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const GOOGLE_GEMINI_KEY = Deno.env.get("GOOGLE_GEMINI_KEY");
-
     // 1. Fetch real forex volatility
     const forexResults = await Promise.all(
       forexPairs.map(async (pair) => {
@@ -92,16 +91,12 @@ serve(async (req) => {
     let conflictEvents = FALLBACK_CONFLICTS;
     let geopoliticalInsights: any = {};
 
-    if (GOOGLE_GEMINI_KEY) {
-      try {
-        const stressedCurrencies = forexResults.filter(f => f.isStressed).map(f => `${f.currency}: ${f.change24h > 0 ? "+" : ""}${f.change24h.toFixed(2)}%`).join(", ");
+    try {
+      const stressedCurrencies = forexResults.filter(f => f.isStressed).map(f => `${f.currency}: ${f.change24h > 0 ? "+" : ""}${f.change24h.toFixed(2)}%`).join(", ");
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: "You are a geopolitical intelligence analyst at a sovereign wealth fund. Return ONLY valid JSON." }] },
-            contents: [{ role: "user", parts: [{ text: `Today is ${new Date().toISOString().split("T")[0]}. 
+      const result = await callAI({
+        systemPrompt: "You are a geopolitical intelligence analyst at a sovereign wealth fund. Return ONLY valid JSON.",
+        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. 
 REAL-TIME FOREX STRESS: ${stressedCurrencies || "No currencies stressed >2%"}
 
 Provide 12-18 REAL current conflicts/crises. MUST include Iran/Israel, Houthis/Red Sea, Ukraine-Russia, China-Taiwan. Be specific with coordinates.
@@ -116,25 +111,17 @@ Return JSON:
   "capitalFlowDirection": "<risk-on|risk-off|mixed>",
   "safeHavenDemand": "<low|moderate|high|extreme>",
   "intelligenceSummary": "<3-4 sentence executive briefing>"
-}` }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 3000 },
-          }),
-        });
+}`,
+        maxTokens: 3000,
+        temperature: 0.25,
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/^```json?\n?/, "")?.replace(/\n?```$/, "");
-          if (raw) {
-            geopoliticalInsights = JSON.parse(raw);
-            if (geopoliticalInsights.conflicts?.length > 0) {
-              conflictEvents = geopoliticalInsights.conflicts;
-            }
-          }
-        } else {
-          console.error("Gemini geo error:", res.status);
-        }
-      } catch (e) { console.error("AI geo error:", e); }
-    }
+      console.log(`geopolitical-data used provider: ${result.provider}`);
+      geopoliticalInsights = JSON.parse(result.text);
+      if (geopoliticalInsights.conflicts?.length > 0) {
+        conflictEvents = geopoliticalInsights.conflicts;
+      }
+    } catch (e) { console.error("AI geo error (using fallback):", e); }
 
     // 3. Compute high-entropy zones
     const highEntropyZones = conflictEvents
@@ -165,7 +152,6 @@ Return JSON:
     });
   } catch (error) {
     console.error("Geopolitical data error:", error);
-    // Even on total failure, return fallback data
     return new Response(JSON.stringify({
       conflictEvents: FALLBACK_CONFLICTS,
       forexVolatility: [],
