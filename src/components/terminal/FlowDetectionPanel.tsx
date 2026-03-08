@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import FlowRadarChart from "@/components/charts/FlowRadarChart";
 
 interface FlowDetectionPanelProps {
   stocks: PortfolioStock[];
