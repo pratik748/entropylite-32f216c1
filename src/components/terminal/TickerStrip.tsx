@@ -63,13 +63,31 @@ const TickerStrip = () => {
         const { data, error } = await supabase.functions.invoke("market-data", {
           body: { tickers: GLOBAL_TICKERS.map(t => t.symbol) },
         });
-        if (!alive || error || !data?.results) return;
+        if (!alive || error) return;
+
+        // Build lookup from indices array (symbol → {price, changePct})
+        const lookup: Record<string, { price: number; changePct: number }> = {};
+        if (data?.indices) {
+          for (const idx of data.indices) {
+            lookup[idx.symbol] = { price: idx.price, changePct: idx.changePct ?? 0 };
+          }
+        }
+        // Also check macro for specific tickers
+        if (data?.macro) {
+          if (data.macro.goldPrice) lookup["GC=F"] = { price: data.macro.goldPrice, changePct: 0 };
+          if (data.macro.crudeBrent) lookup["CL=F"] = { price: data.macro.crudeBrent, changePct: 0 };
+          if (data.macro.btcUsd) lookup["BTC-USD"] = { price: data.macro.btcUsd, changePct: 0 };
+          if (data.macro.ethUsd) lookup["ETH-USD"] = { price: data.macro.ethUsd, changePct: 0 };
+          if (data.macro.silverPrice) lookup["SI=F"] = { price: data.macro.silverPrice, changePct: 0 };
+          if (data.macro.eurUsd) lookup["EURUSD=X"] = { price: data.macro.eurUsd, changePct: 0 };
+        }
+
         setTickers(prev =>
           prev.map(t => {
-            const d = data.results[t.symbol];
+            const d = lookup[t.symbol];
             if (!d) return t;
             const newHistory = [...t.history.slice(-19), d.price];
-            return { ...t, price: d.price, change: d.changePercent ?? 0, history: newHistory };
+            return { ...t, price: d.price, change: d.changePct, history: newHistory };
           })
         );
       } catch { /* silent */ }
