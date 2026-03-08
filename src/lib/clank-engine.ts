@@ -203,7 +203,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
         const dayOfMonth = new Date().getDate();
         const monthEnd = dayOfMonth > 20;
         proximity = monthEnd ? 0.5 + (dayOfMonth - 20) / 20 : 0.1;
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = monthEnd ? `${30 - dayOfMonth} days to rebal` : "Next quarter-end";
         break;
       }
