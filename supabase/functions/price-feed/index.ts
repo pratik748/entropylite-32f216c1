@@ -19,7 +19,9 @@ serve(async (req) => {
     const results: Record<string, { price: number; currency: string }> = {};
 
     await Promise.allSettled(
-      tickers.map(async (ticker: string) => {
+      tickers.map(async (rawTicker: string) => {
+        const ticker = rawTicker.trim();
+        if (!ticker) return;
         try {
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d&_t=${t}`;
           const res = await fetch(url, {

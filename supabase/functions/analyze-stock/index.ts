@@ -12,7 +12,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { ticker, buyPrice, quantity } = await req.json();
+    const rawBody = await req.json();
+    const ticker = (rawBody.ticker || "").toString().trim().toUpperCase();
+    const buyPrice = rawBody.buyPrice;
+    const quantity = rawBody.quantity;
     if (!ticker || !buyPrice || !quantity) {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -33,9 +36,15 @@ serve(async (req) => {
     const isCommodity = ticker.includes("=F");
     if (isIndian) currency = "INR";
 
+    // Known Indian stocks without suffix — auto-try .NS and .BO
+    const KNOWN_INDIAN = ["WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY","CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP","HINDALCO","VEDL","MRF","IRCTC","ZOMATO","PAYTM","NYKAA"];
+    const looksIndian = KNOWN_INDIAN.includes(ticker) || /^[A-Z]{2,20}$/.test(ticker);
+
     const symbolsToTry = isIndian
       ? [ticker, ticker.replace(".NS", ".BO"), ticker.replace(".BO", ".NS")]
-      : [ticker];
+      : looksIndian && !isCrypto && !isForex && !isCommodity && !ticker.startsWith("^")
+        ? [ticker, `${ticker}.NS`, `${ticker}.BO`]
+        : [ticker];
 
     for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
