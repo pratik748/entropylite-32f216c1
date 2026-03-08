@@ -12,6 +12,10 @@ import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "sonner";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  ComposedChart, ReferenceLine, Scatter, Legend, CartesianGrid, Area,
+} from "recharts";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -77,6 +81,13 @@ const categoryLabels: Record<string, string> = {
   REBALANCE: "Rebalance",
   RISK_REDUCTION: "Risk Reduction",
 };
+
+// ─── Chart Colors ───
+const GAIN_COLOR = "hsl(152 90% 45%)";
+const LOSS_COLOR = "hsl(0 90% 55%)";
+const WARNING_COLOR = "hsl(38 92% 55%)";
+const INFO_COLOR = "hsl(210 60% 55%)";
+const MUTED_COLOR = "hsl(0 0% 42%)";
 
 const StrategyLab = ({ stocks }: Props) => {
   const { holdings, fmt } = useNormalizedPortfolio(stocks);
@@ -248,6 +259,90 @@ const StrategyLab = ({ stocks }: Props) => {
         </div>
       )}
 
+      {/* ─── Summary Charts ─── */}
+      {instructions.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* Risk/Reward Overview Chart */}
+          <div className="rounded border border-border bg-card p-4">
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Risk / Reward Map</h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={instructions
+                  .filter(i => i.entry_price && i.entry_price > 0)
+                  .map(i => {
+                    const riskPct = i.stop_loss_price && i.entry_price
+                      ? ((i.stop_loss_price - i.entry_price) / i.entry_price) * 100
+                      : 0;
+                    const rewardPct = i.take_profit_price && i.entry_price
+                      ? ((i.take_profit_price - i.entry_price) / i.entry_price) * 100
+                      : 0;
+                    return { ticker: i.ticker, risk: +riskPct.toFixed(1), reward: +rewardPct.toFixed(1), confidence: i.confidence };
+                  })}
+                layout="vertical"
+                margin={{ top: 0, right: 8, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 12%)" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 9, fill: MUTED_COLOR }} domain={["auto", "auto"]} tickFormatter={v => `${v}%`} />
+                <YAxis dataKey="ticker" type="category" tick={{ fontSize: 10, fill: "hsl(0 0% 96%)", fontFamily: "JetBrains Mono" }} width={55} />
+                <Tooltip
+                  contentStyle={{ background: "hsl(0 0% 5%)", border: "1px solid hsl(0 0% 12%)", borderRadius: 4, fontSize: 11 }}
+                  formatter={(val: number, name: string) => [`${val}%`, name === "risk" ? "Downside Risk" : "Upside Target"]}
+                />
+                <ReferenceLine x={0} stroke="hsl(0 0% 20%)" />
+                <Bar dataKey="risk" name="Risk" radius={[4, 0, 0, 4]}>
+                  {instructions.filter(i => i.entry_price && i.entry_price > 0).map((_, idx) => (
+                    <Cell key={idx} fill={LOSS_COLOR} fillOpacity={0.7} />
+                  ))}
+                </Bar>
+                <Bar dataKey="reward" name="Reward" radius={[0, 4, 4, 0]}>
+                  {instructions.filter(i => i.entry_price && i.entry_price > 0).map((_, idx) => (
+                    <Cell key={idx} fill={GAIN_COLOR} fillOpacity={0.7} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Confidence Distribution */}
+          <div className="rounded border border-border bg-card p-4">
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Confidence & Urgency</h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={instructions.map(i => ({
+                  ticker: i.ticker,
+                  confidence: i.confidence,
+                  action: i.action,
+                  urgency: i.urgency,
+                }))}
+                margin={{ top: 0, right: 8, left: 8, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 12%)" />
+                <XAxis dataKey="ticker" tick={{ fontSize: 9, fill: "hsl(0 0% 96%)", fontFamily: "JetBrains Mono" }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: MUTED_COLOR }} tickFormatter={v => `${v}%`} />
+                <Tooltip
+                  contentStyle={{ background: "hsl(0 0% 5%)", border: "1px solid hsl(0 0% 12%)", borderRadius: 4, fontSize: 11 }}
+                  formatter={(val: number, _: string, props: any) => [`${val}%`, `Confidence (${props.payload.action})`]}
+                />
+                <ReferenceLine y={70} stroke={WARNING_COLOR} strokeDasharray="3 3" label={{ value: "High", fill: WARNING_COLOR, fontSize: 8, position: "right" }} />
+                <Bar dataKey="confidence" radius={[4, 4, 0, 0]}>
+                  {instructions.map((inst, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={
+                        inst.urgency === "IMMEDIATE" ? LOSS_COLOR :
+                        inst.urgency === "TODAY" ? WARNING_COLOR :
+                        inst.confidence >= 70 ? GAIN_COLOR : INFO_COLOR
+                      }
+                      fillOpacity={0.8}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Trade Instructions */}
       {instructions.length === 0 && !loading ? (
         <div className="rounded border border-border bg-card p-8 text-center">
@@ -261,24 +356,18 @@ const StrategyLab = ({ stocks }: Props) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Existing Position Actions */}
           {positionMgmt.length > 0 && (
             <InstructionGroup title="Your Positions" icon={<Layers className="h-4 w-4" />} instructions={positionMgmt} />
           )}
-
-          {/* Hedging */}
           {hedges.length > 0 && (
             <InstructionGroup title="Hedging" icon={<ShieldAlert className="h-4 w-4" />} instructions={hedges} />
           )}
-
-          {/* New Opportunities */}
           {newEntries.length > 0 && (
             <InstructionGroup title="New Opportunities" icon={<ArrowUpRight className="h-4 w-4" />} instructions={newEntries} />
           )}
         </div>
       )}
 
-      {/* Generation timestamp */}
       {lastGenerated > 0 && (
         <p className="text-[9px] text-muted-foreground/40 font-mono text-center">
           Generated {new Date(lastGenerated).toLocaleTimeString()} · Regime: {regime?.regime}
@@ -348,6 +437,24 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
   const ActionIcon = config.icon;
   const urgency = urgencyConfig[inst.urgency] || urgencyConfig.THIS_WEEK;
 
+  // Build price level chart data
+  const hasLevels = (inst.entry_price && inst.entry_price > 0) &&
+    ((inst.stop_loss_price && inst.stop_loss_price > 0) || (inst.take_profit_price && inst.take_profit_price > 0));
+
+  const priceLevels = hasLevels ? (() => {
+    const entry = inst.entry_price!;
+    const sl = inst.stop_loss_price && inst.stop_loss_price > 0 ? inst.stop_loss_price : null;
+    const tp = inst.take_profit_price && inst.take_profit_price > 0 ? inst.take_profit_price : null;
+    const ezLow = inst.entry_zone_low && inst.entry_zone_low > 0 ? inst.entry_zone_low : null;
+    const ezHigh = inst.entry_zone_high && inst.entry_zone_high > 0 ? inst.entry_zone_high : null;
+
+    const all = [sl, ezLow, entry, ezHigh, tp].filter(Boolean) as number[];
+    const min = Math.min(...all) * 0.995;
+    const max = Math.max(...all) * 1.005;
+
+    return { entry, sl, tp, ezLow, ezHigh, min, max };
+  })() : null;
+
   return (
     <div className={`rounded border p-3 ${config.bg}`}>
       {/* Header row */}
@@ -374,6 +481,14 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
       {/* Rationale */}
       <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">{inst.rationale}</p>
 
+      {/* Price Levels Visual */}
+      {priceLevels && (
+        <div className="mb-3 rounded bg-background/40 p-2.5">
+          <p className="text-[8px] uppercase tracking-wider text-muted-foreground mb-1.5">Price Levels</p>
+          <PriceLevelChart levels={priceLevels} ticker={inst.ticker} />
+        </div>
+      )}
+
       {/* Trade Details Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {inst.quantity != null && inst.quantity > 0 && (
@@ -397,6 +512,67 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
         <DetailCell label="R:R" value={inst.risk_reward} />
         <DetailCell label="Horizon" value={inst.time_horizon} />
       </div>
+    </div>
+  );
+};
+
+// ─── Price Level Visualization ───
+const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: number | null; tp: number | null; ezLow: number | null; ezHigh: number | null; min: number; max: number }; ticker: string }) => {
+  const range = levels.max - levels.min;
+  const toPercent = (val: number) => ((val - levels.min) / range) * 100;
+
+  const entryPct = toPercent(levels.entry);
+  const slPct = levels.sl ? toPercent(levels.sl) : null;
+  const tpPct = levels.tp ? toPercent(levels.tp) : null;
+  const ezLowPct = levels.ezLow ? toPercent(levels.ezLow) : null;
+  const ezHighPct = levels.ezHigh ? toPercent(levels.ezHigh) : null;
+
+  return (
+    <div className="relative h-10">
+      {/* Base track */}
+      <div className="absolute top-4 left-0 right-0 h-[2px] bg-border rounded-full" />
+
+      {/* Entry zone fill */}
+      {ezLowPct != null && ezHighPct != null && (
+        <div
+          className="absolute top-2.5 h-3 rounded-sm"
+          style={{
+            left: `${ezLowPct}%`,
+            width: `${ezHighPct - ezLowPct}%`,
+            background: `${INFO_COLOR}22`,
+            border: `1px solid ${INFO_COLOR}44`,
+          }}
+        />
+      )}
+
+      {/* Stop Loss marker */}
+      {slPct != null && (
+        <div className="absolute top-0" style={{ left: `${slPct}%`, transform: "translateX(-50%)" }}>
+          <div className="w-[2px] h-9 mx-auto" style={{ background: LOSS_COLOR }} />
+          <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: LOSS_COLOR }}>
+            SL ${levels.sl!.toFixed(0)}
+          </p>
+        </div>
+      )}
+
+      {/* Entry marker */}
+      <div className="absolute top-0" style={{ left: `${entryPct}%`, transform: "translateX(-50%)" }}>
+        <div className="w-2 h-2 rounded-full mx-auto border-2" style={{ borderColor: "hsl(0 0% 96%)", background: "hsl(0 0% 5%)" }} />
+        <div className="w-[2px] h-6 mx-auto" style={{ background: "hsl(0 0% 60%)" }} />
+        <p className="text-[8px] font-mono text-center whitespace-nowrap text-foreground font-bold">
+          ${levels.entry.toFixed(0)}
+        </p>
+      </div>
+
+      {/* Take Profit marker */}
+      {tpPct != null && (
+        <div className="absolute top-0" style={{ left: `${tpPct}%`, transform: "translateX(-50%)" }}>
+          <div className="w-[2px] h-9 mx-auto" style={{ background: GAIN_COLOR }} />
+          <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: GAIN_COLOR }}>
+            TP ${levels.tp!.toFixed(0)}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
