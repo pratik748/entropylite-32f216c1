@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart } from "recharts";
+import { useMemo, useState } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Dice5, ShieldAlert, TrendingDown, BarChart3 } from "lucide-react";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCompact } from "@/lib/currency";
@@ -13,8 +13,8 @@ interface MonteCarloChartProps {
 }
 
 const NUM_SIMULATIONS = 10000;
-const NUM_DAYS = 90;
-const NUM_SAMPLE_PATHS = 15;
+const NUM_DAYS = 252;
+const NUM_VISIBLE_PATHS = 40;
 
 function gaussianRandom(): number {
   let u = 0, v = 0;
@@ -32,86 +32,112 @@ function percentile(arr: number[], p: number): number {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
 }
 
-// Distinct colors for sample paths (matching reference image style)
 const PATH_COLORS = [
-  "hsl(30, 90%, 55%)", "hsl(180, 70%, 50%)", "hsl(60, 80%, 50%)", "hsl(320, 70%, 55%)",
-  "hsl(145, 70%, 45%)", "hsl(0, 70%, 55%)", "hsl(210, 80%, 55%)", "hsl(270, 60%, 55%)",
-  "hsl(90, 70%, 50%)", "hsl(45, 85%, 55%)", "hsl(200, 75%, 50%)", "hsl(340, 65%, 55%)",
-  "hsl(120, 60%, 45%)", "hsl(15, 80%, 55%)", "hsl(240, 60%, 60%)",
+  "hsl(30,90%,55%)",  "hsl(180,70%,50%)", "hsl(120,60%,45%)", "hsl(280,60%,60%)",
+  "hsl(200,80%,55%)", "hsl(0,70%,55%)",   "hsl(60,80%,45%)",  "hsl(320,60%,55%)",
+  "hsl(160,60%,50%)", "hsl(240,50%,60%)", "hsl(45,90%,50%)",  "hsl(100,50%,50%)",
+  "hsl(350,70%,60%)", "hsl(210,70%,50%)", "hsl(90,60%,45%)",  "hsl(270,50%,55%)",
+  "hsl(20,80%,50%)",  "hsl(140,60%,45%)", "hsl(300,50%,55%)", "hsl(170,60%,50%)",
+  "hsl(50,80%,50%)",  "hsl(230,60%,55%)", "hsl(10,70%,50%)",  "hsl(190,70%,50%)",
+  "hsl(110,50%,45%)", "hsl(330,60%,55%)", "hsl(70,70%,45%)",  "hsl(250,50%,55%)",
+  "hsl(40,80%,50%)",  "hsl(150,60%,50%)", "hsl(355,80%,55%)", "hsl(215,75%,55%)",
+  "hsl(75,70%,45%)",  "hsl(295,55%,55%)", "hsl(5,75%,50%)",   "hsl(185,65%,50%)",
+  "hsl(125,55%,45%)", "hsl(265,50%,55%)", "hsl(35,85%,50%)",  "hsl(155,60%,50%)",
 ];
+
+type ViewMode = "original" | "resample" | "randomized" | "all";
 
 const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency }: MonteCarloChartProps) => {
   const { baseCurrency, convertToBase } = useFX();
+  const [viewMode, setViewMode] = useState<ViewMode>("original");
   const assetCurrency = currency || "USD";
   const sym = getCurrencySymbol(baseCurrency);
-  const fmt = (v: number) => formatCompact(v, baseCurrency);
-
-  // Convert price to base currency for display
-  const basePrice = convertToBase(currentPrice, assetCurrency);
+  const fmtPrice = (v: number) => `${sym}${convertToBase(v, assetCurrency).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const { chartData, stats } = useMemo(() => {
     const upperBound = bullRange[1];
     const lowerBound = bearRange[0];
     const annualVol = Math.max(0.05, (upperBound - lowerBound) / (2 * currentPrice));
     const dailyVol = annualVol / Math.sqrt(252);
-    const dailyDrift = 0;
+    const dailyDrift = 0.0002;
 
-    const dayPrices: number[][] = Array.from({ length: NUM_DAYS + 1 }, () => []);
-    const samplePaths: number[][] = [];
+    const sampleEvery = Math.max(1, Math.floor(NUM_DAYS / 120));
+    const stepsCount = Math.ceil(NUM_DAYS / sampleEvery) + 1;
+
+    const originalPaths: number[][] = [];
+    const resamplePaths: number[][] = [];
+    const randomPaths: number[][] = [];
     const finalPrices: number[] = [];
-    let maxDrawdownCount = 0;
     const allDrawdowns: number[] = [];
 
+    // Original simulation paths
     for (let s = 0; s < NUM_SIMULATIONS; s++) {
       let price = currentPrice;
-      let peak = price;
-      let maxDD = 0;
-      const isSample = s < NUM_SAMPLE_PATHS;
-      if (isSample) samplePaths.push([currentPrice]);
-
-      dayPrices[0].push(currentPrice);
+      let peak = price, maxDD = 0;
+      const storePath = s < NUM_VISIBLE_PATHS;
+      const path: number[] = storePath ? [price] : [];
 
       for (let d = 1; d <= NUM_DAYS; d++) {
         const z = gaussianRandom();
         price = price * Math.exp((dailyDrift - 0.5 * dailyVol * dailyVol) + dailyVol * z);
         price = Math.max(price, 0.01);
-
-        if (isSample) samplePaths[s].push(price);
-        if (d % 3 === 0 || d === NUM_DAYS) dayPrices[d].push(price);
-
         if (price > peak) peak = price;
         const dd = (peak - price) / peak;
         if (dd > maxDD) maxDD = dd;
+        if (storePath && d % sampleEvery === 0) path.push(price);
       }
-
       finalPrices.push(price);
       allDrawdowns.push(maxDD);
-      if (maxDD > 0.2) maxDrawdownCount++;
+      if (storePath) originalPaths.push(path);
+    }
+
+    // Resample paths (slightly different params)
+    for (let i = 0; i < NUM_VISIBLE_PATHS; i++) {
+      let price = currentPrice;
+      const path: number[] = [price];
+      for (let d = 1; d <= NUM_DAYS; d++) {
+        const z = gaussianRandom();
+        price = price * Math.exp((dailyDrift * 1.1 - 0.5 * (dailyVol * 0.95) ** 2) + dailyVol * 0.95 * z);
+        price = Math.max(price, 0.01);
+        if (d % sampleEvery === 0) path.push(price);
+      }
+      resamplePaths.push(path);
+    }
+
+    // Randomized paths (higher vol)
+    for (let i = 0; i < NUM_VISIBLE_PATHS; i++) {
+      let price = currentPrice;
+      const path: number[] = [price];
+      for (let d = 1; d <= NUM_DAYS; d++) {
+        const z = gaussianRandom();
+        price = price * Math.exp((dailyDrift * 0.5 - 0.5 * (dailyVol * 1.3) ** 2) + dailyVol * 1.3 * z);
+        price = Math.max(price, 0.01);
+        if (d % sampleEvery === 0) path.push(price);
+      }
+      randomPaths.push(path);
+    }
+
+    // "Real" path — deterministic drift
+    const realPath: number[] = [currentPrice];
+    let rp = currentPrice;
+    for (let d = 1; d <= NUM_DAYS; d++) {
+      rp *= Math.exp(dailyDrift);
+      if (d % sampleEvery === 0) realPath.push(rp);
     }
 
     // Build chart data
-    const data = [];
-    for (let d = 0; d <= NUM_DAYS; d++) {
-      if (d > 0 && d % 3 !== 0 && d !== NUM_DAYS) continue;
-      const prices = dayPrices[d];
-      if (prices.length === 0) continue;
-      const point: any = {
-        day: d,
-        p1: percentile(prices, 1),
-        p5: percentile(prices, 5),
-        p25: percentile(prices, 25),
-        p50: percentile(prices, 50),
-        p75: percentile(prices, 75),
-        p95: percentile(prices, 95),
-        p99: percentile(prices, 99),
-      };
-      // Add all sample paths
-      for (let i = 0; i < NUM_SAMPLE_PATHS; i++) {
-        point[`s${i}`] = samplePaths[i]?.[d] ?? null;
+    const data = Array.from({ length: stepsCount }, (_, step) => {
+      const point: Record<string, number> = { day: Math.round((step / (stepsCount - 1)) * NUM_DAYS) };
+      point.real = realPath[step] ?? realPath[realPath.length - 1];
+      for (let i = 0; i < NUM_VISIBLE_PATHS; i++) {
+        point[`o${i}`] = originalPaths[i]?.[step] ?? 0;
+        point[`r${i}`] = resamplePaths[i]?.[step] ?? 0;
+        point[`x${i}`] = randomPaths[i]?.[step] ?? 0;
       }
-      data.push(point);
-    }
+      return point;
+    });
 
+    // Stats
     const returns = finalPrices.map(p => (p - currentPrice) / currentPrice);
     const sortedReturns = [...returns].sort((a, b) => a - b);
     const sortedDrawdowns = [...allDrawdowns].sort((a, b) => a - b);
@@ -128,12 +154,26 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
     const meanReturn = (returns.reduce((s, r) => s + r, 0) / returns.length) * 100;
     const stdDev = Math.sqrt(returns.reduce((s, r) => s + (r - meanReturn / 100) ** 2, 0) / returns.length) * 100;
     const medianFinal = percentile(finalPrices, 50);
-    const maxDrawdownProb = (maxDrawdownCount / NUM_SIMULATIONS) * 100;
+    const maxDrawdownCount = allDrawdowns.filter(d => d > 0.2).length;
 
-    // Drawdown stats (matching reference image)
-    const bestDrawdown = sortedDrawdowns[0] * currentPrice;
-    const worstDrawdown = sortedDrawdowns[sortedDrawdowns.length - 1] * currentPrice;
-    const avgDrawdown = (allDrawdowns.reduce((s, d) => s + d, 0) / allDrawdowns.length) * currentPrice;
+    const calcDD = (paths: number[][]) => {
+      let best = Infinity, worst = 0, total = 0;
+      for (const path of paths) {
+        let peak = path[0], maxDD = 0;
+        for (const v of path) {
+          if (v > peak) peak = v;
+          const dd = peak - v;
+          if (dd > maxDD) maxDD = dd;
+        }
+        if (maxDD < best) best = maxDD;
+        if (maxDD > worst) worst = maxDD;
+        total += maxDD;
+      }
+      return { best, worst, avg: paths.length > 0 ? total / paths.length : 0 };
+    };
+
+    const origDD = calcDD(originalPaths);
+    const resDD = calcDD(resamplePaths);
 
     const histBins = 30;
     const minR = sortedReturns[0] * 100;
@@ -158,17 +198,23 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         var99: (var99 * 100).toFixed(1),
         cvar95: (cvar95 * 100).toFixed(1),
         cvar99: (cvar99 * 100).toFixed(1),
-        maxDrawdownProb: maxDrawdownProb.toFixed(1),
+        maxDrawdownProb: ((maxDrawdownCount / NUM_SIMULATIONS) * 100).toFixed(1),
         sharpe: stdDev > 0 ? (meanReturn / stdDev).toFixed(2) : "0",
-        bestDrawdown,
-        worstDrawdown,
-        avgDrawdown,
-        histogram,
+        origDD, resDD, histogram,
       },
     };
   }, [currentPrice, bullRange, bearRange]);
 
-  const fmtPrice = (v: number) => `${sym}${convertToBase(v, assetCurrency).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const getVisiblePrefixes = (): string[] => {
+    switch (viewMode) {
+      case "original": return ["o"];
+      case "resample": return ["r"];
+      case "randomized": return ["x"];
+      case "all": return ["o", "r", "x"];
+    }
+  };
+
+  const visiblePrefixes = getVisiblePrefixes();
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up space-y-4">
@@ -217,62 +263,69 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         </div>
       </div>
 
-      {/* Drawdown Stats (like reference image) */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-lg bg-surface-2 p-3 text-center">
-          <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Best Drawdown</p>
-          <p className="mt-0.5 font-mono text-sm font-bold text-gain">{fmtPrice(stats.bestDrawdown)}</p>
-        </div>
-        <div className="rounded-lg bg-surface-2 p-3 text-center">
-          <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Worst Drawdown</p>
-          <p className="mt-0.5 font-mono text-sm font-bold text-loss">{fmtPrice(stats.worstDrawdown)}</p>
-        </div>
-        <div className="rounded-lg bg-surface-2 p-3 text-center">
-          <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Average Drawdown</p>
-          <p className="mt-0.5 font-mono text-sm font-bold text-foreground">{fmtPrice(stats.avgDrawdown)}</p>
-        </div>
+      {/* View mode tabs */}
+      <div className="flex items-center justify-center gap-1">
+        {(["original", "resample", "randomized", "all"] as ViewMode[]).map(m => (
+          <button key={m} onClick={() => setViewMode(m)}
+            className={`rounded-md px-4 py-1.5 text-[11px] font-medium border transition-all ${viewMode === m ? "bg-foreground text-background border-foreground" : "bg-card text-muted-foreground border-border hover:text-foreground"}`}>
+            {m === "all" ? `1-${NUM_VISIBLE_PATHS}` : m.charAt(0).toUpperCase() + m.slice(1)}
+          </button>
+        ))}
       </div>
 
-      {/* Fan Chart with many colored paths */}
-      <div className="h-72 w-full">
+      {/* Spaghetti Chart */}
+      <div className="h-[420px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 14%)" />
-            <XAxis dataKey="day" tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0, 0%, 14%)" }} label={{ value: "Days", position: "insideBottom", offset: -2, fill: "hsl(0, 0%, 45%)", fontSize: 10 }} />
-            <YAxis tick={{ fill: "hsl(0, 0%, 45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0, 0%, 14%)" }} tickFormatter={(v) => fmtPrice(v)} width={60} />
+          <LineChart data={chartData} margin={{ top: 10, right: 15, left: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+            <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} tickFormatter={v => fmtPrice(v)} width={70} />
             <Tooltip
-              contentStyle={{ background: "hsl(0, 0%, 6%)", border: "1px solid hsl(0, 0%, 14%)", borderRadius: 6, fontSize: 11 }}
+              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 10 }}
               formatter={(value: number, name: string) => {
-                const labels: Record<string, string> = { p1: "1st %ile", p5: "5th %ile", p25: "25th %ile", p50: "Median", p75: "75th %ile", p95: "95th %ile", p99: "99th %ile" };
-                if (name.startsWith("s")) return [fmtPrice(value), `Path ${parseInt(name.slice(1)) + 1}`];
-                return [fmtPrice(value), labels[name] || name];
+                if (name === "real") return [fmtPrice(value), "Real"];
+                return [fmtPrice(value), `Path ${parseInt(name.slice(1)) + 1}`];
               }}
             />
-            <ReferenceLine y={currentPrice} stroke="hsl(210, 100%, 60%)" strokeWidth={2.5} strokeDasharray="none" label={{ value: "Real", fill: "hsl(210, 100%, 60%)", fontSize: 10, position: "right" }} />
 
-            {/* Scenario zone bands */}
-            <Area type="monotone" dataKey="p99" stroke="none" fill="hsl(145, 70%, 45%)" fillOpacity={0.04} />
-            <Area type="monotone" dataKey="p95" stroke="none" fill="hsl(145, 70%, 45%)" fillOpacity={0.04} />
-            <Area type="monotone" dataKey="p75" stroke="none" fill="hsl(0, 0%, 50%)" fillOpacity={0.04} />
-            <Area type="monotone" dataKey="p25" stroke="none" fill="hsl(0, 0%, 50%)" fillOpacity={0.04} />
-            <Area type="monotone" dataKey="p5" stroke="none" fill="hsl(0, 62%, 50%)" fillOpacity={0.04} />
-            <Area type="monotone" dataKey="p1" stroke="none" fill="hsl(0, 62%, 50%)" fillOpacity={0.04} />
+            {/* Individual simulation paths — the spaghetti */}
+            {visiblePrefixes.flatMap(prefix =>
+              Array.from({ length: NUM_VISIBLE_PATHS }, (_, i) => (
+                <Line key={`${prefix}${i}`} type="monotone" dataKey={`${prefix}${i}`}
+                  stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={0.8}
+                  dot={false} strokeOpacity={0.55} isAnimationActive={false} />
+              ))
+            )}
 
-            {/* Percentile boundary lines */}
-            <Line type="monotone" dataKey="p1" stroke="hsl(0, 62%, 40%)" strokeWidth={0.8} dot={false} strokeDasharray="2 2" />
-            <Line type="monotone" dataKey="p5" stroke="hsl(0, 62%, 50%)" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="p25" stroke="hsl(0, 0%, 35%)" strokeWidth={1} dot={false} />
-            <Line type="monotone" dataKey="p50" stroke="hsl(0, 0%, 100%)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="p75" stroke="hsl(0, 0%, 35%)" strokeWidth={1} dot={false} />
-            <Line type="monotone" dataKey="p95" stroke="hsl(145, 70%, 45%)" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-            <Line type="monotone" dataKey="p99" stroke="hsl(145, 70%, 35%)" strokeWidth={0.8} dot={false} strokeDasharray="2 2" />
+            {/* Bold "Real" path on top */}
+            <Line type="monotone" dataKey="real" stroke="hsl(220, 90%, 56%)" strokeWidth={3}
+              dot={false} isAnimationActive={false} name="Real" />
 
-            {/* 15 colored sample paths (like reference image) */}
-            {Array.from({ length: NUM_SAMPLE_PATHS }, (_, i) => (
-              <Line key={i} type="monotone" dataKey={`s${i}`} stroke={PATH_COLORS[i]} strokeWidth={0.7} dot={false} opacity={0.5} connectNulls />
-            ))}
-          </AreaChart>
+            <ReferenceLine y={currentPrice} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.4} />
+          </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Drawdown stats — like reference image */}
+      <div className="border-t border-border pt-3">
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <p className="text-[10px] font-bold text-foreground uppercase tracking-wider mb-2">Original Simulation</p>
+            <div className="space-y-1 font-mono text-[11px]">
+              <div className="flex justify-between"><span className="text-muted-foreground">Best Drawdown:</span><span className="text-foreground">{fmtPrice(stats.origDD.best)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Worst Drawdown:</span><span className="text-loss">{fmtPrice(stats.origDD.worst)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Average Drawdown:</span><span className="text-foreground">{fmtPrice(stats.origDD.avg)}</span></div>
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-foreground uppercase tracking-wider mb-2">Resample Simulation</p>
+            <div className="space-y-1 font-mono text-[11px]">
+              <div className="flex justify-between"><span className="text-muted-foreground">Best Drawdown:</span><span className="text-foreground">{fmtPrice(stats.resDD.best)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Worst Drawdown:</span><span className="text-loss">{fmtPrice(stats.resDD.worst)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Average Drawdown:</span><span className="text-foreground">{fmtPrice(stats.resDD.avg)}</span></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Return Distribution Histogram */}
@@ -287,7 +340,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
             const h = maxPct > 0 ? (bin.pct / maxPct) * 100 : 0;
             return (
               <div key={i} className="flex-1 rounded-t-sm transition-all"
-                style={{ height: `${h}%`, backgroundColor: bin.isNeg ? "hsl(0, 62%, 50%)" : "hsl(145, 70%, 45%)", opacity: 0.4 + (bin.pct / maxPct) * 0.6 }}
+                style={{ height: `${h}%`, backgroundColor: bin.isNeg ? "hsl(var(--loss))" : "hsl(var(--gain))", opacity: 0.4 + (bin.pct / maxPct) * 0.6 }}
                 title={`${bin.bin.toFixed(1)}%: ${bin.count} paths (${bin.pct.toFixed(1)}%)`} />
             );
           })}
@@ -301,11 +354,10 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground flex-wrap">
-        <span className="flex items-center gap-1"><span className="h-0.5 w-4 bg-primary inline-block" style={{ height: 3 }} /> Real Price</span>
-        <span className="flex items-center gap-1"><span className="h-px w-4 bg-loss inline-block" /> Bear (1-5th)</span>
-        <span className="flex items-center gap-1"><span className="h-px w-4 bg-foreground inline-block" style={{ height: 2 }} /> Median</span>
-        <span className="flex items-center gap-1"><span className="h-px w-4 bg-gain inline-block" /> Bull (95-99th)</span>
-        <span className="flex items-center gap-1"><span className="h-px w-4 inline-block" style={{ backgroundColor: PATH_COLORS[0] }} /> Sim Paths</span>
+        <span className="flex items-center gap-1"><span className="inline-block h-[3px] w-4 rounded" style={{ backgroundColor: "hsl(220, 90%, 56%)" }} /> Real</span>
+        {PATH_COLORS.slice(0, 10).map((c, i) => (
+          <span key={i} className="flex items-center gap-1"><span className="inline-block h-[2px] w-3 rounded" style={{ backgroundColor: c }} /> {i + 1}</span>
+        ))}
       </div>
     </div>
   );
