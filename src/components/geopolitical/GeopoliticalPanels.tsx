@@ -180,7 +180,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
             {exposedTickers.map(t => (
               <div key={t} className="flex items-center justify-between glass-subtle rounded-lg p-3">
                 <span className="font-mono text-sm font-bold text-foreground">{t}</span>
-                <span className="text-[10px] text-warning font-mono">EXPOSED</span>
+                <span className="text-[10px] text-loss font-mono font-bold animate-pulse">⚠ EXPOSED</span>
               </div>
             ))}
           </div>
