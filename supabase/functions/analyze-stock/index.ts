@@ -115,8 +115,9 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
     let jsonStr: string;
     try {
       const result = await callAI({
-        systemPrompt: "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders.",
+        systemPrompt: "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation.",
         userPrompt: prompt,
+        maxTokens: 8192,
       });
       jsonStr = result.text;
       console.log(`analyze-stock used provider: ${result.provider}`);
@@ -127,7 +128,37 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
       throw e;
     }
 
-    const analysis = JSON.parse(jsonStr);
+    // Robust JSON parsing with truncation repair
+    let analysis: any;
+    try {
+      analysis = JSON.parse(jsonStr);
+    } catch {
+      console.warn("Direct JSON parse failed, attempting repair...");
+      // Strip markdown fences
+      let cleaned = jsonStr.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      // Find the last complete top-level brace
+      let depth = 0, lastValid = -1;
+      for (let i = 0; i < cleaned.length; i++) {
+        if (cleaned[i] === "{") depth++;
+        else if (cleaned[i] === "}") { depth--; if (depth === 0) { lastValid = i; break; } }
+      }
+      if (lastValid > 0) {
+        try {
+          analysis = JSON.parse(cleaned.substring(0, lastValid + 1));
+          console.log("Repaired truncated JSON successfully");
+        } catch (e2) {
+          // Last resort: regex extract
+          const match = cleaned.match(/\{[\s\S]*\}/);
+          if (match) {
+            analysis = JSON.parse(match[0]);
+          } else {
+            throw e2;
+          }
+        }
+      } else {
+        throw new Error("Could not find valid JSON object in response");
+      }
+    }
     if (currentPrice > 0) analysis.currentPrice = currentPrice;
     analysis.currency = currency;
 
