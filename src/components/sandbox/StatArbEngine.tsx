@@ -203,8 +203,8 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
 
       {/* VaR Distribution */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Loss Distribution (MC 5K paths)</p>
-        <div className="h-40">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Loss Distribution (MC 5K paths)</p>
+        <div className="h-32 sm:h-40">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={(() => {
               const d = data.mcVar.distribution;
