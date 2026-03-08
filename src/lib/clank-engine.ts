@@ -210,7 +210,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       case "margin-call": {
         const marginStress = Math.abs(drawdownProxy) * 5;
         proximity = Math.min(marginStress, 1);
-        prob = proximity * c.confidenceScore;
+        prob = proximity * conf;
         triggerDist = `Drawdown proxy: ${(drawdownProxy * 100).toFixed(1)}%`;
         break;
       }
