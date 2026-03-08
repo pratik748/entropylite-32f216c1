@@ -262,13 +262,13 @@
   font-family: 'JetBrains Mono', monospace;
 }
 .leaflet-control-zoom a {
-  background: hsl(220, 14%, 10%) !important;
-  color: hsl(210, 20%, 70%) !important;
-  border-color: hsl(220, 12%, 16%) !important;
+  background: hsl(0, 0%, 8%) !important;
+  color: hsl(0, 0%, 65%) !important;
+  border-color: hsl(0, 0%, 14%) !important;
 }
 .leaflet-control-zoom a:hover {
-  background: hsl(220, 14%, 16%) !important;
-  color: hsl(210, 20%, 95%) !important;
+  background: hsl(0, 0%, 14%) !important;
+  color: hsl(0, 0%, 96%) !important;
 }
 .entropy-tooltip {
   background: hsl(220, 14%, 8%) !important;
