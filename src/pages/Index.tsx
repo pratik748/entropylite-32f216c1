@@ -292,14 +292,6 @@ const IndexContent = () => {
                     </div>
                   </ResizablePanel>
 
-                  <ResizableHandle withHandle />
-
-                  {/* Bottom center: Sentiment Intel */}
-                  <ResizablePanel defaultSize={35} minSize={15}>
-                    <PanelWrapper title="Sentiment Intel" icon={<Brain className="h-3 w-3" />} noPad collapsible>
-                      <SentimentDashboard ticker={analysis?.ticker} compact />
-                    </PanelWrapper>
-                  </ResizablePanel>
                 </ResizablePanelGroup>
               </ResizablePanel>
 
