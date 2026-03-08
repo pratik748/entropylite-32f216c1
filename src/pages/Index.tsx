@@ -197,20 +197,25 @@ const IndexContent = () => {
       <TickerStrip />
 
       {/* Main Content — fills all remaining space, above the status bar */}
-      <main className="flex-1 min-h-0 pb-6">
+      <main className="flex-1 min-h-0 pb-8 sm:pb-6 overflow-auto">
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2 pb-12">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
                 <>
                   <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} currency={analysis.currency} />
                   <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
+                  <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
+                  <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} currency={analysis.currency} />
+                  <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
+                  <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
+              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
