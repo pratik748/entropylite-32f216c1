@@ -14,7 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_analysis_history: {
+        Row: {
+          buy_price: number
+          confidence: number
+          created_at: string
+          current_price: number
+          id: string
+          suggestion: string
+          ticker: string
+          timestamp: number
+          user_id: string
+        }
+        Insert: {
+          buy_price: number
+          confidence: number
+          created_at?: string
+          current_price: number
+          id?: string
+          suggestion: string
+          ticker: string
+          timestamp: number
+          user_id: string
+        }
+        Update: {
+          buy_price?: number
+          confidence?: number
+          created_at?: string
+          current_price?: number
+          id?: string
+          suggestion?: string
+          ticker?: string
+          timestamp?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_portfolios: {
+        Row: {
+          analysis: Json | null
+          buy_price: number
+          created_at: string
+          id: string
+          quantity: number
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          buy_price: number
+          created_at?: string
+          id?: string
+          quantity: number
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis?: Json | null
+          buy_price?: number
+          created_at?: string
+          id?: string
+          quantity?: number
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
