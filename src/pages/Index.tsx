@@ -30,7 +30,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
 
@@ -52,8 +52,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const [stocks, setStocks] = useLocalStorage<PortfolioStock[]>("entropy-portfolio", []);
-  const [history, setHistory] = useLocalStorage<HistoryEntry[]>("entropy-history", []);
+  const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
@@ -127,17 +126,14 @@ const IndexContent = () => {
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));
         setPriceStatus(prev => ({ ...prev, [stockId]: { lastUpdate: Date.now(), status: "LIVE", failCount: 0 } }));
-        setHistory((prev) => [
-          { id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence },
-          ...prev.slice(0, 49),
-        ]);
+        addHistoryEntry({ id: crypto.randomUUID(), ticker, timestamp: Date.now(), suggestion: data.suggestion, currentPrice: data.currentPrice, buyPrice, confidence: data.confidence });
       } catch (err: any) {
         console.error("Analysis error:", err);
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false } : s)));
         toast({ title: "Analysis Failed", description: err.message || "Could not analyze.", variant: "destructive" });
       }
     },
-    [setStocks, setHistory]
+    [setStocks, addHistoryEntry]
   );
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
@@ -159,6 +155,13 @@ const IndexContent = () => {
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
   };
+  if (!loaded) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground font-mono text-sm animate-pulse">Loading portfolio...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -280,7 +283,7 @@ const IndexContent = () => {
                   {history.length > 0 && (
                     <ResizablePanel defaultSize={35} minSize={15}>
                       <PanelWrapper title="Analysis History" noPad collapsible defaultCollapsed>
-                        <AnalysisHistory entries={history} onClear={() => setHistory([])} onSelect={() => {}} />
+                        <AnalysisHistory entries={history} onClear={clearHistory} onSelect={() => {}} />
                       </PanelWrapper>
                     </ResizablePanel>
                   )}
