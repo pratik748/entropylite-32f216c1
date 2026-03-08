@@ -155,6 +155,13 @@ const IndexContent = () => {
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
   };
+  if (!loaded) {
+    return (
+      <div className="h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground font-mono text-sm animate-pulse">Loading portfolio...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
