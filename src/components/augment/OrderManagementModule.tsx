@@ -1,51 +1,46 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { formatCurrency } from "@/lib/currency";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const OrderManagementModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, totalPnl, holdings, fmt, baseCurrency, sym } = useNormalizedPortfolio(stocks);
 
   const { orders, analytics } = useMemo(() => {
-    if (analyzed.length === 0) return { orders: [], analytics: [] };
+    if (holdings.length === 0) return { orders: [], analytics: [] };
 
-    const orderList = analyzed.map((s, i) => {
-      const price = s.analysis.currentPrice || s.buyPrice;
-      const pnl = (price - s.buyPrice) * s.quantity;
-      const suggestion = s.analysis.suggestion || "Hold";
-      return {
-        id: `ORD-${28420 + i + 1}`,
-        ticker: s.ticker.replace(".NS", "").replace(".BO", ""),
-        side: suggestion === "Exit" ? "SELL" : suggestion === "Add" ? "BUY" : "HOLD",
-        type: s.quantity > 100 ? "ALGO-TWAP" : "LIMIT",
-        qty: s.quantity,
-        price,
-        status: "FILLED",
-        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        venue: "NSE",
-        slippage: `${(Math.random() * 0.08).toFixed(2)}%`,
-      };
-    });
+    const orderList = holdings.map((h, i) => ({
+      id: `ORD-${28420 + i + 1}`,
+      ticker: h.ticker,
+      side: h.suggestion === "Exit" ? "SELL" : h.suggestion === "Add" ? "BUY" : "HOLD",
+      type: h.quantity > 100 ? "ALGO-TWAP" : "LIMIT",
+      qty: h.quantity,
+      price: h.price,
+      priceFormatted: formatCurrency(h.price, h.currency),
+      status: "FILLED",
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      venue: "EXCHANGE",
+      slippage: `${(Math.random() * 0.08).toFixed(2)}%`,
+    }));
 
     const stats = [
-      { label: "Active Positions", value: analyzed.length.toString() },
+      { label: "Active Positions", value: holdings.length.toString() },
       { label: "Avg Slippage", value: `${(Math.random() * 0.05 + 0.01).toFixed(2)}%` },
-      { label: "Portfolio Value", value: `₹${(analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0) / 100000).toFixed(1)} L` },
-      { label: "Day P&L", value: (() => {
-        const pnl = analyzed.reduce((s, st) => s + ((st.analysis.currentPrice || st.buyPrice) - st.buyPrice) * st.quantity, 0);
-        return `${pnl >= 0 ? "+" : ""}₹${(pnl / 100000).toFixed(1)} L`;
-      })() },
+      { label: "Portfolio Value", value: fmt(totalValue) },
+      { label: "Day P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}` },
     ];
 
     return { orders: orderList, analytics: stats };
-  }, [analyzed]);
+  }, [holdings, totalValue, totalPnl, fmt]);
 
   const statusColor: Record<string, string> = {
     FILLED: "text-gain", PARTIAL: "text-warning", WORKING: "text-info",
     PENDING: "text-muted-foreground", REJECTED: "text-loss",
   };
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see order management data.</p>
@@ -83,7 +78,7 @@ const OrderManagementModule = ({ stocks }: Props) => {
                   <td className={`px-2 py-2 font-mono text-xs font-bold ${o.side === "BUY" ? "text-gain" : o.side === "SELL" ? "text-loss" : "text-foreground"}`}>{o.side}</td>
                   <td className="px-2 py-2 text-xs text-muted-foreground">{o.type}</td>
                   <td className="px-2 py-2 font-mono text-foreground">{o.qty}</td>
-                  <td className="px-2 py-2 font-mono text-foreground">₹{o.price.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
+                  <td className="px-2 py-2 font-mono text-foreground">{o.priceFormatted}</td>
                   <td className={`px-2 py-2 font-mono text-xs font-bold ${statusColor[o.status] || ""}`}>{o.status}</td>
                   <td className="px-2 py-2 text-xs text-muted-foreground">{o.venue}</td>
                   <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{o.slippage}</td>

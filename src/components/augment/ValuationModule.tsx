@@ -1,60 +1,57 @@
 import { useMemo } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const ValuationModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt, sym } = useNormalizedPortfolio(stocks);
 
-  const { holdings, cashflows, collateral, totalValue } = useMemo(() => {
-    if (analyzed.length === 0) return { holdings: [], cashflows: [], collateral: [], totalValue: 0 };
+  const { valuations, cashflows, collateral } = useMemo(() => {
+    if (holdings.length === 0) return { valuations: [], cashflows: [], collateral: [] };
 
-    const total = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-
-    const h = analyzed.map(s => {
-      const current = s.analysis.currentPrice || s.buyPrice;
-      const fair = current * (1 + (s.analysis.overallSentiment || 0) / 200); // sentiment-adjusted fair value
+    const h = holdings.map(h => {
+      const current = h.value / h.quantity;
+      const fair = current * (1 + (h.analysis?.overallSentiment || 0) / 200);
       const upside = ((fair - current) / current) * 100;
       return {
-        ticker: s.ticker.replace(".NS", "").replace(".BO", ""),
-        model: s.analysis.pe ? "DCF + Relative" : "DCF",
-        fairValue: `₹${fair.toFixed(0)}`,
-        current: `₹${current.toFixed(0)}`,
+        ticker: h.ticker,
+        model: h.analysis?.pe ? "DCF + Relative" : "DCF",
+        fairValue: fmt(fair),
+        current: fmt(current),
         upside: `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`,
-        pe: s.analysis.pe || 0,
-        pbv: s.analysis.pbv || 0,
-        divYield: s.analysis.dividendYield || 0,
+        pe: h.analysis?.pe || 0,
+        pbv: h.analysis?.pbv || 0,
+        divYield: h.analysis?.dividendYield || 0,
       };
     });
 
-    // Estimate cash flows from dividend yields
     const months = ["Mar 2026", "Apr 2026", "May 2026", "Jun 2026"];
     const cf = months.map((m, i) => {
-      const inflow = analyzed.reduce((s, st) => {
-        const val = (st.analysis.currentPrice || st.buyPrice) * st.quantity;
-        const dy = (st.analysis.dividendYield || 1.5) / 100;
-        return s + val * dy / 4; // quarterly
-      }, 0) * (i === 0 || i === 3 ? 1.5 : 0.5); // Q-end bumps
+      const inflow = holdings.reduce((s, h) => {
+        const dy = (h.analysis?.dividendYield || 1.5) / 100;
+        return s + h.value * dy / 4;
+      }, 0) * (i === 0 || i === 3 ? 1.5 : 0.5);
 
       return {
         month: m,
-        inflow: `₹${(inflow / 100000).toFixed(1)} L`,
-        outflow: `₹${(inflow * 0.3 / 100000).toFixed(1)} L`,
-        net: `${inflow > 0 ? "+" : ""}₹${((inflow * 0.7) / 100000).toFixed(1)} L`,
+        inflow: fmt(inflow),
+        outflow: fmt(inflow * 0.3),
+        net: `${inflow > 0 ? "+" : ""}${fmt(inflow * 0.7)}`,
         type: i === 0 || i === 3 ? "Dividend Period" : "Coupon / Interest",
       };
     });
 
     const coll = [
-      { type: "Cash Equivalent", value: `₹${(total * 0.03 / 100000).toFixed(1)} L`, haircut: "0%", usable: `₹${(total * 0.03 / 100000).toFixed(1)} L` },
-      { type: "Large Cap Equity", value: `₹${(total * 0.6 / 100000).toFixed(1)} L`, haircut: "25%", usable: `₹${(total * 0.45 / 100000).toFixed(1)} L` },
-      { type: "Mid/Small Cap", value: `₹${(total * 0.37 / 100000).toFixed(1)} L`, haircut: "40%", usable: `₹${(total * 0.222 / 100000).toFixed(1)} L` },
+      { type: "Cash Equivalent", value: fmt(totalValue * 0.03), haircut: "0%", usable: fmt(totalValue * 0.03) },
+      { type: "Large Cap Equity", value: fmt(totalValue * 0.6), haircut: "25%", usable: fmt(totalValue * 0.45) },
+      { type: "Mid/Small Cap", value: fmt(totalValue * 0.37), haircut: "40%", usable: fmt(totalValue * 0.222) },
     ];
 
-    return { holdings: h, cashflows: cf, collateral: coll, totalValue: total };
-  }, [analyzed]);
+    return { valuations: h, cashflows: cf, collateral: coll };
+  }, [holdings, totalValue, fmt]);
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see real valuation data.</p>
@@ -76,7 +73,7 @@ const ValuationModule = ({ stocks }: Props) => {
               </tr>
             </thead>
             <tbody>
-              {holdings.map(h => (
+              {valuations.map(h => (
                 <tr key={h.ticker} className="border-b border-border/50">
                   <td className="px-2 py-2 font-mono font-medium text-foreground">{h.ticker}</td>
                   <td className="px-2 py-2 text-xs text-muted-foreground">{h.model}</td>

@@ -1,23 +1,22 @@
 import { useMemo } from "react";
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const RiskModelingModule = ({ stocks }: Props) => {
-  const analyzed = stocks.filter(s => s.analysis);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
   const { riskFactors, concentrationData, varMetrics, creditData } = useMemo(() => {
-    if (analyzed.length === 0) {
+    if (holdings.length === 0) {
       return { riskFactors: [], concentrationData: [], varMetrics: { var95: 0, cvar95: 0, liqVar: 0, stressVar: 0 }, creditData: [] };
     }
 
-    const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
-
-    // Compute real risk factors from analysis data
-    const avgBreakdown = { volatility: 0, sector: 0, regulatory: 0, financial: 0, macro: 0, fx: 0 };
-    analyzed.forEach(s => {
-      const rb = s.analysis.riskBreakdown;
+    const n = holdings.length;
+    const avgBreakdown = { volatility: 0, sector: 0, regulatory: 0, financial: 0, macro: 0 };
+    holdings.forEach(h => {
+      const rb = h.analysis?.riskBreakdown;
       if (rb) {
         avgBreakdown.volatility += rb.volatilityRisk || 0;
         avgBreakdown.sector += rb.sectorRisk || 0;
@@ -26,28 +25,22 @@ const RiskModelingModule = ({ stocks }: Props) => {
         avgBreakdown.macro += rb.macroRisk || 0;
       }
     });
-    const n = analyzed.length;
+
     const factors = [
       { risk: "Market β", value: Math.round(avgBreakdown.volatility / n) },
       { risk: "Credit Spread", value: Math.round(avgBreakdown.financial / n) },
       { risk: "Liquidity", value: Math.round((avgBreakdown.volatility / n) * 0.8) },
       { risk: "Counterparty", value: Math.round(avgBreakdown.regulatory / n) },
-      { risk: "Concentration", value: analyzed.length <= 3 ? 75 : analyzed.length <= 5 ? 55 : 35 },
+      { risk: "Concentration", value: n <= 3 ? 75 : n <= 5 ? 55 : 35 },
       { risk: "FX", value: Math.round(avgBreakdown.macro / n * 0.5) },
     ];
 
-    // Concentration from actual portfolio
-    const holdings = analyzed.map(s => ({
-      name: s.ticker.replace(".NS", "").replace(".BO", ""),
-      value: (s.analysis.currentPrice || s.buyPrice) * s.quantity,
-    })).sort((a, b) => b.value - a.value);
     const concData = holdings.map(h => ({
-      name: h.name,
+      name: h.ticker,
       pct: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
-    }));
+    })).sort((a, b) => b.pct - a.pct);
 
-    // Real VaR from portfolio risk scores
-    const avgRisk = analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / n;
+    const avgRisk = holdings.reduce((s, h) => s + h.risk, 0) / n;
     const dailyVol = (avgRisk / 100) * 0.025;
     const vars = {
       var95: totalValue * dailyVol * 1.645,
@@ -56,28 +49,19 @@ const RiskModelingModule = ({ stocks }: Props) => {
       stressVar: totalValue * dailyVol * 2.326 * 2.0,
     };
 
-    // Credit risk from holdings
-    const credit = analyzed.map(s => {
-      const riskScore = s.analysis.riskScore || 40;
+    const credit = holdings.map(h => {
+      const riskScore = h.risk;
       const rating = riskScore < 30 ? "AAA" : riskScore < 50 ? "AA+" : riskScore < 70 ? "A" : "BBB";
       const pd = riskScore < 30 ? 0.02 : riskScore < 50 ? 0.05 : riskScore < 70 ? 0.12 : 0.25;
-      const exposure = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
       const lgd = 45;
-      const el = exposure * (pd / 100) * (lgd / 100);
-      return {
-        name: s.ticker.replace(".NS", "").replace(".BO", ""),
-        rating,
-        exp: `₹${(exposure / 100000).toFixed(1)} L`,
-        pd: `${pd}%`,
-        lgd: `${lgd}%`,
-        el: `₹${el.toFixed(0)}`,
-      };
+      const el = h.value * (pd / 100) * (lgd / 100);
+      return { name: h.ticker, rating, exp: fmt(h.value), pd: `${pd}%`, lgd: `${lgd}%`, el: fmt(el) };
     });
 
     return { riskFactors: factors, concentrationData: concData, varMetrics: vars, creditData: credit };
-  }, [analyzed]);
+  }, [holdings, totalValue, fmt]);
 
-  if (analyzed.length === 0) {
+  if (holdings.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Analyze stocks to see real risk modeling data.</p>
@@ -89,10 +73,10 @@ const RiskModelingModule = ({ stocks }: Props) => {
     <div className="space-y-6">
       <div className="grid gap-3 md:grid-cols-4">
         {[
-          { label: "VaR (95%)", value: `₹${(varMetrics.var95 / 100000).toFixed(1)} L`, sub: "1-day parametric" },
-          { label: "CVaR (95%)", value: `₹${(varMetrics.cvar95 / 100000).toFixed(1)} L`, sub: "Expected shortfall" },
-          { label: "Liquidity VaR", value: `₹${(varMetrics.liqVar / 100000).toFixed(1)} L`, sub: "5-day adjusted" },
-          { label: "Stress VaR", value: `₹${(varMetrics.stressVar / 100000).toFixed(1)} L`, sub: "2008-type scenario" },
+          { label: "VaR (95%)", value: fmt(varMetrics.var95), sub: "1-day parametric" },
+          { label: "CVaR (95%)", value: fmt(varMetrics.cvar95), sub: "Expected shortfall" },
+          { label: "Liquidity VaR", value: fmt(varMetrics.liqVar), sub: "5-day adjusted" },
+          { label: "Stress VaR", value: fmt(varMetrics.stressVar), sub: "2008-type scenario" },
         ].map(s => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-5">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
@@ -108,10 +92,10 @@ const RiskModelingModule = ({ stocks }: Props) => {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={riskFactors}>
-                <PolarGrid stroke="hsl(0,0%,14%)" />
-                <PolarAngleAxis dataKey="risk" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "hsl(0,0%,45%)", fontSize: 9 }} />
-                <Radar dataKey="value" stroke="hsl(0,0%,100%)" fill="hsl(0,0%,100%)" fillOpacity={0.15} strokeWidth={2} />
+                <PolarGrid stroke="hsl(var(--border))" />
+                <PolarAngleAxis dataKey="risk" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                <Radar dataKey="value" stroke="hsl(var(--foreground))" fill="hsl(var(--foreground))" fillOpacity={0.15} strokeWidth={2} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -122,10 +106,10 @@ const RiskModelingModule = ({ stocks }: Props) => {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={concentrationData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,14%)" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} />
-                <YAxis tick={{ fill: "hsl(0,0%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(0,0%,14%)" }} tickFormatter={v => `${v}%`} />
-                <Tooltip contentStyle={{ background: "hsl(0,0%,6%)", border: "1px solid hsl(0,0%,14%)", borderRadius: 6, fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} tickFormatter={v => `${v}%`} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 11 }} />
                 <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
                   {concentrationData.map((_, i) => (
                     <Cell key={i} fill={`hsl(0, 0%, ${100 - i * 12}%)`} fillOpacity={0.8} />
