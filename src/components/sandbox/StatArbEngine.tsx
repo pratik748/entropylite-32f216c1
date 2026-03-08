@@ -97,16 +97,16 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   if (!asset) return <EmptyMsg />;
 
   return (
-    <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
-      <p className="text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
+    <div className="space-y-4 sm:space-y-5">
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
+      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
 
-      <div className="h-64">
+      <div className="h-48 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
-            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={65} />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={55} />
             <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
             <Line dataKey="gbm" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="GBM" />
             <Line dataKey="jump" stroke="hsl(var(--loss))" strokeWidth={1} dot={false} name="Jump Diffusion" strokeDasharray="3 3" />
@@ -114,10 +114,10 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <p className="text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
-          <div className="h-32">
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
+          <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.garchChart}>
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
@@ -128,8 +128,8 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
-          <div className="h-32">
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
+          <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.regimeChart} stackOffset="expand">
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />

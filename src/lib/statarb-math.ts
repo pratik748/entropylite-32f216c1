@@ -547,3 +547,117 @@ export function detectStructuralFlows(
 
   return signals;
 }
+
+// ─── 10. Mean Reversion / SnapBack ──────────────────────────────────
+
+export interface MeanReversionResult {
+  zScore: number;
+  halfLife: number;
+  hurstExponent: number;
+  isStationary: boolean;
+  meanPrice: number;
+  upperBand: number;
+  lowerBand: number;
+  snapBackProb: number;
+  expectedSnapBack: number;
+  ouParams: { theta: number; mu: number; sigma: number };
+}
+
+/** Ornstein-Uhlenbeck parameter estimation via OLS on dX = θ(μ - X)dt + σdW */
+export function estimateOU(prices: number[]): { theta: number; mu: number; sigma: number } {
+  const n = prices.length;
+  if (n < 10) return { theta: 0.1, mu: mean(prices), sigma: stddev(prices) };
+
+  const dt = 1 / 252;
+  const dX = prices.slice(1).map((p, i) => p - prices[i]);
+  const X = prices.slice(0, -1);
+
+  // OLS: dX = a + b*X → θ = -b/dt, μ = -a/b
+  const mX = mean(X);
+  const mDX = mean(dX);
+  let num = 0, den = 0;
+  for (let i = 0; i < dX.length; i++) {
+    num += (X[i] - mX) * (dX[i] - mDX);
+    den += (X[i] - mX) ** 2;
+  }
+  const b = den > 0 ? num / den : -0.01;
+  const a = mDX - b * mX;
+
+  const theta = Math.max(0.01, -b / dt);
+  const mu = b !== 0 ? -a / b : mean(prices);
+
+  const residuals = dX.map((d, i) => d - a - b * X[i]);
+  const sig = stddev(residuals) / Math.sqrt(dt);
+
+  return { theta, mu, sigma: Math.max(sig, 0.001) };
+}
+
+/** Half-life of mean reversion: t½ = ln(2) / θ */
+export function meanReversionHalfLife(theta: number): number {
+  return theta > 0 ? Math.log(2) / theta : Infinity;
+}
+
+/** Hurst exponent via R/S analysis — H < 0.5 = mean-reverting, H > 0.5 = trending */
+export function hurstExponent(prices: number[]): number {
+  const n = prices.length;
+  if (n < 20) return 0.5;
+  const rets = returns(prices);
+  const m = mean(rets);
+  const cumDev = rets.map((r, i) => rets.slice(0, i + 1).reduce((s, v) => s + (v - m), 0));
+  const R = Math.max(...cumDev) - Math.min(...cumDev);
+  const S = stddev(rets);
+  if (S === 0) return 0.5;
+  return Math.log(R / S) / Math.log(n);
+}
+
+/** Z-score of current price relative to rolling mean/std */
+export function zScore(price: number, prices: number[]): number {
+  const m = mean(prices);
+  const s = stddev(prices);
+  return s > 0 ? (price - m) / s : 0;
+}
+
+/** Mean Reversion SnapBack probability given OU params */
+export function snapBackProbability(currentPrice: number, ou: { theta: number; mu: number; sigma: number }, horizon = 20): number {
+  const distance = Math.abs(currentPrice - ou.mu);
+  const expectedRevert = distance * (1 - Math.exp(-ou.theta * horizon / 252));
+  const volOverHorizon = ou.sigma * Math.sqrt((1 - Math.exp(-2 * ou.theta * horizon / 252)) / (2 * ou.theta));
+  if (volOverHorizon === 0) return 0.5;
+  // Prob of moving at least halfway back
+  const halfwayRevert = distance / 2;
+  const zVal = (expectedRevert - halfwayRevert) / volOverHorizon;
+  // Approximate normal CDF
+  return 0.5 * (1 + Math.tanh(zVal * Math.sqrt(2 / Math.PI)));
+}
+
+/** Generate OU mean-reversion simulation paths */
+export function ouSimPaths(S0: number, ou: { theta: number; mu: number; sigma: number }, days: number, nPaths: number): number[][] {
+  const dt = 1 / 252;
+  const paths: number[][] = [];
+  for (let p = 0; p < nPaths; p++) {
+    const path = [S0];
+    let S = S0;
+    for (let d = 0; d < days; d++) {
+      const dW = gaussianRandom() * Math.sqrt(dt);
+      S = S + ou.theta * (ou.mu - S) * dt + ou.sigma * dW;
+      path.push(Math.max(S, 0.001));
+    }
+    paths.push(path);
+  }
+  return paths;
+}
+
+/** Bollinger-style mean reversion bands */
+export function meanReversionBands(prices: number[], window = 20, numStd = 2): { mean: number[]; upper: number[]; lower: number[] } {
+  const result = { mean: [] as number[], upper: [] as number[], lower: [] as number[] };
+  for (let i = 0; i < prices.length; i++) {
+    const start = Math.max(0, i - window + 1);
+    const slice = prices.slice(start, i + 1);
+    const m = mean(slice);
+    const s = stddev(slice);
+    result.mean.push(m);
+    result.upper.push(m + numStd * s);
+    result.lower.push(m - numStd * s);
+  }
+  return result;
+}
