@@ -288,10 +288,7 @@ const IndexContent = () => {
                       )}
                       {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
                       {analysis && (
-                        <>
-                          <SentimentDashboard ticker={analysis.ticker} />
-                          <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
-                        </>
+                        <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
                       )}
                     </div>
                   </ResizablePanel>
@@ -315,14 +312,6 @@ const IndexContent = () => {
                   <ResizablePanel defaultSize={35} minSize={15}>
                     <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
                       <LiveNewsFeed ticker={analysis?.ticker} compact />
-                    </PanelWrapper>
-                  </ResizablePanel>
-
-                  <ResizableHandle withHandle />
-
-                  <ResizablePanel defaultSize={25} minSize={15}>
-                    <PanelWrapper title="Sentiment Intel" icon={<Brain className="h-3 w-3" />} noPad>
-                      <SentimentDashboard ticker={analysis?.ticker} compact />
                     </PanelWrapper>
                   </ResizablePanel>
 
