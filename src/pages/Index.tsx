@@ -74,7 +74,7 @@ const IndexContent = () => {
       const t = Date.now();
       const tickers = analyzed.map(s => s.ticker);
       try {
-        const { data, error } = await supabase.functions.invoke("price-feed", { body: { tickers } });
+        const { data, error } = await governedInvoke("price-feed", { body: { tickers } });
         if (!alive) return;
         if (error || !data?.prices) {
           const statusUpdates: PriceStatusMap = {};
