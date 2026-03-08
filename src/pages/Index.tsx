@@ -16,6 +16,7 @@ import PortfolioChart from "@/components/PortfolioChart";
 import AnalysisHistory, { type HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
+import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
 import RiskDashboard from "@/components/RiskDashboard";
