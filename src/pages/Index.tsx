@@ -317,14 +317,6 @@ const IndexContent = () => {
 
                   <ResizableHandle withHandle />
 
-                  <ResizablePanel defaultSize={25} minSize={15}>
-                    <PanelWrapper title="Sentiment Intel" icon={<Brain className="h-3 w-3" />} noPad>
-                      <SentimentDashboard ticker={analysis?.ticker} compact />
-                    </PanelWrapper>
-                  </ResizablePanel>
-
-                  <ResizableHandle withHandle />
-
                   <ResizablePanel defaultSize={45} minSize={20}>
                     <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad>
                       <FlowDetectionPanel stocks={stocks} />

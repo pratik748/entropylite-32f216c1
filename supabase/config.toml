@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.strategy-generate]
 verify_jwt = false
+
+[functions.sentiment-intel]
+verify_jwt = false
