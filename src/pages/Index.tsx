@@ -220,6 +220,7 @@ const IndexContent = () => {
                   <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
+                  <SentimentDashboard ticker={analysis.ticker} />
                 </>
               )}
               {stocks.filter((s) => s.analysis).length > 1 && (
