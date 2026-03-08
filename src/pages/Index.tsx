@@ -119,7 +119,7 @@ const IndexContent = () => {
     async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
       setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s)));
       try {
-        const { data, error } = await supabase.functions.invoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
+        const { data, error } = await governedInvoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
         if (error) throw error;
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: false, analysis: analysisData } : s)));

@@ -64,7 +64,7 @@ const TickerStrip = () => {
     let alive = true;
     const fetchPrices = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("market-data", {
+        const { data, error } = await governedInvoke("market-data", {
           body: { tickers: GLOBAL_TICKERS.map(t => t.symbol) },
         });
         if (!alive || error) return;

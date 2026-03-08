@@ -54,10 +54,10 @@ const MarketOverview = () => {
   const [region, setRegion] = useState<Region>("All");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchMarketData = async (showLoading = true) => {
+  const fetchMarketData = async (showLoading = true, force = false) => {
     if (showLoading) setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("market-data");
+      const { data: result, error } = await governedInvoke("market-data", { force });
       if (error) throw error;
       setData(result);
       setLastUpdate(new Date());

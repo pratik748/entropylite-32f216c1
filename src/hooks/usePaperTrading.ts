@@ -57,7 +57,7 @@ export function usePaperTrading() {
       const tickers = [...new Set(activeTrades.map(t => t.ticker))];
 
       // Fire and forget price update
-      supabase.functions.invoke("price-feed", { body: { tickers } }).then(({ data }) => {
+      governedInvoke("price-feed", { body: { tickers } }).then(({ data }) => {
         if (!data?.prices) return;
         setTrades(current =>
           current.map(t => {

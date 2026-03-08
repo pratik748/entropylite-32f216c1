@@ -64,7 +64,7 @@ const GeopoliticalGlobe = ({ stocks }: Props) => {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 30000); return () => clearInterval(i); }, [fetchData]);
+  useEffect(() => { fetchData(); const i = setInterval(() => fetchData(false), 600_000); return () => clearInterval(i); }, [fetchData]);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {

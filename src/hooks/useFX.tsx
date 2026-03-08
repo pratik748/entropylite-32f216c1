@@ -43,7 +43,7 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
 
   const fetchRates = useCallback(async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("fx-rates");
+      const { data, error } = await governedInvoke("fx-rates");
       if (error) throw error;
       if (data?.rates) {
         setRates(data.rates);

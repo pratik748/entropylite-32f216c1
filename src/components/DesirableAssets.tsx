@@ -113,7 +113,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   useEffect(() => {
     fetchRecommendations();
-    const interval = setInterval(() => fetchRecommendations(false), 60000);
+    const interval = setInterval(() => fetchRecommendations(false), 600_000); // 10 min
     return () => clearInterval(interval);
   }, [fetchRecommendations]);
 

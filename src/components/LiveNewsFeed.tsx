@@ -19,7 +19,7 @@ interface LiveNewsFeedProps {
   compact?: boolean;
 }
 
-const NEWS_REFRESH_INTERVAL = 60_000;
+const NEWS_REFRESH_INTERVAL = 600_000; // 10 minutes — governor caches
 
 const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
