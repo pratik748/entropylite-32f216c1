@@ -71,7 +71,7 @@ export function usePaperTrading() {
             const drawdownFromPeak = ((currentPrice - peakPrice) / peakPrice) * 100;
             const maxDrawdownPct = Math.min(t.maxDrawdownPct, drawdownFromPeak);
 
-            let status = t.status;
+            let status: PaperTrade["status"] = t.status;
             if (pnlPct <= t.stopLossPct) status = "sl-hit";
             else if (pnlPct >= t.takeProfitPct) status = "tp-hit";
             else if (maxDrawdownPct <= -5) status = "deactivated";

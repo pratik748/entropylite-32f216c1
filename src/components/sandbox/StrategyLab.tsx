@@ -100,7 +100,6 @@ const StrategyLab = ({ stocks }: Props) => {
       newStrategies.forEach(s => {
         if (s.instruments.length > 0) {
           const ticker = s.instruments[0];
-          // Use a holding price if available, otherwise skip
           const holding = holdings.find(h => h.ticker.toUpperCase() === ticker.toUpperCase());
           if (holding) {
             openTrade({
