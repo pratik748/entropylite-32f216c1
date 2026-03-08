@@ -3,7 +3,7 @@ import { Eye, Bell, BellOff, Trash2, Plus, TrendingUp, TrendingDown, Loader2 } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 
 export interface WatchlistItem {
