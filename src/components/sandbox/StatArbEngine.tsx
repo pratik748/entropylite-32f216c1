@@ -492,7 +492,7 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
         <MetricCard label="Avg Max DD" value={`${(SA.mean(mc.maxDrawdownDist) * 100).toFixed(1)}%`} color="text-loss" />
       </div>
 
-      <div className="h-[360px]">
+      <div className="h-[240px] sm:h-[360px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
