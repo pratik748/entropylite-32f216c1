@@ -87,7 +87,7 @@ async function callOpenRouter(opts: CallAIOptions): Promise<string> {
 }
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const preferred = opts.preferredProvider || "gemini";
+  const preferred = opts.preferredProvider || "openrouter";
   const primary = preferred === "gemini" ? callGemini : callOpenRouter;
   const fallback = preferred === "gemini" ? callOpenRouter : callGemini;
   const primaryName = preferred;
