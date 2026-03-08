@@ -32,7 +32,7 @@ export interface TickerThreat {
   topConflict?: string;
 }
 
-const POLL_INTERVAL = 60_000; // 60s
+const POLL_INTERVAL = 20_000; // 20s — near real-time geo updates
 
 function stripSuffix(ticker: string): string {
   return ticker.replace(/\.(NS|BO|L|T|TYO|HK|SS|SZ|DE|F|PA)$/i, "").replace(/[-=].*$/, "");

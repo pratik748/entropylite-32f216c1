@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, Brain } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
@@ -10,7 +10,7 @@ import SimulationTable from "@/components/SimulationTable";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import ProfitTaskbar from "@/components/ProfitTaskbar";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
-import SentimentDashboard from "@/components/SentimentDashboard";
+
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioChart from "@/components/PortfolioChart";
@@ -220,7 +220,6 @@ const IndexContent = () => {
                   <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
-                  <SentimentDashboard ticker={analysis.ticker} />
                 </>
               )}
               {stocks.filter((s) => s.analysis).length > 1 && (
@@ -293,14 +292,6 @@ const IndexContent = () => {
                     </div>
                   </ResizablePanel>
 
-                  <ResizableHandle withHandle />
-
-                  {/* Bottom center: Sentiment Intel */}
-                  <ResizablePanel defaultSize={35} minSize={15}>
-                    <PanelWrapper title="Sentiment Intel" icon={<Brain className="h-3 w-3" />} noPad collapsible>
-                      <SentimentDashboard ticker={analysis?.ticker} compact />
-                    </PanelWrapper>
-                  </ResizablePanel>
                 </ResizablePanelGroup>
               </ResizablePanel>
 
