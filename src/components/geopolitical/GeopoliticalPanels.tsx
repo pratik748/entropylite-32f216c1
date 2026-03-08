@@ -29,13 +29,16 @@ const TYPE_BADGE: Record<string, string> = {
 
 export function RiskStrip({ data }: { data: GeoData }) {
   const items = [
-    { label: "Global Risk", value: data.globalRiskScore, suffix: "/100", color: data.globalRiskScore > 70 ? "text-loss" : data.globalRiskScore > 40 ? "text-warning" : "text-gain" },
     { label: "Regime", value: data.regimeSignal, color: data.regimeSignal === "crisis" ? "text-loss" : data.regimeSignal === "transition" ? "text-warning" : "text-gain" },
     { label: "Capital Flow", value: data.capitalFlowDirection, color: data.capitalFlowDirection === "risk-off" ? "text-loss" : data.capitalFlowDirection === "risk-on" ? "text-gain" : "text-warning" },
     { label: "Entropy Zones", value: data.highEntropyZones.length, suffix: " ACTIVE", color: "text-warning" },
   ];
   return (
     <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
+      {/* Risk Gauge */}
+      <div className="glass-card rounded-xl p-3 sm:p-4 relative z-10 flex items-center justify-center">
+        <RiskGauge score={data.globalRiskScore} />
+      </div>
       {items.map((item, i) => (
         <div key={i} className="glass-card rounded-xl p-3 sm:p-4 relative z-10">
           <p className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground">{item.label}</p>
