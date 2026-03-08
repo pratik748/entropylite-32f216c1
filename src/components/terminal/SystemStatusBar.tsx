@@ -29,24 +29,21 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   const savingsColor = apiMetrics.savingsPercent > 50 ? "text-gain" : apiMetrics.savingsPercent > 20 ? "text-warning" : "text-muted-foreground";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 px-4 py-1 flex items-center justify-between font-mono text-[9px]">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5">
-          <Zap className="h-2.5 w-2.5 text-gain" />
-          <span className="text-muted-foreground">LATENCY</span>
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 px-2 sm:px-4 py-1 flex items-center justify-between font-mono text-[8px] sm:text-[9px]">
+      <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1">
+          <Zap className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-gain" />
           <span className={`font-semibold tabular-nums ${latencyColor}`}>{latencyMs}ms</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
+          <Wifi className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-gain" />
+          <span className="text-gain font-semibold">LIVE</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5">
           <Activity className="h-2.5 w-2.5 text-primary" />
           <span className="text-muted-foreground">SIMS</span>
           <span className="text-foreground font-semibold tabular-nums">{stockCount > 0 ? simCount + stockCount : 0}</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Wifi className="h-2.5 w-2.5 text-gain" />
-          <span className="text-muted-foreground">WS</span>
-          <span className="text-gain font-semibold">CONNECTED</span>
-        </div>
-        {/* API Governor Metrics */}
         <div className="hidden md:flex items-center gap-1.5">
           <BarChart3 className="h-2.5 w-2.5 text-muted-foreground" />
           <span className="text-muted-foreground">API/HR</span>
@@ -56,26 +53,23 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
           <ShieldCheck className="h-2.5 w-2.5 text-gain" />
           <span className="text-muted-foreground">SAVED</span>
           <span className={`font-semibold tabular-nums ${savingsColor}`}>{apiMetrics.savingsPercent}%</span>
-          <span className="text-muted-foreground/50">({apiMetrics.cacheHits + apiMetrics.requestsBlocked} cached)</span>
         </div>
       </div>
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground">ASSETS</span>
+          <span className="text-foreground font-semibold tabular-nums">{stockCount}</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5">
           <Cpu className="h-2.5 w-2.5 text-muted-foreground" />
-          <span className="text-muted-foreground">COMPUTE</span>
           <span className="text-foreground font-semibold tabular-nums">{cpuLoad}%</span>
           <div className="w-12 h-1 bg-surface-3 rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${cpuLoad}%` }} />
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">ASSETS</span>
-          <span className="text-foreground font-semibold tabular-nums">{stockCount}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+        <div className="flex items-center gap-1">
+          <Clock className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-muted-foreground" />
           <span className="text-foreground font-semibold tabular-nums">{utc}</span>
-          <span className="text-muted-foreground">UTC</span>
         </div>
       </div>
     </div>

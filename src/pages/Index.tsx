@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
@@ -166,28 +166,29 @@ const IndexContent = () => {
 
       {/* Tab Navigation */}
       <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
-        <div className="container flex items-center gap-0 sm:gap-0.5 overflow-x-auto py-1 scrollbar-hide relative z-10">
+        <div className="px-1 sm:container flex items-center gap-0 overflow-x-auto py-0.5 sm:py-1 scrollbar-hide relative z-10">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-2 text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? "glass-subtle glass-glow-primary text-primary"
                   : "text-muted-foreground hover:text-foreground border border-transparent"
               }`}
             >
-              {tab.icon}
+              <span className="sm:hidden">{React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}</span>
+              <span className="hidden sm:block">{tab.icon}</span>
               <span className="hidden sm:inline">{tab.label}</span>
               <span className="sm:hidden">{tab.shortLabel}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0">
-            <span className="relative flex h-2 w-2">
+          <div className="ml-auto flex items-center gap-1 pl-1 flex-shrink-0">
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-gain" />
+              <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-gain" />
             </span>
-            <span className="text-[8px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
+            <span className="text-[7px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
           </div>
         </div>
       </nav>
@@ -196,20 +197,25 @@ const IndexContent = () => {
       <TickerStrip />
 
       {/* Main Content — fills all remaining space, above the status bar */}
-      <main className="flex-1 min-h-0 pb-6">
+      <main className="flex-1 min-h-0 pb-8 sm:pb-6 overflow-auto">
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2 pb-12">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
                 <>
                   <StockSummary ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} currency={analysis.currency} />
                   <MonteCarloChart currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} bearRange={analysis.bearRange} ticker={analysis.ticker} />
+                  <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
+                  <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} currency={analysis.currency} />
+                  <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
+                  <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
+              {stocks.filter((s) => s.analysis).length > 1 && <PortfolioChart stocks={stocks} />}
             </div>
           ) : (
             /* Desktop: Bloomberg-style resizable 3-column layout */
@@ -305,13 +311,13 @@ const IndexContent = () => {
           )
         )}
 
-        {activeTab === "market" && <div className="container py-4"><MarketOverview /></div>}
-        {activeTab === "augment" && <div className="container py-4"><AugmentDashboard stocks={stocks} /></div>}
-        {activeTab === "sandbox" && <div className="container py-4"><EntropySandbox stocks={stocks} /></div>}
-        {activeTab === "statarb" && <div className="container py-4"><StatArbEngine stocks={stocks} /></div>}
-        {activeTab === "geopolitical" && <div className="container py-4"><GeopoliticalGlobe stocks={stocks} /></div>}
-        {activeTab === "desirable" && <div className="container py-4"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
-        {activeTab === "risk" && <div className="container py-4"><RiskDashboard stocks={stocks} /></div>}
+        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview /></div>}
+        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} /></div>}
+        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
+        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
       </main>
 
       {/* System Status Bar */}

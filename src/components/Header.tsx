@@ -29,9 +29,9 @@ const Header = () => {
 
   return (
     <header className="border-b border-border glass-panel relative shrink-0">
-      <div className="container flex h-14 items-center justify-between relative z-10">
-        <div className="flex items-center gap-4">
-          <img alt="Entropy" className="h-9 object-contain" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+      <div className="px-2 sm:container flex h-11 sm:h-14 items-center justify-between relative z-10">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <img alt="Entropy" className="h-7 sm:h-9 object-contain flex-shrink-0" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
           <span className="hidden lg:inline font-mono text-[8px] text-muted-foreground/40 uppercase tracking-[0.2em] leading-tight max-w-[220px]">Economic Neural Trading &amp; Risk Optimisation via Predictive Yield</span>
           <div className="hidden md:flex items-center gap-3 ml-4">
             {markets.map(m => {
@@ -45,15 +45,15 @@ const Header = () => {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
           {/* Base Currency Selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[9px] text-muted-foreground/60">BASE</span>
+          <div className="flex items-center gap-1">
+            <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">BASE</span>
             <select
               value={baseCurrency}
               onChange={(e) => setBaseCurrency(e.target.value)}
-              className="bg-surface-2 border border-border rounded px-1.5 py-0.5 font-mono text-[10px] text-primary font-semibold cursor-pointer hover:border-primary/40 transition-colors appearance-none"
-              style={{ minWidth: 52 }}
+              className="bg-surface-2 border border-border rounded px-1 sm:px-1.5 py-0.5 font-mono text-[9px] sm:text-[10px] text-primary font-semibold cursor-pointer hover:border-primary/40 transition-colors appearance-none"
+              style={{ minWidth: 44 }}
             >
               {SUPPORTED_CURRENCIES.map(c => (
                 <option key={c} value={c}>{getCurrencySymbol(c)} {c}</option>
@@ -61,7 +61,7 @@ const Header = () => {
             </select>
           </div>
 
-          <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+          <span className="hidden sm:inline font-mono text-[11px] text-muted-foreground tabular-nums">
             {time.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })} UTC{time.getTimezoneOffset() > 0 ? "-" : "+"}{Math.abs(time.getTimezoneOffset() / 60)}
           </span>
           <span className="text-[10px] text-muted-foreground/50 font-mono tracking-wider hidden sm:inline">
@@ -69,10 +69,10 @@ const Header = () => {
           </span>
           <button
             onClick={() => supabase.auth.signOut()}
-            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="Sign out"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           </button>
         </div>
       </div>
