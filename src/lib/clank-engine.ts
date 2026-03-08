@@ -217,7 +217,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       case "reg-capital": {
         const bankExposure = analyzed.some(s => ["JPM", "GS", "MS", "BAC", "C"].includes(s.ticker)) ? 0.4 : 0.15;
         proximity = bankExposure + avgRisk * 0.003;
-        prob = Math.min(proximity, 1) * c.confidenceScore;
+        prob = Math.min(proximity, 1) * conf;
         triggerDist = `Capital buffer est: ${((1 - proximity) * 100).toFixed(0)}%`;
         break;
       }
