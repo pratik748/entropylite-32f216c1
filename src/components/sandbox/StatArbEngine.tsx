@@ -530,7 +530,7 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Stress Testing</h3>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Stress Testing</h3>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={results} layout="vertical">
