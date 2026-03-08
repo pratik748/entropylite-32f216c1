@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 interface StockInputProps {
   onAnalyze: (ticker: string, buyPrice: number, quantity: number) => void;
   isLoading: boolean;
+  compact?: boolean;
 }
 
 const QUICK_TICKERS = [
@@ -22,7 +23,7 @@ const QUICK_TICKERS = [
   { label: "HDFCBANK", ticker: "HDFCBANK.NS" },
 ];
 
-const StockInput = ({ onAnalyze, isLoading }: StockInputProps) => {
+const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
   const [ticker, setTicker] = useState("");
   const [buyPrice, setBuyPrice] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -33,6 +34,42 @@ const StockInput = ({ onAnalyze, isLoading }: StockInputProps) => {
       onAnalyze(ticker.toUpperCase(), parseFloat(buyPrice), parseInt(quantity));
     }
   };
+
+  if (compact) {
+    return (
+      <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
+        <Input
+          placeholder="TICKER"
+          value={ticker}
+          onChange={(e) => setTicker(e.target.value)}
+          className="bg-surface-2 border-border font-mono text-[10px] h-6 px-1.5 w-20 placeholder:text-muted-foreground/30"
+        />
+        <Input
+          type="number"
+          step="0.01"
+          placeholder="Price"
+          value={buyPrice}
+          onChange={(e) => setBuyPrice(e.target.value)}
+          className="bg-surface-2 border-border font-mono text-[10px] h-6 px-1.5 w-16 placeholder:text-muted-foreground/30"
+        />
+        <Input
+          type="number"
+          placeholder="Qty"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          className="bg-surface-2 border-border font-mono text-[10px] h-6 px-1.5 w-12 placeholder:text-muted-foreground/30"
+        />
+        <Button
+          type="submit"
+          disabled={!ticker || !buyPrice || !quantity || isLoading}
+          size="sm"
+          className="h-6 px-2 text-[10px] font-mono"
+        >
+          <Search className="h-2.5 w-2.5" />
+        </Button>
+      </form>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 animate-slide-up">

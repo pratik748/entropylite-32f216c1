@@ -16,11 +16,12 @@ interface NewsArticle {
 
 interface LiveNewsFeedProps {
   ticker?: string;
+  compact?: boolean;
 }
 
-const NEWS_REFRESH_INTERVAL = 60_000; // 60 seconds
+const NEWS_REFRESH_INTERVAL = 60_000;
 
-const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
+const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
@@ -49,6 +50,50 @@ const LiveNewsFeed = ({ ticker }: LiveNewsFeedProps) => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [ticker]);
+
+  const getSentimentDot = (sentiment: string | null) => {
+    if (!sentiment) return "bg-muted-foreground/30";
+    if (sentiment.toLowerCase().includes("pos")) return "bg-gain";
+    if (sentiment.toLowerCase().includes("neg")) return "bg-loss";
+    return "bg-warning";
+  };
+
+  if (compact) {
+    return (
+      <div className="flex flex-col h-full font-mono text-[10px]">
+        <div className="flex items-center justify-between px-2 py-1 border-b border-border">
+          <div className="flex items-center gap-1.5">
+            <Newspaper className="h-3 w-3 text-muted-foreground" />
+            <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+          </div>
+          <Button size="sm" variant="ghost" onClick={fetchNews} disabled={loading} className="h-4 w-4 p-0">
+            <RefreshCw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto space-y-0">
+          {articles.slice(0, 20).map((article, i) => (
+            <a
+              key={i}
+              href={article.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2 py-1 hover:bg-surface-2 transition-colors border-b border-border/20 group"
+            >
+              <span className="text-[8px] text-muted-foreground/60 tabular-nums w-10 flex-shrink-0">
+                {new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
+              </span>
+              <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${getSentimentDot(article.sentiment)}`} />
+              <span className="text-[8px] text-muted-foreground/60 w-12 flex-shrink-0 truncate">{article.source}</span>
+              <span className="text-foreground truncate flex-1 group-hover:text-primary transition-colors">{article.title}</span>
+            </a>
+          ))}
+          {!loading && articles.length === 0 && (
+            <div className="py-4 text-center text-muted-foreground text-[9px]">No news</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
