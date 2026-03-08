@@ -146,4 +146,4 @@ const TickerStrip = () => {
   );
 };
 
-export default TickerStrip;
+export default memo(TickerStrip);
