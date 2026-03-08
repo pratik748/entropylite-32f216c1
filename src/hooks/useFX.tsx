@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface FXRates {
   rates: Record<string, number>; // 1 unit of currency = X USD
