@@ -188,7 +188,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
       case "cta-trend": {
         const trendBreak = avgRisk > 50 ? 0.7 : avgRisk > 35 ? 0.4 : 0.15;
         proximity = trendBreak;
-        prob = trendBreak * c.confidenceScore;
+        prob = trendBreak * conf;
         triggerDist = `Trend strength: ${(1 - trendBreak).toFixed(2)}`;
         break;
       }
