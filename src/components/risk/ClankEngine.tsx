@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Shield, Zap, TrendingDown, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, Shield, Zap, TrendingDown, Activity, ChevronDown, ChevronRight, Brain, BookOpen, PlusCircle } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, AreaChart, Area } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import {
@@ -9,9 +9,10 @@ import {
   simulateCascade,
   CATEGORY_COLORS,
   STATUS_COLORS,
+  CONSTRAINT_REGISTRY,
   type ConstraintStatus,
-  type CascadeStep,
 } from "@/lib/clank-engine";
+import { useClankLearning, type ActivationEvent } from "@/hooks/useClankLearning";
 
 interface ClankEngineProps {
   stocks: PortfolioStock[];
@@ -19,8 +20,12 @@ interface ClankEngineProps {
 
 const ClankEngine = ({ stocks }: ClankEngineProps) => {
   const [expandedConstraint, setExpandedConstraint] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"engine" | "learning">("engine");
 
-  const statuses = useMemo(() => evaluateConstraints(stocks), [stocks]);
+  const { overrides, events, loading: learningLoading, confidenceOverridesMap, recordActivation, recordOutcome } = useClankLearning();
+
+  const confMap = useMemo(() => confidenceOverridesMap(), [confidenceOverridesMap]);
+  const statuses = useMemo(() => evaluateConstraints(stocks, confMap), [stocks, confMap]);
   const clankScore = useMemo(() => computeClankScore(statuses), [statuses]);
   const level = useMemo(() => clankLevel(clankScore), [clankScore]);
   const cascade = useMemo(() => simulateCascade(statuses), [statuses]);
@@ -30,7 +35,6 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
     [statuses]
   );
 
-  // Pressure chart data
   const pressureData = useMemo(
     () => sorted.map(s => ({
       name: s.constraint.shortName,
@@ -41,7 +45,6 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
     [sorted]
   );
 
-  // Cascade waterfall data
   const cascadeData = useMemo(() => {
     let cumPrice = 0;
     return cascade.map(step => {
@@ -96,19 +99,74 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
             }`}
             style={{ width: `${clankScore}%` }}
           />
-          {/* Threshold markers */}
           {[30, 60, 80].map(t => (
             <div key={t} className="absolute top-0 h-full w-px bg-foreground/20" style={{ left: `${t}%` }} />
           ))}
         </div>
         <div className="flex justify-between mt-1 text-[8px] text-muted-foreground font-mono">
-          <span>STABLE</span>
-          <span>TENSION</span>
-          <span>INSTABILITY</span>
-          <span>CASCADE</span>
+          <span>STABLE</span><span>TENSION</span><span>INSTABILITY</span><span>CASCADE</span>
         </div>
       </div>
 
+      {/* Tab switch */}
+      <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+        {[
+          { id: "engine" as const, label: "Constraint Engine", icon: Zap },
+          { id: "learning" as const, label: "Learning Loop", icon: Brain },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+              activeTab === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <tab.icon className="h-3.5 w-3.5" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "engine" && (
+        <EngineTab
+          sorted={sorted}
+          pressureData={pressureData}
+          cascadeData={cascadeData}
+          cascade={cascade}
+          statuses={statuses}
+          criticalCount={criticalCount}
+          watchCount={watchCount}
+          totalForcedVol={totalForcedVol}
+          expandedConstraint={expandedConstraint}
+          setExpandedConstraint={setExpandedConstraint}
+          overrides={overrides}
+          clankScore={clankScore}
+          onRecordActivation={recordActivation}
+        />
+      )}
+
+      {activeTab === "learning" && (
+        <LearningTab
+          events={events}
+          overrides={overrides}
+          loading={learningLoading}
+          onRecordOutcome={recordOutcome}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── Engine Tab ─────────────────────────────────────────────────────
+
+function EngineTab({
+  sorted, pressureData, cascadeData, cascade, statuses,
+  criticalCount, watchCount, totalForcedVol,
+  expandedConstraint, setExpandedConstraint,
+  overrides, clankScore, onRecordActivation,
+}: any) {
+  return (
+    <>
       {/* Key Metrics */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         {[
@@ -129,7 +187,6 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
 
       {/* Pressure Chart + Constraint List */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Pressure Distribution */}
         <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">Pressure Distribution</h3>
           <div className="h-52 sm:h-64">
@@ -146,7 +203,7 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
                   ]}
                 />
                 <Bar dataKey="pressure" radius={[0, 4, 4, 0]}>
-                  {pressureData.map((entry, i) => (
+                  {pressureData.map((entry: any, i: number) => (
                     <Cell
                       key={i}
                       fill={entry.probability >= 60 ? "hsl(0, 84%, 55%)" : entry.probability >= 30 ? "hsl(38, 92%, 55%)" : "hsl(210, 100%, 60%)"}
@@ -159,11 +216,10 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
           </div>
         </div>
 
-        {/* Constraint Registry */}
         <div className="rounded-xl border border-border bg-card p-4 sm:p-5 overflow-hidden">
           <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">Active Constraints</h3>
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {sorted.map(cs => (
+            {sorted.map((cs: ConstraintStatus) => (
               <ConstraintRow
                 key={cs.constraint.id}
                 cs={cs}
@@ -171,6 +227,10 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
                 onToggle={() => setExpandedConstraint(
                   expandedConstraint === cs.constraint.id ? null : cs.constraint.id
                 )}
+                hasOverride={!!overrides[cs.constraint.id]}
+                sampleCount={overrides[cs.constraint.id]?.sample_count}
+                clankScore={clankScore}
+                onRecordActivation={onRecordActivation}
               />
             ))}
           </div>
@@ -186,9 +246,7 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
           <p className="text-[10px] text-muted-foreground mb-4">
             Sequential constraint activation modeling with liquidity drain and volatility amplification
           </p>
-
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Cascade waterfall chart */}
             <div className="h-52 sm:h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cascadeData} margin={{ left: 10, right: 10, top: 5 }}>
@@ -208,8 +266,6 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-
-            {/* Cascade table */}
             <div className="overflow-x-auto">
               <table className="w-full text-[10px] sm:text-xs">
                 <thead>
@@ -224,21 +280,17 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {cascade.map(step => (
+                  {cascade.map((step: any) => (
                     <tr key={step.order} className="border-b border-border/30 hover:bg-muted/30">
                       <td className="py-1.5 px-2 font-mono text-muted-foreground">{step.order}</td>
                       <td className="py-1.5 px-2 font-medium text-foreground">{step.constraintName}</td>
                       <td className="py-1.5 px-2 text-right">
                         <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
                           step.action === "SELL" ? "bg-loss/15 text-loss" : step.action === "BUY" ? "bg-gain/15 text-gain" : "bg-primary/15 text-primary"
-                        }`}>
-                          {step.action}
-                        </span>
+                        }`}>{step.action}</span>
                       </td>
                       <td className="py-1.5 px-2 text-right font-mono">${step.volumeImpact.toFixed(1)}</td>
-                      <td className={`py-1.5 px-2 text-right font-mono ${step.priceImpact < 0 ? "text-loss" : "text-gain"}`}>
-                        {step.priceImpact.toFixed(2)}%
-                      </td>
+                      <td className={`py-1.5 px-2 text-right font-mono ${step.priceImpact < 0 ? "text-loss" : "text-gain"}`}>{step.priceImpact.toFixed(2)}%</td>
                       <td className="py-1.5 px-2 text-right font-mono text-warning">{step.liquidityDrain}%</td>
                       <td className="py-1.5 px-2 text-right font-mono">{step.cascadeProbability}</td>
                     </tr>
@@ -256,10 +308,10 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
           Structural Liquidity Impact Model
         </h3>
         <p className="text-[10px] text-muted-foreground mb-3">
-          Price Impact = Forced Volume / Available Liquidity — estimated from order book depth, historical impact curves, and volatility regime
+          Price Impact = Forced Volume / Available Liquidity
         </p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {sorted.filter(s => s.activationProbability > 0.15).map(cs => {
+          {sorted.filter((s: ConstraintStatus) => s.activationProbability > 0.15).map((cs: ConstraintStatus) => {
             const liqAvailable = Math.max(200 - cs.estimatedForcedVolume * 2, 20);
             const priceImpact = (cs.estimatedForcedVolume / liqAvailable) * 100;
             return (
@@ -285,13 +337,230 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
           })}
         </div>
       </div>
+    </>
+  );
+}
+
+// ─── Learning Tab ───────────────────────────────────────────────────
+
+function LearningTab({
+  events, overrides, loading, onRecordOutcome,
+}: {
+  events: ActivationEvent[];
+  overrides: Record<string, { adjusted_confidence: number; sample_count: number }>;
+  loading: boolean;
+  onRecordOutcome: (eventId: string, price: number, vol: number, volChange: number) => Promise<boolean>;
+}) {
+  const [outcomeForm, setOutcomeForm] = useState<string | null>(null);
+  const [formData, setFormData] = useState({ price: "", volume: "", vol: "" });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmitOutcome = async (eventId: string) => {
+    setSaving(true);
+    await onRecordOutcome(eventId, Number(formData.price) || 0, Number(formData.volume) || 0, Number(formData.vol) || 0);
+    setOutcomeForm(null);
+    setFormData({ price: "", volume: "", vol: "" });
+    setSaving(false);
+  };
+
+  const totalSamples = Object.values(overrides).reduce((s, o) => s + o.sample_count, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Learning Summary */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+        {[
+          { label: "Total Events", value: events.length, icon: BookOpen },
+          { label: "Constraints Learned", value: Object.keys(overrides).length, icon: Brain },
+          { label: "Total Samples", value: totalSamples, icon: Activity },
+          { label: "Avg Accuracy", value: (() => {
+            const withAcc = events.filter(e => e.outcome_accuracy != null);
+            return withAcc.length > 0 ? `${(withAcc.reduce((s, e) => s + (e.outcome_accuracy || 0), 0) / withAcc.length * 100).toFixed(0)}%` : "—";
+          })(), icon: Shield },
+        ].map(m => (
+          <div key={m.label} className="rounded-xl border border-border bg-card p-3 sm:p-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <m.icon className="h-3 w-3 text-muted-foreground" />
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{m.label}</p>
+            </div>
+            <p className="font-mono text-xl sm:text-2xl font-bold text-foreground">{m.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Confidence Comparison */}
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">Confidence: Default vs Learned</h3>
+        <div className="space-y-2">
+          {CONSTRAINT_REGISTRY.map(c => {
+            const ov = overrides[c.id];
+            const learned = ov?.adjusted_confidence;
+            const defaultConf = c.confidenceScore;
+            return (
+              <div key={c.id} className="flex items-center gap-3">
+                <span className="text-[10px] text-foreground w-24 truncate">{c.shortName}</span>
+                <div className="flex-1 flex items-center gap-2">
+                  {/* Default bar */}
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden relative">
+                    <div className="h-full rounded-full bg-primary/40" style={{ width: `${defaultConf * 100}%` }} />
+                    {learned != null && (
+                      <div className="absolute top-0 h-full rounded-full bg-primary" style={{ width: `${learned * 100}%`, opacity: 0.9 }} />
+                    )}
+                  </div>
+                  <span className="text-[9px] font-mono text-muted-foreground w-10 text-right">{(defaultConf * 100).toFixed(0)}%</span>
+                  {learned != null ? (
+                    <span className={`text-[9px] font-mono w-10 text-right ${learned > defaultConf ? "text-gain" : learned < defaultConf ? "text-loss" : "text-foreground"}`}>
+                      →{(learned * 100).toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground w-10 text-right">—</span>
+                  )}
+                  {ov && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] text-muted-foreground">
+                      n={ov.sample_count}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Activation History */}
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-3">Activation History</h3>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        ) : events.length === 0 ? (
+          <div className="text-center py-8">
+            <Brain className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">No activations recorded yet.</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Use "Record Activation" on approaching/critical constraints in the Engine tab.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px] sm:text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Date</th>
+                  <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Constraint</th>
+                  <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">P(act)</th>
+                  <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Score</th>
+                  <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Price Δ</th>
+                  <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Accuracy</th>
+                  <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map(ev => {
+                  const cName = CONSTRAINT_REGISTRY.find(c => c.id === ev.constraint_id)?.shortName || ev.constraint_id;
+                  const hasOutcome = ev.outcome_accuracy != null;
+                  return (
+                    <tr key={ev.id} className="border-b border-border/30 hover:bg-muted/30">
+                      <td className="py-1.5 px-2 font-mono text-muted-foreground">
+                        {new Date(ev.activated_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-1.5 px-2 font-medium text-foreground">{cName}</td>
+                      <td className="py-1.5 px-2 text-right font-mono">{(ev.activation_probability * 100).toFixed(0)}%</td>
+                      <td className="py-1.5 px-2 text-right font-mono">{ev.clank_score_at_activation}</td>
+                      <td className="py-1.5 px-2 text-right font-mono">
+                        {ev.observed_price_impact != null ? (
+                          <span className={ev.observed_price_impact < 0 ? "text-loss" : "text-gain"}>
+                            {ev.observed_price_impact.toFixed(2)}%
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="py-1.5 px-2 text-right">
+                        {hasOutcome ? (
+                          <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                            ev.outcome_accuracy! > 0.7 ? "bg-gain/15 text-gain" :
+                            ev.outcome_accuracy! > 0.4 ? "bg-warning/15 text-warning" : "bg-loss/15 text-loss"
+                          }`}>
+                            {(ev.outcome_accuracy! * 100).toFixed(0)}%
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="py-1.5 px-2 text-right">
+                        {!hasOutcome ? (
+                          outcomeForm === ev.id ? (
+                            <div className="flex flex-col gap-1 items-end">
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Price %"
+                                value={formData.price}
+                                onChange={e => setFormData(p => ({ ...p, price: e.target.value }))}
+                                className="w-20 rounded bg-muted border border-border px-1.5 py-0.5 text-[10px] text-foreground"
+                              />
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="Vol $B"
+                                value={formData.volume}
+                                onChange={e => setFormData(p => ({ ...p, volume: e.target.value }))}
+                                className="w-20 rounded bg-muted border border-border px-1.5 py-0.5 text-[10px] text-foreground"
+                              />
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="Vol Δ pts"
+                                value={formData.vol}
+                                onChange={e => setFormData(p => ({ ...p, vol: e.target.value }))}
+                                className="w-20 rounded bg-muted border border-border px-1.5 py-0.5 text-[10px] text-foreground"
+                              />
+                              <button
+                                onClick={() => handleSubmitOutcome(ev.id)}
+                                disabled={saving}
+                                className="rounded bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground hover:bg-primary/90"
+                              >
+                                {saving ? "…" : "Save"}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setOutcomeForm(ev.id); setFormData({ price: "", volume: "", vol: "" }); }}
+                              className="rounded bg-muted px-2 py-0.5 text-[9px] text-foreground hover:bg-muted/80"
+                            >
+                              Update
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-[9px] text-muted-foreground">✓</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
-};
+}
 
 // ─── Constraint Row ─────────────────────────────────────────────────
 
-function ConstraintRow({ cs, expanded, onToggle }: { cs: ConstraintStatus; expanded: boolean; onToggle: () => void }) {
+function ConstraintRow({
+  cs, expanded, onToggle, hasOverride, sampleCount, clankScore, onRecordActivation,
+}: {
+  cs: ConstraintStatus; expanded: boolean; onToggle: () => void;
+  hasOverride: boolean; sampleCount?: number;
+  clankScore: number; onRecordActivation: (id: string, score: number, prob: number) => void;
+}) {
+  const [recording, setRecording] = useState(false);
+
+  const canRecord = cs.status === "approaching" || cs.status === "critical" || cs.status === "active";
+
+  const handleRecord = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRecording(true);
+    await onRecordActivation(cs.constraint.id, clankScore, cs.activationProbability);
+    setRecording(false);
+  };
+
   return (
     <div className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center gap-2 p-2 sm:p-2.5 text-left hover:bg-muted/40 transition-colors">
@@ -303,6 +572,11 @@ function ConstraintRow({ cs, expanded, onToggle }: { cs: ConstraintStatus; expan
           {cs.constraint.category}
         </span>
         <span className="text-xs font-medium text-foreground flex-1 truncate">{cs.constraint.shortName}</span>
+        {hasOverride && (
+          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[8px] text-primary font-medium">
+            n={sampleCount}
+          </span>
+        )}
         <span className="font-mono text-xs text-muted-foreground">{(cs.activationProbability * 100).toFixed(0)}%</span>
       </button>
       {expanded && (
@@ -314,7 +588,9 @@ function ConstraintRow({ cs, expanded, onToggle }: { cs: ConstraintStatus; expan
           <p><span className="text-muted-foreground">Volume:</span> <span className="text-foreground">{cs.constraint.estimatedVolume}</span></p>
           <p><span className="text-muted-foreground">Latency:</span> <span className="text-foreground">{cs.constraint.executionLatency}</span></p>
           <p><span className="text-muted-foreground">Trigger distance:</span> <span className="text-foreground">{cs.triggerDistance}</span></p>
-          <p><span className="text-muted-foreground">Confidence:</span> <span className="text-foreground">{(cs.constraint.confidenceScore * 100).toFixed(0)}%</span></p>
+          <p><span className="text-muted-foreground">Confidence:</span> <span className="text-foreground">{(cs.constraint.confidenceScore * 100).toFixed(0)}%</span>
+            {hasOverride && <span className="text-primary ml-1">(learned)</span>}
+          </p>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-muted-foreground">Proximity:</span>
             <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -325,6 +601,16 @@ function ConstraintRow({ cs, expanded, onToggle }: { cs: ConstraintStatus; expan
             </div>
             <span className="font-mono">{(cs.proximityToTrigger * 100).toFixed(0)}%</span>
           </div>
+          {canRecord && (
+            <button
+              onClick={handleRecord}
+              disabled={recording}
+              className="mt-2 flex items-center gap-1 rounded bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors"
+            >
+              <PlusCircle className="h-3 w-3" />
+              {recording ? "Recording…" : "Record Activation"}
+            </button>
+          )}
         </div>
       )}
     </div>
