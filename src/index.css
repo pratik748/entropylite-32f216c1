@@ -182,13 +182,13 @@
   }
 
   .glass-glow-primary {
-    box-shadow: 0 0 30px hsl(210 100% 60% / 0.12), 0 0 60px hsl(210 100% 60% / 0.05), inset 0 1px 0 hsl(210 100% 80% / 0.1);
+    box-shadow: 0 0 30px hsl(0 0% 90% / 0.08), 0 0 60px hsl(0 0% 90% / 0.03), inset 0 1px 0 hsl(0 0% 80% / 0.08);
   }
   .glass-glow-loss {
-    box-shadow: 0 0 30px hsl(0 84% 55% / 0.12), 0 0 60px hsl(0 84% 55% / 0.05), inset 0 1px 0 hsl(0 100% 80% / 0.08);
+    box-shadow: 0 0 30px hsl(0 90% 55% / 0.15), 0 0 60px hsl(0 90% 55% / 0.06), inset 0 1px 0 hsl(0 100% 80% / 0.08);
   }
   .glass-glow-gain {
-    box-shadow: 0 0 30px hsl(152 82% 42% / 0.12), 0 0 60px hsl(152 82% 42% / 0.05), inset 0 1px 0 hsl(152 100% 80% / 0.08);
+    box-shadow: 0 0 30px hsl(152 90% 45% / 0.15), 0 0 60px hsl(152 90% 45% / 0.06), inset 0 1px 0 hsl(152 100% 80% / 0.08);
   }
 
   .gradient-border {
