@@ -10,7 +10,7 @@ import SimulationTable from "@/components/SimulationTable";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import ProfitTaskbar from "@/components/ProfitTaskbar";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
-import SentimentDashboard from "@/components/SentimentDashboard";
+
 import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
 import PortfolioChart from "@/components/PortfolioChart";
