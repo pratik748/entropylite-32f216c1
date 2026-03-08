@@ -288,9 +288,9 @@
   font-weight: 700 !important;
 }
 .entropy-popup .leaflet-popup-content-wrapper {
-  background: hsl(220, 14%, 8%) !important;
-  color: hsl(210, 20%, 85%) !important;
-  border: 1px solid hsl(220, 12%, 20%) !important;
+  background: hsl(0, 0%, 5%) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border: 1px solid hsl(0, 0%, 18%) !important;
   border-radius: 8px !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 10px !important;
