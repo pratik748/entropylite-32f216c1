@@ -58,6 +58,7 @@ const IndexContent = () => {
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
+  const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks);
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
