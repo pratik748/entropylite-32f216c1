@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import StockSummary from "@/components/StockSummary";
