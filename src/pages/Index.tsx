@@ -311,13 +311,13 @@ const IndexContent = () => {
           )
         )}
 
-        {activeTab === "market" && <div className="container py-4"><MarketOverview /></div>}
-        {activeTab === "augment" && <div className="container py-4"><AugmentDashboard stocks={stocks} /></div>}
-        {activeTab === "sandbox" && <div className="container py-4"><EntropySandbox stocks={stocks} /></div>}
-        {activeTab === "statarb" && <div className="container py-4"><StatArbEngine stocks={stocks} /></div>}
-        {activeTab === "geopolitical" && <div className="container py-4"><GeopoliticalGlobe stocks={stocks} /></div>}
-        {activeTab === "desirable" && <div className="container py-4"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
-        {activeTab === "risk" && <div className="container py-4"><RiskDashboard stocks={stocks} /></div>}
+        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview /></div>}
+        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} /></div>}
+        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
+        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
       </main>
 
       {/* System Status Bar */}
