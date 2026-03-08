@@ -45,18 +45,18 @@ const StatArbEngine = ({ stocks }: Props) => {
   }, [assetData]);
 
   return (
-    <div className="space-y-4">
-      {/* Tab bar */}
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-card p-2">
+    <div className="space-y-3 sm:space-y-4">
+      {/* Tab bar — scrollable on mobile */}
+      <div className="flex gap-1 rounded-xl border border-border bg-card p-1.5 sm:p-2 overflow-x-auto scrollbar-hide">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
             {t}
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-3 sm:p-5">
         {tab === "Price Dynamics" && <PriceDynamicsPanel assets={assetData} fmt={fmt} />}
         {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} />}
         {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} />}
@@ -66,6 +66,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {tab === "Monte Carlo" && <MonteCarloPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} />}
         {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} />}
         {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} />}
+        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
     </div>
