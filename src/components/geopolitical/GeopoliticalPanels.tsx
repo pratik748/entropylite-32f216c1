@@ -137,8 +137,8 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
           </h3>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
             {data.keyThreats.map((threat, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs sm:text-sm text-secondary-foreground glass-subtle rounded-lg p-3">
-                <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning" />
+              <div key={i} className="flex items-start gap-2 text-xs sm:text-sm text-secondary-foreground glass-subtle rounded-lg p-3 border border-loss/10">
+                <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-loss animate-pulse" />
                 {threat}
               </div>
             ))}
