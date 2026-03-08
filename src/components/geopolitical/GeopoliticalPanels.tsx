@@ -174,7 +174,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
       {exposedTickers.length > 0 && (
         <div className="glass-panel rounded-xl p-4 sm:p-5 relative">
           <h3 className="text-[10px] font-bold text-warning uppercase tracking-widest mb-3 flex items-center gap-2 relative z-10">
-            <Shield className="h-3.5 w-3.5" /> Portfolio Exposure
+            <Shield className="h-3.5 w-3.5 text-loss" /> Portfolio Exposure
           </h3>
           <div className="space-y-2 relative z-10">
             {exposedTickers.map(t => (
