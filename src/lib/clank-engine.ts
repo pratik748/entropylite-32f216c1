@@ -181,7 +181,7 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
     switch (c.id) {
       case "vol-control": {
         proximity = Math.min(impliedVix / 30, 1);
-        prob = proximity > 0.7 ? proximity * c.confidenceScore : proximity * 0.5 * c.confidenceScore;
+        prob = proximity > 0.7 ? proximity * conf : proximity * 0.5 * conf;
         triggerDist = `VIX ~${impliedVix.toFixed(0)} (trigger: 25)`;
         break;
       }
