@@ -90,7 +90,7 @@ function computeTickerThreats(stocks: PortfolioStock[], data: GeoData | null): R
   return result;
 }
 
-export function useGeoIntelligence(stocks: PortfolioStock[]) {
+export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
   const [data, setData] = useState<GeoData | null>(null);
   const [loading, setLoading] = useState(true);
   const prevDataRef = useRef<GeoData | null>(null);
