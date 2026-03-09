@@ -269,3 +269,23 @@ export function getThrottleMultiplier(): number {
   if (rpm > 100) return 2;
   return 1;
 }
+
+/**
+ * Flush ALL cached data — used on page load / tab refocus to force live recomputation.
+ */
+export function flushAllCaches() {
+  cache.clear();
+  metrics.lastAiCall = 0;
+}
+
+/**
+ * Flush analytical caches only (keep raw price-feed cache intact).
+ */
+export function flushAnalyticalCaches() {
+  for (const key of Array.from(cache.keys())) {
+    if (!key.startsWith("price-feed")) {
+      cache.delete(key);
+    }
+  }
+  metrics.lastAiCall = 0;
+}
