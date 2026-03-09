@@ -50,24 +50,52 @@ serve(async (req) => {
 
     for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
+      
+      // Try v8 chart endpoint
       try {
         const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
         const yahooRes = await fetch(yahooUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Cache-Control": "no-cache, no-store" },
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Cache-Control": "no-cache, no-store" },
         });
-        const yahooData = await yahooRes.json();
-        const meta = yahooData?.chart?.result?.[0]?.meta;
-        if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
-          currentPrice = meta.regularMarketPrice;
-          currency = meta.currency || currency;
-          prevClose = meta.chartPreviousClose || meta.previousClose || 0;
-          dayHigh = meta.regularMarketDayHigh || 0;
-          dayLow = meta.regularMarketDayLow || 0;
-          volume = meta.regularMarketVolume || 0;
-          fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || 0;
-          fiftyTwoWeekLow = meta.fiftyTwoWeekLow || 0;
+        if (yahooRes.ok) {
+          const yahooData = await yahooRes.json();
+          const meta = yahooData?.chart?.result?.[0]?.meta;
+          if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
+            currentPrice = meta.regularMarketPrice;
+            currency = meta.currency || currency;
+            prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+            dayHigh = meta.regularMarketDayHigh || 0;
+            dayLow = meta.regularMarketDayLow || 0;
+            volume = meta.regularMarketVolume || 0;
+            fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || 0;
+            fiftyTwoWeekLow = meta.fiftyTwoWeekLow || 0;
+            continue;
+          }
         }
-      } catch (e) { console.error(`Yahoo error for ${symbol}:`, e); }
+      } catch (e) { console.error(`Yahoo v8 error for ${symbol}:`, e); }
+
+      // Fallback: v10 quoteSummary
+      try {
+        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
+        const res = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Cache-Control": "no-cache, no-store" },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const pm = data?.quoteSummary?.result?.[0]?.price;
+          const p = pm?.regularMarketPrice?.raw;
+          if (p && p > 0) {
+            currentPrice = p;
+            currency = pm?.currency || currency;
+            prevClose = pm?.regularMarketPreviousClose?.raw || 0;
+            dayHigh = pm?.regularMarketDayHigh?.raw || 0;
+            dayLow = pm?.regularMarketDayLow?.raw || 0;
+            volume = pm?.regularMarketVolume?.raw || 0;
+            fiftyTwoWeekHigh = pm?.fiftyTwoWeekHigh?.raw || 0;
+            fiftyTwoWeekLow = pm?.fiftyTwoWeekLow?.raw || 0;
+          }
+        }
+      } catch (e) { console.error(`Yahoo v10 error for ${symbol}:`, e); }
     }
 
     const currencySymbol = currency === "INR" ? "₹" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "JPY" ? "¥" : "$";
