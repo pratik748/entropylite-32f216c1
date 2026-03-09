@@ -71,7 +71,7 @@ function detectConditions(vix: number, moodScore: number, sectors: { name: strin
   return conds;
 }
 
-export function useMarketRegime(pollIntervalMs = 15000): MarketRegime | null {
+export function useMarketRegime(pollIntervalMs = 15000, refreshKey = 0): MarketRegime | null {
   const [regime, setRegime] = useState<MarketRegime | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -114,7 +114,7 @@ export function useMarketRegime(pollIntervalMs = 15000): MarketRegime | null {
     fetchData();
     timerRef.current = setInterval(fetchData, pollIntervalMs);
     return () => clearInterval(timerRef.current);
-  }, [fetchData, pollIntervalMs]);
+  }, [fetchData, pollIntervalMs, refreshKey]);
 
   return regime;
 }

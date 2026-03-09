@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
@@ -36,6 +36,7 @@ import { toast } from "@/hooks/use-toast";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
+import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk";
 
@@ -60,7 +61,8 @@ const IndexContent = () => {
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
-  const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks);
+  const { refreshKey, isRefreshing } = useIntelligenceRefresh();
+  const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
@@ -170,6 +172,17 @@ const IndexContent = () => {
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header />
+
+      {/* Refresh Banner */}
+      {isRefreshing && (
+        <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
+          <RefreshCw className="h-3 w-3 text-primary animate-spin" />
+          <span className="text-[10px] font-mono text-primary tracking-wider">UPDATING INTELLIGENCE — LIVE RECOMPUTATION IN PROGRESS</span>
+          <div className="ml-auto h-1 w-24 rounded-full bg-primary/20 overflow-hidden">
+            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
@@ -319,12 +332,12 @@ const IndexContent = () => {
           )
         )}
 
-        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview /></div>}
+        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview key={refreshKey} /></div>}
         {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
         {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
         {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
         {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
-        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
+        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
         {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
       </main>
 

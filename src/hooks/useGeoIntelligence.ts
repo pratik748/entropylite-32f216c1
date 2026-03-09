@@ -90,7 +90,7 @@ function computeTickerThreats(stocks: PortfolioStock[], data: GeoData | null): R
   return result;
 }
 
-export function useGeoIntelligence(stocks: PortfolioStock[]) {
+export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
   const [data, setData] = useState<GeoData | null>(null);
   const [loading, setLoading] = useState(true);
   const prevDataRef = useRef<GeoData | null>(null);
@@ -187,12 +187,12 @@ export function useGeoIntelligence(stocks: PortfolioStock[]) {
     }
   }, [stocks]);
 
-  // Poll on mount + interval
+  // Poll on mount + interval + refreshKey change
   useEffect(() => {
     fetchData();
     const i = setInterval(() => fetchData(false), POLL_INTERVAL);
     return () => clearInterval(i);
-  }, [fetchData]);
+  }, [fetchData, refreshKey]);
 
   // Compute ticker-level threat scores
   const tickerThreats = useMemo(() => computeTickerThreats(stocks, data), [stocks, data]);
