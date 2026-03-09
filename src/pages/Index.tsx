@@ -173,6 +173,17 @@ const IndexContent = () => {
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header />
 
+      {/* Refresh Banner */}
+      {isRefreshing && (
+        <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
+          <RefreshCw className="h-3 w-3 text-primary animate-spin" />
+          <span className="text-[10px] font-mono text-primary tracking-wider">UPDATING INTELLIGENCE — LIVE RECOMPUTATION IN PROGRESS</span>
+          <div className="ml-auto h-1 w-24 rounded-full bg-primary/20 overflow-hidden">
+            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
+          </div>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
         <div className="px-1 sm:container flex items-center gap-0 overflow-x-auto py-0.5 sm:py-1 scrollbar-hide relative z-10">
