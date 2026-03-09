@@ -9,18 +9,46 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 async function fetchYahooQuote(symbol: string) {
   const t = Date.now();
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "application/json", "Cache-Control": "no-cache, no-store" },
-  });
-  const data = await res.json();
-  const meta = data?.chart?.result?.[0]?.meta;
-  if (!meta) return null;
-  const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
-  const currentPrice = meta.regularMarketPrice || 0;
-  return { price: currentPrice, prevClose, change: currentPrice - prevClose, changePct: prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0, currency: meta.currency || "USD", volume: meta.regularMarketVolume || 0 };
+  
+  // Try v8 first
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Accept": "application/json", "Cache-Control": "no-cache, no-store" },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
+        const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+        const currentPrice = meta.regularMarketPrice;
+        return { price: currentPrice, prevClose, change: currentPrice - prevClose, changePct: prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0, currency: meta.currency || "USD", volume: meta.regularMarketVolume || 0 };
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Fallback to v10 quoteSummary
+  try {
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const pm = data?.quoteSummary?.result?.[0]?.price;
+      const currentPrice = pm?.regularMarketPrice?.raw;
+      const prevClose = pm?.regularMarketPreviousClose?.raw || 0;
+      if (currentPrice && currentPrice > 0) {
+        return { price: currentPrice, prevClose, change: currentPrice - prevClose, changePct: prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0, currency: pm?.currency || "USD", volume: pm?.regularMarketVolume?.raw || 0 };
+      }
+    }
+  } catch { /* fall through */ }
+
+  return null;
 }
 
 serve(async (req) => {
