@@ -114,7 +114,7 @@ export function useMarketRegime(pollIntervalMs = 15000, refreshKey = 0): MarketR
     fetchData();
     timerRef.current = setInterval(fetchData, pollIntervalMs);
     return () => clearInterval(timerRef.current);
-  }, [fetchData, pollIntervalMs]);
+  }, [fetchData, pollIntervalMs, refreshKey]);
 
   return regime;
 }
