@@ -35,9 +35,9 @@ type Tier = "realtime" | "frequent" | "slow" | "static" | "ai";
 const TTL: Record<Tier, number> = {
   realtime: 15_000,   // 15s — prices
   frequent: 30_000,   // 30s — market overview, ticker strip
-  slow:     600_000,  // 10 min — news, geopolitical, desirable assets
+  slow:     120_000,  // 2 min — news, geopolitical, desirable assets
   static:   Infinity, // permanent — historical data
-  ai:       60_000,   // 60s cooldown for AI calls
+  ai:       30_000,   // 30s cooldown for AI calls
 };
 
 const ENDPOINT_TIER: Record<string, Tier> = {
