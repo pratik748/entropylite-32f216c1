@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
@@ -36,6 +36,7 @@ import { toast } from "@/hooks/use-toast";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
+import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk";
 
