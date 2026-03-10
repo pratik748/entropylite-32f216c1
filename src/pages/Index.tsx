@@ -31,7 +31,7 @@ import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { governedInvoke } from "@/lib/apiGovernor";
+import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
