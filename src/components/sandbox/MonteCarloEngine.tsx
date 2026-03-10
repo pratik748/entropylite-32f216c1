@@ -56,11 +56,26 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const [scenario, setScenario] = useState<string>("base");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
+  const [aiCalibration, setAiCalibration] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
   const avgBeta = holdings.length > 0 ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
-  const params = scenarioParams[scenario];
+  // Fetch AI calibration
+  useEffect(() => {
+    if (holdings.length === 0) return;
+    setAiLoading(true);
+    const portfolio = holdings.map(h => ({ ticker: h.ticker, risk: h.risk, beta: h.beta, value: h.value }));
+    governedInvoke("monte-carlo-intelligence", { body: { portfolio, totalValue, avgRisk, avgBeta, scenario } })
+      .then(({ data }) => { if (data && !data.error) setAiCalibration(data); })
+      .catch(() => {})
+      .finally(() => setAiLoading(false));
+  }, [holdings.map(h => h.ticker).join(","), scenario]);
+
+  // Use AI-calibrated params if available, otherwise static
+  const activeScenarioParams = aiCalibration?.scenarios || scenarioParams;
+  const params = activeScenarioParams[scenario] || scenarioParams[scenario];
   const dailyVol = (avgRisk / 100) * 0.018 * params.volMult;
 
   const results = useMemo(() => {
