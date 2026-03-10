@@ -209,36 +209,29 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   }, [holdings, scenario, totalValue, dailyVol, params]);
 
   const suggestions = useMemo(() => {
+    // Use AI suggestions if available
+    if (aiCalibration?.suggestions?.length > 0) return aiCalibration.suggestions;
+
     const actions: { label: string; type: "protect" | "opportunity" | "wait"; detail: string }[] = [];
     const lossAt95 = totalValue - results.var95;
     const lossPct = totalValue > 0 ? (lossAt95 / totalValue) * 100 : 0;
 
     if (scenario === "base") {
-      if (results.profitProb > 0.6) actions.push({ label: "Hold current positions", type: "wait", detail: `${(results.profitProb * 100).toFixed(0)}% probability of profit. Portfolio is well-positioned.` });
-      if (avgBeta > 1.3) actions.push({ label: "Reduce beta exposure", type: "protect", detail: `Portfolio beta ${avgBeta.toFixed(2)} is elevated. Consider selling high-beta positions or buying index puts.` });
-      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${fmt(lossAt95)} is significant. Buy OTM puts on largest positions.` });
+      if (results.profitProb > 0.6) actions.push({ label: "Hold current positions", type: "wait", detail: `${(results.profitProb * 100).toFixed(0)}% probability of profit.` });
+      if (avgBeta > 1.3) actions.push({ label: "Reduce beta exposure", type: "protect", detail: `Portfolio beta ${avgBeta.toFixed(2)} is elevated.` });
+      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${fmt(lossAt95)} is significant.` });
     } else if (scenario === "rate_shock") {
-      actions.push({ label: "Rotate out of growth stocks", type: "protect", detail: "High-duration growth stocks lose most in rate shocks. Shift to value/dividend names." });
-      actions.push({ label: "Consider floating-rate bonds", type: "opportunity", detail: "Floating-rate instruments benefit from rising rates." });
-    } else if (scenario === "fx_shock") {
-      actions.push({ label: "Increase USD-denominated holdings", type: "protect", detail: "USD strengthens during FX crises. Shift allocation toward US assets." });
-      actions.push({ label: "Add gold position", type: "opportunity", detail: "Gold acts as safe haven during currency turmoil. Target 5-10% allocation via GLD or GC=F." });
+      actions.push({ label: "Rotate out of growth stocks", type: "protect", detail: "High-duration growth stocks lose most in rate shocks." });
     } else if (scenario === "liquidity_freeze") {
-      actions.push({ label: "Move to large-cap liquid names", type: "protect", detail: "Small/mid-cap stocks suffer most in liquidity crunches. Rotate to top-50 large caps." });
-      actions.push({ label: "Increase cash buffer to 20%", type: "protect", detail: `Max drawdown of ${(results.worstDD * 100).toFixed(0)}% requires significant dry powder.` });
+      actions.push({ label: "Move to large-cap liquid names", type: "protect", detail: "Small/mid-cap stocks suffer most." });
     } else if (scenario === "black_swan") {
-      actions.push({ label: "Activate full hedging protocol", type: "protect", detail: `Ruin probability ${(results.ruinProb * 100).toFixed(1)}%. Buy deep OTM puts, reduce leverage to zero.` });
-    } else if (scenario === "war") {
-      actions.push({ label: "Exit geopolitically exposed assets", type: "protect", detail: "Sell stocks with supply chains in conflict zones." });
-      actions.push({ label: "Long energy & defense", type: "opportunity", detail: "Energy and defense stocks historically outperform during conflicts." });
+      actions.push({ label: "Activate full hedging protocol", type: "protect", detail: `Ruin probability ${(results.ruinProb * 100).toFixed(1)}%.` });
     }
-
     if (results.ruinProb > 0.1) {
       actions.push({ label: "CRITICAL: Position sizing too aggressive", type: "protect", detail: `${(results.ruinProb * 100).toFixed(1)}% ruin probability exceeds institutional limits.` });
     }
-
     return actions;
-  }, [scenario, results, avgBeta, totalValue, fmt]);
+  }, [scenario, results, avgBeta, totalValue, fmt, aiCalibration]);
 
   const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
