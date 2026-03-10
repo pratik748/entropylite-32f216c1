@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI } from "../_shared/callAI.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
@@ -14,15 +15,11 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook } = await req.json();
 
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY not configured");
-
     const sectorSummary = (sectors || [])
       .slice(0, 10)
       .map((s: any) => `${s.name}: ${s.changePct > 0 ? "+" : ""}${s.changePct.toFixed(1)}%`)
       .join(", ");
 
-    // Build detailed portfolio context
     const portfolioLines = (portfolio || []).map((p: any) =>
       `${p.ticker}: ${p.quantity} shares @ $${p.currentPrice.toFixed(2)} (bought $${p.buyPrice.toFixed(2)}, PnL ${p.pnlPct > 0 ? "+" : ""}${p.pnlPct.toFixed(1)}%, weight ${p.weightPct.toFixed(1)}%)`
     ).join("\n");
@@ -56,95 +53,65 @@ ${portfolioLines || "EMPTY — No positions. Recommend initial portfolio constru
 
 Generate exact trade instructions for this portfolio in this market environment.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://entropylite.lovable.app",
-        "X-Title": "Entropy Lite",
-      },
-      body: JSON.stringify({
-        model: "nvidia/nemotron-3-nano-30b-a3b:free",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_trade_instructions",
-              description: "Return 4-6 exact, executable trade instructions",
-              parameters: {
-                type: "object",
-                properties: {
-                  portfolio_assessment: {
-                    type: "string",
-                    description: "2-3 sentence assessment of the current portfolio's health, risk exposure, and key concerns given market conditions",
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "generate_trade_instructions",
+          description: "Return 4-6 exact, executable trade instructions",
+          parameters: {
+            type: "object",
+            properties: {
+              portfolio_assessment: {
+                type: "string",
+                description: "2-3 sentence assessment of the current portfolio's health, risk exposure, and key concerns given market conditions",
+              },
+              instructions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    action: { type: "string", enum: ["BUY", "SELL", "TRIM", "ADD", "HEDGE", "HOLD", "CLOSE"], description: "Trade action" },
+                    ticker: { type: "string", description: "Exact ticker symbol e.g. AAPL, SPY, GLD" },
+                    is_existing_position: { type: "boolean", description: "True if this ticker is already in the portfolio" },
+                    urgency: { type: "string", enum: ["IMMEDIATE", "TODAY", "THIS_WEEK", "WHEN_TRIGGERED"], description: "When to execute" },
+                    quantity: { type: "number", description: "Number of shares/contracts" },
+                    dollar_amount: { type: "number", description: "Dollar amount of the trade" },
+                    entry_price: { type: "number", description: "Target entry price" },
+                    entry_zone_low: { type: "number", description: "Lower bound of entry zone" },
+                    entry_zone_high: { type: "number", description: "Upper bound of entry zone" },
+                    stop_loss_price: { type: "number", description: "Exact stop-loss price" },
+                    take_profit_price: { type: "number", description: "Exact take-profit price" },
+                    time_horizon: { type: "string", description: "e.g. Intraday, Swing 2-5 days, Position 1-4 weeks" },
+                    rationale: { type: "string", description: "2-3 sentences explaining WHY this trade, referencing specific market conditions" },
+                    risk_reward: { type: "string", description: "Risk/reward ratio e.g. 1:2.5" },
+                    category: { type: "string", enum: ["POSITION_MGMT", "HEDGE", "NEW_ENTRY", "REBALANCE", "RISK_REDUCTION"], description: "Type of instruction" },
+                    priority: { type: "number", description: "1=highest priority, 6=lowest" },
+                    confidence: { type: "number", description: "Confidence score 0-100" },
                   },
-                  instructions: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        action: { type: "string", enum: ["BUY", "SELL", "TRIM", "ADD", "HEDGE", "HOLD", "CLOSE"], description: "Trade action" },
-                        ticker: { type: "string", description: "Exact ticker symbol e.g. AAPL, SPY, GLD" },
-                        is_existing_position: { type: "boolean", description: "True if this ticker is already in the portfolio" },
-                        urgency: { type: "string", enum: ["IMMEDIATE", "TODAY", "THIS_WEEK", "WHEN_TRIGGERED"], description: "When to execute" },
-                        quantity: { type: "number", description: "Number of shares/contracts" },
-                        dollar_amount: { type: "number", description: "Dollar amount of the trade" },
-                        entry_price: { type: "number", description: "Target entry price" },
-                        entry_zone_low: { type: "number", description: "Lower bound of entry zone" },
-                        entry_zone_high: { type: "number", description: "Upper bound of entry zone" },
-                        stop_loss_price: { type: "number", description: "Exact stop-loss price" },
-                        take_profit_price: { type: "number", description: "Exact take-profit price" },
-                        time_horizon: { type: "string", description: "e.g. Intraday, Swing 2-5 days, Position 1-4 weeks" },
-                        rationale: { type: "string", description: "2-3 sentences explaining WHY this trade, referencing specific market conditions" },
-                        risk_reward: { type: "string", description: "Risk/reward ratio e.g. 1:2.5" },
-                        category: { type: "string", enum: ["POSITION_MGMT", "HEDGE", "NEW_ENTRY", "REBALANCE", "RISK_REDUCTION"], description: "Type of instruction" },
-                        priority: { type: "number", description: "1=highest priority, 6=lowest" },
-                        confidence: { type: "number", description: "Confidence score 0-100" },
-                      },
-                      required: ["action", "ticker", "is_existing_position", "urgency", "rationale", "category", "priority", "confidence", "time_horizon", "risk_reward"],
-                      additionalProperties: false,
-                    },
-                  },
+                  required: ["action", "ticker", "is_existing_position", "urgency", "rationale", "category", "priority", "confidence", "time_horizon", "risk_reward"],
+                  additionalProperties: false,
                 },
-                required: ["portfolio_assessment", "instructions"],
-                additionalProperties: false,
               },
             },
+            required: ["portfolio_assessment", "instructions"],
+            additionalProperties: false,
           },
-        ],
-        tool_choice: { type: "function", function: { name: "generate_trade_instructions" } },
-        temperature: 0.3,
-      }),
+        },
+      },
+    ];
+
+    const result = await callAI({
+      systemPrompt,
+      userPrompt,
+      tools,
+      toolChoice: { type: "function", function: { name: "generate_trade_instructions" } },
+      temperature: 0.3,
+      maxTokens: 4000,
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("AI gateway error:", response.status, errText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, please try again shortly" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI error ${response.status}`);
-    }
+    const parsed = JSON.parse(result.text);
 
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No tool call in response");
-
-    const parsed = JSON.parse(toolCall.function.arguments);
-
-    // Sort instructions by priority
     if (parsed.instructions) {
       parsed.instructions.sort((a: any, b: any) => (a.priority || 99) - (b.priority || 99));
     }
@@ -157,8 +124,18 @@ Generate exact trade instructions for this portfolio in this market environment.
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Strategy generate error:", error);
+    if (error.status === 429) {
+      return new Response(JSON.stringify({ error: "Rate limited, please try again shortly" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (error.status === 402) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
