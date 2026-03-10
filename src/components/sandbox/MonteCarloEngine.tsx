@@ -4,7 +4,6 @@ import { Activity, Lightbulb, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { governedInvoke } from "@/lib/apiGovernor";
-import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
