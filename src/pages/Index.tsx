@@ -56,6 +56,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
