@@ -41,16 +41,22 @@ const TTL: Record<Tier, number> = {
 };
 
 const ENDPOINT_TIER: Record<string, Tier> = {
-  "price-feed":        "realtime",
-  "market-data":       "frequent",
-  "fx-rates":          "slow",
-  "fetch-news":        "slow",
-  "geopolitical-data": "slow",
-  "desirable-assets":  "slow",
-  "analyze-stock":     "ai",
-  "strategy-generate": "ai",
-  "causal-effects":    "ai",
-  "sentiment-intel":   "slow",
+  "price-feed":              "realtime",
+  "market-data":             "frequent",
+  "fx-rates":                "slow",
+  "fetch-news":              "slow",
+  "geopolitical-data":       "slow",
+  "desirable-assets":        "slow",
+  "analyze-stock":           "ai",
+  "strategy-generate":       "ai",
+  "causal-effects":          "ai",
+  "sentiment-intel":         "slow",
+  "risk-intelligence":       "ai",
+  "flow-intelligence":       "ai",
+  "portfolio-intelligence":  "ai",
+  "monte-carlo-intelligence":"ai",
+  "crown-intelligence":      "ai",
+  "deep-intelligence":       "ai",
 };
 
 // Rough cost weights for monitoring (relative units)

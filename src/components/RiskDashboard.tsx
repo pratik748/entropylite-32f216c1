@@ -1,16 +1,18 @@
-import { useState, useMemo } from "react";
-import { Shield, AlertTriangle, Zap } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Shield, AlertTriangle, Zap, Brain } from "lucide-react";
 import ClankEngine from "@/components/risk/ClankEngine";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
 } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface RiskDashboardProps {
   stocks: PortfolioStock[];
 }
 
+// Static fallback
 function computeVaRCVaR(stocks: PortfolioStock[]) {
   const analyzed = stocks.filter(s => s.analysis);
   if (analyzed.length === 0) return { var95: 0, var99: 0, cvar95: 0, cvar99: 0, liquidityVar: 0 };
@@ -28,32 +30,59 @@ function computeVaRCVaR(stocks: PortfolioStock[]) {
 
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
-  const vars = computeVaRCVaR(stocks);
+  const staticVars = computeVaRCVaR(stocks);
+
+  const [aiData, setAiData] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // Fetch AI risk intelligence
+  useEffect(() => {
+    if (analyzed.length === 0) return;
+    setAiLoading(true);
+    const portfolio = analyzed.map(st => ({
+      ticker: st.ticker, quantity: st.quantity, buyPrice: st.buyPrice,
+      currentPrice: st.analysis?.currentPrice || st.buyPrice,
+      riskScore: st.analysis?.riskScore || 40, beta: st.analysis?.beta || 1,
+      sector: st.analysis?.sector || "Unknown", pe: st.analysis?.pe || 0,
+      marketCap: st.analysis?.marketCap || "Unknown",
+    }));
+    governedInvoke("risk-intelligence", { body: { portfolio } })
+      .then(({ data }) => { if (data && !data.error) setAiData(data); })
+      .catch(() => {})
+      .finally(() => setAiLoading(false));
+  }, [analyzed.map(s => s.ticker).join(",")]);
 
   const totalValue = useMemo(() => 
     analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0),
     [analyzed]
   );
 
-  // Compute real factor exposure from portfolio
+  // Use AI data if available, otherwise static
+  const vars = aiData ? {
+    var95: aiData.var95 || staticVars.var95,
+    var99: aiData.var99 || staticVars.var99,
+    cvar95: aiData.cvar95 || staticVars.cvar95,
+    cvar99: aiData.cvar99 || staticVars.cvar99,
+    liquidityVar: aiData.liquidityVar || staticVars.liquidityVar,
+  } : staticVars;
+
+  const avgRiskScore = aiData?.portfolioRiskScore ?? (analyzed.length > 0
+    ? Math.round(analyzed.reduce((s, st) => s + (st.analysis.riskScore || 0), 0) / analyzed.length)
+    : 0);
+
+  // Factor exposure from AI or static
   const factorExposure = useMemo(() => {
+    if (aiData?.factorExposure?.length > 0) return aiData.factorExposure;
     if (analyzed.length === 0) return [];
     const avgBeta = analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length;
     const avgRisk = analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / analyzed.length;
-    
-    // Derive size factor from market cap distribution
     const largeCap = analyzed.filter(s => s.analysis.marketCap === "Large Cap").length;
     const sizeFactor = (analyzed.length - largeCap) / analyzed.length * 0.8 - 0.2;
-    
-    // Value factor from PE
     const avgPE = analyzed.reduce((s, st) => s + (st.analysis.pe || 20), 0) / analyzed.length;
     const valueFactor = avgPE < 15 ? 0.4 : avgPE < 25 ? 0.1 : -0.3;
-    
-    // Momentum from actual returns
     const returns = analyzed.map(s => ((s.analysis.currentPrice || s.buyPrice) - s.buyPrice) / s.buyPrice);
     const avgReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
     const momentumFactor = avgReturn > 0.1 ? 0.5 : avgReturn > 0 ? 0.2 : -0.3;
-
     return [
       { factor: "Market β", exposure: +avgBeta.toFixed(2), contribution: Math.round(avgBeta * 65) },
       { factor: "Size (SMB)", exposure: +sizeFactor.toFixed(2), contribution: Math.round(sizeFactor * 20) },
@@ -62,45 +91,50 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       { factor: "Quality", exposure: +(1 - avgRisk / 100).toFixed(2), contribution: Math.round((1 - avgRisk / 100) * 12) },
       { factor: "Low Vol", exposure: +(avgRisk < 40 ? 0.3 : -0.2).toFixed(2), contribution: Math.round(avgRisk < 40 ? 5 : -3) },
     ];
-  }, [analyzed]);
+  }, [analyzed, aiData]);
 
-  // Real stress scenarios based on portfolio beta
+  // Stress scenarios from AI or static
   const stressScenarios = useMemo(() => {
+    if (aiData?.stressScenarios?.length > 0) return aiData.stressScenarios;
     const avgBeta = analyzed.length > 0 ? analyzed.reduce((s, st) => s + (st.analysis.beta || 1), 0) / analyzed.length : 1;
     return [
-      { scenario: "2008 GFC Replay", impact: -(32.5 * avgBeta), recovery: "18 months" },
-      { scenario: "COVID-19 Crash", impact: -(24.1 * avgBeta), recovery: "5 months" },
-      { scenario: "Rate Hike +200bps", impact: -(8.2 * avgBeta), recovery: "6 months" },
-      { scenario: "Crude Oil $120/bbl", impact: -(11.4 * avgBeta * 0.8), recovery: "4 months" },
-      { scenario: "Forced FII Outflow", impact: -(14.2 * avgBeta), recovery: "8 months" },
-      { scenario: "Currency Crisis 10%", impact: -(5.8 * avgBeta * 1.2), recovery: "3 months" },
+      { scenario: "2008 GFC Replay", impact: -(32.5 * avgBeta), recovery: "18 months", pnlLoss: totalValue * 0.325 * avgBeta },
+      { scenario: "COVID-19 Crash", impact: -(24.1 * avgBeta), recovery: "5 months", pnlLoss: totalValue * 0.241 * avgBeta },
+      { scenario: "Rate Hike +200bps", impact: -(8.2 * avgBeta), recovery: "6 months", pnlLoss: totalValue * 0.082 * avgBeta },
+      { scenario: "Crude Oil $120/bbl", impact: -(11.4 * avgBeta * 0.8), recovery: "4 months", pnlLoss: totalValue * 0.114 * avgBeta * 0.8 },
+      { scenario: "Forced FII Outflow", impact: -(14.2 * avgBeta), recovery: "8 months", pnlLoss: totalValue * 0.142 * avgBeta },
+      { scenario: "Currency Crisis 10%", impact: -(5.8 * avgBeta * 1.2), recovery: "3 months", pnlLoss: totalValue * 0.058 * avgBeta * 1.2 },
     ];
-  }, [analyzed]);
+  }, [analyzed, aiData, totalValue]);
 
-  // Aggregate risk breakdown
-  const avgBreakdown = { volatility: 0, sector: 0, regulatory: 0, financial: 0, macro: 0 };
-  analyzed.forEach((s) => {
-    const rb = s.analysis.riskBreakdown;
-    if (rb) {
-      avgBreakdown.volatility += rb.volatilityRisk || 0;
-      avgBreakdown.sector += rb.sectorRisk || 0;
-      avgBreakdown.regulatory += rb.regulatoryRisk || 0;
-      avgBreakdown.financial += rb.financialRisk || 0;
-      avgBreakdown.macro += rb.macroRisk || 0;
-    }
-  });
-  const n = Math.max(analyzed.length, 1);
+  // Risk breakdown radar
+  const avgBreakdown = aiData?.riskBreakdown || { volatility: 0, sector: 0, regulatory: 0, financial: 0, macro: 0 };
+  if (!aiData) {
+    analyzed.forEach((s) => {
+      const rb = s.analysis.riskBreakdown;
+      if (rb) {
+        avgBreakdown.volatility += rb.volatilityRisk || 0;
+        avgBreakdown.sector += rb.sectorRisk || 0;
+        avgBreakdown.regulatory += rb.regulatoryRisk || 0;
+        avgBreakdown.financial += rb.financialRisk || 0;
+        avgBreakdown.macro += rb.macroRisk || 0;
+      }
+    });
+    const n = Math.max(analyzed.length, 1);
+    avgBreakdown.volatility = Math.round(avgBreakdown.volatility / n);
+    avgBreakdown.sector = Math.round(avgBreakdown.sector / n);
+    avgBreakdown.regulatory = Math.round(avgBreakdown.regulatory / n);
+    avgBreakdown.financial = Math.round(avgBreakdown.financial / n);
+    avgBreakdown.macro = Math.round(avgBreakdown.macro / n);
+  }
+
   const radarData = [
-    { risk: "Volatility", value: Math.round(avgBreakdown.volatility / n) },
-    { risk: "Sector", value: Math.round(avgBreakdown.sector / n) },
-    { risk: "Regulatory", value: Math.round(avgBreakdown.regulatory / n) },
-    { risk: "Financial", value: Math.round(avgBreakdown.financial / n) },
-    { risk: "Macro", value: Math.round(avgBreakdown.macro / n) },
+    { risk: "Volatility", value: avgBreakdown.volatility },
+    { risk: "Sector", value: avgBreakdown.sector },
+    { risk: "Regulatory", value: avgBreakdown.regulatory },
+    { risk: "Financial", value: avgBreakdown.financial },
+    { risk: "Macro", value: avgBreakdown.macro },
   ];
-
-  const avgRiskScore = analyzed.length > 0
-    ? Math.round(analyzed.reduce((s, st) => s + (st.analysis.riskScore || 0), 0) / n)
-    : 0;
 
   const stockRiskData = analyzed.map((s) => ({
     name: s.ticker.replace(".NS", "").replace(".BO", ""),
@@ -129,7 +163,6 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     ? analyzed.slice(0, 5).map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
     : ["Asset 1", "Asset 2", "Asset 3", "Asset 4", "Asset 5"];
 
-  // Generate correlation from actual beta values
   const corrMatrix = useMemo(() => {
     const betas = analyzed.slice(0, 5).map(s => s.analysis?.beta || 1);
     const n = Math.min(betas.length, 5);
@@ -152,8 +185,25 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     return "bg-gain/10 text-foreground";
   };
 
+  const volatilityRegime = aiData?.volatilityRegime;
+
   return (
     <div className="space-y-4">
+      {/* AI indicator */}
+      {aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <Brain className="h-4 w-4 text-primary animate-pulse" />
+          <span className="text-xs text-primary">AI Risk Intelligence computing...</span>
+        </div>
+      )}
+      {aiData && !aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-2">
+          <Brain className="h-4 w-4 text-gain" />
+          <span className="text-xs text-gain">AI-Driven Risk Analysis</span>
+          {volatilityRegime && <span className="ml-auto text-xs font-mono text-foreground">Regime: {volatilityRegime}</span>}
+        </div>
+      )}
+
       {/* Risk Sub-tabs */}
       <div className="flex items-center gap-1 border-b border-border pb-2">
         {([
@@ -217,6 +267,37 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       </div>
 
+      {/* AI Insights */}
+      {aiData?.topRisks?.length > 0 && (
+        <div className="rounded-xl border border-loss/20 bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-loss" /> AI-Identified Top Risks
+          </h3>
+          <div className="space-y-1.5">
+            {aiData.topRisks.map((r: string, i: number) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-secondary-foreground">
+                <span className="text-loss font-mono">⚠</span>
+                <span>{r}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aiData?.hedgingRecommendations?.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">AI Hedging Recommendations</h3>
+          <div className="space-y-1.5">
+            {aiData.hedgingRecommendations.map((r: string, i: number) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-secondary-foreground">
+                <span className="text-primary font-mono">→</span>
+                <span>{r}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Radar + Per-Stock Risk */}
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">
@@ -255,7 +336,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       </div>
 
-      {/* Factor Exposure — computed from real portfolio */}
+      {/* Factor Exposure */}
       {factorExposure.length > 0 && (
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-5">
@@ -268,7 +349,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
                   <YAxis dataKey="factor" type="category" tick={{ fill: "hsl(210,8%,45%)", fontSize: 10 }} axisLine={{ stroke: "hsl(220,12%,13%)" }} width={75} />
                   <Tooltip contentStyle={{ background: "hsl(220,14%,7%)", border: "1px solid hsl(220,12%,13%)", borderRadius: 8, fontSize: 11 }} />
                   <Bar dataKey="exposure" radius={[0, 4, 4, 0]}>
-                    {factorExposure.map((f, i) => (
+                    {factorExposure.map((f: any, i: number) => (
                       <Cell key={i} fill={f.exposure >= 0 ? "hsl(210,100%,60%)" : "hsl(0,84%,55%)"} fillOpacity={0.8} />
                     ))}
                   </Bar>
@@ -280,7 +361,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <div className="rounded-xl border border-border bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Factor Risk Contribution</h3>
             <div className="space-y-2">
-              {factorExposure.map(f => (
+              {factorExposure.map((f: any) => (
                 <div key={f.factor} className="flex items-center gap-3">
                   <span className="w-20 text-xs text-muted-foreground">{f.factor}</span>
                   <div className="flex-1 h-2.5 rounded-full bg-surface-3 overflow-hidden">
@@ -294,18 +375,18 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       )}
 
-      {/* Stress Scenarios — scaled by portfolio beta */}
+      {/* Stress Scenarios */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Stress Scenarios</h3>
         <div className="grid gap-3 md:grid-cols-3">
-          {stressScenarios.map(s => (
+          {stressScenarios.map((s: any) => (
             <div key={s.scenario} className="rounded-lg bg-surface-2 p-4 border border-border/50">
               <p className="text-sm font-medium text-foreground mb-2">{s.scenario}</p>
-              <p className="font-mono text-2xl font-bold text-loss">{s.impact.toFixed(1)}%</p>
+              <p className="font-mono text-2xl font-bold text-loss">{typeof s.impact === "number" ? s.impact.toFixed(1) : s.impact}%</p>
               <p className="text-[10px] text-muted-foreground mt-1">Recovery: {s.recovery}</p>
-              {totalValue > 0 && (
+              {(s.pnlLoss || totalValue > 0) && (
                 <p className="font-mono text-xs text-loss mt-1">
-                  P&L: ${(totalValue * Math.abs(s.impact) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })} loss
+                  P&L: ${(s.pnlLoss || totalValue * Math.abs(s.impact) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })} loss
                 </p>
               )}
             </div>
@@ -313,20 +394,17 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       </div>
 
-      {/* Dynamic Correlation Matrix */}
+      {/* Correlation Matrix */}
       {corrMatrix.length > 1 && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Correlation by Regime</h3>
             <div className="flex gap-1">
               {(["bull", "bear"] as const).map(r => (
-                <button
-                  key={r}
-                  onClick={() => setSelectedRegime(r)}
+                <button key={r} onClick={() => setSelectedRegime(r)}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     selectedRegime === r ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
+                  }`}>
                   {r === "bull" ? "Bull" : "Bear"}
                 </button>
               ))}
@@ -356,47 +434,16 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[10px] text-muted-foreground">
-            Bear markets increase correlations, reducing diversification benefits.
-          </p>
+          {aiData?.correlationInsight && (
+            <p className="mt-3 text-[11px] text-muted-foreground italic">{aiData.correlationInsight}</p>
+          )}
         </div>
       )}
 
-      {/* Concentration */}
-      {concentrationData.length > 0 && (
+      {aiData?.regimeAnalysis && (
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Portfolio Concentration</h3>
-          <div className="space-y-2">
-            {concentrationData.map((c) => (
-              <div key={c.name} className="flex items-center gap-3">
-                <span className="font-mono text-xs font-semibold text-foreground w-24 truncate">{c.name}</span>
-                <div className="flex-1 h-2.5 rounded-full bg-surface-3 overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${c.pct}%` }} />
-                </div>
-                <span className="font-mono text-xs text-muted-foreground w-14 text-right">{c.pct.toFixed(1)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Key Risks */}
-      {analyzed.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">All Key Risks</h3>
-          <div className="grid gap-2 md:grid-cols-2">
-            {analyzed.flatMap((s) =>
-              (s.analysis.keyRisks || []).map((risk: string, i: number) => (
-                <div key={`${s.ticker}-${i}`} className="flex items-start gap-2 rounded-lg bg-surface-2 p-3 text-sm">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-warning" />
-                  <div>
-                    <span className="font-mono text-xs text-foreground">{s.ticker.replace(".NS", "").replace(".BO", "")}</span>
-                    <p className="text-muted-foreground">{risk}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">AI Regime Analysis</h3>
+          <p className="text-xs text-secondary-foreground leading-relaxed">{aiData.regimeAnalysis}</p>
         </div>
       )}
       </>}

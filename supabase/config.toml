@@ -29,3 +29,21 @@ verify_jwt = false
 
 [functions.sentiment-intel]
 verify_jwt = false
+
+[functions.risk-intelligence]
+verify_jwt = false
+
+[functions.flow-intelligence]
+verify_jwt = false
+
+[functions.portfolio-intelligence]
+verify_jwt = false
+
+[functions.monte-carlo-intelligence]
+verify_jwt = false
+
+[functions.crown-intelligence]
+verify_jwt = false
+
+[functions.deep-intelligence]
+verify_jwt = false

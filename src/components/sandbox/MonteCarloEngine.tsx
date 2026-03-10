@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from "recharts";
-import { Activity, Lightbulb } from "lucide-react";
+import { Activity, Lightbulb, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -54,11 +55,26 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const [scenario, setScenario] = useState<string>("base");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
+  const [aiCalibration, setAiCalibration] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
   const avgBeta = holdings.length > 0 ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
-  const params = scenarioParams[scenario];
+  // Fetch AI calibration
+  useEffect(() => {
+    if (holdings.length === 0) return;
+    setAiLoading(true);
+    const portfolio = holdings.map(h => ({ ticker: h.ticker, risk: h.risk, beta: h.beta, value: h.value }));
+    governedInvoke("monte-carlo-intelligence", { body: { portfolio, totalValue, avgRisk, avgBeta, scenario } })
+      .then(({ data }) => { if (data && !data.error) setAiCalibration(data); })
+      .catch(() => {})
+      .finally(() => setAiLoading(false));
+  }, [holdings.map(h => h.ticker).join(","), scenario]);
+
+  // Use AI-calibrated params if available, otherwise static
+  const activeScenarioParams = aiCalibration?.scenarios || scenarioParams;
+  const params = activeScenarioParams[scenario] || scenarioParams[scenario];
   const dailyVol = (avgRisk / 100) * 0.018 * params.volMult;
 
   const results = useMemo(() => {
@@ -193,36 +209,29 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   }, [holdings, scenario, totalValue, dailyVol, params]);
 
   const suggestions = useMemo(() => {
+    // Use AI suggestions if available
+    if (aiCalibration?.suggestions?.length > 0) return aiCalibration.suggestions;
+
     const actions: { label: string; type: "protect" | "opportunity" | "wait"; detail: string }[] = [];
     const lossAt95 = totalValue - results.var95;
     const lossPct = totalValue > 0 ? (lossAt95 / totalValue) * 100 : 0;
 
     if (scenario === "base") {
-      if (results.profitProb > 0.6) actions.push({ label: "Hold current positions", type: "wait", detail: `${(results.profitProb * 100).toFixed(0)}% probability of profit. Portfolio is well-positioned.` });
-      if (avgBeta > 1.3) actions.push({ label: "Reduce beta exposure", type: "protect", detail: `Portfolio beta ${avgBeta.toFixed(2)} is elevated. Consider selling high-beta positions or buying index puts.` });
-      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${fmt(lossAt95)} is significant. Buy OTM puts on largest positions.` });
+      if (results.profitProb > 0.6) actions.push({ label: "Hold current positions", type: "wait", detail: `${(results.profitProb * 100).toFixed(0)}% probability of profit.` });
+      if (avgBeta > 1.3) actions.push({ label: "Reduce beta exposure", type: "protect", detail: `Portfolio beta ${avgBeta.toFixed(2)} is elevated.` });
+      if (lossPct > 15) actions.push({ label: "Add tail risk hedges", type: "protect", detail: `VaR(95%) loss of ${fmt(lossAt95)} is significant.` });
     } else if (scenario === "rate_shock") {
-      actions.push({ label: "Rotate out of growth stocks", type: "protect", detail: "High-duration growth stocks lose most in rate shocks. Shift to value/dividend names." });
-      actions.push({ label: "Consider floating-rate bonds", type: "opportunity", detail: "Floating-rate instruments benefit from rising rates." });
-    } else if (scenario === "fx_shock") {
-      actions.push({ label: "Increase USD-denominated holdings", type: "protect", detail: "USD strengthens during FX crises. Shift allocation toward US assets." });
-      actions.push({ label: "Add gold position", type: "opportunity", detail: "Gold acts as safe haven during currency turmoil. Target 5-10% allocation via GLD or GC=F." });
+      actions.push({ label: "Rotate out of growth stocks", type: "protect", detail: "High-duration growth stocks lose most in rate shocks." });
     } else if (scenario === "liquidity_freeze") {
-      actions.push({ label: "Move to large-cap liquid names", type: "protect", detail: "Small/mid-cap stocks suffer most in liquidity crunches. Rotate to top-50 large caps." });
-      actions.push({ label: "Increase cash buffer to 20%", type: "protect", detail: `Max drawdown of ${(results.worstDD * 100).toFixed(0)}% requires significant dry powder.` });
+      actions.push({ label: "Move to large-cap liquid names", type: "protect", detail: "Small/mid-cap stocks suffer most." });
     } else if (scenario === "black_swan") {
-      actions.push({ label: "Activate full hedging protocol", type: "protect", detail: `Ruin probability ${(results.ruinProb * 100).toFixed(1)}%. Buy deep OTM puts, reduce leverage to zero.` });
-    } else if (scenario === "war") {
-      actions.push({ label: "Exit geopolitically exposed assets", type: "protect", detail: "Sell stocks with supply chains in conflict zones." });
-      actions.push({ label: "Long energy & defense", type: "opportunity", detail: "Energy and defense stocks historically outperform during conflicts." });
+      actions.push({ label: "Activate full hedging protocol", type: "protect", detail: `Ruin probability ${(results.ruinProb * 100).toFixed(1)}%.` });
     }
-
     if (results.ruinProb > 0.1) {
       actions.push({ label: "CRITICAL: Position sizing too aggressive", type: "protect", detail: `${(results.ruinProb * 100).toFixed(1)}% ruin probability exceeds institutional limits.` });
     }
-
     return actions;
-  }, [scenario, results, avgBeta, totalValue, fmt]);
+  }, [scenario, results, avgBeta, totalValue, fmt, aiCalibration]);
 
   const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
@@ -240,6 +249,19 @@ const MonteCarloEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-5">
+      {/* AI indicator */}
+      {aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <Brain className="h-4 w-4 text-primary animate-pulse" />
+          <span className="text-xs text-primary">AI calibrating simulation parameters...</span>
+        </div>
+      )}
+      {aiCalibration && !aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-1.5">
+          <Brain className="h-3.5 w-3.5 text-gain" />
+          <span className="text-[10px] text-gain">AI-Calibrated Monte Carlo</span>
+        </div>
+      )}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="h-4 w-4 text-foreground" />
@@ -366,6 +388,13 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {aiCalibration?.narrativeSummary && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-2">AI Simulation Analysis</h3>
+          <p className="text-xs text-secondary-foreground leading-relaxed">{aiCalibration.narrativeSummary}</p>
+        </div>
+      )}
     </div>
   );
 };
