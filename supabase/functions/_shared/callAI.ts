@@ -23,7 +23,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
   const body: any = {
-    model: opts.model || "google/gemini-2.5-flash",
+    model: opts.model || "meta-llama/llama-3.3-70b-instruct:free",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
