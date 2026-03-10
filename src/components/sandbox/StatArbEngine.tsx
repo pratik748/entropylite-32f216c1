@@ -79,56 +79,98 @@ interface AssetDatum { ticker: string; price: number; vol: number; mu: number; w
 type Fmt = (v: number) => string;
 
 function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
-  const asset = assets[0];
   const data = useMemo(() => {
-    if (!asset) return { gbm: [], jump: [], garchSigma: [], regimes: [] };
-    const gbm = SA.gbmPath(asset.price, asset.mu, asset.vol, 252);
-    const jump = SA.jumpDiffusionPath(asset.price, asset.mu, asset.vol, 252);
-    const logRet = SA.returns(gbm);
-    const { sigma } = SA.garch11(logRet);
-    const { regimeProbs } = SA.hmmRegimeDetect(logRet);
+    if (assets.length === 0) return null;
 
-    const chart = gbm.map((v, i) => ({ day: i, gbm: v, jump: jump[i] || v }));
-    const garchChart = sigma.map((s, i) => ({ day: i, sigma: s * Math.sqrt(252) * 100 }));
-    const regimeChart = regimeProbs.map((p, i) => ({ day: i, bull: p[2] || 0, neutral: p[1] || 0, bear: p[0] || 0 }));
-    return { chart, garchChart, regimeChart };
-  }, [asset]);
+    // Portfolio-wide: generate correlated GBM paths for ALL assets
+    const perAsset = assets.map(a => {
+      const gbm = SA.gbmPath(a.price, a.mu, a.vol, 252);
+      const jump = SA.jumpDiffusionPath(a.price, a.mu, a.vol, 252);
+      const logRet = SA.returns(gbm);
+      const { sigma } = SA.garch11(logRet);
+      const { regimeProbs } = SA.hmmRegimeDetect(logRet);
+      return { ticker: a.ticker, gbm, jump, sigma, regimeProbs };
+    });
 
-  if (!asset) return <EmptyMsg />;
+    // Normalized chart: all assets start at 100 for comparison
+    const chart = Array.from({ length: 253 }, (_, i) => {
+      const point: Record<string, any> = { day: i };
+      perAsset.forEach(a => {
+        point[`${a.ticker}_gbm`] = (a.gbm[i] / a.gbm[0]) * 100;
+        point[`${a.ticker}_jump`] = ((a.jump[i] || a.gbm[i]) / a.gbm[0]) * 100;
+      });
+      return point;
+    });
+
+    // Aggregate portfolio GARCH vol (weighted average)
+    const maxLen = Math.max(...perAsset.map(a => a.sigma.length));
+    const garchChart = Array.from({ length: maxLen }, (_, i) => {
+      const point: Record<string, any> = { day: i };
+      perAsset.forEach(a => {
+        if (a.sigma[i] !== undefined) {
+          point[a.ticker] = a.sigma[i] * Math.sqrt(252) * 100;
+        }
+      });
+      return point;
+    });
+
+    // Regime detection - portfolio aggregate
+    const regimeLen = Math.max(...perAsset.map(a => a.regimeProbs.length));
+    const regimeChart = Array.from({ length: regimeLen }, (_, i) => {
+      let bull = 0, neutral = 0, bear = 0;
+      let count = 0;
+      perAsset.forEach(a => {
+        if (a.regimeProbs[i]) {
+          bull += a.regimeProbs[i][2] || 0;
+          neutral += a.regimeProbs[i][1] || 0;
+          bear += a.regimeProbs[i][0] || 0;
+          count++;
+        }
+      });
+      return { day: i, bull: bull / (count || 1), neutral: neutral / (count || 1), bear: bear / (count || 1) };
+    });
+
+    return { chart, garchChart, regimeChart, perAsset };
+  }, [assets]);
+
+  if (!data) return <EmptyMsg />;
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
-      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Price Dynamics — {assets.length} Assets</h3>
+      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Normalized to base 100 for cross-asset comparison</p>
 
       <div className="h-48 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
-            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={55} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
-            <Line dataKey="gbm" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="GBM" />
-            <Line dataKey="jump" stroke="hsl(var(--loss))" strokeWidth={1} dot={false} name="Jump Diffusion" strokeDasharray="3 3" />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} width={45} label={{ value: "Base 100", angle: -90, position: "insideLeft", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
+            {data.perAsset.map((a, i) => (
+              <Line key={a.ticker} dataKey={`${a.ticker}_gbm`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1.5} dot={false} name={a.ticker} />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility — All Assets</p>
           <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.garchChart}>
+              <LineChart data={data.garchChart}>
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `${v.toFixed(0)}%`} width={35} />
-                <Area dataKey="sigma" fill="hsl(var(--primary))" fillOpacity={0.15} stroke="hsl(var(--primary))" strokeWidth={1} />
-              </AreaChart>
+                {data.perAsset.map((a, i) => (
+                  <Line key={a.ticker} dataKey={a.ticker} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1} dot={false} name={a.ticker} />
+                ))}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
         <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Portfolio Regime Detection (Aggregate)</p>
           <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.regimeChart} stackOffset="expand">
