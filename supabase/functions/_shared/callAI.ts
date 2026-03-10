@@ -1,5 +1,5 @@
 /**
- * AI caller — Lovable AI Gateway (google/gemini-3-flash-preview).
+ * AI caller — OpenRouter gateway.
  */
 
 interface CallAIOptions {
@@ -9,21 +9,21 @@ interface CallAIOptions {
   temperature?: number;
   tools?: any[];
   toolChoice?: any;
-  preferredProvider?: string; // ignored, kept for compat
+  model?: string;
 }
 
 interface AIResult {
   text: string;
-  provider: "lovable";
+  provider: "openrouter";
   toolCall?: any;
 }
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const key = Deno.env.get("LOVABLE_API_KEY");
-  if (!key) throw new Error("LOVABLE_API_KEY not set");
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
   const body: any = {
-    model: "google/gemini-3-flash-preview",
+    model: opts.model || "google/gemini-2.5-flash",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
@@ -37,25 +37,27 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
     if (opts.toolChoice) body.tool_choice = opts.toolChoice;
   }
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": "https://entropylite.lovable.app",
+      "X-Title": "Entropy Lite",
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const errBody = await res.text();
-    console.error(`Lovable AI error ${res.status}:`, errBody.slice(0, 300));
+    console.error(`OpenRouter error ${res.status}:`, errBody.slice(0, 300));
     if (res.status === 429) {
-      throw { status: 429, message: "Rate limited, please try again shortly", provider: "lovable" };
+      throw { status: 429, message: "Rate limited, please try again shortly", provider: "openrouter" };
     }
     if (res.status === 402) {
-      throw { status: 402, message: "AI credits exhausted", provider: "lovable" };
+      throw { status: 402, message: "AI credits exhausted", provider: "openrouter" };
     }
-    throw new Error(`Lovable AI ${res.status}: ${errBody.slice(0, 200)}`);
+    throw new Error(`OpenRouter ${res.status}: ${errBody.slice(0, 200)}`);
   }
 
   const data = await res.json();
@@ -63,11 +65,11 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   // Handle tool calls
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (toolCall) {
-    return { text: toolCall.function.arguments, provider: "lovable", toolCall };
+    return { text: toolCall.function.arguments, provider: "openrouter", toolCall };
   }
 
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty AI response");
   const text = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-  return { text, provider: "lovable" };
+  return { text, provider: "openrouter" };
 }
