@@ -19,7 +19,18 @@ interface AIResult {
 }
 
 function stripThinkingBlocks(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip <think>...</think> XML blocks
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip "Thinking..." prefix lines (Qwen reasoning leak)
+  cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
+  // If it still doesn't start with { or [, try to find the first JSON object
+  if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+    const jsonStart = cleaned.indexOf("{");
+    if (jsonStart > 0) {
+      cleaned = cleaned.substring(jsonStart);
+    }
+  }
+  return cleaned;
 }
 
 async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
@@ -35,7 +46,6 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
     temperature: opts.temperature ?? 0.6,
     max_tokens: opts.maxTokens ?? 16384,
     top_p: 0.95,
-    chat_template_kwargs: { enable_thinking: true },
   };
 
   if (opts.tools) {
@@ -62,13 +72,14 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
 
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (toolCall) {
-    return { text: stripThinkingBlocks(toolCall.function.arguments), provider: "nvidia", toolCall };
+    return { text: toolCall.function.arguments, provider: "nvidia", toolCall };
   }
 
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty NVIDIA response");
-  const cleaned = stripThinkingBlocks(raw);
-  const text = cleaned.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+  // Strip any residual thinking blocks and markdown fences
+  let text = stripThinkingBlocks(raw);
+  text = text.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
   return { text, provider: "nvidia" };
 }
 
