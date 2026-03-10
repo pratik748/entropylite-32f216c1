@@ -342,12 +342,12 @@ const IndexContent = () => {
         )}
 
         {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview key={refreshKey} /></div>}
-        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
-        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
-        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
-        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
+        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe key={refreshKey} stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
         {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
-        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
+        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard key={refreshKey} stocks={stocks} /></div>}
       </main>
 
       {/* System Status Bar */}
