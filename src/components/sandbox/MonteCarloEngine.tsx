@@ -249,6 +249,19 @@ const MonteCarloEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-5">
+      {/* AI indicator */}
+      {aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <Brain className="h-4 w-4 text-primary animate-pulse" />
+          <span className="text-xs text-primary">AI calibrating simulation parameters...</span>
+        </div>
+      )}
+      {aiCalibration && !aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-1.5">
+          <Brain className="h-3.5 w-3.5 text-gain" />
+          <span className="text-[10px] text-gain">AI-Calibrated Monte Carlo</span>
+        </div>
+      )}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="h-4 w-4 text-foreground" />
