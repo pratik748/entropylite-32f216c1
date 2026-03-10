@@ -1,6 +1,5 @@
 /**
- * AI caller — NVIDIA Nemotron Super 49B, with retry + exponential backoff.
- * Switched from Qwen 3.5-122B for 2-3x faster inference.
+ * AI caller — NVIDIA Qwen 3.5-122B only, with retry + exponential backoff.
  */
 
 interface CallAIOptions {
@@ -39,13 +38,14 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
   if (!key) throw new Error("NVIDIA_API_KEY not set");
 
   const body: any = {
-    model: opts.model || "nvidia/llama-3.3-nemotron-super-49b-v1",
+    model: opts.model || "qwen/qwen3.5-122b-a10b",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
     ],
-    temperature: opts.temperature ?? 0.3,
-    max_tokens: opts.maxTokens ?? 4096,
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 16384,
+    top_p: 0.95,
   };
 
   if (opts.tools) {

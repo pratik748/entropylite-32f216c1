@@ -79,98 +79,56 @@ interface AssetDatum { ticker: string; price: number; vol: number; mu: number; w
 type Fmt = (v: number) => string;
 
 function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+  const asset = assets[0];
   const data = useMemo(() => {
-    if (assets.length === 0) return null;
+    if (!asset) return { gbm: [], jump: [], garchSigma: [], regimes: [] };
+    const gbm = SA.gbmPath(asset.price, asset.mu, asset.vol, 252);
+    const jump = SA.jumpDiffusionPath(asset.price, asset.mu, asset.vol, 252);
+    const logRet = SA.returns(gbm);
+    const { sigma } = SA.garch11(logRet);
+    const { regimeProbs } = SA.hmmRegimeDetect(logRet);
 
-    // Portfolio-wide: generate correlated GBM paths for ALL assets
-    const perAsset = assets.map(a => {
-      const gbm = SA.gbmPath(a.price, a.mu, a.vol, 252);
-      const jump = SA.jumpDiffusionPath(a.price, a.mu, a.vol, 252);
-      const logRet = SA.returns(gbm);
-      const { sigma } = SA.garch11(logRet);
-      const { regimeProbs } = SA.hmmRegimeDetect(logRet);
-      return { ticker: a.ticker, gbm, jump, sigma, regimeProbs };
-    });
+    const chart = gbm.map((v, i) => ({ day: i, gbm: v, jump: jump[i] || v }));
+    const garchChart = sigma.map((s, i) => ({ day: i, sigma: s * Math.sqrt(252) * 100 }));
+    const regimeChart = regimeProbs.map((p, i) => ({ day: i, bull: p[2] || 0, neutral: p[1] || 0, bear: p[0] || 0 }));
+    return { chart, garchChart, regimeChart };
+  }, [asset]);
 
-    // Normalized chart: all assets start at 100 for comparison
-    const chart = Array.from({ length: 253 }, (_, i) => {
-      const point: Record<string, any> = { day: i };
-      perAsset.forEach(a => {
-        point[`${a.ticker}_gbm`] = (a.gbm[i] / a.gbm[0]) * 100;
-        point[`${a.ticker}_jump`] = ((a.jump[i] || a.gbm[i]) / a.gbm[0]) * 100;
-      });
-      return point;
-    });
-
-    // Aggregate portfolio GARCH vol (weighted average)
-    const maxLen = Math.max(...perAsset.map(a => a.sigma.length));
-    const garchChart = Array.from({ length: maxLen }, (_, i) => {
-      const point: Record<string, any> = { day: i };
-      perAsset.forEach(a => {
-        if (a.sigma[i] !== undefined) {
-          point[a.ticker] = a.sigma[i] * Math.sqrt(252) * 100;
-        }
-      });
-      return point;
-    });
-
-    // Regime detection - portfolio aggregate
-    const regimeLen = Math.max(...perAsset.map(a => a.regimeProbs.length));
-    const regimeChart = Array.from({ length: regimeLen }, (_, i) => {
-      let bull = 0, neutral = 0, bear = 0;
-      let count = 0;
-      perAsset.forEach(a => {
-        if (a.regimeProbs[i]) {
-          bull += a.regimeProbs[i][2] || 0;
-          neutral += a.regimeProbs[i][1] || 0;
-          bear += a.regimeProbs[i][0] || 0;
-          count++;
-        }
-      });
-      return { day: i, bull: bull / (count || 1), neutral: neutral / (count || 1), bear: bear / (count || 1) };
-    });
-
-    return { chart, garchChart, regimeChart, perAsset };
-  }, [assets]);
-
-  if (!data) return <EmptyMsg />;
+  if (!asset) return <EmptyMsg />;
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Price Dynamics — {assets.length} Assets</h3>
-      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Normalized to base 100 for cross-asset comparison</p>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Price Dynamics — {asset.ticker}</h3>
+      <p className="text-[9px] sm:text-[10px] text-muted-foreground">GBM: dS = μSdt + σSdW | Jump Diffusion: dS = μSdt + σSdW + JSdq</p>
 
       <div className="h-48 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
-            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} width={45} label={{ value: "Base 100", angle: -90, position: "insideLeft", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
-            {data.perAsset.map((a, i) => (
-              <Line key={a.ticker} dataKey={`${a.ticker}_gbm`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1.5} dot={false} name={a.ticker} />
-            ))}
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} tickFormatter={v => fmt(v)} width={55} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
+            <Line dataKey="gbm" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} name="GBM" />
+            <Line dataKey="jump" stroke="hsl(var(--loss))" strokeWidth={1} dot={false} name="Jump Diffusion" strokeDasharray="3 3" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility — All Assets</p>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">GARCH(1,1) Volatility</p>
           <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.garchChart}>
+              <AreaChart data={data.garchChart}>
                 <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `${v.toFixed(0)}%`} width={35} />
-                {data.perAsset.map((a, i) => (
-                  <Line key={a.ticker} dataKey={a.ticker} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1} dot={false} name={a.ticker} />
-                ))}
-              </LineChart>
+                <Area dataKey="sigma" fill="hsl(var(--primary))" fillOpacity={0.15} stroke="hsl(var(--primary))" strokeWidth={1} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
         <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Portfolio Regime Detection (Aggregate)</p>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">HMM Regime Detection</p>
           <div className="h-28 sm:h-32">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.regimeChart} stackOffset="expand">
@@ -349,59 +307,39 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
 }
 
 function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+  const asset = assets[0];
   const data = useMemo(() => {
-    if (assets.length === 0) return null;
+    if (!asset) return null;
+    // Generate synthetic historical prices
+    const prices = [asset.price];
+    for (let i = 1; i < 120; i++) {
+      prices.unshift(prices[0] / Math.exp((asset.mu / 252) + (asset.vol / Math.sqrt(252)) * SA.gaussianRandom()));
+    }
+    const forecast = SA.arimaForecast(prices, 30);
+    const { filtered } = SA.kalmanFilter(prices);
 
-    const perAsset = assets.map(a => {
-      const prices = [a.price];
-      for (let i = 1; i < 120; i++) {
-        prices.unshift(prices[0] / Math.exp((a.mu / 252) + (a.vol / Math.sqrt(252)) * SA.gaussianRandom()));
-      }
-      const forecast = SA.arimaForecast(prices, 30);
-      const { filtered } = SA.kalmanFilter(prices);
-      return { ticker: a.ticker, prices, forecast, filtered };
-    });
+    const histChart = prices.map((p, i) => ({ day: i, raw: p, kalman: filtered[i] }));
+    const forecastChart = forecast.map((p, i) => ({ day: prices.length + i, forecast: p }));
+    return { histChart, forecastChart, combined: [...histChart.map(d => ({ ...d, forecast: undefined })), ...forecastChart.map(d => ({ ...d, raw: undefined, kalman: undefined }))] };
+  }, [asset]);
 
-    // Combined normalized chart (base 100)
-    const combined = Array.from({ length: 150 }, (_, i) => {
-      const point: Record<string, any> = { day: i };
-      perAsset.forEach(a => {
-        if (i < 120) {
-          point[`${a.ticker}_raw`] = (a.prices[i] / a.prices[0]) * 100;
-          point[`${a.ticker}_kalman`] = (a.filtered[i] / a.prices[0]) * 100;
-        } else {
-          const fi = i - 120;
-          if (a.forecast[fi] !== undefined) {
-            point[`${a.ticker}_forecast`] = (a.forecast[fi] / a.prices[0]) * 100;
-          }
-        }
-      });
-      return point;
-    });
-
-    return { combined, perAsset };
-  }, [assets]);
-
-  if (!data) return <EmptyMsg />;
+  if (!data || !asset) return <EmptyMsg />;
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Time Series — {assets.length} Assets</h3>
-      <p className="text-[10px] text-muted-foreground">Kalman Filter (noise separation) + ARIMA Forecast (30-day) | Normalized base 100</p>
+      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Time Series Signals — {asset.ticker}</h3>
+      <p className="text-[10px] text-muted-foreground">Kalman Filter (noise separation) + ARIMA Forecast (30-day projection)</p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.combined}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={45} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={65} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
+            <Line dataKey="raw" stroke="hsl(var(--muted-foreground))" strokeWidth={0.8} dot={false} name="Raw Price" strokeOpacity={0.5} />
+            <Line dataKey="kalman" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Kalman Filtered" />
+            <Line dataKey="forecast" stroke="hsl(var(--gain))" strokeWidth={1.5} dot={false} name="ARIMA Forecast" strokeDasharray="5 3" />
             <ReferenceLine x={120} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.5} />
-            {data.perAsset.map((a, i) => (
-              <Line key={`k-${a.ticker}`} dataKey={`${a.ticker}_kalman`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={2} dot={false} name={`${a.ticker} Kalman`} />
-            ))}
-            {data.perAsset.map((a, i) => (
-              <Line key={`f-${a.ticker}`} dataKey={`${a.ticker}_forecast`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1.5} dot={false} name={`${a.ticker} Forecast`} strokeDasharray="5 3" />
-            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -687,94 +625,156 @@ function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfol
 // ─── Mean Reversion SnapBack Panel ──────────────────────────────────
 
 function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+  const asset = assets[0];
   const data = useMemo(() => {
-    if (assets.length === 0) return null;
+    if (!asset) return null;
 
-    return assets.map(a => {
-      const prices: number[] = [a.price];
-      for (let i = 1; i < 120; i++) {
-        prices.unshift(prices[0] / Math.exp((a.mu / 252) + (a.vol / Math.sqrt(252)) * SA.gaussianRandom()));
-      }
+    // Generate synthetic historical prices
+    const prices: number[] = [asset.price];
+    for (let i = 1; i < 120; i++) {
+      prices.unshift(prices[0] / Math.exp((asset.mu / 252) + (asset.vol / Math.sqrt(252)) * SA.gaussianRandom()));
+    }
 
-      const ou = SA.estimateOU(prices);
-      const halfLife = SA.meanReversionHalfLife(ou.theta);
-      const hurst = SA.hurstExponent(prices);
-      const z = SA.zScore(a.price, prices);
-      const snapProb = SA.snapBackProbability(a.price, ou, 20);
-      const expectedSnap = ou.mu + (a.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
+    const ou = SA.estimateOU(prices);
+    const halfLife = SA.meanReversionHalfLife(ou.theta);
+    const hurst = SA.hurstExponent(prices);
+    const z = SA.zScore(asset.price, prices);
+    const bands = SA.meanReversionBands(prices, 20, 2);
+    const snapProb = SA.snapBackProbability(asset.price, ou, 20);
+    const expectedSnap = ou.mu + (asset.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
 
-      return {
-        ticker: a.ticker, price: a.price, ou, halfLife, hurst, z, snapProb, expectedSnap,
-        isStationary: hurst < 0.5,
-        deviation: ((a.price - ou.mu) / ou.mu * 100),
-      };
+    // Sim paths from current price
+    const simPaths = SA.ouSimPaths(asset.price, ou, 60, 20);
+    const simChart = Array.from({ length: 61 }, (_, d) => {
+      const point: Record<string, number> = { day: d, mean: ou.mu };
+      simPaths.forEach((path, i) => { point[`p${i}`] = path[d]; });
+      return point;
     });
-  }, [assets]);
 
-  if (!data) return <EmptyMsg />;
+    // Price + bands chart
+    const bandsChart = prices.map((p, i) => ({
+      day: i, price: p, sma: bands.mean[i], upper: bands.upper[i], lower: bands.lower[i],
+    }));
+
+    // Z-score history
+    const zHistory = prices.map((_, i) => {
+      const slice = prices.slice(0, i + 1);
+      return { day: i, z: SA.zScore(prices[i], slice.slice(Math.max(0, slice.length - 20))) };
+    });
+
+    return {
+      ou, halfLife, hurst, z, snapProb, expectedSnap,
+      isStationary: hurst < 0.5,
+      bandsChart, simChart, zHistory,
+      meanPrice: ou.mu,
+    };
+  }, [asset]);
+
+  if (!data || !asset) return <EmptyMsg />;
+
+  const snapColor = data.snapProb > 0.6 ? "text-gain" : data.snapProb > 0.4 ? "text-warning" : "text-loss";
+  const hurstColor = data.hurst < 0.45 ? "text-gain" : data.hurst < 0.55 ? "text-warning" : "text-loss";
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Mean Reversion SnapBack — Portfolio</h3>
+        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Mean Reversion SnapBack — {asset.ticker}</h3>
         <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">Ornstein-Uhlenbeck: dX = θ(μ - X)dt + σdW | Half-life = ln(2)/θ</p>
       </div>
 
-      {/* Portfolio-wide comparison table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-[10px] font-mono">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-2 py-1.5 text-left text-muted-foreground">Asset</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Z-Score</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Half-Life</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Hurst</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">SnapBack %</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">θ</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Expected</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Dev %</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Regime</th>
-              <th className="px-2 py-1.5 text-right text-muted-foreground">Signal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map(d => {
-              const snapColor = d.snapProb > 0.6 ? "text-gain" : d.snapProb > 0.4 ? "text-warning" : "text-loss";
-              const hurstColor = d.hurst < 0.45 ? "text-gain" : d.hurst < 0.55 ? "text-warning" : "text-loss";
-              const signal = Math.abs(d.z) > 2 && d.isStationary ? "STRONG" : Math.abs(d.z) > 1.5 && d.isStationary ? "MODERATE" : "—";
-              const signalColor = signal === "STRONG" ? "text-gain" : signal === "MODERATE" ? "text-warning" : "text-muted-foreground";
-              return (
-                <tr key={d.ticker} className="border-b border-border/50 hover:bg-muted/30">
-                  <td className="px-2 py-1.5 font-bold text-foreground">{d.ticker}</td>
-                  <td className={`px-2 py-1.5 text-right ${Math.abs(d.z) > 2 ? "text-loss font-bold" : Math.abs(d.z) > 1 ? "text-warning" : "text-gain"}`}>{d.z.toFixed(2)}</td>
-                  <td className={`px-2 py-1.5 text-right ${d.halfLife < 20 ? "text-gain" : "text-muted-foreground"}`}>{d.halfLife.toFixed(1)}d</td>
-                  <td className={`px-2 py-1.5 text-right ${hurstColor}`}>{d.hurst.toFixed(3)}</td>
-                  <td className={`px-2 py-1.5 text-right font-bold ${snapColor}`}>{(d.snapProb * 100).toFixed(0)}%</td>
-                  <td className="px-2 py-1.5 text-right text-primary">{d.ou.theta.toFixed(3)}</td>
-                  <td className={`px-2 py-1.5 text-right ${d.expectedSnap > d.price ? "text-gain" : "text-loss"}`}>{fmt(d.expectedSnap)}</td>
-                  <td className={`px-2 py-1.5 text-right ${Math.abs(d.deviation) > 5 ? "text-loss" : "text-muted-foreground"}`}>{d.deviation.toFixed(1)}%</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <span className={`inline-flex items-center gap-1 ${d.isStationary ? "text-gain" : "text-warning"}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${d.isStationary ? "bg-gain" : "bg-warning"}`} />
-                      {d.isStationary ? "Revert" : "Trend"}
-                    </span>
-                  </td>
-                  <td className={`px-2 py-1.5 text-right font-bold ${signalColor}`}>
-                    {signal} {d.z > 1.5 ? "↓" : d.z < -1.5 ? "↑" : ""}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Key metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+        <MetricCard label="Z-Score" value={data.z.toFixed(2)} color={Math.abs(data.z) > 2 ? "text-loss" : Math.abs(data.z) > 1 ? "text-warning" : "text-gain"} />
+        <MetricCard label="Half-Life" value={`${data.halfLife.toFixed(1)}d`} color={data.halfLife < 20 ? "text-gain" : "text-muted-foreground"} />
+        <MetricCard label="Hurst Exp" value={data.hurst.toFixed(3)} color={hurstColor} />
+        <MetricCard label="SnapBack Prob" value={`${(data.snapProb * 100).toFixed(0)}%`} color={snapColor} />
+        <MetricCard label="OU θ" value={data.ou.theta.toFixed(3)} color="text-primary" />
+        <MetricCard label="Expected Price" value={fmt(data.expectedSnap)} color={data.expectedSnap > asset.price ? "text-gain" : "text-loss"} />
       </div>
 
-      {/* Summary metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricCard label="Mean-Reverting" value={`${data.filter(d => d.isStationary).length}/${data.length}`} color="text-gain" />
-        <MetricCard label="Strong Signals" value={`${data.filter(d => Math.abs(d.z) > 2 && d.isStationary).length}`} color="text-primary" />
-        <MetricCard label="Avg Half-Life" value={`${(data.reduce((s, d) => s + d.halfLife, 0) / data.length).toFixed(1)}d`} color="text-foreground" />
-        <MetricCard label="Avg Hurst" value={(data.reduce((s, d) => s + d.hurst, 0) / data.length).toFixed(3)} color="text-foreground" />
+      {/* Regime indicator */}
+      <div className={`rounded-lg border p-3 ${data.isStationary ? "border-gain/30 bg-gain/5" : "border-warning/30 bg-warning/5"}`}>
+        <div className="flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full ${data.isStationary ? "bg-gain animate-pulse" : "bg-warning"}`} />
+          <span className="text-[10px] sm:text-xs font-bold text-foreground">
+            {data.isStationary ? "MEAN-REVERTING REGIME DETECTED" : "TRENDING / NON-STATIONARY REGIME"}
+          </span>
+        </div>
+        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">
+          Hurst = {data.hurst.toFixed(3)} {data.isStationary ? "(< 0.5 → anti-persistent)" : "(≥ 0.5 → persistent/trending)"} 
+          | Mean = {fmt(data.meanPrice)} | Current deviation: {((asset.price - data.meanPrice) / data.meanPrice * 100).toFixed(1)}%
+        </p>
+      </div>
+
+      {/* Price with Bollinger bands */}
+      <div>
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Price vs Mean-Reversion Bands (2σ)</p>
+        <div className="h-48 sm:h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data.bandsChart}>
+              <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
+              <Line dataKey="upper" stroke="hsl(var(--loss))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Upper Band" />
+              <Line dataKey="sma" stroke="hsl(var(--muted-foreground))" strokeWidth={1} dot={false} name="SMA(20)" />
+              <Line dataKey="lower" stroke="hsl(var(--gain))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Lower Band" />
+              <Line dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Price" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {/* Z-Score history */}
+        <div>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Z-Score History</p>
+          <div className="h-32 sm:h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.zHistory}>
+                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={30} />
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.5} />
+                <ReferenceLine y={2} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.5} />
+                <ReferenceLine y={-2} stroke="hsl(var(--gain))" strokeDasharray="3 3" strokeOpacity={0.5} />
+                <Area dataKey="z" fill="hsl(var(--primary))" fillOpacity={0.15} stroke="hsl(var(--primary))" strokeWidth={1.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* OU Simulation paths */}
+        <div>
+          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">OU SnapBack Simulation (60d, 20 paths)</p>
+          <div className="h-32 sm:h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.simChart}>
+                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
+                <ReferenceLine y={data.meanPrice} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.6} label={{ value: "μ", position: "right", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                {Array.from({ length: 20 }, (_, i) => (
+                  <Line key={i} dataKey={`p${i}`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={0.7} dot={false} strokeOpacity={0.5} isAnimationActive={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Trade signal summary */}
+      <div className="rounded-lg border border-border p-3 sm:p-4">
+        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">SnapBack Trade Signal</p>
+        <div className="space-y-1 text-[10px] sm:text-[11px] text-muted-foreground font-mono">
+          <p>• Z-Score: <span className={Math.abs(data.z) > 2 ? "text-loss font-bold" : "text-foreground"}>{data.z.toFixed(3)}</span> — {Math.abs(data.z) > 2 ? "EXTREME deviation" : Math.abs(data.z) > 1 ? "Moderate deviation" : "Within normal range"}</p>
+          <p>• Half-life: <span className="text-foreground">{data.halfLife.toFixed(1)} days</span> — {data.halfLife < 10 ? "Fast reversion" : data.halfLife < 30 ? "Moderate speed" : "Slow reversion"}</p>
+          <p>• SnapBack probability (20d): <span className={snapColor + " font-bold"}>{(data.snapProb * 100).toFixed(1)}%</span></p>
+          <p>• Expected price in 20d: <span className="text-foreground">{fmt(data.expectedSnap)}</span> ({((data.expectedSnap - asset.price) / asset.price * 100).toFixed(2)}%)</p>
+          <p>• Signal: <span className={`font-bold ${Math.abs(data.z) > 1.5 && data.isStationary ? "text-gain" : "text-muted-foreground"}`}>
+            {Math.abs(data.z) > 2 && data.isStationary ? "STRONG SNAPBACK" : Math.abs(data.z) > 1.5 && data.isStationary ? "MODERATE SNAPBACK" : "NO SIGNAL"}
+          </span> {data.z > 1.5 ? "(SHORT bias)" : data.z < -1.5 ? "(LONG bias)" : ""}</p>
+        </div>
       </div>
     </div>
   );
