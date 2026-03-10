@@ -135,8 +135,8 @@ async function callOpenRouter(opts: CallAIOptions): Promise<AIResult> {
 // ── Weighted provider selection with failover ──
 
 function selectProvider(): ProviderName {
-  // 80% NVIDIA, 20% OpenRouter
-  return Math.random() < 0.8 ? "nvidia" : "openrouter";
+  // 100% NVIDIA, OpenRouter is fallback only
+  return "nvidia";
 }
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
