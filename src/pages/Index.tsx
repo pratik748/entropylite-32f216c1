@@ -62,7 +62,15 @@ const IndexContent = () => {
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
-  const { refreshKey, isRefreshing } = useIntelligenceRefresh();
+  const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
+
+  // Force refresh when user switches tabs
+  const handleTabSwitch = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    tabSwitchCounter.current++;
+    flushAllCaches();
+    triggerRefresh();
+  }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
 
   const stocksRef = useRef(stocks);
