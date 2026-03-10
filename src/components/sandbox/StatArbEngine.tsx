@@ -349,39 +349,59 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
 }
 
 function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
-  const asset = assets[0];
   const data = useMemo(() => {
-    if (!asset) return null;
-    // Generate synthetic historical prices
-    const prices = [asset.price];
-    for (let i = 1; i < 120; i++) {
-      prices.unshift(prices[0] / Math.exp((asset.mu / 252) + (asset.vol / Math.sqrt(252)) * SA.gaussianRandom()));
-    }
-    const forecast = SA.arimaForecast(prices, 30);
-    const { filtered } = SA.kalmanFilter(prices);
+    if (assets.length === 0) return null;
 
-    const histChart = prices.map((p, i) => ({ day: i, raw: p, kalman: filtered[i] }));
-    const forecastChart = forecast.map((p, i) => ({ day: prices.length + i, forecast: p }));
-    return { histChart, forecastChart, combined: [...histChart.map(d => ({ ...d, forecast: undefined })), ...forecastChart.map(d => ({ ...d, raw: undefined, kalman: undefined }))] };
-  }, [asset]);
+    const perAsset = assets.map(a => {
+      const prices = [a.price];
+      for (let i = 1; i < 120; i++) {
+        prices.unshift(prices[0] / Math.exp((a.mu / 252) + (a.vol / Math.sqrt(252)) * SA.gaussianRandom()));
+      }
+      const forecast = SA.arimaForecast(prices, 30);
+      const { filtered } = SA.kalmanFilter(prices);
+      return { ticker: a.ticker, prices, forecast, filtered };
+    });
 
-  if (!data || !asset) return <EmptyMsg />;
+    // Combined normalized chart (base 100)
+    const combined = Array.from({ length: 150 }, (_, i) => {
+      const point: Record<string, any> = { day: i };
+      perAsset.forEach(a => {
+        if (i < 120) {
+          point[`${a.ticker}_raw`] = (a.prices[i] / a.prices[0]) * 100;
+          point[`${a.ticker}_kalman`] = (a.filtered[i] / a.prices[0]) * 100;
+        } else {
+          const fi = i - 120;
+          if (a.forecast[fi] !== undefined) {
+            point[`${a.ticker}_forecast`] = (a.forecast[fi] / a.prices[0]) * 100;
+          }
+        }
+      });
+      return point;
+    });
+
+    return { combined, perAsset };
+  }, [assets]);
+
+  if (!data) return <EmptyMsg />;
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Time Series Signals — {asset.ticker}</h3>
-      <p className="text-[10px] text-muted-foreground">Kalman Filter (noise separation) + ARIMA Forecast (30-day projection)</p>
+      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Time Series — {assets.length} Assets</h3>
+      <p className="text-[10px] text-muted-foreground">Kalman Filter (noise separation) + ARIMA Forecast (30-day) | Normalized base 100</p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.combined}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
             <XAxis dataKey="day" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={65} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
-            <Line dataKey="raw" stroke="hsl(var(--muted-foreground))" strokeWidth={0.8} dot={false} name="Raw Price" strokeOpacity={0.5} />
-            <Line dataKey="kalman" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Kalman Filtered" />
-            <Line dataKey="forecast" stroke="hsl(var(--gain))" strokeWidth={1.5} dot={false} name="ARIMA Forecast" strokeDasharray="5 3" />
+            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={45} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
             <ReferenceLine x={120} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.5} />
+            {data.perAsset.map((a, i) => (
+              <Line key={`k-${a.ticker}`} dataKey={`${a.ticker}_kalman`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={2} dot={false} name={`${a.ticker} Kalman`} />
+            ))}
+            {data.perAsset.map((a, i) => (
+              <Line key={`f-${a.ticker}`} dataKey={`${a.ticker}_forecast`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={1.5} dot={false} name={`${a.ticker} Forecast`} strokeDasharray="5 3" />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
