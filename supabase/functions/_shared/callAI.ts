@@ -1,5 +1,6 @@
 /**
- * AI caller — NVIDIA Qwen 3.5-122B only, with retry + exponential backoff.
+ * AI caller — NVIDIA Nemotron Super 49B, with retry + exponential backoff.
+ * Switched from Qwen 3.5-122B for 2-3x faster inference.
  */
 
 interface CallAIOptions {
