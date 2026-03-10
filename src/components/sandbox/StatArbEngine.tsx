@@ -687,156 +687,94 @@ function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfol
 // ─── Mean Reversion SnapBack Panel ──────────────────────────────────
 
 function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
-  const asset = assets[0];
   const data = useMemo(() => {
-    if (!asset) return null;
+    if (assets.length === 0) return null;
 
-    // Generate synthetic historical prices
-    const prices: number[] = [asset.price];
-    for (let i = 1; i < 120; i++) {
-      prices.unshift(prices[0] / Math.exp((asset.mu / 252) + (asset.vol / Math.sqrt(252)) * SA.gaussianRandom()));
-    }
+    return assets.map(a => {
+      const prices: number[] = [a.price];
+      for (let i = 1; i < 120; i++) {
+        prices.unshift(prices[0] / Math.exp((a.mu / 252) + (a.vol / Math.sqrt(252)) * SA.gaussianRandom()));
+      }
 
-    const ou = SA.estimateOU(prices);
-    const halfLife = SA.meanReversionHalfLife(ou.theta);
-    const hurst = SA.hurstExponent(prices);
-    const z = SA.zScore(asset.price, prices);
-    const bands = SA.meanReversionBands(prices, 20, 2);
-    const snapProb = SA.snapBackProbability(asset.price, ou, 20);
-    const expectedSnap = ou.mu + (asset.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
+      const ou = SA.estimateOU(prices);
+      const halfLife = SA.meanReversionHalfLife(ou.theta);
+      const hurst = SA.hurstExponent(prices);
+      const z = SA.zScore(a.price, prices);
+      const snapProb = SA.snapBackProbability(a.price, ou, 20);
+      const expectedSnap = ou.mu + (a.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
 
-    // Sim paths from current price
-    const simPaths = SA.ouSimPaths(asset.price, ou, 60, 20);
-    const simChart = Array.from({ length: 61 }, (_, d) => {
-      const point: Record<string, number> = { day: d, mean: ou.mu };
-      simPaths.forEach((path, i) => { point[`p${i}`] = path[d]; });
-      return point;
+      return {
+        ticker: a.ticker, price: a.price, ou, halfLife, hurst, z, snapProb, expectedSnap,
+        isStationary: hurst < 0.5,
+        deviation: ((a.price - ou.mu) / ou.mu * 100),
+      };
     });
+  }, [assets]);
 
-    // Price + bands chart
-    const bandsChart = prices.map((p, i) => ({
-      day: i, price: p, sma: bands.mean[i], upper: bands.upper[i], lower: bands.lower[i],
-    }));
-
-    // Z-score history
-    const zHistory = prices.map((_, i) => {
-      const slice = prices.slice(0, i + 1);
-      return { day: i, z: SA.zScore(prices[i], slice.slice(Math.max(0, slice.length - 20))) };
-    });
-
-    return {
-      ou, halfLife, hurst, z, snapProb, expectedSnap,
-      isStationary: hurst < 0.5,
-      bandsChart, simChart, zHistory,
-      meanPrice: ou.mu,
-    };
-  }, [asset]);
-
-  if (!data || !asset) return <EmptyMsg />;
-
-  const snapColor = data.snapProb > 0.6 ? "text-gain" : data.snapProb > 0.4 ? "text-warning" : "text-loss";
-  const hurstColor = data.hurst < 0.45 ? "text-gain" : data.hurst < 0.55 ? "text-warning" : "text-loss";
+  if (!data) return <EmptyMsg />;
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Mean Reversion SnapBack — {asset.ticker}</h3>
+        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Mean Reversion SnapBack — Portfolio</h3>
         <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">Ornstein-Uhlenbeck: dX = θ(μ - X)dt + σdW | Half-life = ln(2)/θ</p>
       </div>
 
-      {/* Key metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-        <MetricCard label="Z-Score" value={data.z.toFixed(2)} color={Math.abs(data.z) > 2 ? "text-loss" : Math.abs(data.z) > 1 ? "text-warning" : "text-gain"} />
-        <MetricCard label="Half-Life" value={`${data.halfLife.toFixed(1)}d`} color={data.halfLife < 20 ? "text-gain" : "text-muted-foreground"} />
-        <MetricCard label="Hurst Exp" value={data.hurst.toFixed(3)} color={hurstColor} />
-        <MetricCard label="SnapBack Prob" value={`${(data.snapProb * 100).toFixed(0)}%`} color={snapColor} />
-        <MetricCard label="OU θ" value={data.ou.theta.toFixed(3)} color="text-primary" />
-        <MetricCard label="Expected Price" value={fmt(data.expectedSnap)} color={data.expectedSnap > asset.price ? "text-gain" : "text-loss"} />
+      {/* Portfolio-wide comparison table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-[10px] font-mono">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="px-2 py-1.5 text-left text-muted-foreground">Asset</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Z-Score</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Half-Life</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Hurst</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">SnapBack %</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">θ</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Expected</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Dev %</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Regime</th>
+              <th className="px-2 py-1.5 text-right text-muted-foreground">Signal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(d => {
+              const snapColor = d.snapProb > 0.6 ? "text-gain" : d.snapProb > 0.4 ? "text-warning" : "text-loss";
+              const hurstColor = d.hurst < 0.45 ? "text-gain" : d.hurst < 0.55 ? "text-warning" : "text-loss";
+              const signal = Math.abs(d.z) > 2 && d.isStationary ? "STRONG" : Math.abs(d.z) > 1.5 && d.isStationary ? "MODERATE" : "—";
+              const signalColor = signal === "STRONG" ? "text-gain" : signal === "MODERATE" ? "text-warning" : "text-muted-foreground";
+              return (
+                <tr key={d.ticker} className="border-b border-border/50 hover:bg-muted/30">
+                  <td className="px-2 py-1.5 font-bold text-foreground">{d.ticker}</td>
+                  <td className={`px-2 py-1.5 text-right ${Math.abs(d.z) > 2 ? "text-loss font-bold" : Math.abs(d.z) > 1 ? "text-warning" : "text-gain"}`}>{d.z.toFixed(2)}</td>
+                  <td className={`px-2 py-1.5 text-right ${d.halfLife < 20 ? "text-gain" : "text-muted-foreground"}`}>{d.halfLife.toFixed(1)}d</td>
+                  <td className={`px-2 py-1.5 text-right ${hurstColor}`}>{d.hurst.toFixed(3)}</td>
+                  <td className={`px-2 py-1.5 text-right font-bold ${snapColor}`}>{(d.snapProb * 100).toFixed(0)}%</td>
+                  <td className="px-2 py-1.5 text-right text-primary">{d.ou.theta.toFixed(3)}</td>
+                  <td className={`px-2 py-1.5 text-right ${d.expectedSnap > d.price ? "text-gain" : "text-loss"}`}>{fmt(d.expectedSnap)}</td>
+                  <td className={`px-2 py-1.5 text-right ${Math.abs(d.deviation) > 5 ? "text-loss" : "text-muted-foreground"}`}>{d.deviation.toFixed(1)}%</td>
+                  <td className="px-2 py-1.5 text-right">
+                    <span className={`inline-flex items-center gap-1 ${d.isStationary ? "text-gain" : "text-warning"}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${d.isStationary ? "bg-gain" : "bg-warning"}`} />
+                      {d.isStationary ? "Revert" : "Trend"}
+                    </span>
+                  </td>
+                  <td className={`px-2 py-1.5 text-right font-bold ${signalColor}`}>
+                    {signal} {d.z > 1.5 ? "↓" : d.z < -1.5 ? "↑" : ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Regime indicator */}
-      <div className={`rounded-lg border p-3 ${data.isStationary ? "border-gain/30 bg-gain/5" : "border-warning/30 bg-warning/5"}`}>
-        <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${data.isStationary ? "bg-gain animate-pulse" : "bg-warning"}`} />
-          <span className="text-[10px] sm:text-xs font-bold text-foreground">
-            {data.isStationary ? "MEAN-REVERTING REGIME DETECTED" : "TRENDING / NON-STATIONARY REGIME"}
-          </span>
-        </div>
-        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1">
-          Hurst = {data.hurst.toFixed(3)} {data.isStationary ? "(< 0.5 → anti-persistent)" : "(≥ 0.5 → persistent/trending)"} 
-          | Mean = {fmt(data.meanPrice)} | Current deviation: {((asset.price - data.meanPrice) / data.meanPrice * 100).toFixed(1)}%
-        </p>
-      </div>
-
-      {/* Price with Bollinger bands */}
-      <div>
-        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Price vs Mean-Reversion Bands (2σ)</p>
-        <div className="h-48 sm:h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.bandsChart}>
-              <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-              <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
-              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [fmt(v), ""]} />
-              <Line dataKey="upper" stroke="hsl(var(--loss))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Upper Band" />
-              <Line dataKey="sma" stroke="hsl(var(--muted-foreground))" strokeWidth={1} dot={false} name="SMA(20)" />
-              <Line dataKey="lower" stroke="hsl(var(--gain))" strokeWidth={0.8} dot={false} strokeDasharray="4 2" name="Lower Band" />
-              <Line dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Price" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        {/* Z-Score history */}
-        <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Z-Score History</p>
-          <div className="h-32 sm:h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.zHistory}>
-                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={30} />
-                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.5} />
-                <ReferenceLine y={2} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={-2} stroke="hsl(var(--gain))" strokeDasharray="3 3" strokeOpacity={0.5} />
-                <Area dataKey="z" fill="hsl(var(--primary))" fillOpacity={0.15} stroke="hsl(var(--primary))" strokeWidth={1.5} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* OU Simulation paths */}
-        <div>
-          <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">OU SnapBack Simulation (60d, 20 paths)</p>
-          <div className="h-32 sm:h-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.simChart}>
-                <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={55} />
-                <ReferenceLine y={data.meanPrice} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.6} label={{ value: "μ", position: "right", fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-                {Array.from({ length: 20 }, (_, i) => (
-                  <Line key={i} dataKey={`p${i}`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={0.7} dot={false} strokeOpacity={0.5} isAnimationActive={false} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Trade signal summary */}
-      <div className="rounded-lg border border-border p-3 sm:p-4">
-        <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">SnapBack Trade Signal</p>
-        <div className="space-y-1 text-[10px] sm:text-[11px] text-muted-foreground font-mono">
-          <p>• Z-Score: <span className={Math.abs(data.z) > 2 ? "text-loss font-bold" : "text-foreground"}>{data.z.toFixed(3)}</span> — {Math.abs(data.z) > 2 ? "EXTREME deviation" : Math.abs(data.z) > 1 ? "Moderate deviation" : "Within normal range"}</p>
-          <p>• Half-life: <span className="text-foreground">{data.halfLife.toFixed(1)} days</span> — {data.halfLife < 10 ? "Fast reversion" : data.halfLife < 30 ? "Moderate speed" : "Slow reversion"}</p>
-          <p>• SnapBack probability (20d): <span className={snapColor + " font-bold"}>{(data.snapProb * 100).toFixed(1)}%</span></p>
-          <p>• Expected price in 20d: <span className="text-foreground">{fmt(data.expectedSnap)}</span> ({((data.expectedSnap - asset.price) / asset.price * 100).toFixed(2)}%)</p>
-          <p>• Signal: <span className={`font-bold ${Math.abs(data.z) > 1.5 && data.isStationary ? "text-gain" : "text-muted-foreground"}`}>
-            {Math.abs(data.z) > 2 && data.isStationary ? "STRONG SNAPBACK" : Math.abs(data.z) > 1.5 && data.isStationary ? "MODERATE SNAPBACK" : "NO SIGNAL"}
-          </span> {data.z > 1.5 ? "(SHORT bias)" : data.z < -1.5 ? "(LONG bias)" : ""}</p>
-        </div>
+      {/* Summary metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MetricCard label="Mean-Reverting" value={`${data.filter(d => d.isStationary).length}/${data.length}`} color="text-gain" />
+        <MetricCard label="Strong Signals" value={`${data.filter(d => Math.abs(d.z) > 2 && d.isStationary).length}`} color="text-primary" />
+        <MetricCard label="Avg Half-Life" value={`${(data.reduce((s, d) => s + d.halfLife, 0) / data.length).toFixed(1)}d`} color="text-foreground" />
+        <MetricCard label="Avg Hurst" value={(data.reduce((s, d) => s + d.hurst, 0) / data.length).toFixed(3)} color="text-foreground" />
       </div>
     </div>
   );
