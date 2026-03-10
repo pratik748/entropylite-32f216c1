@@ -1,5 +1,5 @@
 /**
- * AI caller — OpenRouter only (nvidia/nemotron-3-nano-30b-a3b:free).
+ * AI caller — Lovable AI Gateway (google/gemini-3-flash-preview).
  */
 
 interface CallAIOptions {
@@ -7,48 +7,67 @@ interface CallAIOptions {
   userPrompt: string;
   maxTokens?: number;
   temperature?: number;
+  tools?: any[];
+  toolChoice?: any;
+  preferredProvider?: string; // ignored, kept for compat
 }
 
 interface AIResult {
   text: string;
-  provider: "openrouter";
+  provider: "lovable";
+  toolCall?: any;
 }
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const key = Deno.env.get("OPENROUTER_API_KEY");
-  if (!key) throw new Error("OPENROUTER_API_KEY not set");
+  const key = Deno.env.get("LOVABLE_API_KEY");
+  if (!key) throw new Error("LOVABLE_API_KEY not set");
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const body: any = {
+    model: "google/gemini-3-flash-preview",
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.3,
+    max_tokens: opts.maxTokens ?? 4000,
+  };
+
+  if (opts.tools) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://entropylite.lovable.app",
-      "X-Title": "Entropy Lite",
     },
-    body: JSON.stringify({
-      model: "nvidia/nemotron-3-nano-30b-a3b:free",
-      messages: [
-        { role: "system", content: opts.systemPrompt },
-        { role: "user", content: opts.userPrompt },
-      ],
-      temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.maxTokens ?? 4000,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    console.error(`OpenRouter error ${res.status}:`, body.slice(0, 300));
-    if (res.status === 429 || res.status === 402) {
-      throw { status: 429, message: "OpenRouter rate limited or insufficient credits", provider: "openrouter" };
+    const errBody = await res.text();
+    console.error(`Lovable AI error ${res.status}:`, errBody.slice(0, 300));
+    if (res.status === 429) {
+      throw { status: 429, message: "Rate limited, please try again shortly", provider: "lovable" };
     }
-    throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 200)}`);
+    if (res.status === 402) {
+      throw { status: 402, message: "AI credits exhausted", provider: "lovable" };
+    }
+    throw new Error(`Lovable AI ${res.status}: ${errBody.slice(0, 200)}`);
   }
 
   const data = await res.json();
+
+  // Handle tool calls
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+  if (toolCall) {
+    return { text: toolCall.function.arguments, provider: "lovable", toolCall };
+  }
+
   const raw = data.choices?.[0]?.message?.content?.trim();
-  if (!raw) throw new Error("Empty OpenRouter response");
+  if (!raw) throw new Error("Empty AI response");
   const text = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-  return { text, provider: "openrouter" };
+  return { text, provider: "lovable" };
 }
