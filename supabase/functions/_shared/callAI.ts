@@ -1,5 +1,5 @@
 /**
- * AI caller — OpenRouter only.
+ * AI caller — OpenRouter only (nvidia/nemotron-3-nano-30b-a3b:free).
  */
 
 interface CallAIOptions {
@@ -14,7 +14,7 @@ interface AIResult {
   provider: "openrouter";
 }
 
-async function callOpenRouter(opts: CallAIOptions): Promise<string> {
+export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const key = Deno.env.get("OPENROUTER_API_KEY");
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
@@ -27,7 +27,7 @@ async function callOpenRouter(opts: CallAIOptions): Promise<string> {
       "X-Title": "Entropy Lite",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "nvidia/nemotron-3-nano-30b-a3b:free",
       messages: [
         { role: "system", content: opts.systemPrompt },
         { role: "user", content: opts.userPrompt },
@@ -40,17 +40,15 @@ async function callOpenRouter(opts: CallAIOptions): Promise<string> {
   if (!res.ok) {
     const body = await res.text();
     console.error(`OpenRouter error ${res.status}:`, body.slice(0, 300));
-    if (res.status === 429 || res.status === 402) throw { status: 429, message: "OpenRouter rate limited or insufficient credits", provider: "openrouter" };
+    if (res.status === 429 || res.status === 402) {
+      throw { status: 429, message: "OpenRouter rate limited or insufficient credits", provider: "openrouter" };
+    }
     throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const data = await res.json();
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty OpenRouter response");
-  return raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
-}
-
-export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const text = await callOpenRouter(opts);
+  const text = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
   return { text, provider: "openrouter" };
 }

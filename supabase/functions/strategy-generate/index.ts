@@ -65,7 +65,7 @@ Generate exact trade instructions for this portfolio in this market environment.
         "X-Title": "Entropy Lite",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "nvidia/nemotron-3-nano-30b-a3b:free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
