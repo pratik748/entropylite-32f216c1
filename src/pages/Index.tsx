@@ -31,7 +31,7 @@ import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { governedInvoke } from "@/lib/apiGovernor";
+import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -56,6 +56,8 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [tabRefreshKey, setTabRefreshKey] = useState(0);
+  const prevTabRef = useRef<Tab>("dashboard");
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
@@ -66,6 +68,15 @@ const IndexContent = () => {
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
+
+  // Force data refresh when user switches tabs
+  useEffect(() => {
+    if (prevTabRef.current !== activeTab) {
+      prevTabRef.current = activeTab;
+      flushAllCaches();
+      setTabRefreshKey(k => k + 1);
+    }
+  }, [activeTab]);
   useEffect(() => { priceStatusRef.current = priceStatus; }, [priceStatus]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
@@ -332,13 +343,13 @@ const IndexContent = () => {
           )
         )}
 
-        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview key={refreshKey} /></div>}
-        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
-        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
-        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
-        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
-        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
-        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
+        {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview key={`market-${tabRefreshKey}`} /></div>}
+        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard key={`aug-${tabRefreshKey}`} stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox key={`sandbox-${tabRefreshKey}`} stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine key={`statarb-${tabRefreshKey}`} stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe key={`geo-${tabRefreshKey}`} stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
+        {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={`des-${tabRefreshKey}`} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
+        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard key={`risk-${tabRefreshKey}`} stocks={stocks} /></div>}
       </main>
 
       {/* System Status Bar */}
