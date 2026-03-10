@@ -35,7 +35,6 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
     temperature: opts.temperature ?? 0.6,
     max_tokens: opts.maxTokens ?? 16384,
     top_p: 0.95,
-    chat_template_kwargs: { enable_thinking: true },
   };
 
   if (opts.tools) {
