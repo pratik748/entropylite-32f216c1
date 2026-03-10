@@ -59,5 +59,5 @@ export function useIntelligenceRefresh() {
     };
   }, [triggerRefresh]);
 
-  return { refreshKey, isRefreshing, markRefreshComplete };
+  return { refreshKey, isRefreshing, markRefreshComplete, triggerRefresh };
 }
