@@ -199,7 +199,7 @@ const IndexContent = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabSwitch(tab.id)}
               className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? "glass-subtle glass-glow-primary text-primary"
