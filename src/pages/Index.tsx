@@ -68,6 +68,15 @@ const IndexContent = () => {
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
+
+  // Force data refresh when user switches tabs
+  useEffect(() => {
+    if (prevTabRef.current !== activeTab) {
+      prevTabRef.current = activeTab;
+      flushAllCaches();
+      setTabRefreshKey(k => k + 1);
+    }
+  }, [activeTab]);
   useEffect(() => { priceStatusRef.current = priceStatus; }, [priceStatus]);
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
