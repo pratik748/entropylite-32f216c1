@@ -61,13 +61,14 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
 
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (toolCall) {
-    return { text: stripThinkingBlocks(toolCall.function.arguments), provider: "nvidia", toolCall };
+    return { text: toolCall.function.arguments, provider: "nvidia", toolCall };
   }
 
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty NVIDIA response");
-  const cleaned = stripThinkingBlocks(raw);
-  const text = cleaned.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+  // Strip any residual thinking blocks and markdown fences
+  let text = stripThinkingBlocks(raw);
+  text = text.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
   return { text, provider: "nvidia" };
 }
 
