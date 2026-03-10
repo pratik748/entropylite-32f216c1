@@ -39,14 +39,13 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
   if (!key) throw new Error("NVIDIA_API_KEY not set");
 
   const body: any = {
-    model: opts.model || "qwen/qwen3.5-122b-a10b",
+    model: opts.model || "nvidia/llama-3.3-nemotron-super-49b-v1",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
     ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 16384,
-    top_p: 0.95,
+    temperature: opts.temperature ?? 0.3,
+    max_tokens: opts.maxTokens ?? 4096,
   };
 
   if (opts.tools) {
