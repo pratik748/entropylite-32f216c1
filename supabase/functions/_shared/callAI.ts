@@ -23,13 +23,46 @@ function stripThinkingBlocks(text: string): string {
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   // Strip "Thinking..." prefix lines (Qwen reasoning leak)
   cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
-  // If it still doesn't start with { or [, try to find the first JSON object
-  if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[")) {
-    const jsonStart = cleaned.indexOf("{");
-    if (jsonStart > 0) {
-      cleaned = cleaned.substring(jsonStart);
+  // Remove markdown code fences
+  cleaned = cleaned.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+  // Extract clean JSON from response (handle trailing garbage after valid JSON)
+  const jsonStart = cleaned.search(/[\{\[]/);
+  if (jsonStart === -1) return cleaned;
+
+  cleaned = cleaned.substring(jsonStart);
+  const isArray = cleaned[0] === "[";
+  const closingChar = isArray ? "]" : "}";
+
+  // Find the matching closing bracket/brace by counting depth
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let endPos = -1;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{" || ch === "[") depth++;
+    if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 0) { endPos = i; break; }
     }
   }
+
+  if (endPos > 0) {
+    cleaned = cleaned.substring(0, endPos + 1);
+  }
+
+  // Fix common LLM JSON issues
+  cleaned = cleaned
+    .replace(/,\s*}/g, "}")    // trailing commas in objects
+    .replace(/,\s*]/g, "]")    // trailing commas in arrays
+    .replace(/[\x00-\x1F\x7F]/g, " "); // control characters → space
+
   return cleaned;
 }
 
@@ -77,9 +110,7 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
 
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty NVIDIA response");
-  // Strip any residual thinking blocks and markdown fences
-  let text = stripThinkingBlocks(raw);
-  text = text.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+  const text = stripThinkingBlocks(raw);
   return { text, provider: "nvidia" };
 }
 
