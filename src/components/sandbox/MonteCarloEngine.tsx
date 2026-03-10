@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from "recharts";
-import { Activity, Lightbulb } from "lucide-react";
+import { Activity, Lightbulb, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
