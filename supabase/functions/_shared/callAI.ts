@@ -19,7 +19,18 @@ interface AIResult {
 }
 
 function stripThinkingBlocks(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip <think>...</think> XML blocks
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip "Thinking..." prefix lines (Qwen reasoning leak)
+  cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
+  // If it still doesn't start with { or [, try to find the first JSON object
+  if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+    const jsonStart = cleaned.indexOf("{");
+    if (jsonStart > 0) {
+      cleaned = cleaned.substring(jsonStart);
+    }
+  }
+  return cleaned;
 }
 
 async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
