@@ -388,6 +388,13 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {aiCalibration?.narrativeSummary && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-2">AI Simulation Analysis</h3>
+          <p className="text-xs text-secondary-foreground leading-relaxed">{aiCalibration.narrativeSummary}</p>
+        </div>
+      )}
     </div>
   );
 };
