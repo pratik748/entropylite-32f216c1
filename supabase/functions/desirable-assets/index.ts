@@ -71,7 +71,7 @@ Return JSON:
 }`,
       maxTokens: 4000,
       temperature: 0.35,
-      preferredProvider: "openrouter",
+      
     });
 
     console.log(`desirable-assets used provider: ${result.provider}`);
