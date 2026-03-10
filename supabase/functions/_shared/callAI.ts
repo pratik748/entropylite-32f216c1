@@ -1,5 +1,5 @@
 /**
- * AI caller — NVIDIA Nemotron only, with retry + exponential backoff.
+ * AI caller — NVIDIA Qwen 3.5-122B only, with retry + exponential backoff.
  */
 
 interface CallAIOptions {
@@ -18,18 +18,24 @@ interface AIResult {
   toolCall?: any;
 }
 
+function stripThinkingBlocks(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
+
 async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
   const key = Deno.env.get("NVIDIA_API_KEY");
   if (!key) throw new Error("NVIDIA_API_KEY not set");
 
   const body: any = {
-    model: opts.model || "nvidia/llama-3.3-nemotron-super-49b-v1",
+    model: opts.model || "qwen/qwen3.5-122b-a10b",
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: opts.userPrompt },
     ],
-    temperature: opts.temperature ?? 0.3,
-    max_tokens: opts.maxTokens ?? 4000,
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 16384,
+    top_p: 0.95,
+    chat_template_kwargs: { enable_thinking: true },
   };
 
   if (opts.tools) {
@@ -56,12 +62,13 @@ async function callNvidia(opts: CallAIOptions): Promise<AIResult> {
 
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (toolCall) {
-    return { text: toolCall.function.arguments, provider: "nvidia", toolCall };
+    return { text: stripThinkingBlocks(toolCall.function.arguments), provider: "nvidia", toolCall };
   }
 
   const raw = data.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("Empty NVIDIA response");
-  const text = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+  const cleaned = stripThinkingBlocks(raw);
+  const text = cleaned.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
   return { text, provider: "nvidia" };
 }
 
@@ -85,17 +92,14 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       lastError = err;
       console.error(`callAI → attempt ${attempt + 1} failed:`, err.message || err);
 
-      // Hard failures — no retry
       if (err.status === 401 || err.status === 402) {
         throw new Error(`NVIDIA auth/credits error (${err.status}): ${err.message}`);
       }
 
-      // Retryable: 429, 5xx
       if (err.status === 429 || (err.status >= 500 && err.status < 600)) {
         continue;
       }
 
-      // Unknown error — throw immediately
       throw err;
     }
   }
