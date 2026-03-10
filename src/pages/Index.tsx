@@ -31,7 +31,7 @@ import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { governedInvoke } from "@/lib/apiGovernor";
+import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -56,12 +56,21 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
-  const { refreshKey, isRefreshing } = useIntelligenceRefresh();
+  const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
+
+  // Force refresh when user switches tabs
+  const handleTabSwitch = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    tabSwitchCounter.current++;
+    flushAllCaches();
+    triggerRefresh();
+  }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
 
   const stocksRef = useRef(stocks);
@@ -190,7 +199,7 @@ const IndexContent = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabSwitch(tab.id)}
               className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? "glass-subtle glass-glow-primary text-primary"
@@ -333,12 +342,12 @@ const IndexContent = () => {
         )}
 
         {activeTab === "market" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><MarketOverview key={refreshKey} /></div>}
-        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard stocks={stocks} /></div>}
-        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox stocks={stocks} /></div>}
-        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine stocks={stocks} /></div>}
-        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
+        {activeTab === "augment" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><AugmentDashboard key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "sandbox" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><EntropySandbox key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "statarb" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><StatArbEngine key={refreshKey} stocks={stocks} /></div>}
+        {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe key={refreshKey} stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
         {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
-        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard stocks={stocks} /></div>}
+        {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard key={refreshKey} stocks={stocks} /></div>}
       </main>
 
       {/* System Status Bar */}

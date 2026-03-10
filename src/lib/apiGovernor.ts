@@ -33,9 +33,9 @@ interface GovernorMetrics {
 type Tier = "realtime" | "frequent" | "slow" | "static" | "ai";
 
 const TTL: Record<Tier, number> = {
-  realtime: 15_000,   // 15s — prices
-  frequent: 30_000,   // 30s — market overview, ticker strip
-  slow:     120_000,  // 2 min — news, geopolitical, desirable assets
+  realtime: 8_000,    // 8s — prices (aggressive freshness)
+  frequent: 15_000,   // 15s — market overview, ticker strip
+  slow:     60_000,   // 1 min — news, geopolitical, desirable assets
   static:   Infinity, // permanent — historical data
   ai:       30_000,   // 30s cooldown for AI calls
 };
