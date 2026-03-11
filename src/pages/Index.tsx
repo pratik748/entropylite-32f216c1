@@ -230,7 +230,7 @@ const IndexContent = () => {
       <TickerStrip />
 
       {/* Main Content — fills all remaining space, above the status bar */}
-      <main className="flex-1 min-h-0 pb-8 sm:pb-6 overflow-auto">
+      <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
