@@ -48,9 +48,6 @@ verify_jwt = false
 [functions.deep-intelligence]
 verify_jwt = false
 
-[functions.parallel-intelligence]
-verify_jwt = false
-
 [functions.continuous-simulation]
 verify_jwt = false
 
