@@ -67,11 +67,13 @@ const ENDPOINT_TIER: Record<string, Tier> = {
 
 // Rough cost weights for monitoring (relative units)
 const COST_WEIGHT: Record<Tier, number> = {
-  realtime: 0.1,
-  frequent: 0.2,
-  slow:     0.5,
-  static:   0,
-  ai:       5,
+  realtime:   0.1,
+  frequent:   0.2,
+  slow:       0.5,
+  static:     0,
+  ai:         5,
+  continuous: 3,
+  evolution:  4,
 };
 
 // --------------- Singleton State ---------------

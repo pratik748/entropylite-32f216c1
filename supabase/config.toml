@@ -47,3 +47,15 @@ verify_jwt = false
 
 [functions.deep-intelligence]
 verify_jwt = false
+
+[functions.parallel-intelligence]
+verify_jwt = false
+
+[functions.continuous-simulation]
+verify_jwt = false
+
+[functions.clank-detection]
+verify_jwt = false
+
+[functions.strategy-evolution]
+verify_jwt = false
