@@ -4,64 +4,78 @@ interface Props {
   size?: number;
 }
 
-const RiskGauge = ({ score, label = "Global Risk", size = 140 }: Props) => {
+const RiskGauge = ({ score, label = "GLOBAL RISK INDEX", size = 140 }: Props) => {
   const clampedScore = Math.max(0, Math.min(100, score));
-  const radius = (size - 20) / 2;
-  const cx = size / 2;
-  const cy = size / 2 + 8;
-  const strokeWidth = 10;
+  const isHigh = clampedScore >= 55;
+  const isMid = clampedScore >= 30;
+  const riskLabel = clampedScore >= 75 ? "CRITICAL" : clampedScore >= 55 ? "ELEVATED" : clampedScore >= 30 ? "MODERATE" : "LOW";
+  const needleColor = isHigh ? "hsl(var(--loss))" : isMid ? "hsl(var(--warning))" : "hsl(var(--gain))";
 
-  // Arc geometry (half-circle from left to right)
-  const startAngle = Math.PI;
-  const sweepAngle = startAngle - (clampedScore / 100) * Math.PI;
+  // Dimensions
+  const w = size;
+  const h = size * 0.65;
+  const cx = w / 2;
+  const cy = h - 12;
+  const outerR = w / 2 - 8;
+  const innerR = outerR - 14;
+  const trackWidth = 6;
 
-  const arcPoint = (angle: number) => ({
-    x: cx + radius * Math.cos(angle),
-    y: cy - radius * Math.sin(angle),
+  // Arc helpers
+  const polarToCart = (angle: number, r: number) => ({
+    x: cx + r * Math.cos(angle),
+    y: cy - r * Math.sin(angle),
   });
 
-  const bgStart = arcPoint(Math.PI);
-  const bgEnd = arcPoint(0);
-  const valEnd = arcPoint(sweepAngle);
+  const arcPath = (r: number, startDeg: number, endDeg: number) => {
+    const s = polarToCart(startDeg, r);
+    const e = polarToCart(endDeg, r);
+    const large = Math.abs(startDeg - endDeg) > Math.PI ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+  };
 
-  // Tick marks at 0, 25, 50, 75, 100
-  const ticks = [0, 25, 50, 75, 100].map((v) => {
-    const angle = Math.PI - (v / 100) * Math.PI;
-    const inner = radius - strokeWidth / 2 - 3;
-    const outer = radius + strokeWidth / 2 + 3;
-    return {
-      x1: cx + inner * Math.cos(angle),
-      y1: cy - inner * Math.sin(angle),
-      x2: cx + outer * Math.cos(angle),
-      y2: cy - outer * Math.sin(angle),
-    };
+  // Build segmented arc (institutional look: 40 segments)
+  const totalSegments = 40;
+  const gapAngle = 0.02; // radians gap between segments
+  const totalArc = Math.PI; // 180 degrees
+  const segArc = (totalArc - gapAngle * totalSegments) / totalSegments;
+  const midR = (outerR + innerR) / 2;
+
+  const segments = Array.from({ length: totalSegments }, (_, i) => {
+    const startAngle = Math.PI - i * (segArc + gapAngle);
+    const endAngle = startAngle - segArc;
+    const segValue = ((i + 1) / totalSegments) * 100;
+    const filled = segValue <= clampedScore;
+
+    let color: string;
+    if (segValue <= 30) color = "hsl(var(--gain))";
+    else if (segValue <= 55) color = "hsl(var(--warning))";
+    else color = "hsl(var(--loss))";
+
+    return { startAngle, endAngle, filled, color };
   });
 
   // Needle
   const needleAngle = Math.PI - (clampedScore / 100) * Math.PI;
-  const needleLen = radius - strokeWidth - 6;
-  const needleX = cx + needleLen * Math.cos(needleAngle);
-  const needleY = cy - needleLen * Math.sin(needleAngle);
+  const needleLen = innerR - 8;
+  const needleTip = polarToCart(needleAngle, needleLen);
+  const needleBase1 = polarToCart(needleAngle + Math.PI / 2, 2.5);
+  const needleBase2 = polarToCart(needleAngle - Math.PI / 2, 2.5);
 
-  const isHigh = clampedScore >= 55;
-  const isMid = clampedScore >= 30;
-  const gradId = `riskGrad-${size}`;
-  const glowId = `riskGlow-${size}`;
-  const needleColor = isHigh ? "hsl(var(--loss))" : isMid ? "hsl(var(--warning))" : "hsl(var(--gain))";
+  // Scale labels
+  const scaleLabels = [0, 25, 50, 75, 100].map(v => {
+    const angle = Math.PI - (v / 100) * Math.PI;
+    const pos = polarToCart(angle, outerR + 9);
+    return { v, ...pos };
+  });
 
-  const riskLabel = clampedScore >= 75 ? "CRITICAL" : clampedScore >= 55 ? "ELEVATED" : clampedScore >= 30 ? "MODERATE" : "LOW";
+  const gradId = `riskSegGlow-${size}`;
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <svg width={size} height={size / 2 + 24} viewBox={`0 0 ${size} ${size / 2 + 24}`}>
+    <div className="flex flex-col items-center">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         <defs>
-          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--gain))" />
-            <stop offset="40%" stopColor="hsl(var(--warning))" />
-            <stop offset="100%" stopColor="hsl(var(--loss))" />
-          </linearGradient>
-          <filter id={glowId}>
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <filter id={gradId}>
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -69,63 +83,61 @@ const RiskGauge = ({ score, label = "Global Risk", size = 140 }: Props) => {
           </filter>
         </defs>
 
-        {/* Background arc */}
-        <path
-          d={`M ${bgStart.x} ${bgStart.y} A ${radius} ${radius} 0 0 1 ${bgEnd.x} ${bgEnd.y}`}
-          fill="none"
-          stroke="hsl(var(--surface-3))"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
+        {/* Scale labels */}
+        {scaleLabels.map(({ v, x, y }) => (
+          <text key={v} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+            className="fill-muted-foreground font-mono" style={{ fontSize: 7 }}>
+            {v}
+          </text>
+        ))}
 
-        {/* Gradient value arc */}
-        {clampedScore > 0 && (
+        {/* Segmented arc */}
+        {segments.map((seg, i) => (
           <path
-            d={`M ${bgStart.x} ${bgStart.y} A ${radius} ${radius} 0 ${clampedScore > 50 ? 1 : 0} 1 ${valEnd.x} ${valEnd.y}`}
-            fill="none"
-            stroke={`url(#${gradId})`}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            filter={isHigh ? `url(#${glowId})` : undefined}
-            className="transition-all duration-700"
-          />
-        )}
-
-        {/* Tick marks */}
-        {ticks.map((t, i) => (
-          <line
             key={i}
-            x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-            stroke="hsl(var(--muted-foreground))"
-            strokeWidth={1}
-            opacity={0.4}
+            d={arcPath(midR, seg.startAngle, seg.endAngle)}
+            fill="none"
+            stroke={seg.filled ? seg.color : "hsl(var(--muted) / 0.15)"}
+            strokeWidth={trackWidth}
+            strokeLinecap="butt"
+            opacity={seg.filled ? (isHigh && seg.color === "hsl(var(--loss))" ? 1 : 0.85) : 0.3}
+            filter={seg.filled && isHigh && seg.color === "hsl(var(--loss))" ? `url(#${gradId})` : undefined}
+            className="transition-all duration-500"
           />
         ))}
 
-        {/* Needle */}
-        <line
-          x1={cx} y1={cy} x2={needleX} y2={needleY}
-          stroke={needleColor}
-          strokeWidth={2}
-          strokeLinecap="round"
-          className="transition-all duration-700"
+        {/* Inner arc track (thin reference line) */}
+        <path
+          d={arcPath(innerR - 4, Math.PI, 0)}
+          fill="none"
+          stroke="hsl(var(--muted) / 0.08)"
+          strokeWidth={1}
         />
-        <circle cx={cx} cy={cy} r={3} fill={needleColor} className="transition-all duration-700" />
 
-        {/* Score text */}
-        <text x={cx} y={cy - 16} textAnchor="middle" className="fill-foreground font-mono font-black" style={{ fontSize: 22 }}>
+        {/* Needle triangle */}
+        <polygon
+          points={`${needleTip.x},${needleTip.y} ${needleBase1.x},${needleBase1.y} ${needleBase2.x},${needleBase2.y}`}
+          fill={needleColor}
+          className="transition-all duration-700"
+          filter={isHigh ? `url(#${gradId})` : undefined}
+        />
+        <circle cx={cx} cy={cy} r={4} fill="hsl(var(--foreground))" />
+        <circle cx={cx} cy={cy} r={2} fill={needleColor} className="transition-all duration-700" />
+
+        {/* Score */}
+        <text x={cx} y={cy - 22} textAnchor="middle" className="fill-foreground font-mono font-black" style={{ fontSize: 20 }}>
           {clampedScore}
         </text>
-        <text x={cx} y={cy - 3} textAnchor="middle" className="fill-muted-foreground uppercase tracking-wider" style={{ fontSize: 7 }}>
+        <text x={cx} y={cy - 11} textAnchor="middle" className="fill-muted-foreground font-mono uppercase" style={{ fontSize: 5.5, letterSpacing: '0.12em' }}>
           {label}
         </text>
       </svg>
       <span
-        className={`text-[9px] font-mono font-bold uppercase tracking-widest ${
+        className={`-mt-1 text-[8px] font-mono font-bold uppercase tracking-[0.2em] ${
           isHigh ? "text-loss" : isMid ? "text-warning" : "text-gain"
-        } ${isHigh ? "animate-pulse" : ""}`}
+        }`}
       >
-        {riskLabel}
+        ■ {riskLabel}
       </span>
     </div>
   );
