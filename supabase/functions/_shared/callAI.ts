@@ -61,6 +61,7 @@ function stripThinkingBlocks(text: string): string {
   cleaned = cleaned
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
+    .replace(/:\s*\+(\d)/g, ': $1')
     .replace(/[\x00-\x1F\x7F]/g, " ");
 
   return cleaned;
