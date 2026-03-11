@@ -168,6 +168,7 @@ serve(async (req) => {
       const timeStr = now.toISOString();
 
       const result = await callAI({
+        provider,
         systemPrompt: "You are a real-time geopolitical intelligence analyst for an institutional trading desk. Assess current global threats using the LIVE market data and news headlines provided. Your analysis must reflect the EXACT current conditions — not generic boilerplate. Return ONLY valid JSON, no markdown.",
         userPrompt: `TIMESTAMP: ${timeStr}
 LIVE MARKET DATA: ${marketContext}
