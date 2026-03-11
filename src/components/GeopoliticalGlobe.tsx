@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Satellite, RefreshCw, Loader2 } from "lucide-react";
+import { Satellite, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,6 +43,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
     conflicts: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
   });
+  const [showLayers, setShowLayers] = useState(false);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -76,89 +77,88 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="glass-panel rounded-xl p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-loss/10 border border-loss/20">
-                <Satellite className="h-5 w-5 text-loss" />
-              </div>
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-loss opacity-75" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-loss" />
-              </span>
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">God's Eye — Global Intelligence Map</h2>
-              <p className="text-[9px] text-muted-foreground font-mono tracking-widest">
-                LIVE 20s · {data.conflictEvents.length} CONFLICTS · {data.timestamp ? `${Math.round((Date.now() - data.timestamp) / 1000)}s ago` : ""}
-                {exposedTickers.length > 0 && <span className="text-loss ml-2">⚠ {exposedTickers.length} HOLDINGS EXPOSED</span>}
-              </p>
-            </div>
+    <div className="space-y-2">
+      {/* Compact Header Bar */}
+      <div className="glass-panel rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="relative flex-shrink-0">
+            <Satellite className="h-4 w-4 text-loss" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-loss opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-loss" />
+            </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap relative z-10">
-            {(["map", "threats", "forex"] as const).map(m => (
-              <button key={m} onClick={() => setViewMode(m)}
-                className={`rounded-lg px-3 py-1.5 text-[10px] font-mono font-medium transition-all ${viewMode === m ? "glass-panel glass-glow-primary text-primary" : "glass-subtle text-muted-foreground hover:text-foreground"}`}>
-                {m === "map" ? "🗺 Map" : m === "threats" ? "⚠ Threats" : "💱 Forex"}
-              </button>
-            ))}
-            <Button size="sm" variant="ghost" onClick={() => onRefresh(false)} className="h-7 gap-1 text-[10px]">
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> 20s
-            </Button>
+          <div className="min-w-0">
+            <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye — Intelligence Map</h2>
+            <p className="text-[8px] text-muted-foreground font-mono tracking-widest truncate">
+              LIVE 20s · {data.conflictEvents.length} CONFLICTS
+              {exposedTickers.length > 0 && <span className="text-loss ml-1">⚠ {exposedTickers.length} EXPOSED</span>}
+            </p>
           </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {(["map", "threats", "forex"] as const).map(m => (
+            <button key={m} onClick={() => setViewMode(m)}
+              className={`rounded-md px-2 py-1 text-[9px] font-mono font-medium transition-all ${viewMode === m ? "glass-panel glass-glow-primary text-primary" : "glass-subtle text-muted-foreground hover:text-foreground"}`}>
+              {m === "map" ? "🗺 Map" : m === "threats" ? "⚠ Threats" : "💱 FX"}
+            </button>
+          ))}
+          <Button size="sm" variant="ghost" onClick={() => onRefresh(false)} className="h-6 w-6 p-0">
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          </Button>
         </div>
       </div>
 
       <RiskStrip data={data} />
 
-      {/* Portfolio Exposure Alert Banner */}
+      {/* Slim Exposure Alert */}
       {exposedTickers.length > 0 && (
-        <div className="glass-panel glass-glow-loss rounded-xl p-3 sm:p-4 border border-loss/30 animate-pulse-subtle">
-          <div className="flex items-center gap-2 mb-2 relative z-10">
-            <span className="flex h-2 w-2"><span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-loss opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-loss" /></span>
-            <span className="text-[10px] font-bold text-loss uppercase tracking-widest">Portfolio Under Threat</span>
-          </div>
-          <div className="flex flex-wrap gap-2 relative z-10">
-            {exposedTickers.map(t => {
-              const threat = tickerThreats[t];
-              return (
-                <div key={t} className="flex items-center gap-1.5 rounded-lg bg-loss/10 border border-loss/20 px-2.5 py-1.5">
-                  <span className="font-mono text-xs font-bold text-loss">{t}</span>
-                  {threat && (
-                    <>
-                      <span className="text-[8px] font-mono text-loss/80">Score: {threat.score}</span>
-                      {threat.topConflict && <span className="text-[8px] text-loss/60">· {threat.topConflict}</span>}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <div className="glass-panel rounded-xl px-3 py-2 border border-loss/30 flex items-center gap-2 flex-wrap">
+          <span className="flex h-2 w-2 flex-shrink-0"><span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-loss opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-loss" /></span>
+          <span className="text-[9px] font-bold text-loss uppercase tracking-widest flex-shrink-0">Exposed:</span>
+          {exposedTickers.map(t => {
+            const threat = tickerThreats[t];
+            return (
+              <span key={t} className="inline-flex items-center gap-1 rounded bg-loss/10 border border-loss/20 px-1.5 py-0.5">
+                <span className="font-mono text-[10px] font-bold text-loss">{t}</span>
+                {threat && <span className="text-[7px] font-mono text-loss/70">{threat.score}</span>}
+              </span>
+            );
+          })}
         </div>
       )}
 
       <IntelligenceBrief data={data} />
 
       {viewMode === "map" && (
-        <>
-          <div className="flex flex-wrap gap-3 glass-subtle rounded-lg px-3 py-2">
-            {Object.entries(LAYER_LABELS).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-1.5 cursor-pointer">
-                <Checkbox checked={visibleLayers[key] !== false} onCheckedChange={() => toggleLayer(key)} className="h-3 w-3" />
-                <span className="text-[9px] font-mono text-muted-foreground">{label}</span>
-              </label>
-            ))}
+        <div className="relative" style={{ minHeight: 380 }}>
+          {/* Floating Layer Toggles */}
+          <div className="absolute top-2 left-2 z-[1000]">
+            <button
+              onClick={() => setShowLayers(!showLayers)}
+              className="glass-panel rounded-md px-2 py-1 text-[8px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              Layers {showLayers ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
+            </button>
+            {showLayers && (
+              <div className="glass-panel rounded-md mt-1 p-2 space-y-1.5">
+                {Object.entries(LAYER_LABELS).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox checked={visibleLayers[key] !== false} onCheckedChange={() => toggleLayer(key)} className="h-3 w-3" />
+                    <span className="text-[8px] font-mono text-muted-foreground">{label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 500 }}>
+
+          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[1fr_280px]" style={{ minHeight: 380 }}>
+            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 380 }}>
               <GeopoliticalMap data={data} portfolioMarkers={portfolioMarkers} onSelectConflict={setSelectedConflict} visibleLayers={visibleLayers} />
             </div>
             <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
           </div>
-        </>
+        </div>
       )}
 
       {viewMode === "threats" && <ThreatsView data={data} exposedTickers={exposedTickers} />}
