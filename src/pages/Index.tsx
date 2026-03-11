@@ -234,7 +234,7 @@ const IndexContent = () => {
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
-            <div className="p-2 space-y-2 pb-12">
+            <div className="p-1.5 space-y-1.5 pb-10">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
