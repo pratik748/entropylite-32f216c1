@@ -39,6 +39,7 @@ type SectionId = typeof sections[number]["id"];
 
 const EntropySandbox = ({ stocks }: Props) => {
   const [activeSection, setActiveSection] = useState<SectionId>("strategy");
+  const { provider, toggle, providerLabel } = useAIProvider();
   const analyzed = stocks.filter(s => s.analysis);
 
   const renderSection = () => {
