@@ -325,15 +325,6 @@ const IndexContent = () => {
               {/* Right: News + Flow Detection */}
               <ResizablePanel defaultSize={23} minSize={15} maxSize={35}>
                 <ResizablePanelGroup direction="vertical">
-                  <ResizablePanel defaultSize={25} minSize={10}>
-                    <PanelWrapper title="AI Consensus" icon={<Activity className="h-3 w-3" />} noPad>
-                      <div className="p-2 overflow-auto h-full">
-                        <IntelligenceConsensus data={consensusData} loading={consensusLoading} />
-                      </div>
-                    </PanelWrapper>
-                  </ResizablePanel>
-
-                  <ResizableHandle withHandle />
 
                   <ResizablePanel defaultSize={30} minSize={15}>
                     <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
