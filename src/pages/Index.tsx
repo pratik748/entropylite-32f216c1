@@ -30,7 +30,7 @@ import SystemStatusBar from "@/components/terminal/SystemStatusBar";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
-import IntelligenceConsensus from "@/components/terminal/IntelligenceConsensus";
+
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
