@@ -112,7 +112,53 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
           {[30, 60, 80].map(t => (
             <div key={t} className="absolute top-0 h-full w-px bg-foreground/20" style={{ left: `${t}%` }} />
           ))}
+      </div>
+
+      {/* AI Detection Overlay */}
+      {aiLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+          <Brain className="h-3.5 w-3.5 text-primary animate-pulse" />
+          <span className="text-[10px] text-primary font-mono">AI scanning institutional constraints via Cloudflare...</span>
         </div>
+      )}
+      {hasAIClank && aiClank?.constraints?.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Brain className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-bold text-foreground">AI CONSTRAINT DETECTION</span>
+            <span className="text-[9px] text-muted-foreground font-mono ml-auto">
+              Confidence: {aiClank.meta?.model_confidence || 0}% · Score: {aiClank.aggregate_pressure_score || 0}/100
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {aiClank.constraints.slice(0, 6).map((c: any, i: number) => (
+              <div key={i} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
+                c.status === "critical" ? "border-loss/30 bg-loss/5" :
+                c.status === "active" ? "border-warning/30 bg-warning/5" :
+                "border-border/50 bg-muted/20"
+              }`}>
+                <div>
+                  <span className="text-[10px] font-semibold text-foreground">{c.name}</span>
+                  <p className="text-[9px] text-muted-foreground">{c.trigger_condition}</p>
+                </div>
+                <div className="flex items-center gap-3 text-right">
+                  <div>
+                    <p className="text-[8px] text-muted-foreground">Prob</p>
+                    <p className="text-[10px] font-mono font-bold">{(c.activation_probability * 100).toFixed(0)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground">Vol</p>
+                    <p className="text-[10px] font-mono">${c.estimated_forced_volume_bn?.toFixed(1)}B</p>
+                  </div>
+                  <span className={`rounded px-1.5 py-0.5 text-[8px] font-bold uppercase ${
+                    c.direction === "SELL" ? "bg-loss/15 text-loss" : c.direction === "BUY" ? "bg-gain/15 text-gain" : "bg-primary/15 text-primary"
+                  }`}>{c.direction}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
         <div className="flex justify-between mt-1 text-[8px] text-muted-foreground font-mono">
           <span>STABLE</span><span>TENSION</span><span>INSTABILITY</span><span>CASCADE</span>
         </div>
