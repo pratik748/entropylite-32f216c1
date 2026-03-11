@@ -22,11 +22,20 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
   const { baseCurrency } = useFX();
   const sym = getCurrencySymbol(baseCurrency);
 
-  const data = stocks
+  const analyzed = stocks.filter((s) => s.analysis && !s.isLoading);
+  
+  // Deduplicate by ticker name
+  const seen = new Set<string>();
+  const data = analyzed
     .map((s) => ({
       name: s.ticker.replace(".NS", "").replace(".BO", ""),
-      value: (s.analysis?.currentPrice ?? s.buyPrice) * s.quantity,
+      value: (s.analysis!.currentPrice) * s.quantity,
     }))
+    .filter((d) => {
+      if (seen.has(d.name)) return false;
+      seen.add(d.name);
+      return d.value > 0;
+    })
     .sort((a, b) => b.value - a.value);
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
