@@ -143,6 +143,8 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
+    const body = await req.json().catch(() => ({}));
+    const provider = body.provider || "mistral";
 
     // 1. Fetch real forex volatility + market context + headlines in parallel
     const [forexResults, marketContext, headlines] = await Promise.all([
@@ -166,6 +168,7 @@ serve(async (req) => {
       const timeStr = now.toISOString();
 
       const result = await callAI({
+        provider,
         systemPrompt: "You are a real-time geopolitical intelligence analyst for an institutional trading desk. Assess current global threats using the LIVE market data and news headlines provided. Your analysis must reflect the EXACT current conditions — not generic boilerplate. Return ONLY valid JSON, no markdown.",
         userPrompt: `TIMESTAMP: ${timeStr}
 LIVE MARKET DATA: ${marketContext}
@@ -182,6 +185,7 @@ Return 8-12 current conflicts as JSON:
 {"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.0-1.0,"type":"war|sanctions|unrest|terrorism|trade_war|cyber|energy","affectedAssets":["X"],"summary":"1-2 sentences reflecting CURRENT situation","nearTradeHub":"str","distanceKm":0,"escalationProb":0.0-1.0,"actionableIntel":"specific trading action"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high|medium|low","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":0-100,"regimeSignal":"stable|transition|crisis","keyThreats":["t1","t2","t3","t4"],"capitalFlowDirection":"risk-on|risk-off|mixed","safeHavenDemand":"low|moderate|high|extreme","intelligenceSummary":"3 sentences reflecting CURRENT market+geopolitical state"}`,
         maxTokens: 2000,
         temperature: 0.4,
+        provider,
       });
 
       console.log(`geopolitical-data used provider: ${result.provider}`);

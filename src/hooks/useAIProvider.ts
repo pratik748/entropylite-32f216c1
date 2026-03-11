@@ -8,9 +8,9 @@ export function useAIProvider() {
   const [provider, setProviderState] = useState<AIProvider>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      return stored === "mistral" ? "mistral" : "cloudflare";
+      return stored === "cloudflare" ? "cloudflare" : "mistral";
     } catch {
-      return "cloudflare";
+      return "mistral";
     }
   });
 
@@ -25,7 +25,7 @@ export function useAIProvider() {
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
-        setProviderState(e.newValue === "mistral" ? "mistral" : "cloudflare");
+        setProviderState(e.newValue === "cloudflare" ? "cloudflare" : "mistral");
       }
     };
     window.addEventListener("storage", handler);
@@ -36,7 +36,7 @@ export function useAIProvider() {
     provider,
     setProvider,
     providerLabel: provider === "mistral" ? "M" : "C",
-    toggle: () => setProvider(provider === "cloudflare" ? "mistral" : "cloudflare"),
+    toggle: () => setProvider(provider === "mistral" ? "cloudflare" : "mistral"),
   };
 }
 
@@ -44,8 +44,8 @@ export function useAIProvider() {
 export function getAIProvider(): AIProvider {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "mistral" ? "mistral" : "cloudflare";
+    return stored === "cloudflare" ? "cloudflare" : "mistral";
   } catch {
-    return "cloudflare";
+    return "mistral";
   }
 }

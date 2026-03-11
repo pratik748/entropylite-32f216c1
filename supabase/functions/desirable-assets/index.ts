@@ -35,6 +35,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const portfolioTickers = body.portfolioTickers || [];
     const portfolioValue = body.portfolioValue || 100000;
+    const provider = body.provider || "mistral";
 
     const result = await callAI({
       systemPrompt: "You are an elite portfolio strategist at a $50B+ asset manager. Return ONLY valid JSON.",
@@ -71,7 +72,7 @@ Return JSON:
 }`,
       maxTokens: 4000,
       temperature: 0.35,
-      
+      provider,
     });
 
     console.log(`desirable-assets used provider: ${result.provider}`);

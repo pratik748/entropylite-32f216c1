@@ -55,6 +55,8 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
+    const body = await req.json().catch(() => ({}));
+    const provider = body.provider || "mistral";
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
@@ -127,6 +129,7 @@ serve(async (req) => {
       const nifty = indexData.find(i => i?.name === "NIFTY 50");
 
       const result = await callAI({
+        provider,
         systemPrompt: "You are a global macro strategist. Return ONLY valid JSON, no markdown.",
         userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. S&P 500: ${sp500?.changePct?.toFixed(2) || "N/A"}%, NIFTY: ${nifty?.changePct?.toFixed(2) || "N/A"}%, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}
 
@@ -144,7 +147,7 @@ Provide:
 }`,
         maxTokens: 800,
         temperature: 0.3,
-        preferredProvider: "openrouter",
+        provider,
       });
 
       console.log(`market-data used provider: ${result.provider}`);
