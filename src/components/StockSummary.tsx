@@ -60,7 +60,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
             </p>
           )}
         </div>
-        <div className="rounded-lg bg-surface-2 p-2 sm:p-3">
+        <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Portfolio Value</p>
           <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentValue, currency)}</p>
           {convertedValue !== null && (
