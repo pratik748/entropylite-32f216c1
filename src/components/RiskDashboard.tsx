@@ -159,6 +159,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
 
   const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
   const [riskTab, setRiskTab] = useState<"analytics" | "clank">("analytics");
+  const { provider, toggle } = useAIProvider();
 
   const CORR_LABELS = analyzed.length > 0 
     ? analyzed.slice(0, 5).map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
