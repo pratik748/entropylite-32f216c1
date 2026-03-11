@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.strategy-evolution]
 verify_jwt = false
+
+[functions.alpaca-trading]
+verify_jwt = false
