@@ -10,6 +10,7 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
+  provider?: "cloudflare" | "mistral";
 }
 
 interface AIResult {
