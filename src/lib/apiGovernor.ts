@@ -192,7 +192,7 @@ export async function governedInvoke<T = any>(
     // Inject provider for all calls — non-AI functions ignore it harmlessly
     {
       try {
-        const provider = localStorage.getItem("entropy-ai-provider") || "cloudflare";
+        const provider = localStorage.getItem("entropy-ai-provider") || "mistral";
         body = { ...body, provider };
       } catch {}
     }
