@@ -160,12 +160,10 @@
   /* Liquid Glass System */
   .glass-panel {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
     border: 1px solid hsl(var(--glass-border));
-    box-shadow:
-      var(--glow-glass),
-      0 8px 32px hsl(220 30% 4% / 0.4);
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.5);
     position: relative;
     overflow: hidden;
   }
