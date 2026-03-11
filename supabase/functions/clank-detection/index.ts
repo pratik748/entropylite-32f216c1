@@ -10,10 +10,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, vix, regime } = await req.json();
+    const { portfolio, vix, regime, provider } = await req.json();
     const ctx = JSON.stringify({ portfolio: portfolio?.slice(0, 20), vix, regime });
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an institutional constraint detection engine. Analyze portfolio holdings against known mechanical market forces that create predictable, forced trading flows. Detect ALL applicable constraints from this list:
 
 1. Index Rebalance Flows — quarterly S&P/Russell reconstitution forcing passive fund buying/selling

@@ -4,6 +4,7 @@ import {
   Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { useAIProvider } from "@/hooks/useAIProvider";
 import StrategyLab from "./StrategyLab";
 import MonteCarloEngine from "./MonteCarloEngine";
 import AftermathMatrix from "./AftermathMatrix";
@@ -38,6 +39,7 @@ type SectionId = typeof sections[number]["id"];
 
 const EntropySandbox = ({ stocks }: Props) => {
   const [activeSection, setActiveSection] = useState<SectionId>("strategy");
+  const { provider, toggle, providerLabel } = useAIProvider();
   const analyzed = stocks.filter(s => s.analysis);
 
   const renderSection = () => {
@@ -64,12 +66,21 @@ const EntropySandbox = ({ stocks }: Props) => {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
             <Zap className="h-5 w-5 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-lg font-bold text-foreground tracking-tight">Entropy Simulation Sandbox</h2>
             <p className="text-[10px] text-muted-foreground font-mono tracking-wider">
               PREDICTION + AFTERMATH ENGINE · {analyzed.length} ASSETS LOADED
             </p>
           </div>
+          {/* Secret AI Provider Toggle */}
+          <button
+            onClick={toggle}
+            className="flex items-center gap-1 px-2 py-1 rounded border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer select-none"
+          >
+            <span className={`text-[9px] font-mono font-bold ${provider === "cloudflare" ? "text-primary" : "text-muted-foreground/40"}`}>C</span>
+            <span className="text-[9px] text-muted-foreground/30">/</span>
+            <span className={`text-[9px] font-mono font-bold ${provider === "mistral" ? "text-primary" : "text-muted-foreground/40"}`}>M</span>
+          </button>
         </div>
       </div>
 

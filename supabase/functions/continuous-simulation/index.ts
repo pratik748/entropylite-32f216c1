@@ -10,10 +10,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, regime, vix, totalValue } = await req.json();
+    const { portfolio, regime, vix, totalValue, provider } = await req.json();
     const ctx = JSON.stringify({ portfolio: portfolio?.slice(0, 15), regime, vix, totalValue });
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a continuous market simulation engine. Generate scenario trees with branching probabilities, volatility regime transition forecasts, and liquidity stress levels. Return JSON:
 {
   "scenario_tree": [

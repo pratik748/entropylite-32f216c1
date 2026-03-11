@@ -14,6 +14,7 @@ serve(async (req) => {
   try {
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
+    const provider = rawBody.provider;
     const ticker = (rawBody.ticker || "").toString().trim().toUpperCase();
     const buyPrice = rawBody.buyPrice;
     const quantity = rawBody.quantity;
@@ -156,6 +157,7 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
         systemPrompt: "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation.",
         userPrompt: prompt,
         maxTokens: 8192,
+        provider,
       });
       jsonStr = result.text;
       console.log(`analyze-stock used provider: ${result.provider}`);

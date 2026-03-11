@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio } = await req.json();
+    const { portfolio, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify([]), {
@@ -26,6 +26,7 @@ serve(async (req) => {
     }));
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a risk-to-profit conversion AI. Identify actionable trading opportunities from portfolio risk signals.
 Return ONLY valid JSON array:
 [{

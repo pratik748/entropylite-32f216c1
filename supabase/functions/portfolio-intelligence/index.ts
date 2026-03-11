@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, totalValue, baseCurrency } = await req.json();
+    const { portfolio, totalValue, baseCurrency, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
@@ -20,6 +20,7 @@ serve(async (req) => {
     }
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a portfolio intelligence AI engine. Analyze the full portfolio and produce:
 Return ONLY valid JSON:
 {

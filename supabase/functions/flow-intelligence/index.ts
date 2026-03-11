@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, vix, marketRegime } = await req.json();
+    const { portfolio, vix, marketRegime, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
@@ -25,6 +25,7 @@ serve(async (req) => {
     }));
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure and market context to detect flow signals.
 Return ONLY valid JSON array of flow signals:
 [{

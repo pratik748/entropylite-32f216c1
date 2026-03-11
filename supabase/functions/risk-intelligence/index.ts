@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, vix, marketRegime } = await req.json();
+    const { portfolio, vix, marketRegime, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
@@ -34,6 +34,7 @@ serve(async (req) => {
     const totalValue = portfolioSummary.reduce((s: number, p: any) => s + p.currentPrice * p.qty, 0);
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an institutional risk intelligence engine. Analyze the portfolio and produce a comprehensive risk assessment.
 Return ONLY valid JSON matching this exact schema:
 {
