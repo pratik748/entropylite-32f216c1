@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Newspaper, ExternalLink, RefreshCw, Radio } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,18 +13,15 @@ interface NewsArticle {
   imageUrl: string | null;
   category: string;
   sentiment: string | null;
+  sourceTier?: number;
+  origin?: string;
 }
 
-const TIER_1 = ["reuters", "associated press", "ap", "bloomberg"];
-const TIER_2 = ["cnbc", "wall street journal", "wsj", "financial times", "ft", "economist"];
-const TIER_3 = ["marketwatch", "seeking alpha", "investopedia", "yahoo finance", "barrons"];
-
-function getSourceTier(source: string): { tier: number; label: string; className: string } {
-  const s = source.toLowerCase();
-  for (const t of TIER_1) if (s.includes(t)) return { tier: 1, label: "T1", className: "bg-primary text-primary-foreground" };
-  for (const t of TIER_2) if (s.includes(t)) return { tier: 2, label: "T2", className: "bg-accent text-accent-foreground" };
-  for (const t of TIER_3) if (s.includes(t)) return { tier: 3, label: "T3", className: "bg-muted text-muted-foreground" };
-  return { tier: 4, label: "", className: "" };
+function getTierBadge(tier?: number): { label: string; className: string } | null {
+  if (tier === 1) return { label: "T1", className: "bg-primary text-primary-foreground" };
+  if (tier === 2) return { label: "T2", className: "bg-accent text-accent-foreground" };
+  if (tier === 3) return { label: "T3", className: "bg-muted text-muted-foreground" };
+  return null;
 }
 
 interface LiveNewsFeedProps {
@@ -32,12 +29,13 @@ interface LiveNewsFeedProps {
   compact?: boolean;
 }
 
-const NEWS_REFRESH_INTERVAL = 600_000; // 10 minutes — governor caches
+const NEWS_REFRESH_INTERVAL = 600_000;
 
 const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [sourcesPolled, setSourcesPolled] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNews = async () => {
@@ -48,6 +46,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
       });
       if (error) throw error;
       setArticles(data.articles || []);
+      setSourcesPolled(data.sourcesPolled || 0);
       setLastFetched(new Date());
     } catch (err) {
       console.error("News fetch error:", err);
@@ -76,31 +75,38 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
       <div className="flex flex-col h-full font-mono text-[10px]">
         <div className="flex items-center justify-between px-2 py-1 border-b border-border">
           <div className="flex items-center gap-1.5">
-            <Newspaper className="h-3 w-3 text-muted-foreground" />
+            <Radio className="h-3 w-3 text-primary" />
+            <span className="text-[7px] font-bold text-primary tracking-widest">MULTI-SRC</span>
             <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+            {sourcesPolled > 0 && (
+              <span className="text-[7px] text-muted-foreground">{sourcesPolled} feeds</span>
+            )}
           </div>
           <Button size="sm" variant="ghost" onClick={fetchNews} disabled={loading} className="h-4 w-4 p-0">
             <RefreshCw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
         <div className="flex-1 overflow-auto space-y-0">
-          {articles.slice(0, 20).map((article, i) => (
-            <a
-              key={i}
-              href={article.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2 py-1 hover:bg-surface-2 transition-colors border-b border-border/20 group"
-            >
-              <span className="text-[8px] text-muted-foreground/60 tabular-nums w-10 flex-shrink-0">
-                {new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
-              </span>
-              <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${getSentimentDot(article.sentiment)}`} />
-              {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[6px] px-0.5 py-0 h-2.5 rounded leading-none`}>{t.label}</Badge> : null; })()}
-              <span className="text-[8px] text-muted-foreground/60 w-12 flex-shrink-0 truncate">{article.source}</span>
-              <span className="text-foreground truncate flex-1 group-hover:text-primary transition-colors">{article.title}</span>
-            </a>
-          ))}
+          {articles.slice(0, 25).map((article, i) => {
+            const tier = getTierBadge(article.sourceTier);
+            return (
+              <a
+                key={i}
+                href={article.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2 py-1 hover:bg-surface-2 transition-colors border-b border-border/20 group"
+              >
+                <span className="text-[8px] text-muted-foreground/60 tabular-nums w-10 flex-shrink-0">
+                  {article.pubDate ? new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) : "--:--"}
+                </span>
+                <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${getSentimentDot(article.sentiment)}`} />
+                {tier && <Badge className={`${tier.className} text-[6px] px-0.5 py-0 h-2.5 rounded leading-none`}>{tier.label}</Badge>}
+                <span className="text-[8px] text-muted-foreground/60 w-12 flex-shrink-0 truncate">{article.source}</span>
+                <span className="text-foreground truncate flex-1 group-hover:text-primary transition-colors">{article.title}</span>
+              </a>
+            );
+          })}
           {!loading && articles.length === 0 && (
             <div className="py-4 text-center text-muted-foreground text-[9px]">No news</div>
           )}
@@ -113,20 +119,24 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Newspaper className="h-5 w-5 text-foreground" />
-          <h2 className="text-base font-semibold text-foreground">Live News</h2>
+          <Radio className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold text-foreground">Multi-Source Intelligence</h2>
           {ticker && (
             <span className="rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
               {ticker}
             </span>
           )}
           <span className="h-2 w-2 rounded-full bg-gain animate-pulse" />
-          <span className="text-[10px] text-muted-foreground font-mono">Auto-refresh 60s</span>
+          {sourcesPolled > 0 && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-mono">
+              {sourcesPolled} feeds
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {lastFetched && (
             <span className="text-[10px] text-muted-foreground">
-              {lastFetched.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {lastFetched.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
           )}
           <Button
@@ -154,31 +164,40 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
 
       {articles.length > 0 && (
         <div className="space-y-2 max-h-[500px] overflow-y-auto">
-          {articles.map((article, i) => (
-            <a
-              key={i}
-              href={article.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex gap-3 rounded-lg border border-border/50 bg-surface-2 p-3 transition-colors hover:bg-surface-3 hover:border-border"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 group-hover:underline">
-                  {article.title}
-                </p>
-                {article.description && (
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
-                )}
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
-                  {(() => { const t = getSourceTier(article.source); return t.tier <= 3 ? <Badge className={`${t.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{t.label}</Badge> : null; })()}
-                  <span className="font-medium">{article.source}</span>
-                  <span>·</span>
-                  <span>{new Date(article.pubDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+          {articles.map((article, i) => {
+            const tier = getTierBadge(article.sourceTier);
+            return (
+              <a
+                key={i}
+                href={article.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex gap-3 rounded-lg border border-border/50 bg-surface-2 p-3 transition-colors hover:bg-surface-3 hover:border-border"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 group-hover:underline">
+                    {article.title}
+                  </p>
+                  {article.description && (
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
+                  )}
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    {tier && <Badge className={`${tier.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{tier.label}</Badge>}
+                    <span className="font-medium">{article.source}</span>
+                    <span>·</span>
+                    <span>{article.pubDate ? new Date(article.pubDate).toLocaleDateString("en-US", { day: "numeric", month: "short" }) : ""}</span>
+                    {article.origin && (
+                      <>
+                        <span>·</span>
+                        <span className="text-muted-foreground/50 uppercase text-[8px]">{article.origin}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 group-hover:text-foreground mt-1" />
-            </a>
-          ))}
+                <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 group-hover:text-foreground mt-1" />
+              </a>
+            );
+          })}
         </div>
       )}
 
