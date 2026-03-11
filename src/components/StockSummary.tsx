@@ -32,7 +32,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
           <p className="font-mono text-base sm:text-xl font-bold text-foreground">{ticker}</p>
           <p className="text-xs sm:text-sm text-muted-foreground">{currency || "USD"}</p>
         </div>
-        <div className={`flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 ${isProfit ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
+        <div className={`flex items-center gap-1 rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 ${isProfit ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
           {isProfit ? <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4" />}
           <span className="font-mono text-xs sm:text-sm font-semibold">
             {isProfit ? "+" : ""}{pnlPercent.toFixed(2)}%
