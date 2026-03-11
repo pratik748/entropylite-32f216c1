@@ -192,6 +192,12 @@ const RETRY_DELAYS = [0, 1000, 3000];
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   let lastError: any;
 
+  // If provider is explicitly set to "mistral", skip Cloudflare entirely
+  if (opts.provider === "mistral") {
+    console.log("callAI → Mistral (forced by provider preference)");
+    return await callMistral(opts);
+  }
+
   // Try Cloudflare first with retries
   for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
     if (RETRY_DELAYS[attempt] > 0) {

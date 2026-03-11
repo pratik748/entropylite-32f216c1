@@ -186,10 +186,17 @@ export async function governedInvoke<T = any>(
     }
   }
 
-  // 4. Execute request
+  // 4. Execute request — inject AI provider for AI-tier calls
   const promise = (async () => {
+    let body = opts.body;
+    if (tier === "ai" || tier === "continuous" || tier === "evolution") {
+      try {
+        const provider = localStorage.getItem("entropy-ai-provider") || "cloudflare";
+        body = { ...body, provider };
+      } catch {}
+    }
     const { data, error } = await supabase.functions.invoke(functionName, {
-      body: opts.body,
+      body,
     });
     if (error) throw error;
 
