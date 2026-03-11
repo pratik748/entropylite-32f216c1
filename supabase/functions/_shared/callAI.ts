@@ -14,7 +14,7 @@ interface CallAIOptions {
 
 interface AIResult {
   text: string;
-  provider: "cloudflare";
+  provider: "cloudflare" | "mistral";
   toolCall?: any;
 }
 
