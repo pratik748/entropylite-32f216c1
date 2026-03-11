@@ -13,6 +13,7 @@ import {
   type ConstraintStatus,
 } from "@/lib/clank-engine";
 import { useClankLearning, type ActivationEvent } from "@/hooks/useClankLearning";
+import { useAIIntelligence } from "@/hooks/useAIIntelligence";
 
 interface ClankEngineProps {
   stocks: PortfolioStock[];
