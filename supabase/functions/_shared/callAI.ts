@@ -14,7 +14,7 @@ interface CallAIOptions {
 
 interface AIResult {
   text: string;
-  provider: "cloudflare";
+  provider: "cloudflare" | "mistral";
   toolCall?: any;
 }
 
@@ -128,11 +128,70 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "cloudflare" };
 }
 
+async function callMistral(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("MISTRAL_API_KEY");
+  if (!apiKey) throw new Error("MISTRAL_API_KEY not set");
+
+  const model = "mistral-medium-latest";
+
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 8192,
+  };
+
+  if (opts.tools) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`Mistral error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  if (!choice) throw new Error("Empty Mistral response");
+
+  // Handle tool calls
+  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+    const toolCall = choice.message.tool_calls[0];
+    return {
+      text: typeof toolCall.function?.arguments === "string"
+        ? toolCall.function.arguments
+        : JSON.stringify(toolCall.function?.arguments),
+      provider: "mistral",
+      toolCall,
+    };
+  }
+
+  const raw = (choice.message?.content || "").trim();
+  if (!raw) throw new Error("Empty Mistral response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "mistral" };
+}
+
 const RETRY_DELAYS = [0, 1000, 3000];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   let lastError: any;
 
+  // Try Cloudflare first with retries
   for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
     if (RETRY_DELAYS[attempt] > 0) {
       console.log(`callAI → retry #${attempt} after ${RETRY_DELAYS[attempt]}ms`);
@@ -140,25 +199,34 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
     }
 
     try {
-      console.log(`callAI → attempt ${attempt + 1}`);
+      console.log(`callAI → Cloudflare attempt ${attempt + 1}`);
       const result = await callCloudflare(opts);
-      console.log(`callAI → success on attempt ${attempt + 1}`);
+      console.log(`callAI → Cloudflare success on attempt ${attempt + 1}`);
       return result;
     } catch (err: any) {
       lastError = err;
-      console.error(`callAI → attempt ${attempt + 1} failed:`, err.message || err);
+      console.error(`callAI → Cloudflare attempt ${attempt + 1} failed:`, err.message || err);
 
       if (err.status === 401 || err.status === 403) {
-        throw new Error(`Cloudflare auth error (${err.status}): ${err.message}`);
+        break; // Don't retry auth errors, fall through to Mistral
       }
 
       if (err.status === 429 || (err.status >= 500 && err.status < 600)) {
         continue;
       }
 
-      throw err;
+      break; // Non-retryable error, fall through to Mistral
     }
   }
 
-  throw lastError;
+  // Fallback to Mistral
+  console.log("callAI → Cloudflare exhausted, falling back to Mistral");
+  try {
+    const result = await callMistral(opts);
+    console.log("callAI → Mistral fallback success");
+    return result;
+  } catch (mistralErr: any) {
+    console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
+    throw lastError; // Throw original Cloudflare error
+  }
 }
