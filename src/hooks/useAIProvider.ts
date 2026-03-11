@@ -36,7 +36,7 @@ export function useAIProvider() {
     provider,
     setProvider,
     providerLabel: provider === "mistral" ? "M" : "C",
-    toggle: () => setProvider(provider === "cloudflare" ? "mistral" : "cloudflare"),
+    toggle: () => setProvider(provider === "mistral" ? "cloudflare" : "mistral"),
   };
 }
 
