@@ -10,7 +10,7 @@ export function useAIProvider() {
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored === "cloudflare" ? "cloudflare" : "mistral";
     } catch {
-      return "cloudflare";
+      return "mistral";
     }
   });
 
