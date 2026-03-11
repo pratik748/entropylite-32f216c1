@@ -128,7 +128,7 @@ const TickerStrip = () => {
           return (
             <div
               key={`${t.symbol}-${i}`}
-              className="flex items-center gap-2 px-3 py-1 border-r border-border/50 hover:bg-surface-2 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-0.5 border-r border-border/30 hover:bg-surface-2 transition-colors"
             >
               <span className="font-mono text-[9px] text-muted-foreground font-semibold">{t.name}</span>
               <span className="font-mono text-[10px] text-foreground font-medium tabular-nums">

@@ -38,7 +38,7 @@ export default function AuthPage() {
         </div>
 
         {/* Auth buttons */}
-        <div className="space-y-3 border border-border rounded-md p-6 bg-card/50 backdrop-blur-sm">
+        <div className="space-y-3 border border-border rounded-sm p-6 bg-card/50 backdrop-blur-sm">
           <Button
             variant="outline"
             className="w-full h-11 font-mono text-xs tracking-wide border-border hover:bg-accent"

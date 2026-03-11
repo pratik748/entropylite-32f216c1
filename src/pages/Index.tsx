@@ -283,8 +283,8 @@ const IndexContent = () => {
                   <ResizablePanel defaultSize={65} minSize={30}>
                     <div className="h-full overflow-auto p-3 space-y-3">
                       {!isLoading && !analysis && (
-                        <div className="flex flex-col items-center justify-center rounded border border-border bg-card py-16 animate-fade-in">
-                          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                        <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
+                          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
                             <Activity className="h-7 w-7 text-primary" />
                           </div>
                           <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
