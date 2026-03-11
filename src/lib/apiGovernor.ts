@@ -189,7 +189,8 @@ export async function governedInvoke<T = any>(
   // 4. Execute request — inject AI provider for AI-tier calls
   const promise = (async () => {
     let body = opts.body;
-    if (tier === "ai" || tier === "continuous" || tier === "evolution") {
+    // Inject provider for all calls — non-AI functions ignore it harmlessly
+    {
       try {
         const provider = localStorage.getItem("entropy-ai-provider") || "cloudflare";
         body = { ...body, provider };
