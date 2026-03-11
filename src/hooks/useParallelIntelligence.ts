@@ -61,7 +61,7 @@ export function useParallelIntelligence(stocks: PortfolioStock[], refreshKey: nu
       const { data: result } = await governedInvoke<ParallelIntelligence>("parallel-intelligence", {
         body: { portfolio, regime: "unknown", vix: 18 },
       });
-      if (result && !result.error) setData(result);
+      if (result && !(result as any).error) setData(result);
     } catch { /* fallback stays */ }
     setLoading(false);
   }, [portfolio.length, refreshKey]);

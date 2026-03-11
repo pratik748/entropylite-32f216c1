@@ -49,7 +49,7 @@ export function useContinuousSimulation(stocks: PortfolioStock[], refreshKey: nu
         const { data: result } = await governedInvoke<ContinuousSimData>("continuous-simulation", {
           body: { portfolio, regime: "unknown", vix: 18, totalValue },
         });
-        if (result && !result.error) setData(result);
+        if (result && !(result as any).error) setData(result);
       } catch { /* keep fallback */ }
       setLoading(false);
     };
