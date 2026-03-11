@@ -59,6 +59,10 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "monte-carlo-intelligence":"ai",
   "crown-intelligence":      "ai",
   "deep-intelligence":       "ai",
+  "parallel-intelligence":   "ai",
+  "continuous-simulation":   "continuous",
+  "clank-detection":         "ai",
+  "strategy-evolution":      "evolution",
 };
 
 // Rough cost weights for monitoring (relative units)
