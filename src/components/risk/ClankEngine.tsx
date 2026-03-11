@@ -25,6 +25,15 @@ const ClankEngine = ({ stocks }: ClankEngineProps) => {
 
   const { overrides, events, loading: learningLoading, confidenceOverridesMap, recordActivation, recordOutcome } = useClankLearning();
 
+  // AI-powered constraint detection overlay
+  const analyzed = stocks.filter(s => s.analysis);
+  const aiBody = useMemo(() => analyzed.length > 0 ? {
+    portfolio: analyzed.map(s => ({ ticker: s.ticker, value: (s.analysis?.currentPrice || 0) * s.quantity, risk: s.analysis?.riskLevel })),
+    vix: 18,
+    regime: "unknown",
+  } : null, [analyzed.map(s => s.ticker).join(",")]);
+  const { data: aiClank, loading: aiLoading, isAI: hasAIClank } = useAIIntelligence<any>("clank-detection", aiBody, null, analyzed.length > 0);
+
   const confMap = useMemo(() => confidenceOverridesMap(), [confidenceOverridesMap]);
   const statuses = useMemo(() => evaluateConstraints(stocks, confMap), [stocks, confMap]);
   const clankScore = useMemo(() => computeClankScore(statuses), [statuses]);
