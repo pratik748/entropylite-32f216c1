@@ -30,14 +30,16 @@ interface GovernorMetrics {
   requestsInWindow: number;
 }
 
-type Tier = "realtime" | "frequent" | "slow" | "static" | "ai";
+type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution";
 
 const TTL: Record<Tier, number> = {
-  realtime: 8_000,    // 8s — prices (aggressive freshness)
-  frequent: 15_000,   // 15s — market overview, ticker strip
-  slow:     60_000,   // 1 min — news, geopolitical, desirable assets
-  static:   Infinity, // permanent — historical data
-  ai:       30_000,   // 30s cooldown for AI calls
+  realtime:   8_000,    // 8s — prices
+  frequent:   15_000,   // 15s — market overview, ticker strip
+  slow:       60_000,   // 1 min — news, geopolitical, desirable assets
+  static:     Infinity, // permanent — historical data
+  ai:         30_000,   // 30s cooldown for AI calls
+  continuous: 60_000,   // 60s — background simulation loops
+  evolution:  120_000,  // 120s — strategy discovery
 };
 
 const ENDPOINT_TIER: Record<string, Tier> = {
@@ -57,15 +59,21 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "monte-carlo-intelligence":"ai",
   "crown-intelligence":      "ai",
   "deep-intelligence":       "ai",
+  "parallel-intelligence":   "ai",
+  "continuous-simulation":   "continuous",
+  "clank-detection":         "ai",
+  "strategy-evolution":      "evolution",
 };
 
 // Rough cost weights for monitoring (relative units)
 const COST_WEIGHT: Record<Tier, number> = {
-  realtime: 0.1,
-  frequent: 0.2,
-  slow:     0.5,
-  static:   0,
-  ai:       5,
+  realtime:   0.1,
+  frequent:   0.2,
+  slow:       0.5,
+  static:     0,
+  ai:         5,
+  continuous: 3,
+  evolution:  4,
 };
 
 // --------------- Singleton State ---------------

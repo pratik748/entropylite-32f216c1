@@ -22,6 +22,7 @@ import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
+import { useParallelIntelligence } from "@/hooks/useParallelIntelligence";
 import RiskDashboard from "@/components/RiskDashboard";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import TickerStrip from "@/components/terminal/TickerStrip";
@@ -29,6 +30,7 @@ import SystemStatusBar from "@/components/terminal/SystemStatusBar";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
+import IntelligenceConsensus from "@/components/terminal/IntelligenceConsensus";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
@@ -72,6 +74,7 @@ const IndexContent = () => {
     triggerRefresh();
   }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
+  const { data: consensusData, loading: consensusLoading } = useParallelIntelligence(stocks, refreshKey);
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
@@ -322,7 +325,17 @@ const IndexContent = () => {
               {/* Right: News + Flow Detection */}
               <ResizablePanel defaultSize={23} minSize={15} maxSize={35}>
                 <ResizablePanelGroup direction="vertical">
-                  <ResizablePanel defaultSize={35} minSize={15}>
+                  <ResizablePanel defaultSize={25} minSize={10}>
+                    <PanelWrapper title="AI Consensus" icon={<Activity className="h-3 w-3" />} noPad>
+                      <div className="p-2 overflow-auto h-full">
+                        <IntelligenceConsensus data={consensusData} loading={consensusLoading} />
+                      </div>
+                    </PanelWrapper>
+                  </ResizablePanel>
+
+                  <ResizableHandle withHandle />
+
+                  <ResizablePanel defaultSize={30} minSize={15}>
                     <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
                       <LiveNewsFeed ticker={analysis?.ticker} compact />
                     </PanelWrapper>
