@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart,
+  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StrategyLab from "./StrategyLab";
@@ -14,6 +14,7 @@ import ScarMemory from "./ScarMemory";
 import CrownLayer from "./CrownLayer";
 import CausalEffectsEngine from "./CausalEffectsEngine";
 import StatArbEngine from "./StatArbEngine";
+import StrategyFactory from "./StrategyFactory";
 
 interface Props {
   stocks: PortfolioStock[];
