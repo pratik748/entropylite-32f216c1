@@ -225,6 +225,15 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
             <span>{t.label}</span>
           </button>
         ))}
+        {/* Secret AI Provider Toggle */}
+        <button
+          onClick={toggle}
+          className="ml-auto flex items-center gap-1 px-2 py-1 rounded border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer select-none"
+        >
+          <span className={`text-[9px] font-mono font-bold ${provider === "cloudflare" ? "text-primary" : "text-muted-foreground/40"}`}>C</span>
+          <span className="text-[9px] text-muted-foreground/30">/</span>
+          <span className={`text-[9px] font-mono font-bold ${provider === "mistral" ? "text-primary" : "text-muted-foreground/40"}`}>M</span>
+        </button>
       </div>
 
       {riskTab === "clank" && <ClankEngine stocks={stocks} />}
