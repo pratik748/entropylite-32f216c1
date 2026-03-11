@@ -39,7 +39,7 @@ Return JSON:
   "reflexivity_score": <0-100>,
   "scar_tag": "<pattern tag>"
 }`,
-      maxTokens: 3000,
+      maxTokens: 4096,
       temperature: 0.3,
     });
 

@@ -64,6 +64,31 @@ function stripThinkingBlocks(text: string): string {
     .replace(/:\s*\+(\d)/g, ': $1')
     .replace(/[\x00-\x1F\x7F]/g, " ");
 
+  // Repair truncated JSON — close unbalanced braces/brackets
+  try {
+    JSON.parse(cleaned);
+  } catch {
+    // Remove trailing incomplete key-value pairs (e.g. `"key": "incompl`)
+    cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
+    cleaned = cleaned.replace(/,\s*$/, "");
+
+    let braces = 0, brackets = 0;
+    let inStr = false, esc = false;
+    for (let i = 0; i < cleaned.length; i++) {
+      const c = cleaned[i];
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === "{") braces++;
+      if (c === "}") braces--;
+      if (c === "[") brackets++;
+      if (c === "]") brackets--;
+    }
+    while (brackets > 0) { cleaned += "]"; brackets--; }
+    while (braces > 0) { cleaned += "}"; braces--; }
+  }
+
   return cleaned;
 }
 
