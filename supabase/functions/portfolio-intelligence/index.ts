@@ -20,6 +20,7 @@ serve(async (req) => {
     }
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a portfolio intelligence AI engine. Analyze the full portfolio and produce:
 Return ONLY valid JSON:
 {

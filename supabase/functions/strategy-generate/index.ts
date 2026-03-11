@@ -102,6 +102,7 @@ Generate exact trade instructions for this portfolio in this market environment.
     ];
 
     const result = await callAI({
+      provider,
       systemPrompt,
       userPrompt,
       tools,

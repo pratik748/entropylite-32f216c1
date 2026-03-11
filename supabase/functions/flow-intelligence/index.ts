@@ -25,6 +25,7 @@ serve(async (req) => {
     }));
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure and market context to detect flow signals.
 Return ONLY valid JSON array of flow signals:
 [{

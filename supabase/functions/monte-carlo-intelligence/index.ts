@@ -14,6 +14,7 @@ serve(async (req) => {
     const { portfolio, totalValue, avgRisk, avgBeta, scenario, provider } = await req.json();
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a Monte Carlo simulation calibration AI. Given a portfolio and scenario, calibrate simulation parameters and interpret results.
 Return ONLY valid JSON:
 {

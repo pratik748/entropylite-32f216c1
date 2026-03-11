@@ -19,6 +19,7 @@ serve(async (req) => {
     });
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an autonomous strategy evolution engine. Generate 6-10 novel trading strategy candidates, simulate their expected performance, then filter and rank them. Only return strategies with estimated Sharpe > 0.5 and confidence > 40%.
 
 For each surviving strategy provide:

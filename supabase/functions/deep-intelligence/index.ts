@@ -27,6 +27,7 @@ serve(async (req) => {
     }));
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a deep intelligence layer AI. Produce institutional-grade assessments across 4 dimensions for each stock.
 Return ONLY valid JSON:
 {

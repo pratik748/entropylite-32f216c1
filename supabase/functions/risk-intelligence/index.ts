@@ -34,6 +34,7 @@ serve(async (req) => {
     const totalValue = portfolioSummary.reduce((s: number, p: any) => s + p.currentPrice * p.qty, 0);
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are an institutional risk intelligence engine. Analyze the portfolio and produce a comprehensive risk assessment.
 Return ONLY valid JSON matching this exact schema:
 {

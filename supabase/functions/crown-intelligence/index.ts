@@ -26,6 +26,7 @@ serve(async (req) => {
     }));
 
     const result = await callAI({
+      provider,
       systemPrompt: `You are a risk-to-profit conversion AI. Identify actionable trading opportunities from portfolio risk signals.
 Return ONLY valid JSON array:
 [{

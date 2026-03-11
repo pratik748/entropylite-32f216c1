@@ -16,6 +16,7 @@ serve(async (req) => {
     const { event, portfolio, provider } = await req.json();
 
     const result = await callAI({
+      provider,
       systemPrompt: "You are a macro-strategist at a sovereign wealth fund. Model second and third-order causal effects of geopolitical and economic events. Return ONLY valid JSON.",
       userPrompt: `Event: "${event}"
 Portfolio: ${portfolio || "No portfolio loaded"}
