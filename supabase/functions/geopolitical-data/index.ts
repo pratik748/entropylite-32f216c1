@@ -184,6 +184,7 @@ Return 8-12 current conflicts as JSON:
 {"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.0-1.0,"type":"war|sanctions|unrest|terrorism|trade_war|cyber|energy","affectedAssets":["X"],"summary":"1-2 sentences reflecting CURRENT situation","nearTradeHub":"str","distanceKm":0,"escalationProb":0.0-1.0,"actionableIntel":"specific trading action"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high|medium|low","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":0-100,"regimeSignal":"stable|transition|crisis","keyThreats":["t1","t2","t3","t4"],"capitalFlowDirection":"risk-on|risk-off|mixed","safeHavenDemand":"low|moderate|high|extreme","intelligenceSummary":"3 sentences reflecting CURRENT market+geopolitical state"}`,
         maxTokens: 2000,
         temperature: 0.4,
+        provider,
       });
 
       console.log(`geopolitical-data used provider: ${result.provider}`);

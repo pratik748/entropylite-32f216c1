@@ -72,7 +72,7 @@ Return JSON:
 }`,
       maxTokens: 4000,
       temperature: 0.35,
-      
+      provider,
     });
 
     console.log(`desirable-assets used provider: ${result.provider}`);

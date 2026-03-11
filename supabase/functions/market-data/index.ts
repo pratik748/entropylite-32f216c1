@@ -146,7 +146,7 @@ Provide:
 }`,
         maxTokens: 800,
         temperature: 0.3,
-        preferredProvider: "openrouter",
+        provider,
       });
 
       console.log(`market-data used provider: ${result.provider}`);
