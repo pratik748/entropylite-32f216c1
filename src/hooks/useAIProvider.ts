@@ -25,7 +25,7 @@ export function useAIProvider() {
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
-        setProviderState(e.newValue === "mistral" ? "mistral" : "cloudflare");
+        setProviderState(e.newValue === "cloudflare" ? "cloudflare" : "mistral");
       }
     };
     window.addEventListener("storage", handler);
