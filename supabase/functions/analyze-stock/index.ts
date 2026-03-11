@@ -15,6 +15,7 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
     const provider = rawBody.provider;
+    const ticker = (rawBody.ticker || "").toString().trim().toUpperCase();
     const buyPrice = rawBody.buyPrice;
     const quantity = rawBody.quantity;
     if (!ticker || !buyPrice || !quantity) {
