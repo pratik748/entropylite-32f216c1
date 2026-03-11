@@ -31,6 +31,7 @@ const sections = [
   { id: "execution", label: "Execution Engine", icon: Target, desc: "VWAP/TWAP slicing, dark pool routing, liquidity-aware sizing" },
   { id: "command", label: "Command Center", icon: Layers, desc: "Portfolio heatmap, risk constellation, liquidity radar" },
   { id: "scar", label: "Scar Memory", icon: Skull, desc: "Track past mistakes and lessons — never repeat errors" },
+  { id: "factory", label: "Strategy Factory", icon: Dna, desc: "AI evolution machine — autonomous strategy discovery & ranking" },
 ] as const;
 
 type SectionId = typeof sections[number]["id"];
