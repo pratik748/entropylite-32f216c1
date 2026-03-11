@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio } = await req.json();
+    const { portfolio, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
