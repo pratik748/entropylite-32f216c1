@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, totalValue, avgRisk, avgBeta, scenario } = await req.json();
+    const { portfolio, totalValue, avgRisk, avgBeta, scenario, provider } = await req.json();
 
     const result = await callAI({
       systemPrompt: `You are a Monte Carlo simulation calibration AI. Given a portfolio and scenario, calibrate simulation parameters and interpret results.
