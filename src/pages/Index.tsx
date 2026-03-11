@@ -74,7 +74,7 @@ const IndexContent = () => {
     triggerRefresh();
   }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
-  const { data: consensusData, loading: consensusLoading } = useParallelIntelligence(stocks, refreshKey);
+  
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
