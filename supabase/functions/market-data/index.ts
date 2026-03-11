@@ -55,6 +55,8 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
+    const body = await req.json().catch(() => ({}));
+    const provider = body.provider || "mistral";
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
