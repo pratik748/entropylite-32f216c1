@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, regime, vix, totalValue } = await req.json();
+    const { portfolio, regime, vix, totalValue, provider } = await req.json();
     const ctx = JSON.stringify({ portfolio: portfolio?.slice(0, 15), regime, vix, totalValue });
 
     const result = await callAI({
