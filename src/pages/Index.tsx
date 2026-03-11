@@ -197,30 +197,31 @@ const IndexContent = () => {
       )}
 
       {/* Tab Navigation */}
-      <nav className="border-b border-border glass-panel sticky top-0 z-30 shrink-0">
-        <div className="px-1 sm:container flex items-center gap-0 overflow-x-auto py-0.5 sm:py-1 scrollbar-hide relative z-10">
+      <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
+        <div className="px-0.5 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative" style={{ scrollSnapType: 'x mandatory' }}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabSwitch(tab.id)}
-              className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+              style={{ scrollSnapAlign: 'start' }}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 ${
                 activeTab === tab.id
-                  ? "glass-subtle glass-glow-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground border border-transparent"
+                  ? "border-primary text-primary bg-surface-2"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
               }`}
             >
               <span className="sm:hidden">{React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}</span>
               <span className="hidden sm:block">{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.shortLabel}</span>
+              <span className="hidden sm:inline uppercase tracking-wider">{tab.label}</span>
+              <span className="sm:hidden uppercase tracking-wider">{tab.shortLabel}</span>
             </button>
           ))}
-          <div className="ml-auto flex items-center gap-1 pl-1 flex-shrink-0">
-            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-gain" />
+          <div className="ml-auto flex items-center gap-1 pl-1 pr-2 flex-shrink-0">
+            <span className="relative flex h-1 w-1">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
+              <span className="relative inline-flex h-1 w-1 rounded-full bg-gain" />
             </span>
-            <span className="text-[7px] sm:text-[9px] font-mono text-muted-foreground">LIVE</span>
+            <span className="text-[7px] font-mono text-gain/70 uppercase tracking-widest">Live</span>
           </div>
         </div>
       </nav>
@@ -229,11 +230,11 @@ const IndexContent = () => {
       <TickerStrip />
 
       {/* Main Content — fills all remaining space, above the status bar */}
-      <main className="flex-1 min-h-0 pb-8 sm:pb-6 overflow-auto">
+      <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
-            <div className="p-2 space-y-2 pb-12">
+            <div className="p-1.5 space-y-1.5 pb-10">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
@@ -282,8 +283,8 @@ const IndexContent = () => {
                   <ResizablePanel defaultSize={65} minSize={30}>
                     <div className="h-full overflow-auto p-3 space-y-3">
                       {!isLoading && !analysis && (
-                        <div className="flex flex-col items-center justify-center rounded border border-border bg-card py-16 animate-fade-in">
-                          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                        <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
+                          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
                             <Activity className="h-7 w-7 text-primary" />
                           </div>
                           <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>

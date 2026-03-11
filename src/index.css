@@ -35,7 +35,7 @@
     --input: 0 0% 10%;
     --ring: 0 0% 80%;
 
-    --radius: 0.375rem;
+    --radius: 0.125rem;
 
     /* Custom tokens */
     --gain: 152 90% 45%;
@@ -95,20 +95,32 @@
     transform: translateZ(0);
   }
 
-  /* Premium scrollbar */
+  /* Institutional scrollbar */
   ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 3px;
+    height: 3px;
   }
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: hsl(0 0% 4%);
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 18%);
-    border-radius: 4px;
+    background: hsl(0 0% 15%);
+    border-radius: 0;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
+    background: hsl(0 0% 25%);
+  }
+
+  /* Selection */
+  ::selection {
+    background: hsl(0 0% 30%);
+    color: hsl(0 0% 98%);
+  }
+
+  /* Prevent iOS bounce on fixed panels */
+  .no-touch-bounce {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -148,12 +160,10 @@
   /* Liquid Glass System */
   .glass-panel {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
     border: 1px solid hsl(var(--glass-border));
-    box-shadow:
-      var(--glow-glass),
-      0 8px 32px hsl(220 30% 4% / 0.4);
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.5);
     position: relative;
     overflow: hidden;
   }
@@ -302,11 +312,11 @@
   color: hsl(0, 0%, 92%) !important;
   font-weight: 700 !important;
 }
-.entropy-popup .leaflet-popup-content-wrapper {
+  .entropy-popup .leaflet-popup-content-wrapper {
   background: hsl(0, 0%, 5%) !important;
   color: hsl(0, 0%, 85%) !important;
   border: 1px solid hsl(0, 0%, 18%) !important;
-  border-radius: 8px !important;
+  border-radius: 2px !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 10px !important;
 }
@@ -314,7 +324,7 @@
   background: hsl(0, 0%, 5%) !important;
   color: hsl(0, 0%, 85%) !important;
   border: 1px solid hsl(0, 0%, 18%) !important;
-  border-radius: 8px !important;
+  border-radius: 2px !important;
   font-size: 11px !important;
 }
 .leaflet-popup-tip {

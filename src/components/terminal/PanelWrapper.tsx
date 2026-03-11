@@ -16,8 +16,8 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
 
   const content = (
-    <div className={`flex flex-col h-full border border-border rounded bg-card overflow-hidden ${expanded ? "fixed inset-0 z-50" : ""} ${className}`}>
-      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border bg-surface-2 shrink-0">
+    <div className={`flex flex-col h-full border border-border bg-card ${expanded ? "fixed inset-0 z-50" : ""} ${className}`}>
+      <div className="flex items-center justify-between px-2 py-1 border-b border-border bg-surface-2 shrink-0">
         <div
           className={`flex items-center gap-1.5 ${collapsible ? "cursor-pointer" : ""}`}
           onClick={collapsible ? () => setCollapsed(!collapsed) : undefined}
