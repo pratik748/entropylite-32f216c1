@@ -26,7 +26,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
   const convertedPnl = showConverted ? convertToBase(pnl, currency) : null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3 sm:p-6 animate-slide-up">
+    <div className="rounded-sm border border-border bg-card p-3 sm:p-5 animate-slide-up">
       <div className="mb-3 sm:mb-4 flex items-center justify-between">
         <div>
           <p className="font-mono text-base sm:text-xl font-bold text-foreground">{ticker}</p>
