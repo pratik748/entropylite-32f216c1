@@ -44,7 +44,7 @@ export function useAIProvider() {
 export function getAIProvider(): AIProvider {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "mistral" ? "mistral" : "cloudflare";
+    return stored === "cloudflare" ? "cloudflare" : "mistral";
   } catch {
     return "cloudflare";
   }
