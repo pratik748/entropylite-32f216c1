@@ -41,7 +41,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-        <div className="rounded-lg bg-surface-2 p-2 sm:p-3">
+        <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Current Price</p>
           <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentPrice, currency)}</p>
           {convertedPrice !== null && (
