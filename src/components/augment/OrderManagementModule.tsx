@@ -1,28 +1,34 @@
 import { useMemo } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie,
+} from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { formatCurrency } from "@/lib/currency";
 
 interface Props { stocks: PortfolioStock[]; }
 
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
+
 const OrderManagementModule = ({ stocks }: Props) => {
   const { totalValue, totalPnl, holdings, fmt, baseCurrency, sym } = useNormalizedPortfolio(stocks);
 
-  const { orders, analytics } = useMemo(() => {
-    if (holdings.length === 0) return { orders: [], analytics: [] };
+  const { orders, analytics, valueBarData, sidePieData } = useMemo(() => {
+    if (holdings.length === 0) return { orders: [], analytics: [], valueBarData: [], sidePieData: [] };
 
     const orderList = holdings.map((h, i) => ({
-      id: `ORD-${28420 + i + 1}`,
-      ticker: h.ticker,
+      id: `ORD-${28420 + i + 1}`, ticker: h.ticker,
       side: h.suggestion === "Exit" ? "SELL" : h.suggestion === "Add" ? "BUY" : "HOLD",
-      type: h.quantity > 100 ? "ALGO-TWAP" : "LIMIT",
-      qty: h.quantity,
-      price: h.price,
-      priceFormatted: formatCurrency(h.price, h.currency),
+      type: h.quantity > 100 ? "ALGO-TWAP" : "LIMIT", qty: h.quantity,
+      price: h.price, priceFormatted: formatCurrency(h.price, h.currency),
       status: "FILLED",
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      venue: "EXCHANGE",
-      slippage: `${(Math.random() * 0.08).toFixed(2)}%`,
+      venue: "EXCHANGE", slippage: `${(Math.random() * 0.08).toFixed(2)}%`,
+      value: h.value,
     }));
 
     const stats = [
@@ -32,7 +38,19 @@ const OrderManagementModule = ({ stocks }: Props) => {
       { label: "Day P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}` },
     ];
 
-    return { orders: orderList, analytics: stats };
+    // Value bar
+    const bars = orderList.map(o => ({ name: o.ticker, value: +o.value.toFixed(0) }));
+
+    // Side distribution pie
+    const sideCount = { BUY: 0, SELL: 0, HOLD: 0 };
+    orderList.forEach(o => { sideCount[o.side as keyof typeof sideCount]++; });
+    const pie = [
+      { name: "BUY", value: sideCount.BUY, fill: "hsl(152,90%,45%)" },
+      { name: "SELL", value: sideCount.SELL, fill: "hsl(0,90%,55%)" },
+      { name: "HOLD", value: sideCount.HOLD, fill: "hsl(0,0%,45%)" },
+    ].filter(p => p.value > 0);
+
+    return { orders: orderList, analytics: stats, valueBarData: bars, sidePieData: pie };
   }, [holdings, totalValue, totalPnl, fmt]);
 
   const statusColor: Record<string, string> = {
@@ -57,6 +75,48 @@ const OrderManagementModule = ({ stocks }: Props) => {
             <p className="mt-1 font-mono text-xl font-bold text-foreground">{a.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Position Value by Ticker</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={valueBarData} margin={{ left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                <Tooltip contentStyle={tipStyle} />
+                <Bar dataKey="value" fill="hsl(0,0%,60%)" radius={[4, 4, 0, 0]}>
+                  {valueBarData.map((_, i) => <Cell key={i} fill={`hsl(0,0%,${80 - i * 8}%)`} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Order Side Distribution</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={sidePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} innerRadius={45} strokeWidth={2} stroke={CARD_BG}>
+                  {sidePieData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                </Pie>
+                <Tooltip contentStyle={tipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-2 flex justify-center gap-4">
+            {sidePieData.map(d => (
+              <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+                <span className="text-muted-foreground">{d.name} ({d.value})</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">

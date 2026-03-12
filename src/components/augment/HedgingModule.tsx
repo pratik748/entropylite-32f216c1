@@ -1,173 +1,107 @@
 import { useMemo, useState } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell,
+} from "recharts";
 import { Shield, AlertTriangle, Zap, BarChart3, RefreshCw } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
-
 type HedgeMode = "defensive" | "balanced" | "aggressive";
 
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
+
 interface ActiveHedge {
-  instrument: string;
-  type: string;
-  notional: number;
-  notionalFmt: string;
-  delta: number;
-  gamma: number;
-  theta: number;
-  purpose: string;
-  urgency: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  trigger: string;
-  targetTicker?: string;
-  hedgeRatio: number;
-  costBps: number;
+  instrument: string; type: string; notional: number; notionalFmt: string;
+  delta: number; gamma: number; theta: number; purpose: string;
+  urgency: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"; trigger: string;
+  targetTicker?: string; hedgeRatio: number; costBps: number;
 }
 
 const HedgingModule = ({ stocks }: Props) => {
   const { totalValue, holdings, fmt, baseCurrency, sym, convertToBase } = useNormalizedPortfolio(stocks);
   const [mode, setMode] = useState<HedgeMode>("balanced");
 
-  const { hedges, metrics, portfolioGreeks, riskBudget } = useMemo(() => {
-    if (holdings.length === 0) return { hedges: [], metrics: [], portfolioGreeks: null, riskBudget: null };
+  const { hedges, metrics, portfolioGreeks, riskBudget, notionalBarData, greeksCompareData } = useMemo(() => {
+    if (holdings.length === 0) return { hedges: [], metrics: [], portfolioGreeks: null, riskBudget: null, notionalBarData: [], greeksCompareData: [] };
 
-    // Compute portfolio-level Greeks
     const weightedBeta = holdings.reduce((s, h) => s + h.beta * (h.value / totalValue), 0);
     const weightedRisk = holdings.reduce((s, h) => s + h.risk * (h.value / totalValue), 0);
-    const portfolioVol = (weightedRisk / 100) * 0.25; // annualized vol estimate
-    const portfolioDelta = weightedBeta * totalValue / 100; // dollar delta per 1% move
-    const portfolioGamma = portfolioDelta * 0.05; // estimated gamma
-    const portfolioVega = totalValue * portfolioVol * 0.01; // vega exposure
+    const portfolioVol = (weightedRisk / 100) * 0.25;
+    const portfolioDelta = weightedBeta * totalValue / 100;
+    const portfolioGamma = portfolioDelta * 0.05;
+    const portfolioVega = totalValue * portfolioVol * 0.01;
 
-    // Mode multipliers
     const modeConfig = {
       defensive: { hedgeRatio: 0.8, costTolerance: 1.5, minUrgency: 30 },
       balanced: { hedgeRatio: 0.5, costTolerance: 1.0, minUrgency: 45 },
       aggressive: { hedgeRatio: 0.3, costTolerance: 0.6, minUrgency: 60 },
     };
     const cfg = modeConfig[mode];
-
     const hedgeList: ActiveHedge[] = [];
 
-    // --- DYNAMIC HEDGE 1: Portfolio Beta Neutralization ---
+    // Beta neutralization
     if (weightedBeta > 1.05) {
       const excessBeta = weightedBeta - 1;
       const hedgeNotional = totalValue * excessBeta * cfg.hedgeRatio;
       const hasIndian = holdings.some(h => h.rawTicker?.includes(".NS") || h.rawTicker?.includes(".BO"));
-      const instrument = hasIndian ? "NIFTY Futures Short" : "ES Mini Futures Short";
       hedgeList.push({
-        instrument, type: "Index Futures", notional: hedgeNotional, notionalFmt: fmt(hedgeNotional),
+        instrument: hasIndian ? "NIFTY Futures Short" : "ES Mini Futures Short", type: "Index Futures",
+        notional: hedgeNotional, notionalFmt: fmt(hedgeNotional),
         delta: -excessBeta * cfg.hedgeRatio, gamma: 0, theta: 0,
         purpose: `Neutralize excess β (${weightedBeta.toFixed(2)} → ${(weightedBeta - excessBeta * cfg.hedgeRatio).toFixed(2)})`,
         urgency: weightedBeta > 1.4 ? "CRITICAL" : weightedBeta > 1.2 ? "HIGH" : "MEDIUM",
-        trigger: `β > ${(1 + (1 - cfg.hedgeRatio) * 0.1).toFixed(2)}`, hedgeRatio: cfg.hedgeRatio,
-        costBps: 0.5,
+        trigger: `β > ${(1 + (1 - cfg.hedgeRatio) * 0.1).toFixed(2)}`, hedgeRatio: cfg.hedgeRatio, costBps: 0.5,
       });
     }
 
-    // --- DYNAMIC HEDGE 2: Per-position tail risk (risk-weighted) ---
-    const sortedByRisk = [...holdings].sort((a, b) => b.risk * b.value - a.risk * a.value);
-    const topRiskPositions = sortedByRisk.filter(h => h.risk >= cfg.minUrgency).slice(0, 5);
-
-    topRiskPositions.forEach(h => {
+    // Per-position tail risk
+    const topRisk = [...holdings].sort((a, b) => b.risk * b.value - a.risk * a.value).filter(h => h.risk >= cfg.minUrgency).slice(0, 5);
+    topRisk.forEach(h => {
       const posVol = (h.risk / 100) * 0.018 * Math.sqrt(252);
-      const otmStrike = 0.95; // 5% OTM
-      const putDelta = -0.30 * (h.risk / 50); // dynamic delta based on risk
+      const putDelta = -0.30 * (h.risk / 50);
       const notional = h.value * posVol * cfg.hedgeRatio;
-      const impliedTheta = -notional * 0.0015; // daily theta decay estimate
-      const impliedGamma = Math.abs(putDelta) * 0.08;
-
       hedgeList.push({
-        instrument: `${h.ticker} PUT ${Math.round(otmStrike * 100)}% Strike`,
-        type: "Equity Put Option", notional, notionalFmt: fmt(notional),
-        delta: putDelta, gamma: impliedGamma, theta: impliedTheta,
-        purpose: `Vol-weighted protection (σ=${(posVol * 100).toFixed(0)}%, risk=${h.risk})`,
+        instrument: `${h.ticker} PUT 95% Strike`, type: "Equity Put Option",
+        notional, notionalFmt: fmt(notional), delta: putDelta, gamma: Math.abs(putDelta) * 0.08,
+        theta: -notional * 0.0015, purpose: `Vol-weighted protection (σ=${(posVol * 100).toFixed(0)}%, risk=${h.risk})`,
         urgency: h.risk >= 70 ? "CRITICAL" : h.risk >= 55 ? "HIGH" : "MEDIUM",
         trigger: `${h.ticker} drops >${(posVol * 100 * 1.5).toFixed(0)}% in 5d`,
-        targetTicker: h.ticker, hedgeRatio: cfg.hedgeRatio,
-        costBps: posVol * 100 * 2,
+        targetTicker: h.ticker, hedgeRatio: cfg.hedgeRatio, costBps: posVol * 100 * 2,
       });
     });
 
-    // --- DYNAMIC HEDGE 3: Correlation-based portfolio put ---
+    // Portfolio put
     if (holdings.length >= 3) {
-      const concentration = holdings.reduce((max, h) => Math.max(max, h.value / totalValue), 0);
-      const diversificationBenefit = 1 - concentration;
       const portfolioPutNotional = totalValue * 0.03 * (1 + weightedRisk / 100) * cfg.hedgeRatio;
-
       hedgeList.push({
         instrument: holdings.some(h => h.rawTicker?.includes(".NS")) ? "NIFTY PUT OTM 7%" : "SPY PUT OTM 5%",
         type: "Index Put Option", notional: portfolioPutNotional, notionalFmt: fmt(portfolioPutNotional),
         delta: -0.20, gamma: 0.03, theta: -portfolioPutNotional * 0.001,
-        purpose: `Portfolio tail hedge (diversification: ${(diversificationBenefit * 100).toFixed(0)}%)`,
-        urgency: weightedRisk > 55 ? "HIGH" : "MEDIUM",
-        trigger: `Index drops >5% from current level`, hedgeRatio: cfg.hedgeRatio,
-        costBps: 3.5,
+        purpose: "Portfolio tail hedge", urgency: weightedRisk > 55 ? "HIGH" : "MEDIUM",
+        trigger: "Index drops >5% from current level", hedgeRatio: cfg.hedgeRatio, costBps: 3.5,
       });
     }
 
-    // --- DYNAMIC HEDGE 4: Crypto volatility hedge ---
-    const cryptoHoldings = holdings.filter(h => h.rawTicker?.includes("-USD"));
-    if (cryptoHoldings.length > 0) {
-      const cryptoValue = cryptoHoldings.reduce((s, h) => s + h.value, 0);
-      const cryptoWeight = cryptoValue / totalValue;
-      const cryptoVol = 0.65; // ~65% annualized vol for crypto
-      const hedgeNotional = cryptoValue * 0.15 * cfg.hedgeRatio;
-
-      hedgeList.push({
-        instrument: "BTC Perpetual Short / BITO PUT", type: "Crypto Derivative",
-        notional: hedgeNotional, notionalFmt: fmt(hedgeNotional),
-        delta: -0.5 * cryptoWeight, gamma: 0.02, theta: -hedgeNotional * 0.002,
-        purpose: `Crypto vol hedge (${(cryptoWeight * 100).toFixed(0)}% portfolio, σ=${(cryptoVol * 100).toFixed(0)}%)`,
-        urgency: cryptoWeight > 0.2 ? "CRITICAL" : "HIGH",
-        trigger: `BTC vol >80% or drawdown >15%`, hedgeRatio: cfg.hedgeRatio,
-        costBps: cryptoVol * 10,
-      });
-    }
-
-    // --- DYNAMIC HEDGE 5: FX hedge for multi-currency exposure ---
-    const currencyExposure: Record<string, number> = {};
-    holdings.forEach(h => {
-      const ccy = h.currency || "USD";
-      if (ccy !== baseCurrency) {
-        currencyExposure[ccy] = (currencyExposure[ccy] || 0) + h.value;
-      }
-    });
-
-    Object.entries(currencyExposure).forEach(([ccy, exposure]) => {
-      const fxWeight = exposure / totalValue;
-      if (fxWeight > 0.1) { // Only hedge if >10% exposure
-        const hedgeNotional = exposure * 0.5 * cfg.hedgeRatio;
-        hedgeList.push({
-          instrument: `${ccy}/${baseCurrency} Forward 3M`, type: "FX Forward",
-          notional: hedgeNotional, notionalFmt: fmt(hedgeNotional),
-          delta: -fxWeight * cfg.hedgeRatio, gamma: 0, theta: 0,
-          purpose: `Hedge ${(fxWeight * 100).toFixed(0)}% ${ccy} exposure (${fmt(exposure)})`,
-          urgency: fxWeight > 0.3 ? "HIGH" : "MEDIUM",
-          trigger: `${ccy}/${baseCurrency} moves >2% in 5d`, hedgeRatio: cfg.hedgeRatio,
-          costBps: 1.2,
-        });
-      }
-    });
-
-    // --- DYNAMIC HEDGE 6: Volatility expansion hedge ---
+    // VIX hedge
     if (weightedRisk > 50 && totalValue > 0) {
-      const vixHedgeNotional = totalValue * 0.02 * (weightedRisk / 50) * cfg.hedgeRatio;
+      const vixNotional = totalValue * 0.02 * (weightedRisk / 50) * cfg.hedgeRatio;
       hedgeList.push({
         instrument: "VIX Call Spread 20/30", type: "Volatility Derivative",
-        notional: vixHedgeNotional, notionalFmt: fmt(vixHedgeNotional),
-        delta: 0, gamma: 0.15, theta: -vixHedgeNotional * 0.003,
+        notional: vixNotional, notionalFmt: fmt(vixNotional),
+        delta: 0, gamma: 0.15, theta: -vixNotional * 0.003,
         purpose: `Vol expansion protection (portfolio σ=${(portfolioVol * 100).toFixed(1)}%)`,
         urgency: weightedRisk > 65 ? "HIGH" : "MEDIUM",
-        trigger: `VIX spikes >25 or realized vol >30%`, hedgeRatio: cfg.hedgeRatio,
-        costBps: 2.0,
+        trigger: "VIX spikes >25 or realized vol >30%", hedgeRatio: cfg.hedgeRatio, costBps: 2.0,
       });
     }
 
-    // Sort by urgency then notional
     const urgencyOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
     hedgeList.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.notional - a.notional);
 
-    // Aggregate metrics
     const totalHedgeCost = hedgeList.reduce((s, h) => s + h.notional * h.costBps / 10000, 0);
     const totalNotional = hedgeList.reduce((s, h) => s + h.notional, 0);
     const netDelta = weightedBeta + hedgeList.reduce((s, h) => s + h.delta, 0);
@@ -183,11 +117,24 @@ const HedgingModule = ({ stocks }: Props) => {
       { metric: "Active Hedges", value: `${hedgeList.length}` },
     ];
 
+    // Charts data
+    const notionalBars = hedgeList.map(h => ({
+      name: h.instrument.length > 18 ? h.instrument.slice(0, 18) + "…" : h.instrument,
+      notional: +h.notional.toFixed(0),
+      fill: h.urgency === "CRITICAL" ? "hsl(0,90%,55%)" : h.urgency === "HIGH" ? "hsl(38,92%,55%)" : "hsl(0,0%,50%)",
+    }));
+
+    const greeksCompare = [
+      { name: "Delta (β)", pre: +weightedBeta.toFixed(2), post: +netDelta.toFixed(2) },
+      { name: "Gamma", pre: +portfolioGamma.toFixed(2), post: +(portfolioGamma + netGamma).toFixed(2) },
+      { name: "Vega", pre: +(portfolioVega / 1000).toFixed(1), post: +(portfolioVega * 0.7 / 1000).toFixed(1) },
+    ];
+
     return {
-      hedges: hedgeList,
-      metrics: metricsData,
+      hedges: hedgeList, metrics: metricsData,
       portfolioGreeks: { delta: portfolioDelta, gamma: portfolioGamma, vega: portfolioVega, beta: weightedBeta, vol: portfolioVol, netDelta, netGamma, netTheta },
       riskBudget: { weightedRisk, totalHedgeCost, costPct: (totalHedgeCost / totalValue) * 100 },
+      notionalBarData: notionalBars, greeksCompareData: greeksCompare,
     };
   }, [holdings, totalValue, fmt, mode, baseCurrency, convertToBase]);
 
@@ -238,7 +185,6 @@ const HedgingModule = ({ stocks }: Props) => {
           <p className={`mt-1 font-mono text-2xl font-bold ${portfolioGreeks && portfolioGreeks.beta > 1.2 ? "text-warning" : "text-foreground"}`}>
             {portfolioGreeks?.beta.toFixed(3) || "—"}
           </p>
-          {portfolioGreeks && <p className="text-[10px] text-muted-foreground mt-0.5">Net: {portfolioGreeks.netDelta.toFixed(3)}</p>}
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Portfolio σ (ann.)</p>
@@ -253,33 +199,44 @@ const HedgingModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* Portfolio Greeks */}
-      {portfolioGreeks && (
+      {/* Charts: Hedge Notionals + Greeks Pre/Post */}
+      <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" /> Portfolio Greeks (Pre → Post Hedge)
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Delta (β)", pre: portfolioGreeks.beta.toFixed(3), post: portfolioGreeks.netDelta.toFixed(3), good: Math.abs(portfolioGreeks.netDelta) < Math.abs(portfolioGreeks.beta) },
-              { label: "Γ Gamma", pre: portfolioGreeks.gamma.toFixed(2), post: (portfolioGreeks.gamma + portfolioGreeks.netGamma).toFixed(2), good: true },
-              { label: "Vega", pre: fmt(portfolioGreeks.vega), post: fmt(portfolioGreeks.vega * 0.7), good: true },
-              { label: "Θ Theta", pre: "0", post: fmt(portfolioGreeks.netTheta), good: false },
-            ].map(g => (
-              <div key={g.label} className="rounded-lg bg-surface-2 p-3">
-                <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{g.label}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="font-mono text-sm text-muted-foreground line-through">{g.pre}</span>
-                  <span className="text-muted-foreground">→</span>
-                  <span className={`font-mono text-sm font-bold ${g.good ? "text-gain" : "text-loss"}`}>{g.post}</span>
-                </div>
-              </div>
-            ))}
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Hedge Notional by Instrument</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={notionalBarData} layout="vertical" margin={{ left: 120 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+                <XAxis type="number" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                <YAxis dataKey="name" type="category" tick={{ fill: MUTED, fontSize: 8 }} axisLine={{ stroke: GRID }} width={115} />
+                <Tooltip contentStyle={tipStyle} />
+                <Bar dataKey="notional" radius={[0, 4, 4, 0]}>
+                  {notionalBarData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      )}
 
-      {/* Active hedge recommendations */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Greeks: Pre vs Post Hedge</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={greeksCompareData} margin={{ left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 10 }} axisLine={{ stroke: GRID }} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                <Tooltip contentStyle={tipStyle} />
+                <Legend wrapperStyle={{ fontSize: 10, color: MUTED }} />
+                <Bar dataKey="pre" fill="hsl(0,0%,40%)" radius={[2, 2, 0, 0]} name="Pre-Hedge" />
+                <Bar dataKey="post" fill="hsl(152,90%,45%)" radius={[2, 2, 0, 0]} name="Post-Hedge" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Hedge recommendations table */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
           <Zap className="h-4 w-4 text-primary" /> Dynamic Hedge Recommendations
@@ -296,9 +253,7 @@ const HedgingModule = ({ stocks }: Props) => {
             <tbody>
               {hedges.map((h, i) => (
                 <tr key={i} className="border-b border-border/50 hover:bg-surface-2 transition-colors">
-                  <td className="px-2 py-2.5">
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${urgencyColor(h.urgency)}`}>{h.urgency}</span>
-                  </td>
+                  <td className="px-2 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${urgencyColor(h.urgency)}`}>{h.urgency}</span></td>
                   <td className="px-2 py-2.5 font-mono text-xs text-foreground font-medium">{h.instrument}</td>
                   <td className="px-2 py-2.5 text-xs text-muted-foreground">{h.type}</td>
                   <td className="px-2 py-2.5 font-mono text-foreground">{h.notionalFmt}</td>
@@ -311,22 +266,6 @@ const HedgingModule = ({ stocks }: Props) => {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Per-hedge purpose detail */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Hedge Rationale</h3>
-        <div className="space-y-2">
-          {hedges.map((h, i) => (
-            <div key={i} className={`rounded-lg border p-3 ${h.urgency === "CRITICAL" ? "border-loss/30 bg-loss/5" : h.urgency === "HIGH" ? "border-warning/20 bg-warning/5" : "border-border bg-surface-2"}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-semibold text-foreground">{h.instrument}</span>
-                <span className="font-mono text-xs text-muted-foreground">{h.notionalFmt}</span>
-              </div>
-              <p className="text-[11px] text-secondary-foreground mt-1">{h.purpose}</p>
-            </div>
-          ))}
         </div>
       </div>
 

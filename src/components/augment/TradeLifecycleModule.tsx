@@ -1,4 +1,12 @@
-import { CheckCircle2, Clock, AlertTriangle, ArrowRight } from "lucide-react";
+import { CheckCircle2, Clock, ArrowRight } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
+
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
 
 const LIFECYCLE_STAGES = [
   { stage: "Pre-Trade", status: "complete", checks: ["Compliance ✓", "Margin ✓", "Limit ✓", "Best Execution ✓"] },
@@ -14,6 +22,23 @@ const TRADE_LOG = [
   { id: "TRD-9839", ticker: "INFY", action: "BUY 300 @ 1,542", preCheck: "PASS", execution: "PARTIAL", clearing: "PENDING", settlement: "PENDING", postTrade: "PENDING" },
 ];
 
+// Stacked bar: lifecycle progress per trade
+const lifecycleBarData = TRADE_LOG.map(t => {
+  const stageValue = (s: string) => {
+    if (["PASS", "FILLED", "CONFIRMED", "NETTED", "SETTLED", "BOOKED"].includes(s)) return 100;
+    if (["PARTIAL", "T+1 PENDING"].includes(s)) return 50;
+    return 10;
+  };
+  return {
+    name: t.ticker,
+    "Pre-Trade": stageValue(t.preCheck),
+    "Execution": stageValue(t.execution),
+    "Clearing": stageValue(t.clearing),
+    "Settlement": stageValue(t.settlement),
+    "Post-Trade": stageValue(t.postTrade),
+  };
+});
+
 const stageIcon = (status: string) => {
   if (status === "complete") return <CheckCircle2 className="h-5 w-5 text-gain" />;
   if (status === "active") return <Clock className="h-5 w-5 text-warning animate-pulse" />;
@@ -22,6 +47,27 @@ const stageIcon = (status: string) => {
 
 const TradeLifecycleModule = () => (
   <div className="space-y-6">
+    {/* Stacked Bar Chart */}
+    <div className="rounded-xl border border-border bg-card p-5">
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Lifecycle Progress by Trade</h3>
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={lifecycleBarData} margin={{ left: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+            <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 10 }} axisLine={{ stroke: GRID }} />
+            <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+            <Tooltip contentStyle={tipStyle} />
+            <Legend wrapperStyle={{ fontSize: 9, color: MUTED }} />
+            <Bar dataKey="Pre-Trade" stackId="a" fill="hsl(152,90%,45%)" />
+            <Bar dataKey="Execution" stackId="a" fill="hsl(210,60%,55%)" />
+            <Bar dataKey="Clearing" stackId="a" fill="hsl(38,92%,55%)" />
+            <Bar dataKey="Settlement" stackId="a" fill="hsl(0,0%,50%)" />
+            <Bar dataKey="Post-Trade" stackId="a" fill="hsl(0,0%,30%)" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+
     <div className="rounded-xl border border-border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-6">Trade Lifecycle Pipeline</h3>
       <div className="flex items-start gap-2 overflow-x-auto pb-2">

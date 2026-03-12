@@ -1,13 +1,22 @@
 import { useMemo } from "react";
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 
 interface Props { stocks: PortfolioStock[]; }
 
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
+
 const ESGModule = ({ stocks }: Props) => {
   const analyzed = stocks.filter(s => s.analysis);
 
-  const { scores, policyChecks, avgScore } = useMemo(() => {
-    if (analyzed.length === 0) return { scores: [], policyChecks: [], avgScore: 0 };
+  const { scores, policyChecks, avgScore, radarData, barData } = useMemo(() => {
+    if (analyzed.length === 0) return { scores: [], policyChecks: [], avgScore: 0, radarData: [], barData: [] };
 
     const esgScores = analyzed.map(s => {
       const base = s.analysis.esgScore || Math.round(50 + Math.random() * 30);
@@ -32,7 +41,22 @@ const ESGModule = ({ stocks }: Props) => {
       { policy: "Governance score > 70 (all)", status: esgScores.every(e => e.governance > 70) ? "PASS" : "WARNING", detail: `${esgScores.filter(e => e.governance <= 70).length} below threshold` },
     ];
 
-    return { scores: esgScores, policyChecks: policies, avgScore: avg };
+    // Radar: portfolio average E/S/G
+    const avgE = Math.round(esgScores.reduce((s, e) => s + e.env, 0) / esgScores.length);
+    const avgS = Math.round(esgScores.reduce((s, e) => s + e.social, 0) / esgScores.length);
+    const avgG = Math.round(esgScores.reduce((s, e) => s + e.governance, 0) / esgScores.length);
+    const radar = [
+      { factor: "Environment", value: avgE },
+      { factor: "Social", value: avgS },
+      { factor: "Governance", value: avgG },
+    ];
+
+    // Bar: per-stock E/S/G breakdown
+    const bar = esgScores.map(e => ({
+      name: e.ticker, E: e.env, S: e.social, G: e.governance,
+    }));
+
+    return { scores: esgScores, policyChecks: policies, avgScore: avg, radarData: radar, barData: bar };
   }, [analyzed]);
 
   const scoreColor = (v: number) => v >= 75 ? "text-gain" : v >= 50 ? "text-warning" : "text-loss";
@@ -59,6 +83,41 @@ const ESGModule = ({ stocks }: Props) => {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Controversies</p>
           <p className="mt-1 font-mono text-3xl font-bold text-foreground">{scores.filter(s => s.controversy !== "None").length} flagged</p>
+        </div>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Portfolio ESG Profile</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData}>
+                <PolarGrid stroke={GRID} />
+                <PolarAngleAxis dataKey="factor" tick={{ fill: MUTED, fontSize: 11 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: MUTED, fontSize: 9 }} />
+                <Radar dataKey="value" stroke="hsl(152,90%,45%)" fill="hsl(152,90%,45%)" fillOpacity={0.15} strokeWidth={2} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">ESG Breakdown by Stock</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData} margin={{ left: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} domain={[0, 100]} />
+                <Tooltip contentStyle={tipStyle} />
+                <Legend wrapperStyle={{ fontSize: 10, color: MUTED }} />
+                <Bar dataKey="E" fill="hsl(152,70%,40%)" radius={[2, 2, 0, 0]} name="Environment" />
+                <Bar dataKey="S" fill="hsl(210,60%,55%)" radius={[2, 2, 0, 0]} name="Social" />
+                <Bar dataKey="G" fill="hsl(38,80%,50%)" radius={[2, 2, 0, 0]} name="Governance" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
