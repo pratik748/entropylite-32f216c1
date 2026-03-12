@@ -70,6 +70,23 @@ interface GraphEdge {
 
 const CausalEffectsEngine = ({ stocks }: Props) => {
   const [event, setEvent] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleChaos = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio("/audio/chaos-currency.mp3");
+      audioRef.current.loop = true;
+      audioRef.current.addEventListener("ended", () => setIsPlaying(false));
+    }
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
   const [analysis, setAnalysis] = useState<CausalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [density, setDensity] = useState(1); // 0.5 to 2
