@@ -66,7 +66,7 @@ Return JSON:
       temperature: 0.7,
     });
 
-    const data = JSON.parse(result.text);
+    const data = safeParseJSON(result.text);
     return new Response(JSON.stringify({ ...data, timestamp: Date.now(), provider: "cloudflare" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

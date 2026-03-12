@@ -71,7 +71,7 @@ Analyze:
       maxTokens: 4096,
     });
 
-    const riskData = JSON.parse(result.text);
+    const riskData = safeParseJSON(result.text);
     return new Response(JSON.stringify(riskData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

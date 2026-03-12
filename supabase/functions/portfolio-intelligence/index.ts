@@ -59,7 +59,7 @@ Analyze capital allocation efficiency, market impact, optimal execution, and pro
       maxTokens: 4096,
     });
 
-    const data = JSON.parse(result.text);
+    const data = safeParseJSON(result.text);
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

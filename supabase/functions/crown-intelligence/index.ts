@@ -47,7 +47,7 @@ Identify crowded trades, forced sellers, volatility opportunities, momentum play
       maxTokens: 3072,
     });
 
-    const opportunities = JSON.parse(result.text);
+    const opportunities = safeParseJSON(result.text);
     return new Response(JSON.stringify(opportunities), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

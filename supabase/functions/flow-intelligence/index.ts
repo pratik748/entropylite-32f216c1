@@ -45,7 +45,7 @@ Detect institutional flow patterns based on the portfolio's beta exposure, secto
       maxTokens: 2048,
     });
 
-    const signals = JSON.parse(result.text);
+    const signals = safeParseJSON(result.text);
     return new Response(JSON.stringify(signals), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

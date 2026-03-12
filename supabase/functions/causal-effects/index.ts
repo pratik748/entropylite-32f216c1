@@ -45,7 +45,7 @@ Return JSON:
     });
 
     console.log(`causal-effects used provider: ${result.provider}`);
-    const parsed = JSON.parse(result.text);
+    const parsed = safeParseJSON(result.text);
 
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: any) {

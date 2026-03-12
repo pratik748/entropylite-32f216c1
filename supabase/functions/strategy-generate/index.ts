@@ -112,7 +112,7 @@ Generate exact trade instructions for this portfolio in this market environment.
       maxTokens: 4000,
     });
 
-    const parsed = JSON.parse(result.text);
+    const parsed = safeParseJSON(result.text);
 
     if (parsed.instructions) {
       parsed.instructions.sort((a: any, b: any) => (a.priority || 99) - (b.priority || 99));

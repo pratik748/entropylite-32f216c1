@@ -152,7 +152,7 @@ Provide:
       });
 
       console.log(`market-data used provider: ${result.provider}`);
-      aiMacro = JSON.parse(result.text);
+      aiMacro = safeParseJSON(result.text);
     } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {
