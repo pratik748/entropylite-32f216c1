@@ -189,12 +189,16 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
       {/* Recommendation Cards */}
       <div className="grid gap-4 md:grid-cols-2">
-        {recommendations.map((rec, i) => {
-          const price = rec.realPrice || rec.currentEstPrice;
+      {recommendations.map((rec, i) => {
+          const price = rec.realPrice || rec.currentEstPrice || 0;
           const sym = getCurrencySymbol(rec.realCurrency || rec.currency);
-          const upside = price > 0 ? ((rec.targetPrice - price) / price * 100) : 0;
-          const downside = price > 0 ? ((rec.stopLoss - price) / price * 100) : 0;
-          const inZone = price >= rec.entryZone[0] && price <= rec.entryZone[1];
+          const targetPrice = rec.targetPrice || 0;
+          const stopLoss = rec.stopLoss || 0;
+          const entryZone: [number, number] = [rec.entryZone?.[0] || 0, rec.entryZone?.[1] || 0];
+          const upside = price > 0 ? ((targetPrice - price) / price * 100) : 0;
+          const downside = price > 0 ? ((stopLoss - price) / price * 100) : 0;
+          const inZone = price >= entryZone[0] && price <= entryZone[1];
+          const priceChange24h = rec.priceChange24h || 0;
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
 
@@ -223,30 +227,30 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 <div>
                   <p className="text-[8px] text-muted-foreground uppercase">Current</p>
                   <p className="font-mono text-sm font-bold text-foreground">{sym}{price.toLocaleString()}</p>
-                  <p className={`font-mono text-[9px] ${rec.priceChange24h >= 0 ? "text-gain" : "text-loss"}`}>
-                    {rec.priceChange24h >= 0 ? "+" : ""}{rec.priceChange24h.toFixed(2)}%
+                  <p className={`font-mono text-[9px] ${priceChange24h >= 0 ? "text-gain" : "text-loss"}`}>
+                    {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(2)}%
                   </p>
                 </div>
                 <div>
                   <p className="text-[8px] text-muted-foreground uppercase">Target</p>
-                  <p className="font-mono text-sm font-bold text-gain">{sym}{rec.targetPrice.toLocaleString()}</p>
+                  <p className="font-mono text-sm font-bold text-gain">{sym}{targetPrice.toLocaleString()}</p>
                   <p className="font-mono text-[9px] text-gain">+{upside.toFixed(1)}%</p>
                 </div>
                 <div>
                   <p className="text-[8px] text-muted-foreground uppercase">Stop Loss</p>
-                  <p className="font-mono text-sm font-bold text-loss">{sym}{rec.stopLoss.toLocaleString()}</p>
+                  <p className="font-mono text-sm font-bold text-loss">{sym}{stopLoss.toLocaleString()}</p>
                   <p className="font-mono text-[9px] text-loss">{downside.toFixed(1)}%</p>
                 </div>
                 <div>
                   <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
-                  <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward}</p>
-                  <p className="text-[9px] text-muted-foreground">{rec.timeHorizon}</p>
+                  <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || "—"}</p>
+                  <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || "—"}</p>
                 </div>
               </div>
 
               {/* Entry Zone */}
               <div className={`rounded-lg px-3 py-2 mb-3 text-[10px] font-mono relative z-10 ${inZone ? "bg-gain/10 text-gain border border-gain/20" : "bg-surface-2 text-muted-foreground"}`}>
-                <span className="font-bold">{inZone ? "✓ IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{rec.entryZone[0].toLocaleString()} – {sym}{rec.entryZone[1].toLocaleString()}
+                <span className="font-bold">{inZone ? "✓ IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{entryZone[0].toLocaleString()} – {sym}{entryZone[1].toLocaleString()}
                 {inZone && " · BUY SIGNAL ACTIVE"}
               </div>
 
