@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2 } from "lucide-react";
+import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2, Volume2, VolumeX } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
