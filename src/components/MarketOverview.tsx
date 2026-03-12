@@ -50,6 +50,7 @@ const regions = ["All", "US", "Europe", "Asia", "India"] as const;
 type Region = typeof regions[number];
 
 const MarketOverview = () => {
+  const { data: macroIntel } = useMacroIntelligence();
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
