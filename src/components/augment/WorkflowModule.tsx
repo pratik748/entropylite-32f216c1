@@ -1,50 +1,48 @@
 import { useMemo } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
 import { ArrowRight, CheckCircle2, Clock } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
+
 const WorkflowModule = ({ stocks }: Props) => {
   const { totalValue, totalPnl, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const workflowStages = useMemo(() => {
+  const { workflowStages, stageBarData } = useMemo(() => {
     const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 0;
     const avgConf = holdings.length > 0 ? holdings.reduce((s, h) => s + (h.analysis?.confidence || 0), 0) / holdings.length : 0;
+    const hasData = holdings.length > 0;
 
-    return [
-      {
-        stage: "Research", status: holdings.length > 0 ? "complete" : "active",
-        description: "AI-powered analysis, news sentiment, risk scoring",
-        metrics: [{ label: "Stocks Analyzed", value: holdings.length.toString() }, { label: "Avg Confidence", value: holdings.length > 0 ? `${avgConf.toFixed(0)}%` : "—" }],
-      },
-      {
-        stage: "Portfolio", status: holdings.length > 0 ? "complete" : "pending",
-        description: "Construction, allocation, optimization",
-        metrics: [{ label: "Positions", value: holdings.length.toString() }, { label: "Total Value", value: fmt(totalValue) }],
-      },
-      {
-        stage: "Trade", status: holdings.length > 0 ? "active" : "pending",
-        description: "Order generation, execution",
-        metrics: [{ label: "Suggestions", value: holdings.filter(h => h.suggestion).length.toString() }, { label: "Actions", value: `${holdings.filter(h => h.suggestion === "Add").length} Add, ${holdings.filter(h => h.suggestion === "Exit").length} Exit` }],
-      },
-      { stage: "Settlement", status: "active", description: "Clearing, reconciliation", metrics: [{ label: "Status", value: "Real-time" }] },
-      {
-        stage: "Reporting", status: holdings.length > 0 ? "active" : "pending",
-        description: "NAV, P&L attribution, client reports",
-        metrics: [{ label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}` }],
-      },
-      {
-        stage: "Compliance", status: holdings.length > 0 ? "active" : "pending",
-        description: "Mandate checks, regulatory",
-        metrics: [{ label: "Risk Score", value: `${avgRisk.toFixed(0)}/100` }],
-      },
-      {
-        stage: "Client", status: holdings.length > 0 ? "active" : "pending",
-        description: "Performance review, reporting",
-        metrics: [{ label: "Holdings", value: holdings.length.toString() }],
-      },
+    const stages = [
+      { stage: "Research", status: hasData ? "complete" : "active", description: "AI-powered analysis, news sentiment, risk scoring", completion: hasData ? 100 : 20,
+        metrics: [{ label: "Stocks Analyzed", value: holdings.length.toString() }, { label: "Avg Confidence", value: hasData ? `${avgConf.toFixed(0)}%` : "—" }] },
+      { stage: "Portfolio", status: hasData ? "complete" : "pending", description: "Construction, allocation, optimization", completion: hasData ? 100 : 0,
+        metrics: [{ label: "Positions", value: holdings.length.toString() }, { label: "Total Value", value: fmt(totalValue) }] },
+      { stage: "Trade", status: hasData ? "active" : "pending", description: "Order generation, execution", completion: hasData ? 75 : 0,
+        metrics: [{ label: "Suggestions", value: holdings.filter(h => h.suggestion).length.toString() }, { label: "Actions", value: `${holdings.filter(h => h.suggestion === "Add").length}A/${holdings.filter(h => h.suggestion === "Exit").length}E` }] },
+      { stage: "Settlement", status: "active", description: "Clearing, reconciliation", completion: hasData ? 60 : 0, metrics: [{ label: "Status", value: "Real-time" }] },
+      { stage: "Reporting", status: hasData ? "active" : "pending", description: "NAV, P&L attribution", completion: hasData ? 90 : 0,
+        metrics: [{ label: "P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}` }] },
+      { stage: "Compliance", status: hasData ? "active" : "pending", description: "Mandate checks, regulatory", completion: hasData ? 85 : 0,
+        metrics: [{ label: "Risk", value: `${avgRisk.toFixed(0)}/100` }] },
+      { stage: "Client", status: hasData ? "active" : "pending", description: "Performance review", completion: hasData ? 70 : 0,
+        metrics: [{ label: "Holdings", value: holdings.length.toString() }] },
     ];
+
+    const bars = stages.map(s => ({
+      name: s.stage, completion: s.completion,
+      fill: s.completion === 100 ? "hsl(152,90%,45%)" : s.completion >= 70 ? "hsl(210,60%,55%)" : s.completion >= 40 ? "hsl(38,92%,55%)" : "hsl(0,0%,35%)",
+    }));
+
+    return { workflowStages: stages, stageBarData: bars };
   }, [holdings, totalValue, totalPnl, fmt]);
 
   const stageIcon = (status: string) => {
@@ -55,6 +53,24 @@ const WorkflowModule = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-6">
+      {/* Stage Completion Chart */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Workflow Stage Completion</h3>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={stageBarData} margin={{ left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+              <Tooltip contentStyle={tipStyle} formatter={(v: number) => [`${v}%`, "Completion"]} />
+              <Bar dataKey="completion" radius={[4, 4, 0, 0]}>
+                {stageBarData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">End-to-End Investment Workflow</h3>
         <p className="text-xs text-muted-foreground mb-6">Research → Portfolio → Trade → Settlement → Reporting → Compliance → Client</p>

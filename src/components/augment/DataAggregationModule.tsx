@@ -1,15 +1,22 @@
-import { useState, useEffect } from "react";
-import { Database, RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, Clock } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
+
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
 
 const DATA_FEEDS = [
-  { source: "Yahoo Finance", type: "Market Data", status: "LIVE", latency: "120ms", records: "15,420", lastUpdate: "Just now" },
-  { source: "newsdata.io", type: "News", status: "LIVE", latency: "350ms", records: "2,841", lastUpdate: "2s ago" },
-  { source: "RBI DBIE", type: "Economic", status: "LIVE", latency: "1.2s", records: "892", lastUpdate: "5m ago" },
-  { source: "SEBI EDIFAR", type: "Regulatory", status: "LIVE", latency: "2.1s", records: "445", lastUpdate: "15m ago" },
-  { source: "Alpha Vantage", type: "Fundamentals", status: "LIVE", latency: "280ms", records: "8,210", lastUpdate: "1m ago" },
-  { source: "FRED", type: "Global Macro", status: "LIVE", latency: "450ms", records: "3,120", lastUpdate: "1h ago" },
-  { source: "NSE Bhav Copy", type: "EOD Data", status: "SCHEDULED", latency: "--", records: "2,000+", lastUpdate: "16:00 IST" },
-  { source: "Satellite/Alt Data", type: "Alternative", status: "BETA", latency: "5.4s", records: "124", lastUpdate: "6h ago" },
+  { source: "Yahoo Finance", type: "Market Data", status: "LIVE", latency: 120, records: 15420, lastUpdate: "Just now" },
+  { source: "newsdata.io", type: "News", status: "LIVE", latency: 350, records: 2841, lastUpdate: "2s ago" },
+  { source: "RBI DBIE", type: "Economic", status: "LIVE", latency: 1200, records: 892, lastUpdate: "5m ago" },
+  { source: "SEBI EDIFAR", type: "Regulatory", status: "LIVE", latency: 2100, records: 445, lastUpdate: "15m ago" },
+  { source: "Alpha Vantage", type: "Fundamentals", status: "LIVE", latency: 280, records: 8210, lastUpdate: "1m ago" },
+  { source: "FRED", type: "Global Macro", status: "LIVE", latency: 450, records: 3120, lastUpdate: "1h ago" },
+  { source: "NSE Bhav Copy", type: "EOD Data", status: "SCHEDULED", latency: 0, records: 2000, lastUpdate: "16:00 IST" },
+  { source: "Satellite/Alt Data", type: "Alternative", status: "BETA", latency: 5400, records: 124, lastUpdate: "6h ago" },
 ];
 
 const CLEANING_PIPELINE = [
@@ -27,6 +34,17 @@ const statusIcon = (s: string) => {
   return <Clock className="h-3.5 w-3.5 text-info" />;
 };
 
+const recordsBarData = DATA_FEEDS.map(f => ({
+  name: f.source.length > 12 ? f.source.slice(0, 12) + "…" : f.source,
+  records: f.records,
+}));
+
+const latencyBarData = DATA_FEEDS.filter(f => f.latency > 0).map(f => ({
+  name: f.source.length > 12 ? f.source.slice(0, 12) + "…" : f.source,
+  latency: f.latency,
+  fill: f.latency > 1000 ? "hsl(0,90%,55%)" : f.latency > 400 ? "hsl(38,92%,55%)" : "hsl(152,90%,45%)",
+}));
+
 const DataAggregationModule = () => (
   <div className="space-y-6">
     <div className="grid gap-4 md:grid-cols-4">
@@ -41,6 +59,43 @@ const DataAggregationModule = () => (
           <p className="mt-1 font-mono text-2xl font-bold text-foreground">{s.value}</p>
         </div>
       ))}
+    </div>
+
+    {/* Charts */}
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Records by Source</h3>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={recordsBarData} margin={{ left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 8 }} axisLine={{ stroke: GRID }} interval={0} angle={-25} textAnchor="end" height={50} />
+              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+              <Tooltip contentStyle={tipStyle} />
+              <Bar dataKey="records" fill="hsl(0,0%,60%)" radius={[4, 4, 0, 0]}>
+                {recordsBarData.map((_, i) => <Cell key={i} fill={`hsl(0,0%,${80 - i * 7}%)`} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Latency by Source (ms)</h3>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={latencyBarData} layout="vertical" margin={{ left: 90 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} horizontal={false} />
+              <XAxis type="number" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+              <YAxis dataKey="name" type="category" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} width={85} />
+              <Tooltip contentStyle={tipStyle} formatter={(v: number) => [`${v}ms`, "Latency"]} />
+              <Bar dataKey="latency" radius={[0, 4, 4, 0]}>
+                {latencyBarData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
 
     <div className="rounded-xl border border-border bg-card p-5">
@@ -60,8 +115,8 @@ const DataAggregationModule = () => (
                 <td className="px-3 py-2 font-medium text-foreground">{f.source}</td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{f.type}</td>
                 <td className="px-3 py-2"><div className="flex items-center gap-1.5">{statusIcon(f.status)}<span className="font-mono text-xs">{f.status}</span></div></td>
-                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{f.latency}</td>
-                <td className="px-3 py-2 font-mono text-xs text-foreground">{f.records}</td>
+                <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{f.latency > 0 ? `${f.latency}ms` : "--"}</td>
+                <td className="px-3 py-2 font-mono text-xs text-foreground">{f.records.toLocaleString()}</td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{f.lastUpdate}</td>
               </tr>
             ))}

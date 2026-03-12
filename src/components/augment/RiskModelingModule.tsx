@@ -1,16 +1,25 @@
 import { useMemo } from "react";
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
+  AreaChart, Area,
+} from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props { stocks: PortfolioStock[]; }
 
+const GRID = "hsl(220,12%,13%)";
+const MUTED = "hsl(210,8%,45%)";
+const CARD_BG = "hsl(0,0%,5%)";
+const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
+
 const RiskModelingModule = ({ stocks }: Props) => {
   const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
 
-  const { riskFactors, concentrationData, varMetrics, creditData } = useMemo(() => {
+  const { riskFactors, concentrationData, varMetrics, creditData, varTrend } = useMemo(() => {
     if (holdings.length === 0) {
-      return { riskFactors: [], concentrationData: [], varMetrics: { var95: 0, cvar95: 0, liqVar: 0, stressVar: 0 }, creditData: [] };
+      return { riskFactors: [], concentrationData: [], varMetrics: { var95: 0, cvar95: 0, liqVar: 0, stressVar: 0 }, creditData: [], varTrend: [] };
     }
 
     const n = holdings.length;
@@ -36,8 +45,7 @@ const RiskModelingModule = ({ stocks }: Props) => {
     ];
 
     const concData = holdings.map(h => ({
-      name: h.ticker,
-      pct: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
+      name: h.ticker, pct: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
     })).sort((a, b) => b.pct - a.pct);
 
     const avgRisk = holdings.reduce((s, h) => s + h.risk, 0) / n;
@@ -49,6 +57,12 @@ const RiskModelingModule = ({ stocks }: Props) => {
       stressVar: totalValue * dailyVol * 2.326 * 2.0,
     };
 
+    // VaR trend (simulated 30-day history)
+    const trend = Array.from({ length: 30 }, (_, i) => {
+      const noise = 1 + (Math.sin(i * 0.5) * 0.15 + (Math.random() - 0.5) * 0.1);
+      return { day: `D-${30 - i}`, var95: +(vars.var95 * noise).toFixed(0), cvar95: +(vars.cvar95 * noise).toFixed(0) };
+    });
+
     const credit = holdings.map(h => {
       const riskScore = h.risk;
       const rating = riskScore < 30 ? "AAA" : riskScore < 50 ? "AA+" : riskScore < 70 ? "A" : "BBB";
@@ -58,7 +72,7 @@ const RiskModelingModule = ({ stocks }: Props) => {
       return { name: h.ticker, rating, exp: fmt(h.value), pd: `${pd}%`, lgd: `${lgd}%`, el: fmt(el) };
     });
 
-    return { riskFactors: factors, concentrationData: concData, varMetrics: vars, creditData: credit };
+    return { riskFactors: factors, concentrationData: concData, varMetrics: vars, creditData: credit, varTrend: trend };
   }, [holdings, totalValue, fmt]);
 
   if (holdings.length === 0) {
@@ -86,16 +100,33 @@ const RiskModelingModule = ({ stocks }: Props) => {
         ))}
       </div>
 
+      {/* VaR Trend Chart */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">VaR / CVaR Trend (30D)</h3>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={varTrend} margin={{ left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="day" tick={{ fill: MUTED, fontSize: 8 }} axisLine={{ stroke: GRID }} interval={4} />
+              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+              <Tooltip contentStyle={tipStyle} />
+              <Area type="monotone" dataKey="cvar95" stroke="hsl(0,90%,55%)" fill="hsl(0,90%,55%)" fillOpacity={0.08} strokeWidth={1.5} name="CVaR 95%" />
+              <Area type="monotone" dataKey="var95" stroke="hsl(38,92%,55%)" fill="hsl(38,92%,55%)" fillOpacity={0.1} strokeWidth={2} name="VaR 95%" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Multi-Factor Risk Radar</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={riskFactors}>
-                <PolarGrid stroke="hsl(var(--border))" />
-                <PolarAngleAxis dataKey="risk" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
-                <Radar dataKey="value" stroke="hsl(var(--foreground))" fill="hsl(var(--foreground))" fillOpacity={0.15} strokeWidth={2} />
+                <PolarGrid stroke={GRID} />
+                <PolarAngleAxis dataKey="risk" tick={{ fill: MUTED, fontSize: 10 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: MUTED, fontSize: 9 }} />
+                <Radar dataKey="value" stroke="hsl(0,0%,95%)" fill="hsl(0,0%,95%)" fillOpacity={0.15} strokeWidth={2} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -106,10 +137,10 @@ const RiskModelingModule = ({ stocks }: Props) => {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={concentrationData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} />
-                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} axisLine={{ stroke: "hsl(var(--border))" }} tickFormatter={v => `${v}%`} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6, fontSize: 11 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 10 }} axisLine={{ stroke: GRID }} />
+                <YAxis tick={{ fill: MUTED, fontSize: 10 }} axisLine={{ stroke: GRID }} tickFormatter={v => `${v}%`} />
+                <Tooltip contentStyle={tipStyle} />
                 <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
                   {concentrationData.map((_, i) => (
                     <Cell key={i} fill={`hsl(0, 0%, ${100 - i * 12}%)`} fillOpacity={0.8} />
