@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import FlowRadarChart from "@/components/charts/FlowRadarChart";
-import { Brain } from "lucide-react";
+import { Brain, Zap } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
 
 interface FlowDetectionPanelProps {
   stocks: PortfolioStock[];
@@ -20,6 +21,8 @@ interface FlowSignal {
 const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
   const [aiSignals, setAiSignals] = useState<FlowSignal[] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const tickers = stocks.map(s => s.ticker);
+  const { data: instFlows } = useInstitutionalFlows(tickers);
 
   const analyzed = stocks.filter(s => s.analysis);
 
@@ -56,7 +59,43 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
       .finally(() => setAiLoading(false));
   }, [analyzed.map(s => s.ticker).join(",")]);
 
-  const signals = aiSignals || staticSignals;
+  // Merge institutional flow signals into display
+  const instSignals: FlowSignal[] = useMemo(() => {
+    if (!instFlows) return [];
+    const sigs: FlowSignal[] = [];
+    if (instFlows.aggregate) {
+      sigs.push({
+        name: `Smart Money: ${instFlows.aggregate.smartMoneyDirection}`,
+        category: "INST",
+        intensity: instFlows.aggregate.unusualActivityCount > 2 ? 80 : 50,
+        direction: instFlows.aggregate.smartMoneyDirection === "RISK_ON" ? "BUY" : instFlows.aggregate.smartMoneyDirection === "RISK_OFF" ? "SELL" : "NEUTRAL",
+        impact: 70,
+      });
+    }
+    for (const of_ of (instFlows.optionsFlow || []).filter(o => o.unusualActivity)) {
+      sigs.push({
+        name: `${of_.ticker} Options ${of_.signal}`,
+        category: "OPTIONS",
+        intensity: Math.min(95, of_.impliedVolatility),
+        direction: of_.signal === "bullish" ? "BUY" : of_.signal === "bearish" ? "SELL" : "NEUTRAL",
+        impact: 65,
+        reasoning: `P/C: ${of_.putCallRatio} | IV: ${of_.impliedVolatility}%`,
+      });
+    }
+    for (const etf of (instFlows.etfFlows || []).filter(e => e.flowSignal !== "neutral").slice(0, 3)) {
+      sigs.push({
+        name: `${etf.symbol} ${etf.flowSignal}`,
+        category: "ETF",
+        intensity: Math.min(85, Math.abs(etf.change) * 20 + 30),
+        direction: etf.flowSignal === "inflow" ? "BUY" : "SELL",
+        impact: 55,
+        reasoning: `${etf.name}: ${etf.change > 0 ? "+" : ""}${etf.change}%`,
+      });
+    }
+    return sigs;
+  }, [instFlows]);
+
+  const signals = [...(aiSignals || staticSignals), ...instSignals];
 
   const getIntensityColor = (v: number) => {
     if (v >= 70) return "bg-loss/60";
@@ -77,7 +116,8 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
       <div className="px-2 py-1 border-b border-border/30 flex items-center justify-between">
         <span className="text-[8px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           {aiSignals && <Brain className="h-2.5 w-2.5 text-gain" />}
-          {aiLoading ? "AI Computing..." : aiSignals ? "AI Flow Signals" : "Flow Signals"}
+          {instFlows && <Zap className="h-2.5 w-2.5 text-warning" />}
+          {aiLoading ? "AI Computing..." : aiSignals ? "AI + Institutional" : instFlows ? "Flow + Institutional" : "Flow Signals"}
         </span>
         <button onClick={() => setShowRadar(!showRadar)} className="text-[8px] text-primary hover:text-primary/80 transition-colors">
           {showRadar ? "List" : "Radar"}

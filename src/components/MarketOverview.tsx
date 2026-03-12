@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin } from "lucide-react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin, Landmark } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import VixGauge from "@/components/charts/VixGauge";
+import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -49,6 +50,7 @@ const regions = ["All", "US", "Europe", "Asia", "India"] as const;
 type Region = typeof regions[number];
 
 const MarketOverview = () => {
+  const { data: macroIntel } = useMacroIntelligence();
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -258,6 +260,46 @@ const MarketOverview = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {/* Macro Intelligence Strip */}
+      {macroIntel && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Landmark className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Macro Regime Intelligence</h3>
+            <span className={`ml-auto rounded-lg px-3 py-1 font-mono text-xs font-bold ${
+              macroIntel.regime.regime === "expansion" ? "text-gain bg-gain/10" :
+              macroIntel.regime.regime === "contraction" ? "text-loss bg-loss/10" :
+              "text-warning bg-warning/10"
+            }`}>
+              {macroIntel.regime.regime.toUpperCase()} ({macroIntel.regime.confidence}%)
+            </span>
+          </div>
+          <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+            {macroIntel.indicators.filter(i => i.impact === "high").slice(0, 8).map(ind => (
+              <div key={ind.id} className="rounded-lg bg-surface-2 p-2.5">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{ind.name}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="font-mono text-sm font-bold text-foreground">
+                    {typeof ind.value === "number" ? ind.value.toFixed(2) : ind.value}
+                  </span>
+                  <span className={`text-[9px] font-mono ${ind.trend === "rising" ? "text-gain" : ind.trend === "falling" ? "text-loss" : "text-muted-foreground"}`}>
+                    {ind.trend === "rising" ? "▲" : ind.trend === "falling" ? "▼" : "—"}
+                  </span>
+                </div>
+                <p className="text-[8px] text-muted-foreground mt-0.5">{ind.source} · {ind.lastUpdated}</p>
+              </div>
+            ))}
+          </div>
+          {macroIntel.regime.signals.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {macroIntel.regime.signals.map((sig, i) => (
+                <span key={i} className="rounded-md bg-surface-3 px-2 py-1 text-[9px] text-muted-foreground">{sig}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
