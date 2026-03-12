@@ -116,7 +116,8 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
       <div className="px-2 py-1 border-b border-border/30 flex items-center justify-between">
         <span className="text-[8px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           {aiSignals && <Brain className="h-2.5 w-2.5 text-gain" />}
-          {aiLoading ? "AI Computing..." : aiSignals ? "AI Flow Signals" : "Flow Signals"}
+          {instFlows && <Zap className="h-2.5 w-2.5 text-warning" />}
+          {aiLoading ? "AI Computing..." : aiSignals ? "AI + Institutional" : instFlows ? "Flow + Institutional" : "Flow Signals"}
         </span>
         <button onClick={() => setShowRadar(!showRadar)} className="text-[8px] text-primary hover:text-primary/80 transition-colors">
           {showRadar ? "List" : "Radar"}
