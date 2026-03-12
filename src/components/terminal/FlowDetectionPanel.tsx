@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import FlowRadarChart from "@/components/charts/FlowRadarChart";
-import { Brain } from "lucide-react";
+import { Brain, Zap } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
 
 interface FlowDetectionPanelProps {
   stocks: PortfolioStock[];
