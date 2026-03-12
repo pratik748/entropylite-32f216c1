@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +44,7 @@ Calibrate Monte Carlo params for this specific portfolio. Consider current marke
       maxTokens: 3072,
     });
 
-    const data = JSON.parse(result.text);
+    const data = safeParseJSON(result.text);
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

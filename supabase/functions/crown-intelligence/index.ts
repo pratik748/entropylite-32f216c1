@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +47,7 @@ Identify crowded trades, forced sellers, volatility opportunities, momentum play
       maxTokens: 3072,
     });
 
-    const opportunities = JSON.parse(result.text);
+    const opportunities = safeParseJSON(result.text);
     return new Response(JSON.stringify(opportunities), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

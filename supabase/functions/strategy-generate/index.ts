@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
@@ -111,7 +112,7 @@ Generate exact trade instructions for this portfolio in this market environment.
       maxTokens: 4000,
     });
 
-    const parsed = JSON.parse(result.text);
+    const parsed = safeParseJSON(result.text);
 
     if (parsed.instructions) {
       parsed.instructions.sort((a: any, b: any) => (a.priority || 99) - (b.priority || 99));

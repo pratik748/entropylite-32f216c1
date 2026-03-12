@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
@@ -77,61 +78,7 @@ Return JSON:
 
     console.log(`desirable-assets used provider: ${result.provider}`);
     
-    // Robust JSON extraction with repair
-    let parsed: any;
-    try {
-      parsed = JSON.parse(result.text);
-    } catch (firstErr) {
-      console.warn("First JSON parse failed, attempting repair:", (firstErr as Error).message);
-      let cleaned = result.text
-        .replace(/```json?\s*\n?/gi, "").replace(/\n?```\s*$/gi, "").trim();
-      
-      // Find JSON boundaries
-      const jsonStart = cleaned.search(/[\{\[]/);
-      if (jsonStart === -1) throw new Error("No JSON found in AI response");
-      cleaned = cleaned.substring(jsonStart);
-      
-      // Find matching closing brace by depth
-      let depth = 0, inStr = false, esc = false, endPos = -1;
-      for (let i = 0; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (esc) { esc = false; continue; }
-        if (ch === "\\") { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === "{" || ch === "[") depth++;
-        if (ch === "}" || ch === "]") { depth--; if (depth === 0) { endPos = i; break; } }
-      }
-      if (endPos > 0) cleaned = cleaned.substring(0, endPos + 1);
-      
-      // Fix common LLM JSON issues
-      cleaned = cleaned
-        .replace(/,\s*}/g, "}")
-        .replace(/,\s*]/g, "]")
-        .replace(/:\s*\+(\d)/g, ': $1')
-        .replace(/[\x00-\x1F\x7F]/g, " ");
-      
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        // Remove trailing incomplete pairs and close unbalanced brackets
-        cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "").replace(/,\s*$/, "");
-        let braces = 0, brackets = 0;
-        let s = false, e = false;
-        for (let i = 0; i < cleaned.length; i++) {
-          const c = cleaned[i];
-          if (e) { e = false; continue; }
-          if (c === "\\") { e = true; continue; }
-          if (c === '"') { s = !s; continue; }
-          if (s) continue;
-          if (c === "{") braces++; if (c === "}") braces--;
-          if (c === "[") brackets++; if (c === "]") brackets--;
-        }
-        while (brackets > 0) { cleaned += "]"; brackets--; }
-        while (braces > 0) { cleaned += "}"; braces--; }
-        parsed = JSON.parse(cleaned);
-      }
-    }
+    const parsed = safeParseJSON(result.text);
 
     // Validate prices with real Yahoo data
     const enriched = await Promise.all(

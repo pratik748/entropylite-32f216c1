@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,7 +71,7 @@ Analyze:
       maxTokens: 4096,
     });
 
-    const riskData = JSON.parse(result.text);
+    const riskData = safeParseJSON(result.text);
     return new Response(JSON.stringify(riskData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

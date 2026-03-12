@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
@@ -151,7 +152,7 @@ Provide:
       });
 
       console.log(`market-data used provider: ${result.provider}`);
-      aiMacro = JSON.parse(result.text);
+      aiMacro = safeParseJSON(result.text);
     } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {

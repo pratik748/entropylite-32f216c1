@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,7 +45,7 @@ Detect institutional flow patterns based on the portfolio's beta exposure, secto
       maxTokens: 2048,
     });
 
-    const signals = JSON.parse(result.text);
+    const signals = safeParseJSON(result.text);
     return new Response(JSON.stringify(signals), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
