@@ -59,3 +59,18 @@ verify_jwt = false
 
 [functions.alpaca-trading]
 verify_jwt = false
+
+[functions.macro-intelligence]
+verify_jwt = false
+
+[functions.sec-filings]
+verify_jwt = false
+
+[functions.alternative-signals]
+verify_jwt = false
+
+[functions.institutional-flows]
+verify_jwt = false
+
+[functions.data-pipeline-status]
+verify_jwt = false

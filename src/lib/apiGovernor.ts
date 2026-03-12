@@ -63,6 +63,11 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "continuous-simulation":   "continuous",
   "clank-detection":         "ai",
   "strategy-evolution":      "evolution",
+  "macro-intelligence":      "slow",
+  "sec-filings":             "slow",
+  "alternative-signals":     "slow",
+  "institutional-flows":     "slow",
+  "data-pipeline-status":    "frequent",
 };
 
 // Rough cost weights for monitoring (relative units)
