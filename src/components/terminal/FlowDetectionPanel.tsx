@@ -21,6 +21,8 @@ interface FlowSignal {
 const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
   const [aiSignals, setAiSignals] = useState<FlowSignal[] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const tickers = stocks.map(s => s.ticker);
+  const { data: instFlows } = useInstitutionalFlows(tickers);
 
   const analyzed = stocks.filter(s => s.analysis);
 
