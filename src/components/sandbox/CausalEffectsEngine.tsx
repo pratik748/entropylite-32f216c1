@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2 } from "lucide-react";
+import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2, Volume2, VolumeX } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,23 @@ interface GraphEdge {
 
 const CausalEffectsEngine = ({ stocks }: Props) => {
   const [event, setEvent] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleChaos = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio("/audio/chaos-currency.mp3");
+      audioRef.current.loop = true;
+      audioRef.current.addEventListener("ended", () => setIsPlaying(false));
+    }
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying]);
   const [analysis, setAnalysis] = useState<CausalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [density, setDensity] = useState(1); // 0.5 to 2
@@ -364,10 +381,25 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
             <GitBranch className="h-5 w-5 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             <h3 className="text-sm font-bold text-foreground">Causal Effects Engine</h3>
             <p className="text-[9px] text-muted-foreground font-mono tracking-wider">SECOND & THIRD ORDER SIMULATION</p>
           </div>
+          <button
+            onClick={toggleChaos}
+            className={`group relative flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300 ${
+              isPlaying
+                ? "bg-primary/20 border border-primary/40 shadow-[0_0_12px_hsl(var(--primary)/0.2)]"
+                : "bg-transparent border border-transparent hover:bg-surface-2 opacity-30 hover:opacity-100"
+            }`}
+            title="🎶"
+          >
+            {isPlaying ? (
+              <Volume2 className="h-3.5 w-3.5 text-primary animate-pulse" />
+            ) : (
+              <VolumeX className="h-3 w-3 text-muted-foreground" />
+            )}
+          </button>
         </div>
 
         <div className="flex gap-2 mb-3 relative z-10">
