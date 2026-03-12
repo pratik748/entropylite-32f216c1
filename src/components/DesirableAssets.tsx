@@ -189,12 +189,16 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
       {/* Recommendation Cards */}
       <div className="grid gap-4 md:grid-cols-2">
-        {recommendations.map((rec, i) => {
-          const price = rec.realPrice || rec.currentEstPrice;
+      {recommendations.map((rec, i) => {
+          const price = rec.realPrice || rec.currentEstPrice || 0;
           const sym = getCurrencySymbol(rec.realCurrency || rec.currency);
-          const upside = price > 0 ? ((rec.targetPrice - price) / price * 100) : 0;
-          const downside = price > 0 ? ((rec.stopLoss - price) / price * 100) : 0;
-          const inZone = price >= rec.entryZone[0] && price <= rec.entryZone[1];
+          const targetPrice = rec.targetPrice || 0;
+          const stopLoss = rec.stopLoss || 0;
+          const entryZone: [number, number] = [rec.entryZone?.[0] || 0, rec.entryZone?.[1] || 0];
+          const upside = price > 0 ? ((targetPrice - price) / price * 100) : 0;
+          const downside = price > 0 ? ((stopLoss - price) / price * 100) : 0;
+          const inZone = price >= entryZone[0] && price <= entryZone[1];
+          const priceChange24h = rec.priceChange24h || 0;
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
 
