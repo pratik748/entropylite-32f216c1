@@ -316,3 +316,19 @@ export function flushAnalyticalCaches() {
   }
   metrics.lastAiCall = 0;
 }
+
+/**
+ * Flush AI-tier caches only — called when provider is switched.
+ */
+export function flushAICaches() {
+  const aiTiers: Tier[] = ["ai", "continuous", "evolution"];
+  for (const key of Array.from(cache.keys())) {
+    // Check if the endpoint is AI-tier
+    const fn = key.split("::")[0];
+    const tier = ENDPOINT_TIER[fn];
+    if (tier && aiTiers.includes(tier)) {
+      cache.delete(key);
+    }
+  }
+  metrics.lastAiCall = 0;
+}
