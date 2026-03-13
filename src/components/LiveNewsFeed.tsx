@@ -43,7 +43,7 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
     setLoading(true);
     try {
       const { data, error } = await governedInvoke("fetch-news", {
-        body: { ticker: ticker || "", category: "business" },
+        body: { ticker: ticker || "", category: "business", region: region || "All" },
       });
       if (error) throw error;
       setArticles(data.articles || []);
