@@ -125,6 +125,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         throw new Error("No recommendations returned. Try refreshing.");
       }
 
+      setCachedDA(data.recommendations, data.marketCondition || "", data.regimeType || "");
       setRecommendations(data.recommendations);
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
