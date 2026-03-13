@@ -314,6 +314,7 @@ const IndexContent = () => {
                         </div>
                       )}
                       {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
+                      {analysis && <CompanyIntelligence ticker={analysis.ticker} />}
                       {analysis && (
                         <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
                       )}
