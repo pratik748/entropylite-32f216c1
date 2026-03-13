@@ -32,7 +32,7 @@ interface LiveNewsFeedProps {
 
 const NEWS_REFRESH_INTERVAL = 600_000;
 
-const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
+const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
