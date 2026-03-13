@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
 } from "recharts";
 import { ScatterChart as ScatterIcon } from "lucide-react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Text, Line as DreiLine, Grid } from "@react-three/drei";
+import * as THREE from "three";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
