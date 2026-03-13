@@ -206,7 +206,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <p className="text-sm font-medium text-foreground">{error}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true); }} className="ml-auto">
+          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">
             Retry
           </Button>
         </div>
