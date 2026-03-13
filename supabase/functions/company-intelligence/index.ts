@@ -1,4 +1,3 @@
-import { corsHeaders } from "../_shared/cors.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
