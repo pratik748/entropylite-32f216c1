@@ -27,6 +27,7 @@ function getTierBadge(tier?: number): { label: string; className: string } | nul
 interface LiveNewsFeedProps {
   ticker?: string;
   compact?: boolean;
+  region?: string;
 }
 
 const NEWS_REFRESH_INTERVAL = 600_000;
