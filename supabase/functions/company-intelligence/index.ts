@@ -103,5 +103,11 @@ All number fields for signals should be 0-100. Revenue percentages should sum to
       status: 500,
       headers: { ...corsH, "Content-Type": "application/json" },
     });
+  } catch (err: any) {
+    console.error("company-intelligence error:", err);
+    return new Response(JSON.stringify({ error: err.message || "Failed" }), {
+      status: 500,
+      headers: { ...corsH, "Content-Type": "application/json" },
+    });
   }
 });
