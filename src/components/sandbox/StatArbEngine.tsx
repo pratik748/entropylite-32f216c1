@@ -998,22 +998,22 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   );
 }
 
-/** UNIFIED FORESIGHT — Synthesizes all Stat Arb engines into one truth */
+/** 3D FORESIGHT COMMAND CENTER — The Hub */
 function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const [tradeCards, setTradeCards] = useState<TradeInstruction[]>([]);
+
   const foresight = useMemo(() => {
     if (assets.length === 0) return null;
 
-    // 1. Monte Carlo
     const mc = SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 10, true);
     const profitProb = mc.finalValues.filter(v => v > totalValue).length / mc.finalValues.length;
     const medianFinal = SA.percentile(mc.finalValues, 50);
     const medianReturn = (medianFinal - totalValue) / totalValue;
 
-    // 2. VaR/CVaR
     const mcVar = SA.monteCarloVaR(totalValue, portfolioMu, portfolioVol, 10, 5000);
     const hVar95 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.95) * totalValue * Math.sqrt(10);
 
-    // 3. Mean Reversion per asset
     const mrSignals = assets.map(a => {
       const n = 120;
       const totalReturn = Math.log(a.price / a.buyPrice);
@@ -1026,117 +1026,324 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
       const hurst = SA.hurstExponent(scaledPrices);
       const z = SA.zScore(a.price, scaledPrices);
       const snapProb = SA.snapBackProbability(a.price, ou, 20);
-      return { ticker: a.ticker, z, hurst, snapProb, isStationary: hurst < 0.5, ou };
+      const optHorizon = SA.optimalHorizon(ou, a.price, a.mu);
+      return { ticker: a.ticker, z, hurst, snapProb, isStationary: hurst < 0.5, ou, optHorizon };
     });
 
-    // 4. Regime detection
     const portReturns = Array.from({ length: 120 }, () => portfolioMu / 252 + portfolioVol / Math.sqrt(252) * SA.gaussianRandom());
-    const { currentRegime, transitionMatrix } = SA.hmmRegimeDetect(portReturns);
+    const { currentRegime, regimeProbs, transitionMatrix } = SA.hmmRegimeDetect(portReturns);
     const regimeLabel = currentRegime === 2 ? "Bull" : currentRegime === 1 ? "Neutral" : "Bear";
+    const regimeAssignments = portReturns.map((_, i) => {
+      const probs = regimeProbs[i];
+      return probs.indexOf(Math.max(...probs));
+    });
 
-    // 5. Sharpe
+    const weights = assets.map(a => a.weight);
+    const entropy = SA.shannonEntropy(weights);
+    const eRatio = SA.entropyRatio(weights);
     const sharpe = portfolioVol > 0 ? (portfolioMu - 0.04) / portfolioVol : 0;
+    const sortino = SA.sortinoRatio(portReturns);
+    const avgMaxDD = SA.mean(mc.maxDrawdownDist);
+    const calmar = SA.calmarRatio(portfolioMu, avgMaxDD);
+    const omega = SA.omegaRatio(portReturns);
+    const kurt = SA.kurtosis(mc.finalValues.map(v => (v - totalValue) / totalValue));
+    const fragility = SA.fragilityIndex(mc.var95, mc.cvar95);
 
-    // 6. Stress worst case
+    const rcVaR = SA.regimeConditionalVaR(portReturns, regimeAssignments);
+
+    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    const tailDepMatrix = SA.tailDependenceMatrix(returnSeries);
+    const cov = SA.covarianceMatrix(returnSeries);
+    const corr = cov.map((row, i) => row.map((v, j) => v / (Math.sqrt(cov[i][i]) * Math.sqrt(cov[j][j]) || 1)));
+    const rpWeights = SA.riskParityWeights(cov);
+    const kellyFracs = assets.map(a => SA.kellyCriterion(a.mu > 0 ? 0.55 + a.mu * 0.5 : 0.45, 1 + a.mu));
+
     const worstStress = SA.stressTest(
-      assets.map(a => a.weight),
-      assets.map(a => [a.beta, 0.3, 0.2, 0.3, 0.1]),
+      weights, assets.map(a => [a.beta, 0.3, 0.2, 0.3, 0.1]),
       { name: "Black Swan", shocks: { Market: -0.25, Size: -0.20, Value: -0.10, Momentum: -0.15, Quality: -0.05 } }
     );
 
-    // 7. Portfolio risk contribution
-    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
-    const cov = SA.covarianceMatrix(returnSeries);
-    const rpWeights = SA.riskParityWeights(cov);
+    const profitScore = profitProb * 25;
+    const sharpeScore = Math.min(15, Math.max(0, (sharpe + 1) * 7.5));
+    const mrScore = mrSignals.filter(s => s.isStationary && Math.abs(s.z) > 1).length * 4;
+    const regimeScore = currentRegime === 2 ? 15 : currentRegime === 1 ? 8 : 0;
+    const stressScore = Math.max(0, 15 + worstStress.portfolioImpact * 60);
+    const diversificationScore = eRatio * 15;
+    const fragilityPenalty = fragility > 1.5 ? -5 : fragility > 1.2 ? -2 : 0;
+    const compositeScore = Math.min(100, Math.max(0, profitScore + sharpeScore + mrScore + regimeScore + stressScore + diversificationScore + fragilityPenalty));
 
-    // 8. Composite score (0-100)
-    const profitScore = profitProb * 30;
-    const sharpeScore = Math.min(20, Math.max(0, (sharpe + 1) * 10));
-    const mrScore = mrSignals.filter(s => s.isStationary && Math.abs(s.z) > 1).length * 5;
-    const regimeScore = currentRegime === 2 ? 20 : currentRegime === 1 ? 10 : 0;
-    const stressScore = Math.max(0, 20 + worstStress.portfolioImpact * 100);
-    const compositeScore = Math.min(100, Math.max(0, profitScore + sharpeScore + mrScore + regimeScore + stressScore));
-
-    // Per-asset verdict
     const assetVerdicts = assets.map((a, i) => {
       const mr = mrSignals[i];
       let verdict: "ACCUMULATE" | "HOLD" | "REDUCE" | "EXIT" = "HOLD";
       let reason = "";
-      if (mr.isStationary && mr.z < -1.5) { verdict = "ACCUMULATE"; reason = `Mean-reverting (H=${mr.hurst.toFixed(2)}), oversold (Z=${mr.z.toFixed(1)}), snap-back prob ${(mr.snapProb * 100).toFixed(0)}%`; }
-      else if (mr.isStationary && mr.z > 2) { verdict = "REDUCE"; reason = `Overbought (Z=${mr.z.toFixed(1)}), likely to revert, half-life ${SA.meanReversionHalfLife(mr.ou.theta).toFixed(0)}d`; }
-      else if (a.pnlPct < -20) { verdict = "EXIT"; reason = `Deep loss (${a.pnlPct.toFixed(1)}%), trending (H=${mr.hurst.toFixed(2)}), weak snap-back`; }
-      else if (a.mu > 0.08 && a.pnlPct > 0) { verdict = "ACCUMULATE"; reason = `Strong drift (μ=${(a.mu*100).toFixed(0)}%), positive momentum, favorable risk-reward`; }
-      else { reason = `Neutral signal. Vol=${(a.vol*100).toFixed(0)}%, Beta=${a.beta.toFixed(2)}`; }
-
+      if (mr.isStationary && mr.z < -1.5) { verdict = "ACCUMULATE"; reason = `Mean-reverting (H=${mr.hurst.toFixed(2)}), oversold (Z=${mr.z.toFixed(1)}), snap-back ${(mr.snapProb * 100).toFixed(0)}%`; }
+      else if (mr.isStationary && mr.z > 2) { verdict = "REDUCE"; reason = `Overbought (Z=${mr.z.toFixed(1)}), revert half-life ${SA.meanReversionHalfLife(mr.ou.theta).toFixed(0)}d`; }
+      else if (a.pnlPct < -20) { verdict = "EXIT"; reason = `Deep loss (${a.pnlPct.toFixed(1)}%), trending (H=${mr.hurst.toFixed(2)})`; }
+      else if (a.mu > 0.08 && a.pnlPct > 0) { verdict = "ACCUMULATE"; reason = `Strong drift (μ=${(a.mu*100).toFixed(0)}%), positive momentum`; }
+      else { reason = `Neutral. Vol=${(a.vol*100).toFixed(0)}%, β=${a.beta.toFixed(2)}`; }
       const rpDelta = rpWeights[i] - a.weight;
-      return { ...a, verdict, reason, rpDelta, mr };
+      return { ...a, verdict, reason, rpDelta, mr, kellyFrac: kellyFracs[i], optHorizon: mr.optHorizon };
     });
 
+    const riskSurfaceData = assets.map((a, i) => ({
+      ticker: a.ticker, x: i, y: a.weight * a.vol, z: a.mu, weight: a.weight, verdict: assetVerdicts[i].verdict,
+      color: assetVerdicts[i].verdict === "ACCUMULATE" ? "#22c55e" : assetVerdicts[i].verdict === "HOLD" ? "#eab308" : assetVerdicts[i].verdict === "REDUCE" ? "#f97316" : "#ef4444",
+    }));
+
+    const corrEdges: { from: number; to: number; corr: number }[] = [];
+    for (let i = 0; i < assets.length; i++) {
+      for (let j = i + 1; j < assets.length; j++) {
+        if (Math.abs(corr[i][j]) > 0.15) corrEdges.push({ from: i, to: j, corr: corr[i][j] });
+      }
+    }
+
     return {
-      compositeScore, profitProb, medianReturn, sharpe, regimeLabel,
+      compositeScore, profitProb, medianReturn, sharpe, sortino, calmar, omega,
+      regimeLabel, currentRegime, entropy, eRatio, fragility, kurt,
       mcVar: mcVar.var, hVar95, worstStress: worstStress.portfolioImpact,
-      avgMaxDD: SA.mean(mc.maxDrawdownDist), assetVerdicts, rpWeights,
+      avgMaxDD, assetVerdicts, rpWeights, kellyFracs, rcVaR,
+      tailDepMatrix, riskSurfaceData, corrEdges, corr, transitionMatrix, mc,
     };
   }, [assets, totalValue, portfolioMu, portfolioVol]);
+
+  const executeRebalance = useCallback(() => {
+    if (!foresight) return;
+    const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
+      const targetWeight = foresight.rpWeights[i];
+      const delta = targetWeight * totalValue - av.weight * totalValue;
+      const shares = Math.abs(Math.round(delta / (av.price || 1)));
+      return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares, dollarAmount: Math.abs(delta), reason: `RP: ${(av.weight * 100).toFixed(1)}% → ${(targetWeight * 100).toFixed(1)}%` };
+    }).filter(t => t.shares > 0);
+    setTradeCards(trades);
+    toast.success(`Generated ${trades.length} rebalance trades`);
+  }, [foresight, totalValue]);
+
+  const executeVerdicts = useCallback(() => {
+    if (!foresight) return;
+    const trades: TradeInstruction[] = foresight.assetVerdicts.filter(av => av.verdict !== "HOLD").map(av => {
+      const pct = av.verdict === "ACCUMULATE" ? 0.25 : av.verdict === "REDUCE" ? 0.5 : 1.0;
+      const dollarAmt = av.value * pct;
+      return { ticker: av.ticker, action: av.verdict === "ACCUMULATE" ? "BUY" : "SELL", shares: Math.round(dollarAmt / (av.price || 1)), dollarAmount: dollarAmt, reason: av.reason };
+    });
+    setTradeCards(trades);
+    toast.success(`Generated ${trades.length} verdict trades`);
+  }, [foresight]);
+
+  const executeHedge = useCallback(() => {
+    if (!foresight) return;
+    const hedgeSize = foresight.mcVar * 1.2;
+    const contracts = Math.max(1, Math.round(hedgeSize / 54000));
+    setTradeCards([
+      { ticker: "SPY", action: "BUY PUT", shares: contracts, dollarAmount: contracts * 540 * 0.03 * 100, reason: `Hedge ${fmt(hedgeSize)} VaR · ${contracts} ATM puts` },
+      { ticker: "SH", action: "BUY", shares: Math.round(hedgeSize * 0.3 / 40), dollarAmount: hedgeSize * 0.3, reason: "Inverse S&P 500 · 30% hedge" },
+    ]);
+    toast.success("Generated hedge portfolio");
+  }, [foresight, fmt]);
+
+  const executeKelly = useCallback(() => {
+    if (!foresight) return;
+    const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
+      const kellyW = foresight.kellyFracs[i] * 0.5;
+      const delta = kellyW * totalValue - av.weight * totalValue;
+      return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares: Math.abs(Math.round(delta / (av.price || 1))), dollarAmount: Math.abs(delta), reason: `½-Kelly: ${(av.weight * 100).toFixed(1)}% → ${(kellyW * 100).toFixed(1)}%` };
+    }).filter(t => t.shares > 0);
+    setTradeCards(trades);
+    toast.success(`Generated ${trades.length} Kelly trades`);
+  }, [foresight, totalValue]);
+
+  const copyTrade = useCallback((t: TradeInstruction) => {
+    navigator.clipboard.writeText(`${t.action} ${t.shares} ${t.ticker} (~${fmt(t.dollarAmount)}) — ${t.reason}`);
+    setCopiedCmd(t.ticker);
+    setTimeout(() => setCopiedCmd(null), 2000);
+  }, [fmt]);
 
   if (!foresight || assets.length === 0) return <EmptyMsg msg="Add assets to generate unified foresight" />;
 
   const scoreColor = foresight.compositeScore > 65 ? "text-gain" : foresight.compositeScore > 40 ? "text-warning" : "text-loss";
-  const scoreBg = foresight.compositeScore > 65 ? "bg-gain/10 border-gain/30" : foresight.compositeScore > 40 ? "bg-warning/10 border-warning/30" : "bg-loss/10 border-loss/30";
+  const scoreBorder = foresight.compositeScore > 65 ? "border-gain/30" : foresight.compositeScore > 40 ? "border-warning/30" : "border-loss/30";
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Brain className="h-5 w-5 text-primary" />
-        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Unified Mathematical Foresight</h3>
-      </div>
-      <p className="text-[10px] text-muted-foreground">
-        Synthesizes Monte Carlo · VaR/CVaR · Mean Reversion · Regime Detection · Factor Model · Stress Test · Risk Parity into one verdict
-      </p>
-
-      {/* Composite Score */}
-      <div className={`rounded-xl border p-5 text-center ${scoreBg}`}>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio Foresight Score</p>
-        <p className={`font-mono text-5xl font-black ${scoreColor}`}>{foresight.compositeScore.toFixed(0)}</p>
-        <p className="text-[10px] text-muted-foreground mt-1">/ 100</p>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+          <Brain className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Foresight Command Center</h3>
+          <p className="text-[9px] text-muted-foreground font-mono">MC · VaR · OU · HMM · ENTROPY · FRAGILITY · KELLY · TAIL-DEP · REGIME-CVAR</p>
+        </div>
       </div>
 
-      {/* Key metrics grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricCard label="P(Profit 1Y)" value={`${(foresight.profitProb * 100).toFixed(0)}%`} color={foresight.profitProb > 0.5 ? "text-gain" : "text-loss"} />
-        <MetricCard label="Median Return" value={`${(foresight.medianReturn * 100).toFixed(1)}%`} color={foresight.medianReturn > 0 ? "text-gain" : "text-loss"} />
-        <MetricCard label="Sharpe Ratio" value={foresight.sharpe.toFixed(2)} color={foresight.sharpe > 0.5 ? "text-gain" : "text-warning"} />
-        <MetricCard label="Regime" value={foresight.regimeLabel} color={foresight.regimeLabel === "Bull" ? "text-gain" : foresight.regimeLabel === "Bear" ? "text-loss" : "text-warning"} />
-        <MetricCard label="VaR 95% (10d)" value={fmt(foresight.hVar95)} color="text-loss" />
-        <MetricCard label="MC VaR 95%" value={fmt(foresight.mcVar)} color="text-loss" />
-        <MetricCard label="Black Swan Impact" value={`${(foresight.worstStress * 100).toFixed(1)}%`} color="text-loss" />
-        <MetricCard label="Avg Max Drawdown" value={`${(foresight.avgMaxDD * 100).toFixed(1)}%`} color="text-loss" />
+      {/* Score Gauge + Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className={`rounded-xl border ${scoreBorder} p-4 flex flex-col items-center`}>
+          <div className="h-40 w-full">
+            <Canvas camera={{ position: [0, 0, 5], fov: 40 }}>
+              <ambientLight intensity={0.4} />
+              <pointLight position={[5, 5, 5]} intensity={1} />
+              <ScoreGauge3D score={foresight.compositeScore} />
+            </Canvas>
+          </div>
+          <p className="text-[9px] uppercase tracking-wider text-muted-foreground mt-1">Foresight Score</p>
+        </div>
+        <div className="lg:col-span-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <MetricCard label="P(Profit)" value={`${(foresight.profitProb * 100).toFixed(0)}%`} color={foresight.profitProb > 0.5 ? "text-gain" : "text-loss"} />
+          <MetricCard label="Median Ret" value={`${(foresight.medianReturn * 100).toFixed(1)}%`} color={foresight.medianReturn > 0 ? "text-gain" : "text-loss"} />
+          <MetricCard label="Sharpe" value={foresight.sharpe.toFixed(2)} color={foresight.sharpe > 0.5 ? "text-gain" : "text-warning"} />
+          <MetricCard label="Sortino" value={foresight.sortino.toFixed(2)} color={foresight.sortino > 1 ? "text-gain" : "text-warning"} />
+          <MetricCard label="Calmar" value={foresight.calmar.toFixed(2)} color={foresight.calmar > 1 ? "text-gain" : "text-warning"} />
+          <MetricCard label="Omega" value={foresight.omega > 10 ? "∞" : foresight.omega.toFixed(2)} color={foresight.omega > 1 ? "text-gain" : "text-loss"} />
+          <MetricCard label="Regime" value={foresight.regimeLabel} color={foresight.regimeLabel === "Bull" ? "text-gain" : foresight.regimeLabel === "Bear" ? "text-loss" : "text-warning"} />
+          <MetricCard label="VaR 95%" value={fmt(foresight.hVar95)} color="text-loss" />
+          <MetricCard label="Fragility" value={foresight.fragility.toFixed(2)} color={foresight.fragility > 1.3 ? "text-loss" : "text-gain"} />
+          <MetricCard label="Entropy" value={`${(foresight.eRatio * 100).toFixed(0)}%`} color={foresight.eRatio > 0.7 ? "text-gain" : "text-warning"} />
+          <MetricCard label="Kurtosis" value={foresight.kurt.toFixed(1)} color={foresight.kurt > 4 ? "text-loss" : "text-gain"} />
+          <MetricCard label="Avg Max DD" value={`${(foresight.avgMaxDD * 100).toFixed(1)}%`} color="text-loss" />
+        </div>
       </div>
 
-      {/* Per-asset verdicts */}
+      {/* 3D Risk Surface */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-3">Per-Asset Mathematical Verdict</p>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">3D Risk-Return Surface</p>
+        <div className="h-[300px] sm:h-[400px] rounded-lg border border-border bg-background overflow-hidden">
+          <Canvas camera={{ position: [6, 4, 8], fov: 50 }}>
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={0.8} />
+            <Grid position={[0, -2, 0]} args={[12, 12]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
+            {foresight.riskSurfaceData.map((d, i) => {
+              const x = (d.x / Math.max(1, assets.length - 1)) * 8 - 4;
+              const y = d.y * 30 - 1;
+              const z = d.z * 10;
+              const size = 0.15 + d.weight * 2;
+              return (
+                <group key={d.ticker} position={[x, y, z]}>
+                  <Sphere args={[size, 16, 16]}>
+                    <meshStandardMaterial color={d.color} emissive={d.color} emissiveIntensity={0.4} transparent opacity={0.85} />
+                  </Sphere>
+                  <Text position={[0, size + 0.2, 0]} fontSize={0.25} color="#ccc" anchorX="center">{d.ticker}</Text>
+                </group>
+              );
+            })}
+            <mesh position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[10, 10]} />
+              <meshBasicMaterial color="#444" transparent opacity={0.05} side={THREE.DoubleSide} />
+            </mesh>
+            <Text position={[0, -2.5, -6]} fontSize={0.3} color="#666" anchorX="center">Asset Index</Text>
+            <Text position={[-5.5, 0, 0]} fontSize={0.3} color="#666" rotation={[0, Math.PI / 2, 0]}>Risk</Text>
+            <Text position={[0, -2.5, 6]} fontSize={0.3} color="#666" anchorX="center">Return</Text>
+            <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.3} />
+          </Canvas>
+        </div>
+        <p className="text-[8px] text-muted-foreground text-center mt-1">Sphere size = weight · 🟢 Accumulate · 🟡 Hold · 🟠 Reduce · 🔴 Exit</p>
+      </div>
+
+      {/* 3D Correlation Network */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">3D Correlation Network</p>
+        <div className="h-[280px] sm:h-[380px] rounded-lg border border-border bg-background overflow-hidden">
+          <Canvas camera={{ position: [0, 3, 8], fov: 50 }}>
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={0.6} />
+            {assets.map((a, i) => {
+              const angle = (i / assets.length) * Math.PI * 2;
+              const r = 3;
+              return (
+                <group key={a.ticker} position={[Math.cos(angle) * r, (a.mu - portfolioMu) * 10, Math.sin(angle) * r]}>
+                  <Sphere args={[0.2 + a.weight * 1.5, 16, 16]}>
+                    <meshStandardMaterial color={PATH_COLORS[i % PATH_COLORS.length]} emissive={PATH_COLORS[i % PATH_COLORS.length]} emissiveIntensity={0.3} />
+                  </Sphere>
+                  <Text position={[0, 0.4 + a.weight, 0]} fontSize={0.22} color="#ccc" anchorX="center">{a.ticker}</Text>
+                </group>
+              );
+            })}
+            {foresight.corrEdges.map((edge, ei) => {
+              const r = 3;
+              const fA = (edge.from / assets.length) * Math.PI * 2;
+              const tA = (edge.to / assets.length) * Math.PI * 2;
+              const fromP: [number, number, number] = [Math.cos(fA) * r, (assets[edge.from].mu - portfolioMu) * 10, Math.sin(fA) * r];
+              const toP: [number, number, number] = [Math.cos(tA) * r, (assets[edge.to].mu - portfolioMu) * 10, Math.sin(tA) * r];
+              return <DreiLine key={ei} points={[fromP, toP]} color={edge.corr > 0 ? "#22c55e" : "#ef4444"} lineWidth={Math.abs(edge.corr) * 3} transparent opacity={Math.abs(edge.corr) * 0.6} />;
+            })}
+            <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.6} />
+          </Canvas>
+        </div>
+        <p className="text-[8px] text-muted-foreground text-center mt-1">Green = +ρ · Red = −ρ · Thickness = |ρ|</p>
+      </div>
+
+      {/* Regime-Conditional VaR + Transition + Tail Dep */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-[10px] font-bold text-foreground uppercase mb-2">Regime-Conditional VaR (95%)</p>
+          <div className="space-y-2">
+            {foresight.rcVaR.map(rv => (
+              <div key={rv.regime} className="rounded-lg border border-border p-2.5">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] font-bold text-foreground">{rv.regime}</span>
+                  <span className="text-[9px] text-muted-foreground font-mono">n={rv.count}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${rv.regime === "Bear" ? "bg-loss" : rv.regime === "Bull" ? "bg-gain" : "bg-warning"}`} style={{ width: `${Math.min(100, rv.var * 10000)}%` }} />
+                  </div>
+                  <span className="text-[10px] font-mono text-loss">{(rv.var * 100).toFixed(2)}%</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-0.5">CVaR: {(rv.cvar * 100).toFixed(2)}%</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-foreground uppercase mb-2">Regime Transition Matrix</p>
+          <table className="text-[10px] font-mono w-full">
+            <thead><tr>
+              <th className="px-2 py-1 text-muted-foreground text-left">From\To</th>
+              {["Bear", "Neutral", "Bull"].map(l => <th key={l} className="px-2 py-1 text-muted-foreground">{l}</th>)}
+            </tr></thead>
+            <tbody>
+              {["Bear", "Neutral", "Bull"].map((label, i) => (
+                <tr key={label} className="border-b border-border/50">
+                  <td className="px-2 py-1 font-bold text-foreground">{label}</td>
+                  {foresight.transitionMatrix[i]?.map((v, j) => (
+                    <td key={j} className="px-2 py-1 text-center" style={{ backgroundColor: `hsla(${j === 2 ? 152 : j === 0 ? 0 : 45}, 70%, 50%, ${v * 0.4})` }}>{(v * 100).toFixed(0)}%</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[10px] font-bold text-foreground uppercase mb-2 mt-4">Tail Crash Co-Movement</p>
+          <div className="space-y-1">
+            {assets.slice(0, 5).map((a, i) => {
+              const maxTD = Math.max(...foresight.tailDepMatrix[i].filter((_, j) => j !== i));
+              const maxIdx = foresight.tailDepMatrix[i].findIndex((v, j) => j !== i && v === maxTD);
+              return (
+                <div key={a.ticker} className="flex items-center justify-between text-[10px] font-mono px-1">
+                  <span className="text-foreground">{a.ticker}</span>
+                  <span className={maxTD > 0.4 ? "text-loss font-bold" : "text-muted-foreground"}>↔ {assets[maxIdx]?.ticker || "—"}: {(maxTD * 100).toFixed(0)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Per-Asset Verdicts */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-3">Per-Asset Verdict + Optimal Horizon</p>
         <div className="space-y-2">
           {foresight.assetVerdicts.map((av, i) => {
-            const verdictColor: Record<string, string> = {
-              ACCUMULATE: "bg-gain/15 text-gain border-gain/30",
-              HOLD: "bg-warning/10 text-warning border-warning/30",
-              REDUCE: "bg-loss/10 text-loss border-loss/30",
-              EXIT: "bg-loss/20 text-loss border-loss/40",
-            };
+            const vc: Record<string, string> = { ACCUMULATE: "bg-gain/15 text-gain border-gain/30", HOLD: "bg-warning/10 text-warning border-warning/30", REDUCE: "bg-loss/10 text-loss border-loss/30", EXIT: "bg-loss/20 text-loss border-loss/40" };
             return (
-              <div key={av.ticker} className={`rounded-lg border p-3 ${verdictColor[av.verdict] || ""}`}>
+              <div key={av.ticker} className={`rounded-lg border p-3 ${vc[av.verdict] || ""}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{av.ticker}</span>
-                    <span className={`rounded px-2 py-0.5 text-[9px] font-mono font-bold uppercase ${verdictColor[av.verdict]}`}>{av.verdict}</span>
+                    <span className={`rounded px-2 py-0.5 text-[9px] font-mono font-bold uppercase ${vc[av.verdict]}`}>{av.verdict}</span>
                   </div>
                   <div className="flex items-center gap-3 text-[9px] font-mono">
-                    <span>W: {(av.weight * 100).toFixed(1)}%</span>
-                    <span className={av.rpDelta > 0.02 ? "text-gain" : av.rpDelta < -0.02 ? "text-loss" : "text-muted-foreground"}>
-                      RP Δ: {av.rpDelta > 0 ? "+" : ""}{(av.rpDelta * 100).toFixed(1)}%
-                    </span>
-                    <span className={av.pnlPct > 0 ? "text-gain" : "text-loss"}>P&L: {av.pnlPct.toFixed(1)}%</span>
+                    <span>Kelly: {(av.kellyFrac * 100).toFixed(0)}%</span>
+                    <span>Horizon: {av.optHorizon.optimalDays}d</span>
+                    <span className={av.optHorizon.riskRewardRatio > 1 ? "text-gain" : "text-loss"}>R/R: {av.optHorizon.riskRewardRatio.toFixed(1)}</span>
+                    <span className={av.rpDelta > 0.02 ? "text-gain" : av.rpDelta < -0.02 ? "text-loss" : "text-muted-foreground"}>RP Δ: {av.rpDelta > 0 ? "+" : ""}{(av.rpDelta * 100).toFixed(1)}%</span>
                   </div>
                 </div>
                 <p className="text-[10px] opacity-80">{av.reason}</p>
@@ -1145,9 +1352,87 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
           })}
         </div>
       </div>
+
+      {/* Command Console */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <p className="text-[10px] font-bold text-foreground uppercase mb-3 flex items-center gap-2">
+          <Zap className="h-3.5 w-3.5 text-primary" /> Executable Command Console
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { fn: executeRebalance, icon: Shield, color: "primary", title: "Risk Parity Rebalance", desc: "Equalize risk contributions" },
+            { fn: executeVerdicts, icon: TrendingUp, color: "gain", title: "Execute Verdicts", desc: "Trade on math signals" },
+            { fn: executeHedge, icon: Shield, color: "loss", title: "Hedge Portfolio", desc: "SPY puts + inverse ETFs" },
+            { fn: executeKelly, icon: BarChart3, color: "warning", title: "Optimize Kelly", desc: "Half-Kelly sizing" },
+          ].map(cmd => (
+            <button key={cmd.title} onClick={cmd.fn} className={`rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-${cmd.color}/40 hover:bg-${cmd.color}/5 transition-all`}>
+              <cmd.icon className={`h-3.5 w-3.5 text-${cmd.color} mb-1`} />
+              <p className="text-[10px] font-bold text-foreground">{cmd.title}</p>
+              <p className="text-[8px] text-muted-foreground">{cmd.desc}</p>
+            </button>
+          ))}
+        </div>
+        {tradeCards.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-[9px] font-bold text-foreground uppercase">Generated Trade Instructions</p>
+            {tradeCards.map((t, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${t.action.includes("BUY") ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}>{t.action}</span>
+                  <span className="text-[11px] font-bold text-foreground">{t.ticker}</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">{t.shares} shares</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">~{fmt(t.dollarAmount)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-muted-foreground max-w-[200px] truncate">{t.reason}</span>
+                  <button onClick={() => copyTrade(t)} className="rounded p-1 hover:bg-muted transition-colors">
+                    {copiedCmd === t.ticker ? <Check className="h-3 w-3 text-gain" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+function ScoreGauge3D({ score }: { score: number }) {
+  const ringRef = useRef<THREE.Mesh>(null);
+  const particlesRef = useRef<THREE.Points>(null);
+  useFrame(({ clock }) => {
+    if (ringRef.current) ringRef.current.rotation.z = clock.getElapsedTime() * 0.3;
+    if (particlesRef.current) particlesRef.current.rotation.y = clock.getElapsedTime() * 0.5;
+  });
+  const scoreAngle = (score / 100) * Math.PI * 2;
+  const color = score > 65 ? "#22c55e" : score > 40 ? "#eab308" : "#ef4444";
+  const particlePositions = useMemo(() => {
+    const pos = new Float32Array(60 * 3);
+    for (let i = 0; i < 60; i++) {
+      const angle = (i / 60) * Math.PI * 2;
+      const r = 1.6 + Math.random() * 0.4;
+      pos[i * 3] = Math.cos(angle) * r;
+      pos[i * 3 + 1] = Math.sin(angle) * r;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+    }
+    return pos;
+  }, []);
+  return (
+    <group>
+      <mesh><torusGeometry args={[1.5, 0.08, 8, 64]} /><meshStandardMaterial color="#333" transparent opacity={0.3} /></mesh>
+      <mesh ref={ringRef}><torusGeometry args={[1.5, 0.12, 8, 64, scoreAngle]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} /></mesh>
+      <Text position={[0, 0.15, 0.1]} fontSize={0.7} color={color} anchorX="center" anchorY="middle" font={undefined}>{score.toFixed(0)}</Text>
+      <Text position={[0, -0.35, 0.1]} fontSize={0.2} color="#888" anchorX="center">/ 100</Text>
+      <points ref={particlesRef}>
+        <bufferGeometry><bufferAttribute attach="attributes-position" count={60} array={particlePositions} itemSize={3} /></bufferGeometry>
+        <pointsMaterial size={0.04} color={color} transparent opacity={0.4} />
+      </points>
+    </group>
+  );
+}
+
+interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; }
 
 function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfolioVol: number }) {
   return (
