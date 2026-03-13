@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.data-pipeline-status]
 verify_jwt = false
+
+[functions.company-intelligence]
+verify_jwt = false

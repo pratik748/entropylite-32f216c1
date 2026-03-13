@@ -18,6 +18,7 @@ import PnLWaterfall from "@/components/charts/PnLWaterfall";
 import type { HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
+import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
@@ -245,6 +246,7 @@ const IndexContent = () => {
                   <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} currency={analysis.currency} />
                   <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
+                  <CompanyIntelligence ticker={analysis.ticker} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
@@ -312,6 +314,7 @@ const IndexContent = () => {
                         </div>
                       )}
                       {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
+                      {analysis && <CompanyIntelligence ticker={analysis.ticker} />}
                       {analysis && (
                         <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
                       )}

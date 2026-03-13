@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
 } from "recharts";
 import { ScatterChart as ScatterIcon } from "lucide-react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Text, Line as DreiLine, Grid } from "@react-three/drei";
+import * as THREE from "three";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
@@ -613,18 +616,51 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     return SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 30, true);
   }, [totalValue, portfolioMu, portfolioVol]);
 
-  const chartData = useMemo(() => {
-    const stepsCount = mc.paths[0]?.length || 0;
-    return Array.from({ length: stepsCount }, (_, step) => {
-      const point: Record<string, number> = { day: Math.round((step / (stepsCount - 1)) * 252) };
-      mc.paths.forEach((path, i) => { point[`p${i}`] = path[step]; });
-      return point;
+  // Compute median path for highlighting
+  const medianPath = useMemo(() => {
+    const steps = mc.paths[0]?.length || 0;
+    return Array.from({ length: steps }, (_, step) => {
+      const vals = mc.paths.map(p => p[step]).sort((a, b) => a - b);
+      return vals[Math.floor(vals.length / 2)];
     });
   }, [mc]);
 
+  // Normalize paths for 3D: X=day(0-10), Y=value(normalized), Z=pathIndex(0-10)
+  const pathLines = useMemo(() => {
+    const steps = mc.paths[0]?.length || 0;
+    const maxDay = 252;
+    const pathCount = mc.paths.length;
+    const minVal = Math.min(...mc.paths.flatMap(p => p));
+    const maxVal = Math.max(...mc.paths.flatMap(p => p));
+    const valRange = maxVal - minVal || 1;
+
+    return mc.paths.map((path, pi) => {
+      const points: [number, number, number][] = path.map((val, si) => {
+        const x = (si / (steps - 1)) * 10 - 5; // -5 to 5
+        const y = ((val - minVal) / valRange) * 6 - 3; // -3 to 3
+        const z = (pi / (pathCount - 1)) * 8 - 4; // -4 to 4
+        return [x, y, z] as [number, number, number];
+      });
+      return points;
+    });
+  }, [mc]);
+
+  const medianLine = useMemo(() => {
+    const steps = medianPath.length;
+    const minVal = Math.min(...mc.paths.flatMap(p => p));
+    const maxVal = Math.max(...mc.paths.flatMap(p => p));
+    const valRange = maxVal - minVal || 1;
+    return medianPath.map((val, si) => {
+      const x = (si / (steps - 1)) * 10 - 5;
+      const y = ((val - minVal) / valRange) * 6 - 3;
+      const z = 0;
+      return [x, y, z] as [number, number, number];
+    });
+  }, [medianPath, mc]);
+
   return (
     <div className="space-y-5">
-      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths</h3>
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths (3D)</h3>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <MetricCard label="Expected Return" value={`${(mc.expectedReturn * 100).toFixed(1)}%`} color={mc.expectedReturn > 0 ? "text-gain" : "text-loss"} />
         <MetricCard label="VaR 95%" value={`${(mc.var95 * 100).toFixed(1)}%`} color="text-loss" />
@@ -632,20 +668,74 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
         <MetricCard label="CVaR 95%" value={`${(mc.cvar95 * 100).toFixed(1)}%`} color="text-warning" />
         <MetricCard label="Avg Max DD" value={`${(SA.mean(mc.maxDrawdownDist) * 100).toFixed(1)}%`} color="text-loss" />
       </div>
-      <div className="h-[240px] sm:h-[360px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-            <XAxis dataKey="day" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-            <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={70} />
-            <ReferenceLine y={totalValue} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.4} />
-            {mc.paths.map((_, i) => (
-              <Line key={i} dataKey={`p${i}`} stroke={PATH_COLORS[i % PATH_COLORS.length]} strokeWidth={0.7}
-                dot={false} strokeOpacity={0.5} isAnimationActive={false} />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="h-[320px] sm:h-[480px] rounded-lg border border-border bg-background overflow-hidden">
+        <Canvas camera={{ position: [8, 5, 10], fov: 50 }}>
+          <ambientLight intensity={0.6} />
+          <pointLight position={[10, 10, 10]} intensity={0.8} />
+
+          {/* Grid floor */}
+          <Grid
+            position={[0, -3.1, 0]}
+            args={[12, 10]}
+            cellSize={1}
+            cellThickness={0.5}
+            cellColor="#333"
+            sectionSize={5}
+            sectionThickness={1}
+            sectionColor="#555"
+            fadeDistance={30}
+            infiniteGrid={false}
+          />
+
+          {/* Simulation paths */}
+          {pathLines.map((points, i) => (
+            <DreiLine
+              key={i}
+              points={points}
+              color={PATH_COLORS[i % PATH_COLORS.length]}
+              lineWidth={0.8}
+              transparent
+              opacity={0.35}
+            />
+          ))}
+
+          {/* Median path - bold */}
+          <DreiLine
+            points={medianLine}
+            color="hsl(45, 100%, 60%)"
+            lineWidth={3}
+          />
+
+          {/* Axis labels */}
+          <Text position={[0, -3.5, -5]} fontSize={0.35} color="#888" anchorX="center">
+            Trading Days (0-252)
+          </Text>
+          <Text position={[-6, 0, 0]} fontSize={0.35} color="#888" rotation={[0, Math.PI / 2, 0]} anchorX="center">
+            Portfolio Value
+          </Text>
+          <Text position={[0, -3.5, 5]} fontSize={0.35} color="#888" anchorX="center">
+            Path Index
+          </Text>
+
+          {/* Reference plane at starting value */}
+          <mesh position={[0, -3 + (6 * 0.5), 0]} rotation={[0, 0, 0]}>
+            <planeGeometry args={[10, 8]} />
+            <meshBasicMaterial color="#666" transparent opacity={0.05} side={THREE.DoubleSide} />
+          </mesh>
+
+          <OrbitControls
+            enablePan
+            enableZoom
+            enableRotate
+            autoRotate
+            autoRotateSpeed={0.5}
+            maxPolarAngle={Math.PI / 1.5}
+          />
+        </Canvas>
       </div>
+      <p className="text-[9px] text-muted-foreground text-center">
+        Drag to rotate · Scroll to zoom · Yellow line = median path · {mc.paths.length} sampled paths rendered
+      </p>
     </div>
   );
 }
