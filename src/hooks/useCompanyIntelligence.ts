@@ -47,7 +47,32 @@ export interface CompanyIntelligence {
   };
 }
 
-const tickerCache = new Map<string, CompanyIntelligence>();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_PREFIX = "ci_dossier_";
+
+function getCachedIntel(ticker: string): CompanyIntelligence | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + ticker.toUpperCase());
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_PREFIX + ticker.toUpperCase());
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedIntel(ticker: string, data: CompanyIntelligence) {
+  try {
+    localStorage.setItem(
+      CACHE_PREFIX + ticker.toUpperCase(),
+      JSON.stringify({ data, ts: Date.now() })
+    );
+  } catch { /* storage full — ignore */ }
+}
 
 export function useCompanyIntelligence(ticker: string | null) {
   const [data, setData] = useState<CompanyIntelligence | null>(null);
@@ -58,14 +83,18 @@ export function useCompanyIntelligence(ticker: string | null) {
   useEffect(() => {
     if (!ticker) return;
 
-    // Check local cache
-    const cached = tickerCache.get(ticker);
-    if (cached && ticker === lastTicker.current) {
+    // Check 24h localStorage cache first
+    const cached = getCachedIntel(ticker);
+    if (cached) {
       setData(cached);
       setLoading(false);
       setError(null);
+      lastTicker.current = ticker;
       return;
     }
+
+    // Prevent duplicate fetches for same ticker
+    if (ticker === lastTicker.current && data) return;
     lastTicker.current = ticker;
 
     let alive = true;
@@ -82,7 +111,7 @@ export function useCompanyIntelligence(ticker: string | null) {
         setLoading(false);
         return;
       }
-      tickerCache.set(ticker, result);
+      setCachedIntel(ticker, result);
       setData(result);
       setLoading(false);
     });
