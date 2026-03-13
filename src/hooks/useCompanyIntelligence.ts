@@ -56,17 +56,17 @@ export function useCompanyIntelligence(ticker: string | null) {
   const lastTicker = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!ticker || ticker === lastTicker.current) return;
-    lastTicker.current = ticker;
+    if (!ticker) return;
 
     // Check local cache
     const cached = tickerCache.get(ticker);
-    if (cached) {
+    if (cached && ticker === lastTicker.current) {
       setData(cached);
       setLoading(false);
       setError(null);
       return;
     }
+    lastTicker.current = ticker;
 
     let alive = true;
     setLoading(true);
