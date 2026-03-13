@@ -62,6 +62,8 @@ function stripThinkingBlocks(text: string): string {
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
     .replace(/:\s*\+(\d)/g, ': $1')
+    .replace(/:\s*[~≈∼]\s*(\d)/g, ': $1')
+    .replace(/:\s*approximately\s+(\d)/gi, ': $1')
     .replace(/[\x00-\x1F\x7F]/g, " ");
 
   // Repair truncated JSON — close unbalanced braces/brackets
