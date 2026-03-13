@@ -27,11 +27,12 @@ function getTierBadge(tier?: number): { label: string; className: string } | nul
 interface LiveNewsFeedProps {
   ticker?: string;
   compact?: boolean;
+  region?: string;
 }
 
 const NEWS_REFRESH_INTERVAL = 600_000;
 
-const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
+const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
@@ -42,7 +43,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
     setLoading(true);
     try {
       const { data, error } = await governedInvoke("fetch-news", {
-        body: { ticker: ticker || "", category: "business" },
+        body: { ticker: ticker || "", category: "business", region: region || "All" },
       });
       if (error) throw error;
       setArticles(data.articles || []);
@@ -61,7 +62,7 @@ const LiveNewsFeed = ({ ticker, compact }: LiveNewsFeedProps) => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [ticker]);
+  }, [ticker, region]);
 
   const getSentimentDot = (sentiment: string | null) => {
     if (!sentiment) return "bg-muted-foreground/30";

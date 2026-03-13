@@ -39,7 +39,13 @@ export function safeParseJSON(raw: string): any {
     .replace(/:\s*\+(\d)/g, ": $1")
     .replace(/:\s*[~≈∼]\s*(\d)/g, ": $1")
     .replace(/:\s*approximately\s+(\d)/gi, ": $1")
-    .replace(/[\x00-\x1F\x7F]/g, " ");
+    .replace(/[\x00-\x1F\x7F]/g, " ")
+    // Fix single-quoted strings → double-quoted
+    .replace(/'/g, '"')
+    // Fix unquoted property names: { key: → { "key":
+    .replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
+    // Fix trailing text after JSON (e.g. "} Note: ...")
+    .replace(/}[^}\]]*$/, "}");
 
   // 6. Try parse after cleanup
   try {
