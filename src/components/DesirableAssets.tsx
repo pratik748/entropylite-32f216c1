@@ -48,6 +48,27 @@ const tagColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
+const DA_CACHE_KEY = "da_recommendations";
+const DA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+function getCachedDA(): { recommendations: Recommendation[]; marketCondition: string; regimeType: string; timestamp: number } | null {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > DA_CACHE_TTL) {
+      localStorage.removeItem(DA_CACHE_KEY);
+      return null;
+    }
+    return cached;
+  } catch { return null; }
+}
+
+function setCachedDA(recommendations: Recommendation[], marketCondition: string, regimeType: string) {
+  try {
+    localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ recommendations, marketCondition, regimeType, timestamp: Date.now() }));
+  } catch { /* ignore */ }
+}
 
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -61,7 +82,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   const existingTickers = stocks.map(s => s.ticker);
 
-  const fetchRecommendations = useCallback(async (showLoading = true) => {
+  const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
+    // Check 6h cache first
+    if (!forceRefresh) {
+      const cached = getCachedDA();
+      if (cached) {
+        setRecommendations(cached.recommendations);
+        setMarketCondition(cached.marketCondition);
+        setRegimeType(cached.regimeType);
+        setLastFetch(cached.timestamp);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+    }
+
     if (showLoading) { setLoading(true); setError(null); }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
