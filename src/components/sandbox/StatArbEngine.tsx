@@ -1237,39 +1237,6 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
         <p className="text-[8px] text-muted-foreground text-center mt-1">Sphere size = weight · 🟢 Accumulate · 🟡 Hold · 🟠 Reduce · 🔴 Exit</p>
       </div>
 
-      {/* 3D Correlation Network */}
-      <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">3D Correlation Network</p>
-        <div className="h-[280px] sm:h-[380px] rounded-lg border border-border bg-background overflow-hidden">
-          <Canvas camera={{ position: [0, 3, 8], fov: 50 }}>
-            <ambientLight intensity={0.5} />
-            <pointLight position={[10, 10, 10]} intensity={0.6} />
-            {assets.map((a, i) => {
-              const angle = (i / assets.length) * Math.PI * 2;
-              const r = 3;
-              return (
-                <group key={a.ticker} position={[Math.cos(angle) * r, (a.mu - portfolioMu) * 10, Math.sin(angle) * r]}>
-                  <Sphere args={[0.2 + a.weight * 1.5, 16, 16]}>
-                    <meshStandardMaterial color={PATH_COLORS[i % PATH_COLORS.length]} emissive={PATH_COLORS[i % PATH_COLORS.length]} emissiveIntensity={0.3} />
-                  </Sphere>
-                  <Text position={[0, 0.4 + a.weight, 0]} fontSize={0.22} color="#ccc" anchorX="center">{a.ticker}</Text>
-                </group>
-              );
-            })}
-            {foresight.corrEdges.map((edge, ei) => {
-              const r = 3;
-              const fA = (edge.from / assets.length) * Math.PI * 2;
-              const tA = (edge.to / assets.length) * Math.PI * 2;
-              const fromP: [number, number, number] = [Math.cos(fA) * r, (assets[edge.from].mu - portfolioMu) * 10, Math.sin(fA) * r];
-              const toP: [number, number, number] = [Math.cos(tA) * r, (assets[edge.to].mu - portfolioMu) * 10, Math.sin(tA) * r];
-              return <DreiLine key={ei} points={[fromP, toP]} color={edge.corr > 0 ? "#22c55e" : "#ef4444"} lineWidth={Math.abs(edge.corr) * 3} transparent opacity={Math.abs(edge.corr) * 0.6} />;
-            })}
-            <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.6} />
-          </Canvas>
-        </div>
-        <p className="text-[8px] text-muted-foreground text-center mt-1">Green = +ρ · Red = −ρ · Thickness = |ρ|</p>
-      </div>
-
       {/* Regime-Conditional VaR + Transition + Tail Dep */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
