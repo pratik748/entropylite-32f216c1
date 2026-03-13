@@ -661,3 +661,149 @@ export function meanReversionBands(prices: number[], window = 20, numStd = 2): {
   }
   return result;
 }
+
+// ─── 11. Advanced Analytics (Unique) ────────────────────────────────
+
+/** Shannon Entropy — measures portfolio disorder/unpredictability */
+export function shannonEntropy(weights: number[]): number {
+  const filtered = weights.filter(w => w > 0);
+  if (filtered.length === 0) return 0;
+  return -filtered.reduce((s, w) => s + w * Math.log2(w), 0);
+}
+
+/** Maximum possible entropy for n assets (equal weight) */
+export function maxEntropy(n: number): number {
+  return n > 0 ? Math.log2(n) : 0;
+}
+
+/** Entropy ratio: actual / max. 1 = perfectly diversified, 0 = concentrated */
+export function entropyRatio(weights: number[]): number {
+  const n = weights.filter(w => w > 0).length;
+  const max = maxEntropy(n);
+  return max > 0 ? shannonEntropy(weights) / max : 0;
+}
+
+/** Tail Dependence — measures co-movement in crash scenarios (lower tail) */
+export function tailDependence(returnSeriesA: number[], returnSeriesB: number[], threshold = 0.1): number {
+  const n = Math.min(returnSeriesA.length, returnSeriesB.length);
+  if (n < 20) return 0;
+  const sortedA = [...returnSeriesA].sort((a, b) => a - b);
+  const sortedB = [...returnSeriesB].sort((a, b) => a - b);
+  const cutoffIdx = Math.max(1, Math.floor(n * threshold));
+  const threshA = sortedA[cutoffIdx];
+  const threshB = sortedB[cutoffIdx];
+  let jointTail = 0;
+  let tailA = 0;
+  for (let i = 0; i < n; i++) {
+    if (returnSeriesA[i] <= threshA) {
+      tailA++;
+      if (returnSeriesB[i] <= threshB) jointTail++;
+    }
+  }
+  return tailA > 0 ? jointTail / tailA : 0;
+}
+
+/** Tail Dependence Matrix for all asset pairs */
+export function tailDependenceMatrix(returnSeries: number[][], threshold = 0.1): number[][] {
+  const n = returnSeries.length;
+  const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    matrix[i][i] = 1;
+    for (let j = i + 1; j < n; j++) {
+      const td = tailDependence(returnSeries[i], returnSeries[j], threshold);
+      matrix[i][j] = td;
+      matrix[j][i] = td;
+    }
+  }
+  return matrix;
+}
+
+/** Regime-Conditional VaR — separate VaR for bull/neutral/bear regimes */
+export function regimeConditionalVaR(
+  portfolioReturns: number[], regimeAssignments: number[],
+  confidence = 0.95, nRegimes = 3
+): { regime: string; var: number; cvar: number; count: number }[] {
+  const labels = ["Bear", "Neutral", "Bull"];
+  const results: { regime: string; var: number; cvar: number; count: number }[] = [];
+  for (let r = 0; r < nRegimes; r++) {
+    const regimeReturns = portfolioReturns.filter((_, i) => regimeAssignments[i] === r);
+    if (regimeReturns.length < 5) {
+      results.push({ regime: labels[r] || `Regime ${r}`, var: 0, cvar: 0, count: regimeReturns.length });
+      continue;
+    }
+    const sorted = [...regimeReturns].sort((a, b) => a - b);
+    const varIdx = Math.floor((1 - confidence) * sorted.length);
+    const varVal = -sorted[varIdx];
+    const tailVals = sorted.slice(0, Math.max(1, varIdx));
+    const cvar = -mean(tailVals);
+    results.push({ regime: labels[r] || `Regime ${r}`, var: varVal, cvar, count: regimeReturns.length });
+  }
+  return results;
+}
+
+/** Portfolio Fragility Index — CVaR/VaR ratio. >1 means fat tail, losses accelerate beyond VaR */
+export function fragilityIndex(var95: number, cvar95: number): number {
+  return var95 > 0 ? cvar95 / var95 : 1;
+}
+
+/** Optimal Horizon — uses OU half-life and drift to find best holding period */
+export function optimalHorizon(
+  ou: { theta: number; mu: number; sigma: number },
+  currentPrice: number, drift: number
+): { optimalDays: number; expectedReturn: number; riskRewardRatio: number } {
+  const halfLife = meanReversionHalfLife(ou.theta);
+  const distance = Math.abs(currentPrice - ou.mu);
+  const relativeDistance = distance / (currentPrice || 1);
+  
+  // Optimal horizon is ~1.5x half-life for mean-reverting, drift-adjusted
+  let optDays: number;
+  if (relativeDistance > 0.05 && ou.theta > 0.5) {
+    // Strong mean reversion signal — use half-life
+    optDays = Math.min(120, Math.max(5, halfLife * 1.5));
+  } else {
+    // Drift-dominated — use momentum horizon
+    const absReturn = Math.abs(drift) * 252;
+    optDays = absReturn > 0.2 ? 20 : absReturn > 0.1 ? 40 : 60;
+  }
+  
+  const expectedRevert = distance * (1 - Math.exp(-ou.theta * optDays / 252));
+  const driftReturn = drift * optDays / 252;
+  const totalExpectedReturn = (currentPrice < ou.mu ? expectedRevert : -expectedRevert) / currentPrice + driftReturn;
+  const volOverHorizon = ou.sigma * Math.sqrt(optDays / 252) / currentPrice;
+  const rrRatio = volOverHorizon > 0 ? Math.abs(totalExpectedReturn) / volOverHorizon : 0;
+  
+  return { optimalDays: Math.round(optDays), expectedReturn: totalExpectedReturn, riskRewardRatio: rrRatio };
+}
+
+/** Kurtosis — measures tail heaviness. >3 = fat tails (leptokurtic) */
+export function kurtosis(arr: number[]): number {
+  const n = arr.length;
+  if (n < 4) return 3;
+  const m = mean(arr);
+  const s = stddev(arr);
+  if (s === 0) return 3;
+  return arr.reduce((acc, v) => acc + Math.pow((v - m) / s, 4), 0) / n;
+}
+
+/** Sortino Ratio — like Sharpe but only penalizes downside deviation */
+export function sortinoRatio(returns: number[], riskFreeRate = 0.04): number {
+  const excessReturns = returns.map(r => r - riskFreeRate / 252);
+  const avgExcess = mean(excessReturns);
+  const downsideReturns = excessReturns.filter(r => r < 0);
+  const downsideDev = downsideReturns.length > 0
+    ? Math.sqrt(downsideReturns.reduce((s, r) => s + r * r, 0) / downsideReturns.length)
+    : 0.001;
+  return (avgExcess * Math.sqrt(252)) / (downsideDev * Math.sqrt(252));
+}
+
+/** Calmar Ratio — annualized return / max drawdown */
+export function calmarRatio(annualReturn: number, maxDD: number): number {
+  return maxDD > 0 ? annualReturn / maxDD : 0;
+}
+
+/** Omega Ratio — probability-weighted gains over losses */
+export function omegaRatio(returns: number[], threshold = 0): number {
+  const gains = returns.filter(r => r > threshold).reduce((s, r) => s + (r - threshold), 0);
+  const losses = returns.filter(r => r <= threshold).reduce((s, r) => s + (threshold - r), 0);
+  return losses > 0 ? gains / losses : gains > 0 ? Infinity : 1;
+}
