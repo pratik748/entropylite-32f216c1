@@ -48,6 +48,27 @@ const tagColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
+const DA_CACHE_KEY = "da_recommendations";
+const DA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+function getCachedDA(): { recommendations: Recommendation[]; marketCondition: string; regimeType: string; timestamp: number } | null {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > DA_CACHE_TTL) {
+      localStorage.removeItem(DA_CACHE_KEY);
+      return null;
+    }
+    return cached;
+  } catch { return null; }
+}
+
+function setCachedDA(recommendations: Recommendation[], marketCondition: string, regimeType: string) {
+  try {
+    localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ recommendations, marketCondition, regimeType, timestamp: Date.now() }));
+  } catch { /* ignore */ }
+}
 
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -61,7 +82,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   const existingTickers = stocks.map(s => s.ticker);
 
-  const fetchRecommendations = useCallback(async (showLoading = true) => {
+  const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
+    // Check 6h cache first
+    if (!forceRefresh) {
+      const cached = getCachedDA();
+      if (cached) {
+        setRecommendations(cached.recommendations);
+        setMarketCondition(cached.marketCondition);
+        setRegimeType(cached.regimeType);
+        setLastFetch(cached.timestamp);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+    }
+
     if (showLoading) { setLoading(true); setError(null); }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
@@ -90,6 +125,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         throw new Error("No recommendations returned. Try refreshing.");
       }
 
+      setCachedDA(data.recommendations, data.marketCondition || "", data.regimeType || "");
       setRecommendations(data.recommendations);
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
@@ -155,8 +191,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground">60s refresh</span>
-          <Button size="sm" variant="ghost" onClick={() => { retryCount.current = 0; fetchRecommendations(true); }} className="h-7 gap-1.5 text-xs">
+          <span className="text-[9px] font-mono text-muted-foreground">Cached 6h</span>
+          <Button size="sm" variant="ghost" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -170,7 +206,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <p className="text-sm font-medium text-foreground">{error}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true); }} className="ml-auto">
+          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">
             Retry
           </Button>
         </div>
