@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { governedInvoke } from "@/lib/apiGovernor";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface CompanyIntelligence {
   companyName: string;
@@ -98,13 +98,21 @@ export function useCompanyIntelligence(ticker: string | null) {
     lastTicker.current = ticker;
 
     let alive = true;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    governedInvoke<CompanyIntelligence>("company-intelligence", {
-      body: { ticker },
-      tier: "slow",
+    // 90-second timeout for long AI generations
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+
+    const provider = (() => {
+      try { return localStorage.getItem("entropy-ai-provider") || "mistral"; } catch { return "mistral"; }
+    })();
+
+    supabase.functions.invoke("company-intelligence", {
+      body: { ticker, provider },
     }).then(({ data: result, error: err }) => {
+      clearTimeout(timeout);
       if (!alive) return;
       if (err || !result || (result as any).error) {
         setError(err?.message || (result as any)?.error || "Failed to load intelligence");
@@ -114,9 +122,14 @@ export function useCompanyIntelligence(ticker: string | null) {
       setCachedIntel(ticker, result);
       setData(result);
       setLoading(false);
+    }).catch((e) => {
+      clearTimeout(timeout);
+      if (!alive) return;
+      setError(e?.message || "Request timed out");
+      setLoading(false);
     });
 
-    return () => { alive = false; };
+    return () => { alive = false; clearTimeout(timeout); };
   }, [ticker]);
 
   return { data, loading, error };

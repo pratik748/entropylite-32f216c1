@@ -78,7 +78,7 @@ const MarketOverview = () => {
     fetchMarketData();
     intervalRef.current = setInterval(() => fetchMarketData(false), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+  }, [region]);
 
   if (loading && !data) {
     return (
