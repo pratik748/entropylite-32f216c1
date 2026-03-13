@@ -278,9 +278,24 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
-    const { ticker } = await req.json();
+    const { ticker, region } = await req.json();
     const cleanTicker = (ticker || "").replace(/\.(NS|BO|BSE)$/i, "").trim();
-    const query = cleanTicker ? `${cleanTicker} stock market` : "stock market OR earnings OR inflation";
+
+    // Region-aware query building
+    const regionKeywords: Record<string, string> = {
+      India: "India OR NSE OR BSE OR Sensex OR Nifty OR RBI OR rupee",
+      US: "US OR Wall Street OR Federal Reserve OR S&P 500 OR NASDAQ OR NYSE",
+      Europe: "Europe OR ECB OR FTSE OR DAX OR eurozone OR EU economy",
+      Asia: "Asia OR Nikkei OR Hang Seng OR China OR Japan OR Korea",
+    };
+    const regionContext = region && region !== "All" ? regionKeywords[region] || "" : "";
+    
+    let query: string;
+    if (cleanTicker) {
+      query = regionContext ? `${cleanTicker} stock ${regionContext}` : `${cleanTicker} stock market`;
+    } else {
+      query = regionContext || "stock market OR earnings OR inflation";
+    }
 
     console.log("Multi-source news fetch for:", query);
 
