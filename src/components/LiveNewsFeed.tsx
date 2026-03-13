@@ -62,7 +62,7 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [ticker]);
+  }, [ticker, region]);
 
   const getSentimentDot = (sentiment: string | null) => {
     if (!sentiment) return "bg-muted-foreground/30";

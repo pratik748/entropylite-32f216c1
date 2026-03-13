@@ -303,8 +303,8 @@ const MarketOverview = () => {
         </div>
       )}
 
-      {/* Live News Feed */}
-      <LiveNewsFeed />
+      {/* Live News Feed — region-aware */}
+      <LiveNewsFeed region={region} />
     </div>
   );
 };

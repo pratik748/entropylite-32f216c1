@@ -66,22 +66,40 @@ Deno.serve(async (req) => {
 
 All number fields for signals should be 0-100. Revenue percentages should sum to ~100. Be factually accurate for ${ticker}. Use real company data where known, make informed estimates where not.`;
 
-    const result = await callAI({
-      systemPrompt,
-      userPrompt,
-      maxTokens: 8192,
-      temperature: 0.4,
-      provider: provider || "mistral",
-    });
+    // Retry up to 2 times on parse failures
+    let lastErr: any;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await callAI({
+          systemPrompt,
+          userPrompt,
+          maxTokens: 8192,
+          temperature: 0.4,
+          provider: provider || "mistral",
+        });
 
-    const parsed = safeParseJSON(result.text);
+        const parsed = safeParseJSON(result.text);
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsH, "Content-Type": "application/json" },
-    });
-  } catch (err: any) {
-    console.error("company-intelligence error:", err);
-    return new Response(JSON.stringify({ error: err.message || "Failed" }), {
+        // Validate essential fields exist
+        if (!parsed || (!parsed.companyName && !parsed.sector)) {
+          throw new Error("Incomplete response — missing companyName/sector");
+        }
+
+        return new Response(JSON.stringify(parsed), {
+          headers: { ...corsH, "Content-Type": "application/json" },
+        });
+      } catch (err: any) {
+        lastErr = err;
+        console.error(`company-intelligence attempt ${attempt + 1} failed:`, err.message || err);
+        if (attempt === 0) {
+          // Brief pause before retry
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    }
+
+    console.error("company-intelligence all attempts failed:", lastErr?.message);
+    return new Response(JSON.stringify({ error: lastErr?.message || "Failed to generate intelligence" }), {
       status: 500,
       headers: { ...corsH, "Content-Type": "application/json" },
     });
