@@ -18,6 +18,7 @@ import PnLWaterfall from "@/components/charts/PnLWaterfall";
 import type { HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
+import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
