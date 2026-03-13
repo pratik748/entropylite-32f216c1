@@ -77,7 +77,7 @@ export function useCompanyIntelligence(ticker: string | null) {
       tier: "slow",
     }).then(({ data: result, error: err }) => {
       if (!alive) return;
-      if (err || !result || result.error) {
+      if (err || !result || (result as any).error) {
         setError(err?.message || (result as any)?.error || "Failed to load intelligence");
         setLoading(false);
         return;
