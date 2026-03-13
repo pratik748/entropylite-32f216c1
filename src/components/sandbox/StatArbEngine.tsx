@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
 } from "recharts";
-import { ScatterChart as ScatterIcon } from "lucide-react";
+import { ScatterChart as ScatterIcon, Brain } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Line as DreiLine, Grid } from "@react-three/drei";
 import * as THREE from "three";
@@ -16,7 +16,7 @@ interface Props { stocks: PortfolioStock[]; }
 const TABS = [
   "Price Dynamics", "Portfolio Risk", "Optimization", "Time Series",
   "Factor Model", "Liquidity", "Monte Carlo", "Stress Test",
-  "Structural Flow", "Mean Reversion", "Real-Time",
+  "Structural Flow", "Mean Reversion", "Foresight", "Real-Time",
 ] as const;
 type Tab = typeof TABS[number];
 
@@ -30,7 +30,6 @@ const StatArbEngine = ({ stocks }: Props) => {
   const [tab, setTab] = useState<Tab>("Price Dynamics");
   const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
 
-  // Derive per-asset data using REAL prices from analysis
   const assetData = useMemo(() => {
     return holdings.map(h => {
       const vol = (h.risk / 100) * 0.3;
@@ -52,12 +51,11 @@ const StatArbEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* Tab bar */}
       <div className="flex gap-1 rounded-xl border border-border bg-card p-1.5 sm:p-2 overflow-x-auto scrollbar-hide">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
-            {t}
+            {t === "Foresight" ? "🔮 Foresight" : t}
           </button>
         ))}
       </div>
@@ -73,6 +71,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} />}
         {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} />}
         {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} />}
+        {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
     </div>
@@ -91,8 +90,6 @@ type Fmt = (v: number) => string;
 function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
-
-    // Per-asset GBM + Jump paths (252 day projections from REAL current prices)
     const assetPaths = assets.map(a => {
       const gbm = SA.gbmPath(a.price, a.mu, a.vol, 252);
       const jump = SA.jumpDiffusionPath(a.price, a.mu, a.vol, 252);
@@ -100,8 +97,6 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
       const { sigma } = SA.garch11(logRet);
       return { ticker: a.ticker, gbm, jump, sigma, price: a.price };
     });
-
-    // Normalized portfolio path (weighted sum)
     const days = 253;
     const portfolioGbm = Array.from({ length: days }, (_, d) =>
       assetPaths.reduce((s, ap, i) => s + (ap.gbm[d] / ap.price) * assets[i].weight, 0)
@@ -109,27 +104,18 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
     const portfolioJump = Array.from({ length: days }, (_, d) =>
       assetPaths.reduce((s, ap, i) => s + (ap.jump[d] / ap.price) * assets[i].weight, 0)
     );
-
-    // Combined chart: normalized returns (base = 100)
     const chart = Array.from({ length: days }, (_, d) => {
       const point: Record<string, any> = { day: d };
-      assetPaths.forEach(ap => {
-        point[`${ap.ticker}_gbm`] = (ap.gbm[d] / ap.price) * 100;
-      });
+      assetPaths.forEach(ap => { point[`${ap.ticker}_gbm`] = (ap.gbm[d] / ap.price) * 100; });
       point.portfolio_gbm = portfolioGbm[d] * 100;
       point.portfolio_jump = portfolioJump[d] * 100;
       return point;
     });
-
-    // Portfolio GARCH from weighted returns
     const portRet = SA.returns(portfolioGbm.map(v => v * 1000));
     const { sigma: portSigma } = SA.garch11(portRet);
     const garchChart = portSigma.map((s, i) => ({ day: i, sigma: s * Math.sqrt(252) * 100 }));
-
-    // Portfolio regime detection
     const { regimeProbs } = SA.hmmRegimeDetect(portRet);
     const regimeChart = regimeProbs.map((p, i) => ({ day: i, bull: p[2] || 0, neutral: p[1] || 0, bear: p[0] || 0 }));
-
     return { chart, garchChart, regimeChart, assetPaths };
   }, [assets]);
 
@@ -143,8 +129,6 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
       <p className="text-[9px] sm:text-[10px] text-muted-foreground">
         GBM: dS = μSdt + σSdW | Normalized returns (base=100) | Portfolio = Σ(wᵢ · Rᵢ)
       </p>
-
-      {/* Portfolio + all assets normalized chart */}
       <div className="h-56 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
@@ -152,20 +136,16 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
             <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
             <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} width={45} />
             <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
-            {/* Individual asset paths (thin) */}
             {assets.slice(0, 8).map((a, i) => (
               <Line key={a.ticker} dataKey={`${a.ticker}_gbm`} stroke={PATH_COLORS[i % PATH_COLORS.length]}
                 strokeWidth={0.8} dot={false} name={a.ticker} strokeOpacity={0.6} />
             ))}
-            {/* Portfolio aggregate (bold) */}
             <Line dataKey="portfolio_gbm" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} name="Portfolio" />
             <Line dataKey="portfolio_jump" stroke="hsl(var(--loss))" strokeWidth={1.5} dot={false} name="Portfolio (Jump)" strokeDasharray="3 3" />
             <ReferenceLine y={100} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.4} />
           </LineChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Asset summary table */}
       <div className="overflow-x-auto">
         <table className="w-full text-[10px] font-mono">
           <thead>
@@ -194,7 +174,6 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
           </tbody>
         </table>
       </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <p className="text-[9px] sm:text-[10px] font-bold text-foreground uppercase mb-2">Portfolio GARCH(1,1) Volatility</p>
@@ -236,7 +215,19 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
     const hVar95 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.95) * totalValue * Math.sqrt(10);
     const hVar99 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.99) * totalValue * Math.sqrt(10);
     const corr = cov.map((row, i) => row.map((v, j) => v / (Math.sqrt(cov[i][i]) * Math.sqrt(cov[j][j]) || 1)));
-    return { cov, corr, mcVar, hVar95, hVar99 };
+
+    // Per-asset risk contribution (marginal VaR approach)
+    const totalPortVol = Math.sqrt(
+      assets.reduce((s1, a1, i) =>
+        s1 + assets.reduce((s2, a2, j) =>
+          s2 + a1.weight * a2.weight * cov[i][j], 0), 0)
+    );
+    const riskContrib = assets.map((a, i) => {
+      const marginal = assets.reduce((s, a2, j) => s + a2.weight * cov[i][j], 0) / (totalPortVol || 1);
+      return { ticker: a.ticker, marginalVaR: marginal * 1.645 * totalValue, pctContrib: (a.weight * marginal) / (totalPortVol || 1) * 100 };
+    });
+
+    return { cov, corr, mcVar, hVar95, hVar99, riskContrib };
   }, [assets, totalValue, portfolioMu, portfolioVol]);
 
   if (!data || assets.length === 0) return <EmptyMsg />;
@@ -251,9 +242,9 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
         <MetricCard label="MC CVaR 95%" value={fmt(data.mcVar.cvar)} color="text-warning" />
       </div>
 
-      {/* Correlation Matrix */}
+      {/* Correlation Heatmap */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Correlation Matrix</p>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Correlation Heatmap</p>
         <div className="overflow-x-auto">
           <table className="text-[10px] font-mono">
             <thead>
@@ -266,12 +257,45 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
               {data.corr.map((row, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 text-muted-foreground font-bold">{assets[i].ticker.slice(0, 6)}</td>
-                  {row.map((v, j) => (
-                    <td key={j} className="px-2 py-1 text-center" style={{
-                      backgroundColor: `hsl(${v > 0 ? "var(--gain)" : "var(--loss)"} / ${Math.abs(v) * 0.4})`,
-                      color: "hsl(var(--foreground))"
-                    }}>{v.toFixed(2)}</td>
-                  ))}
+                  {row.map((v, j) => {
+                    const absV = Math.abs(v);
+                    const hue = v > 0 ? 152 : 0;
+                    const sat = v > 0 ? 82 : 84;
+                    const light = v > 0 ? 42 : 55;
+                    return (
+                      <td key={j} className="px-2 py-1 text-center text-[9px] font-bold" style={{
+                        backgroundColor: `hsla(${hue}, ${sat}%, ${light}%, ${absV * 0.5})`,
+                        color: absV > 0.5 ? "white" : "hsl(var(--foreground))",
+                      }}>{v.toFixed(2)}</td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Risk Contribution Table */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Per-Asset Risk Contribution</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[10px] font-mono">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
+                <th className="px-2 py-1 text-right text-muted-foreground">Weight</th>
+                <th className="px-2 py-1 text-right text-muted-foreground">Marginal VaR</th>
+                <th className="px-2 py-1 text-right text-muted-foreground">% of Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.riskContrib.map((r, i) => (
+                <tr key={r.ticker} className="border-b border-border/50">
+                  <td className="px-2 py-1 font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{r.ticker}</td>
+                  <td className="px-2 py-1 text-right text-foreground">{(assets[i].weight * 100).toFixed(1)}%</td>
+                  <td className="px-2 py-1 text-right text-loss">{fmt(r.marginalVaR)}</td>
+                  <td className="px-2 py-1 text-right text-foreground">{r.pctContrib.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
@@ -323,11 +347,9 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
     const frontier = SA.markowitzFrontier(expRet, cov, 30);
     const rpWeights = SA.riskParityWeights(cov);
     const kellyFracs = assets.map(a => SA.kellyCriterion(a.mu > 0 ? 0.55 + a.mu * 0.5 : 0.45, 1 + a.mu));
-
     const frontierData = frontier.risks.map((r, i) => ({ risk: r * 100, return: frontier.returns[i] * 100 }));
     const rpData = rpWeights.map((w, i) => ({ ticker: assets[i].ticker, rp: w * 100, equal: 100 / assets.length, current: assets[i].weight * 100 }));
     const kellyData = assets.map((a, i) => ({ ticker: a.ticker, kelly: kellyFracs[i] * 100 }));
-
     return { frontierData, rpData, kellyData };
   }, [assets]);
 
@@ -382,15 +404,11 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
   );
 }
 
-/** PORTFOLIO-WIDE Time Series — Kalman + ARIMA for ALL assets */
 function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
-
-    // For each asset, generate synthetic history anchored to real buyPrice → currentPrice
     const assetSeries = assets.map(a => {
       const n = 120;
-      // Build history from buyPrice to currentPrice with realistic noise
       const totalReturn = Math.log(a.price / a.buyPrice);
       const dailyDrift = totalReturn / n;
       const prices: number[] = [a.buyPrice];
@@ -399,16 +417,12 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
         const nextPrice = prices[i - 1] * Math.exp(dailyDrift + noise);
         prices.push(Math.max(nextPrice, 0.01));
       }
-      // Anchor last price to actual current price
       const scale = a.price / prices[n];
       const scaledPrices = prices.map(p => p * scale);
-
       const forecast = SA.arimaForecast(scaledPrices, 30);
       const { filtered } = SA.kalmanFilter(scaledPrices);
       return { ticker: a.ticker, prices: scaledPrices, forecast, filtered };
     });
-
-    // Build normalized chart (base=100) for all assets
     const histLen = 121;
     const forecastLen = 30;
     const chart = Array.from({ length: histLen + forecastLen }, (_, i) => {
@@ -426,7 +440,6 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
       });
       return point;
     });
-
     return { chart, assetSeries, histLen };
   }, [assets]);
 
@@ -434,12 +447,8 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
 
   return (
     <div className="space-y-5">
-      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
-        Portfolio Time Series — {assets.length} Assets
-      </h3>
-      <p className="text-[10px] text-muted-foreground">
-        Kalman Filter (noise separation) + ARIMA Forecast (30d) | Normalized (base=100)
-      </p>
+      <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Time Series — {assets.length} Assets</h3>
+      <p className="text-[10px] text-muted-foreground">Kalman Filter (noise separation) + ARIMA Forecast (30d) | Normalized (base=100)</p>
       <div className="h-64 sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data.chart}>
@@ -461,18 +470,14 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Per-asset forecast table */}
       <div className="overflow-x-auto">
         <table className="w-full text-[10px] font-mono">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Current</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">30d Forecast</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Expected Δ</th>
-            </tr>
-          </thead>
+          <thead><tr className="border-b border-border">
+            <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Current</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">30d Forecast</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Expected Δ</th>
+          </tr></thead>
           <tbody>
             {data.assetSeries.map((as, i) => {
               const forecastEnd = as.forecast[as.forecast.length - 1] || as.prices[as.prices.length - 1];
@@ -533,16 +538,14 @@ function FactorModelPanel({ assets }: { assets: AssetDatum[] }) {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[10px] font-mono">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Alpha</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">R²</th>
-              {["Mkt β", "Size β", "Val β", "Mom β", "Qual β"].map(h => (
-                <th key={h} className="px-2 py-1 text-right text-muted-foreground">{h}</th>
-              ))}
-            </tr>
-          </thead>
+          <thead><tr className="border-b border-border">
+            <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Alpha</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">R²</th>
+            {["Mkt β", "Size β", "Val β", "Mom β", "Qual β"].map(h => (
+              <th key={h} className="px-2 py-1 text-right text-muted-foreground">{h}</th>
+            ))}
+          </tr></thead>
           <tbody>
             {data.results.map(r => (
               <tr key={r.ticker} className="border-b border-border/50">
@@ -578,31 +581,26 @@ function LiquidityPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
 
   if (assets.length === 0) return <EmptyMsg />;
 
-  // Show impact curves for ALL assets overlaid
   return (
     <div className="space-y-5">
       <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Liquidity & Market Impact</h3>
       <p className="text-[10px] text-muted-foreground">Almgren-Chriss model: Impact = η·σ·(V/ADV)^0.6</p>
-
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data[0]?.impacts || []}>
             <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-            <XAxis dataKey="participation" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} label={{ value: "Participation %", position: "bottom", fontSize: 9 }} />
+            <XAxis dataKey="participation" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
             <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `${v.toFixed(0)}bps`} width={45} />
             <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
             <Line dataKey="totalCostBps" stroke="hsl(var(--loss))" strokeWidth={2} dot name="Total Cost (bps)" />
           </LineChart>
         </ResponsiveContainer>
       </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {data.map((d, i) => (
           <div key={d.ticker} className="rounded-lg border border-border p-3">
             <p className="text-[10px] font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{d.ticker}</p>
-            <p className={`font-mono text-sm font-bold ${d.obi > 0 ? "text-gain" : "text-loss"}`}>
-              OBI: {(d.obi * 100).toFixed(1)}%
-            </p>
+            <p className={`font-mono text-sm font-bold ${d.obi > 0 ? "text-gain" : "text-loss"}`}>OBI: {(d.obi * 100).toFixed(1)}%</p>
             <p className="text-[8px] text-muted-foreground">{d.obi > 0 ? "Bid pressure" : "Ask pressure"}</p>
           </div>
         ))}
@@ -613,10 +611,9 @@ function LiquidityPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
 
 function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
   const mc = useMemo(() => {
-    return SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 30, true);
+    return SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 60, true);
   }, [totalValue, portfolioMu, portfolioVol]);
 
-  // Compute median path for highlighting
   const medianPath = useMemo(() => {
     const steps = mc.paths[0]?.length || 0;
     return Array.from({ length: steps }, (_, step) => {
@@ -625,20 +622,17 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     });
   }, [mc]);
 
-  // Normalize paths for 3D: X=day(0-10), Y=value(normalized), Z=pathIndex(0-10)
   const pathLines = useMemo(() => {
     const steps = mc.paths[0]?.length || 0;
-    const maxDay = 252;
     const pathCount = mc.paths.length;
     const minVal = Math.min(...mc.paths.flatMap(p => p));
     const maxVal = Math.max(...mc.paths.flatMap(p => p));
     const valRange = maxVal - minVal || 1;
-
     return mc.paths.map((path, pi) => {
       const points: [number, number, number][] = path.map((val, si) => {
-        const x = (si / (steps - 1)) * 10 - 5; // -5 to 5
-        const y = ((val - minVal) / valRange) * 6 - 3; // -3 to 3
-        const z = (pi / (pathCount - 1)) * 8 - 4; // -4 to 4
+        const x = (si / (steps - 1)) * 10 - 5;
+        const y = ((val - minVal) / valRange) * 6 - 3;
+        const z = (pi / (pathCount - 1)) * 8 - 4;
         return [x, y, z] as [number, number, number];
       });
       return points;
@@ -653,89 +647,137 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     return medianPath.map((val, si) => {
       const x = (si / (steps - 1)) * 10 - 5;
       const y = ((val - minVal) / valRange) * 6 - 3;
-      const z = 0;
-      return [x, y, z] as [number, number, number];
+      return [x, y, 0] as [number, number, number];
     });
   }, [medianPath, mc]);
+
+  // Additional statistics
+  const stats = useMemo(() => {
+    const profitPaths = mc.finalValues.filter(v => v > totalValue).length;
+    const profitProb = profitPaths / mc.finalValues.length;
+    const medianFinal = SA.percentile(mc.finalValues, 50);
+    const sortedFinals = [...mc.finalValues].sort((a, b) => a - b);
+    const m = SA.mean(mc.finalValues);
+    const s = SA.stddev(mc.finalValues);
+    const n = mc.finalValues.length;
+    const skewness = mc.finalValues.reduce((acc, v) => acc + Math.pow((v - m) / s, 3), 0) / n;
+    const sharpe = portfolioVol > 0 ? (portfolioMu - 0.04) / portfolioVol : 0; // rf=4%
+    return { profitProb, medianFinal, skewness, sharpe };
+  }, [mc, totalValue, portfolioMu, portfolioVol]);
+
+  // Histogram of final values
+  const histogramData = useMemo(() => {
+    const vals = mc.finalValues;
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const bins = 35, bw = (max - min) / bins;
+    return Array.from({ length: bins }, (_, i) => {
+      const lo = min + i * bw;
+      const mid = lo + bw / 2;
+      return { value: mid, count: vals.filter(v => v >= lo && v < lo + bw).length, isProfit: mid > totalValue };
+    });
+  }, [mc, totalValue]);
+
+  // Max Drawdown distribution
+  const ddHistData = useMemo(() => {
+    const vals = mc.maxDrawdownDist.map(v => v * 100);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const bins = 25, bw = (max - min) / bins;
+    return Array.from({ length: bins }, (_, i) => {
+      const lo = min + i * bw;
+      return { value: lo + bw / 2, count: vals.filter(v => v >= lo && v < lo + bw).length };
+    });
+  }, [mc]);
 
   return (
     <div className="space-y-5">
       <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths (3D)</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      
+      {/* Extended metrics */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         <MetricCard label="Expected Return" value={`${(mc.expectedReturn * 100).toFixed(1)}%`} color={mc.expectedReturn > 0 ? "text-gain" : "text-loss"} />
         <MetricCard label="VaR 95%" value={`${(mc.var95 * 100).toFixed(1)}%`} color="text-loss" />
         <MetricCard label="VaR 99%" value={`${(mc.var99 * 100).toFixed(1)}%`} color="text-loss" />
         <MetricCard label="CVaR 95%" value={`${(mc.cvar95 * 100).toFixed(1)}%`} color="text-warning" />
+        <MetricCard label="Sharpe Ratio" value={stats.sharpe.toFixed(2)} color={stats.sharpe > 0.5 ? "text-gain" : "text-warning"} />
+        <MetricCard label="P(Profit)" value={`${(stats.profitProb * 100).toFixed(0)}%`} color={stats.profitProb > 0.5 ? "text-gain" : "text-loss"} />
+        <MetricCard label="Median Final" value={fmt(stats.medianFinal)} color="text-foreground" />
+        <MetricCard label="Skewness" value={stats.skewness.toFixed(2)} color={stats.skewness > 0 ? "text-gain" : "text-loss"} />
         <MetricCard label="Avg Max DD" value={`${(SA.mean(mc.maxDrawdownDist) * 100).toFixed(1)}%`} color="text-loss" />
       </div>
+
+      {/* 3D Visualization */}
       <div className="h-[320px] sm:h-[480px] rounded-lg border border-border bg-background overflow-hidden">
         <Canvas camera={{ position: [8, 5, 10], fov: 50 }}>
           <ambientLight intensity={0.6} />
           <pointLight position={[10, 10, 10]} intensity={0.8} />
-
-          {/* Grid floor */}
-          <Grid
-            position={[0, -3.1, 0]}
-            args={[12, 10]}
-            cellSize={1}
-            cellThickness={0.5}
-            cellColor="#333"
-            sectionSize={5}
-            sectionThickness={1}
-            sectionColor="#555"
-            fadeDistance={30}
-            infiniteGrid={false}
-          />
-
-          {/* Simulation paths */}
+          <Grid position={[0, -3.1, 0]} args={[12, 10]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
           {pathLines.map((points, i) => (
-            <DreiLine
-              key={i}
-              points={points}
-              color={PATH_COLORS[i % PATH_COLORS.length]}
-              lineWidth={0.8}
-              transparent
-              opacity={0.35}
-            />
+            <DreiLine key={i} points={points} color={PATH_COLORS[i % PATH_COLORS.length]} lineWidth={0.8} transparent opacity={0.35} />
           ))}
-
-          {/* Median path - bold */}
-          <DreiLine
-            points={medianLine}
-            color="hsl(45, 100%, 60%)"
-            lineWidth={3}
-          />
-
-          {/* Axis labels */}
-          <Text position={[0, -3.5, -5]} fontSize={0.35} color="#888" anchorX="center">
-            Trading Days (0-252)
-          </Text>
-          <Text position={[-6, 0, 0]} fontSize={0.35} color="#888" rotation={[0, Math.PI / 2, 0]} anchorX="center">
-            Portfolio Value
-          </Text>
-          <Text position={[0, -3.5, 5]} fontSize={0.35} color="#888" anchorX="center">
-            Path Index
-          </Text>
-
-          {/* Reference plane at starting value */}
-          <mesh position={[0, -3 + (6 * 0.5), 0]} rotation={[0, 0, 0]}>
-            <planeGeometry args={[10, 8]} />
-            <meshBasicMaterial color="#666" transparent opacity={0.05} side={THREE.DoubleSide} />
-          </mesh>
-
-          <OrbitControls
-            enablePan
-            enableZoom
-            enableRotate
-            autoRotate
-            autoRotateSpeed={0.5}
-            maxPolarAngle={Math.PI / 1.5}
-          />
+          <DreiLine points={medianLine} color="hsl(45, 100%, 60%)" lineWidth={3} />
+          <Text position={[0, -3.5, -5]} fontSize={0.35} color="#888" anchorX="center">Trading Days (0-252)</Text>
+          <Text position={[-6, 0, 0]} fontSize={0.35} color="#888" rotation={[0, Math.PI / 2, 0]} anchorX="center">Portfolio Value</Text>
+          <Text position={[0, -3.5, 5]} fontSize={0.35} color="#888" anchorX="center">Path Index</Text>
+          <mesh position={[0, -3 + (6 * 0.5), 0]}><planeGeometry args={[10, 8]} /><meshBasicMaterial color="#666" transparent opacity={0.05} side={THREE.DoubleSide} /></mesh>
+          <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.5} maxPolarAngle={Math.PI / 1.5} />
         </Canvas>
       </div>
       <p className="text-[9px] text-muted-foreground text-center">
-        Drag to rotate · Scroll to zoom · Yellow line = median path · {mc.paths.length} sampled paths rendered
+        Drag to rotate · Scroll to zoom · Yellow = median · {mc.paths.length} paths rendered
       </p>
+
+      {/* Percentile Fan Chart */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Confidence Band Fan Chart (5th–95th Percentile)</p>
+        <div className="h-48 sm:h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={mc.percentileBands}>
+              <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+              <XAxis dataKey="day" tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} width={60} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => fmt(v)} />
+              <Area dataKey="p95" stackId="a" fill="hsl(var(--primary))" fillOpacity={0.08} stroke="none" name="95th" />
+              <Area dataKey="p75" stackId="b" fill="hsl(var(--primary))" fillOpacity={0.12} stroke="none" name="75th" />
+              <Area dataKey="p50" stackId="c" fill="none" stroke="hsl(var(--primary))" strokeWidth={2} name="Median" />
+              <Area dataKey="p25" stackId="d" fill="hsl(var(--loss))" fillOpacity={0.08} stroke="none" name="25th" />
+              <Area dataKey="p5" stackId="e" fill="hsl(var(--loss))" fillOpacity={0.12} stroke="none" name="5th" />
+              <ReferenceLine y={totalValue} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 3" strokeOpacity={0.5} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Final Value Distribution Histogram */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-[10px] font-bold text-foreground uppercase mb-2">Final Value Distribution</p>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={histogramData}>
+                <XAxis dataKey="value" tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => fmt(v)} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={30} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [v, "Paths"]} labelFormatter={v => `Value: ${fmt(Number(v))}`} />
+                <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+                  {histogramData.map((d, i) => <Cell key={i} fill={d.isProfit ? "hsl(var(--gain))" : "hsl(var(--loss))"} fillOpacity={0.65} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-foreground uppercase mb-2">Max Drawdown Distribution</p>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ddHistData}>
+                <XAxis dataKey="value" tick={{ fontSize: 7, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `${v.toFixed(0)}%`} />
+                <YAxis tick={{ fontSize: 8, fill: "hsl(var(--muted-foreground))" }} width={30} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} formatter={(v: number) => [v, "Paths"]} labelFormatter={v => `DD: ${Number(v).toFixed(1)}%`} />
+                <Bar dataKey="count" fill="hsl(var(--loss))" fillOpacity={0.55} radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -774,6 +816,34 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Per-asset impact breakdown */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Per-Asset Impact Breakdown</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[10px] font-mono">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
+                {results.map(r => <th key={r.name} className="px-2 py-1 text-right text-muted-foreground">{r.name.split(" ")[0]}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {assets.map((a, ai) => (
+                <tr key={a.ticker} className="border-b border-border/50">
+                  <td className="px-2 py-1 font-bold" style={{ color: PATH_COLORS[ai % PATH_COLORS.length] }}>{a.ticker}</td>
+                  {results.map((r, ri) => (
+                    <td key={ri} className={`px-2 py-1 text-right ${r.assetImpacts[ai] < -0.05 ? "text-loss font-bold" : r.assetImpacts[ai] < 0 ? "text-loss" : "text-gain"}`}>
+                      {(r.assetImpacts[ai] * 100).toFixed(1)}%
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {results.map(r => (
           <div key={r.name} className="rounded-lg border border-border p-2 text-center">
@@ -826,42 +896,29 @@ function StructuralFlowPanel({ assets }: { assets: AssetDatum[] }) {
   );
 }
 
-/** PORTFOLIO-WIDE Mean Reversion — OU + Hurst for ALL assets */
 function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
-
     const assetMR = assets.map(a => {
-      // Generate history anchored to real buyPrice → price
       const n = 120;
       const totalReturn = Math.log(a.price / a.buyPrice);
       const dailyDrift = totalReturn / n;
       const prices: number[] = [a.buyPrice];
-      for (let i = 1; i <= n; i++) {
-        prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
-      }
+      for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
       const scale = a.price / prices[n];
       const scaledPrices = prices.map(p => p * scale);
-
       const ou = SA.estimateOU(scaledPrices);
       const halfLife = SA.meanReversionHalfLife(ou.theta);
       const hurst = SA.hurstExponent(scaledPrices);
       const z = SA.zScore(a.price, scaledPrices);
       const snapProb = SA.snapBackProbability(a.price, ou, 20);
       const expectedSnap = ou.mu + (a.price - ou.mu) * Math.exp(-ou.theta * 20 / 252);
-
-      return {
-        ticker: a.ticker, price: a.price, ou, halfLife, hurst, z, snapProb, expectedSnap,
-        isStationary: hurst < 0.5, meanPrice: ou.mu,
-      };
+      return { ticker: a.ticker, price: a.price, ou, halfLife, hurst, z, snapProb, expectedSnap, isStationary: hurst < 0.5, meanPrice: ou.mu };
     });
-
-    // Summary chart: Z-scores for all assets
     const zChart = assetMR.map(a => ({
       ticker: a.ticker, z: a.z, hurst: a.hurst, halfLife: a.halfLife,
       snapProb: a.snapProb * 100, signal: Math.abs(a.z) > 2 && a.isStationary ? "STRONG" : Math.abs(a.z) > 1.5 && a.isStationary ? "MODERATE" : "NONE",
     }));
-
     return { assetMR, zChart };
   }, [assets]);
 
@@ -869,14 +926,8 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
-        Portfolio Mean Reversion — {assets.length} Assets
-      </h3>
-      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
-        Ornstein-Uhlenbeck: dX = θ(μ - X)dt + σdW | Half-life = ln(2)/θ
-      </p>
-
-      {/* Z-Score bar chart for all assets */}
+      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Mean Reversion — {assets.length} Assets</h3>
+      <p className="text-[9px] sm:text-[10px] text-muted-foreground">Ornstein-Uhlenbeck: dX = θ(μ - X)dt + σdW | Half-life = ln(2)/θ</p>
       <div className="h-48 sm:h-56">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data.zChart}>
@@ -895,23 +946,19 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
           </BarChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Full metrics table */}
       <div className="overflow-x-auto">
         <table className="w-full text-[10px] font-mono">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Price</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Mean (μ)</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Z-Score</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Hurst</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Half-Life</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Snap %</th>
-              <th className="px-2 py-1 text-right text-muted-foreground">Expected</th>
-              <th className="px-2 py-1 text-center text-muted-foreground">Signal</th>
-            </tr>
-          </thead>
+          <thead><tr className="border-b border-border">
+            <th className="px-2 py-1 text-left text-muted-foreground">Asset</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Price</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Mean (μ)</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Z-Score</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Hurst</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Half-Life</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Snap %</th>
+            <th className="px-2 py-1 text-right text-muted-foreground">Expected</th>
+            <th className="px-2 py-1 text-center text-muted-foreground">Signal</th>
+          </tr></thead>
           <tbody>
             {data.assetMR.map((a, i) => {
               const snapColor = a.snapProb > 0.6 ? "text-gain" : a.snapProb > 0.4 ? "text-warning" : "text-loss";
@@ -928,17 +975,13 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
                   <td className="px-2 py-1 text-right text-foreground">{a.halfLife.toFixed(1)}d</td>
                   <td className={`px-2 py-1 text-right ${snapColor}`}>{(a.snapProb * 100).toFixed(0)}%</td>
                   <td className={`px-2 py-1 text-right ${a.expectedSnap > a.price ? "text-gain" : "text-loss"}`}>{fmt(a.expectedSnap)}</td>
-                  <td className="px-2 py-1 text-center">
-                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-bold ${signalColor}`}>{signal}</span>
-                  </td>
+                  <td className="px-2 py-1 text-center"><span className={`rounded px-1.5 py-0.5 text-[8px] font-bold ${signalColor}`}>{signal}</span></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-
-      {/* Regime summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {data.assetMR.map((a, i) => (
           <div key={a.ticker} className={`rounded-lg border p-2 ${a.isStationary ? "border-gain/30 bg-gain/5" : "border-warning/30 bg-warning/5"}`}>
@@ -946,11 +989,160 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
               <span className={`h-2 w-2 rounded-full ${a.isStationary ? "bg-gain animate-pulse" : "bg-warning"}`} />
               <span className="text-[10px] font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{a.ticker}</span>
             </div>
-            <p className="text-[9px] text-muted-foreground">
-              {a.isStationary ? "Mean-reverting" : "Trending"} · H={a.hurst.toFixed(2)} · t½={a.halfLife.toFixed(0)}d
-            </p>
+            <p className="text-[9px] text-muted-foreground">{a.isStationary ? "Mean-reverting" : "Trending"} · H={a.hurst.toFixed(2)} · t½={a.halfLife.toFixed(0)}d</p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** UNIFIED FORESIGHT — Synthesizes all Stat Arb engines into one truth */
+function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
+  const foresight = useMemo(() => {
+    if (assets.length === 0) return null;
+
+    // 1. Monte Carlo
+    const mc = SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 10, true);
+    const profitProb = mc.finalValues.filter(v => v > totalValue).length / mc.finalValues.length;
+    const medianFinal = SA.percentile(mc.finalValues, 50);
+    const medianReturn = (medianFinal - totalValue) / totalValue;
+
+    // 2. VaR/CVaR
+    const mcVar = SA.monteCarloVaR(totalValue, portfolioMu, portfolioVol, 10, 5000);
+    const hVar95 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.95) * totalValue * Math.sqrt(10);
+
+    // 3. Mean Reversion per asset
+    const mrSignals = assets.map(a => {
+      const n = 120;
+      const totalReturn = Math.log(a.price / a.buyPrice);
+      const dailyDrift = totalReturn / n;
+      const prices: number[] = [a.buyPrice];
+      for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
+      const scale = a.price / prices[n];
+      const scaledPrices = prices.map(p => p * scale);
+      const ou = SA.estimateOU(scaledPrices);
+      const hurst = SA.hurstExponent(scaledPrices);
+      const z = SA.zScore(a.price, scaledPrices);
+      const snapProb = SA.snapBackProbability(a.price, ou, 20);
+      return { ticker: a.ticker, z, hurst, snapProb, isStationary: hurst < 0.5, ou };
+    });
+
+    // 4. Regime detection
+    const portReturns = Array.from({ length: 120 }, () => portfolioMu / 252 + portfolioVol / Math.sqrt(252) * SA.gaussianRandom());
+    const { currentRegime, transitionMatrix } = SA.hmmRegimeDetect(portReturns);
+    const regimeLabel = currentRegime === 2 ? "Bull" : currentRegime === 1 ? "Neutral" : "Bear";
+
+    // 5. Sharpe
+    const sharpe = portfolioVol > 0 ? (portfolioMu - 0.04) / portfolioVol : 0;
+
+    // 6. Stress worst case
+    const worstStress = SA.stressTest(
+      assets.map(a => a.weight),
+      assets.map(a => [a.beta, 0.3, 0.2, 0.3, 0.1]),
+      { name: "Black Swan", shocks: { Market: -0.25, Size: -0.20, Value: -0.10, Momentum: -0.15, Quality: -0.05 } }
+    );
+
+    // 7. Portfolio risk contribution
+    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    const cov = SA.covarianceMatrix(returnSeries);
+    const rpWeights = SA.riskParityWeights(cov);
+
+    // 8. Composite score (0-100)
+    const profitScore = profitProb * 30;
+    const sharpeScore = Math.min(20, Math.max(0, (sharpe + 1) * 10));
+    const mrScore = mrSignals.filter(s => s.isStationary && Math.abs(s.z) > 1).length * 5;
+    const regimeScore = currentRegime === 2 ? 20 : currentRegime === 1 ? 10 : 0;
+    const stressScore = Math.max(0, 20 + worstStress.portfolioImpact * 100);
+    const compositeScore = Math.min(100, Math.max(0, profitScore + sharpeScore + mrScore + regimeScore + stressScore));
+
+    // Per-asset verdict
+    const assetVerdicts = assets.map((a, i) => {
+      const mr = mrSignals[i];
+      let verdict: "ACCUMULATE" | "HOLD" | "REDUCE" | "EXIT" = "HOLD";
+      let reason = "";
+      if (mr.isStationary && mr.z < -1.5) { verdict = "ACCUMULATE"; reason = `Mean-reverting (H=${mr.hurst.toFixed(2)}), oversold (Z=${mr.z.toFixed(1)}), snap-back prob ${(mr.snapProb * 100).toFixed(0)}%`; }
+      else if (mr.isStationary && mr.z > 2) { verdict = "REDUCE"; reason = `Overbought (Z=${mr.z.toFixed(1)}), likely to revert, half-life ${SA.meanReversionHalfLife(mr.ou.theta).toFixed(0)}d`; }
+      else if (a.pnlPct < -20) { verdict = "EXIT"; reason = `Deep loss (${a.pnlPct.toFixed(1)}%), trending (H=${mr.hurst.toFixed(2)}), weak snap-back`; }
+      else if (a.mu > 0.08 && a.pnlPct > 0) { verdict = "ACCUMULATE"; reason = `Strong drift (μ=${(a.mu*100).toFixed(0)}%), positive momentum, favorable risk-reward`; }
+      else { reason = `Neutral signal. Vol=${(a.vol*100).toFixed(0)}%, Beta=${a.beta.toFixed(2)}`; }
+
+      const rpDelta = rpWeights[i] - a.weight;
+      return { ...a, verdict, reason, rpDelta, mr };
+    });
+
+    return {
+      compositeScore, profitProb, medianReturn, sharpe, regimeLabel,
+      mcVar: mcVar.var, hVar95, worstStress: worstStress.portfolioImpact,
+      avgMaxDD: SA.mean(mc.maxDrawdownDist), assetVerdicts, rpWeights,
+    };
+  }, [assets, totalValue, portfolioMu, portfolioVol]);
+
+  if (!foresight || assets.length === 0) return <EmptyMsg msg="Add assets to generate unified foresight" />;
+
+  const scoreColor = foresight.compositeScore > 65 ? "text-gain" : foresight.compositeScore > 40 ? "text-warning" : "text-loss";
+  const scoreBg = foresight.compositeScore > 65 ? "bg-gain/10 border-gain/30" : foresight.compositeScore > 40 ? "bg-warning/10 border-warning/30" : "bg-loss/10 border-loss/30";
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Brain className="h-5 w-5 text-primary" />
+        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Unified Mathematical Foresight</h3>
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        Synthesizes Monte Carlo · VaR/CVaR · Mean Reversion · Regime Detection · Factor Model · Stress Test · Risk Parity into one verdict
+      </p>
+
+      {/* Composite Score */}
+      <div className={`rounded-xl border p-5 text-center ${scoreBg}`}>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio Foresight Score</p>
+        <p className={`font-mono text-5xl font-black ${scoreColor}`}>{foresight.compositeScore.toFixed(0)}</p>
+        <p className="text-[10px] text-muted-foreground mt-1">/ 100</p>
+      </div>
+
+      {/* Key metrics grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MetricCard label="P(Profit 1Y)" value={`${(foresight.profitProb * 100).toFixed(0)}%`} color={foresight.profitProb > 0.5 ? "text-gain" : "text-loss"} />
+        <MetricCard label="Median Return" value={`${(foresight.medianReturn * 100).toFixed(1)}%`} color={foresight.medianReturn > 0 ? "text-gain" : "text-loss"} />
+        <MetricCard label="Sharpe Ratio" value={foresight.sharpe.toFixed(2)} color={foresight.sharpe > 0.5 ? "text-gain" : "text-warning"} />
+        <MetricCard label="Regime" value={foresight.regimeLabel} color={foresight.regimeLabel === "Bull" ? "text-gain" : foresight.regimeLabel === "Bear" ? "text-loss" : "text-warning"} />
+        <MetricCard label="VaR 95% (10d)" value={fmt(foresight.hVar95)} color="text-loss" />
+        <MetricCard label="MC VaR 95%" value={fmt(foresight.mcVar)} color="text-loss" />
+        <MetricCard label="Black Swan Impact" value={`${(foresight.worstStress * 100).toFixed(1)}%`} color="text-loss" />
+        <MetricCard label="Avg Max Drawdown" value={`${(foresight.avgMaxDD * 100).toFixed(1)}%`} color="text-loss" />
+      </div>
+
+      {/* Per-asset verdicts */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-3">Per-Asset Mathematical Verdict</p>
+        <div className="space-y-2">
+          {foresight.assetVerdicts.map((av, i) => {
+            const verdictColor: Record<string, string> = {
+              ACCUMULATE: "bg-gain/15 text-gain border-gain/30",
+              HOLD: "bg-warning/10 text-warning border-warning/30",
+              REDUCE: "bg-loss/10 text-loss border-loss/30",
+              EXIT: "bg-loss/20 text-loss border-loss/40",
+            };
+            return (
+              <div key={av.ticker} className={`rounded-lg border p-3 ${verdictColor[av.verdict] || ""}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{av.ticker}</span>
+                    <span className={`rounded px-2 py-0.5 text-[9px] font-mono font-bold uppercase ${verdictColor[av.verdict]}`}>{av.verdict}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[9px] font-mono">
+                    <span>W: {(av.weight * 100).toFixed(1)}%</span>
+                    <span className={av.rpDelta > 0.02 ? "text-gain" : av.rpDelta < -0.02 ? "text-loss" : "text-muted-foreground"}>
+                      RP Δ: {av.rpDelta > 0 ? "+" : ""}{(av.rpDelta * 100).toFixed(1)}%
+                    </span>
+                    <span className={av.pnlPct > 0 ? "text-gain" : "text-loss"}>P&L: {av.pnlPct.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <p className="text-[10px] opacity-80">{av.reason}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -964,9 +1156,10 @@ function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfol
         <StatusCard label="Market Data Feed" status="active" detail="Yahoo Finance · 8s polling" />
         <StatusCard label="GARCH Engine" status="active" detail={`σ = ${(portfolioVol * 100).toFixed(1)}% annualized`} />
         <StatusCard label="Regime Detector" status="active" detail="HMM 3-state portfolio-wide" />
-        <StatusCard label="Monte Carlo" status="active" detail="10K paths · portfolio-level" />
+        <StatusCard label="Monte Carlo" status="active" detail="10K paths · 60 rendered · 3D" />
         <StatusCard label="Factor Model" status="active" detail={`5-factor OLS · ${assets.length} assets`} />
         <StatusCard label="Mean Reversion" status="active" detail={`OU + Hurst · ${assets.length} assets`} />
+        <StatusCard label="Foresight Engine" status="active" detail="Unified composite scoring" />
       </div>
       <div className="rounded-lg border border-border p-4">
         <p className="text-[10px] font-bold text-foreground uppercase mb-2">Computation Architecture</p>
@@ -977,6 +1170,7 @@ function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfol
           <p>• Cholesky decomposition for correlated multi-asset simulations</p>
           <p>• Kalman filter + ARIMA forecast run on all {assets.length} assets</p>
           <p>• OU/Hurst mean reversion computed per-asset with portfolio Z-scores</p>
+          <p>• Foresight synthesizes all engines into composite score (0-100)</p>
         </div>
       </div>
     </div>

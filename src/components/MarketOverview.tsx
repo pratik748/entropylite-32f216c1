@@ -60,7 +60,10 @@ const MarketOverview = () => {
   const fetchMarketData = async (showLoading = true, force = false) => {
     if (showLoading) setLoading(true);
     try {
-      const { data: result, error } = await governedInvoke("market-data", { force });
+      const { data: result, error } = await governedInvoke("market-data", {
+        body: { region },
+        force,
+      });
       if (error) throw error;
       setData(result);
       setLastUpdate(new Date());
@@ -75,7 +78,7 @@ const MarketOverview = () => {
     fetchMarketData();
     intervalRef.current = setInterval(() => fetchMarketData(false), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+  }, [region]);
 
   if (loading && !data) {
     return (

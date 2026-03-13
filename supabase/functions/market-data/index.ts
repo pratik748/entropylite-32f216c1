@@ -51,6 +51,36 @@ async function fetchYahooQuote(symbol: string) {
   return null;
 }
 
+function getRegionContext(region: string) {
+  const regionMap: Record<string, { focus: string; indices: string; centralBank: string; currency: string }> = {
+    India: {
+      focus: "Indian equity markets (NIFTY 50, SENSEX, BANK NIFTY)",
+      indices: "NIFTY 50, SENSEX, BANK NIFTY",
+      centralBank: "RBI (Reserve Bank of India)",
+      currency: "INR/USD",
+    },
+    Europe: {
+      focus: "European markets (FTSE 100, DAX, CAC 40, Euro Stoxx 50)",
+      indices: "FTSE 100, DAX, CAC 40, Euro Stoxx 50",
+      centralBank: "ECB (European Central Bank)",
+      currency: "EUR/USD, GBP/USD",
+    },
+    Asia: {
+      focus: "Asian markets (Nikkei 225, Hang Seng, Shanghai Composite, KOSPI)",
+      indices: "Nikkei 225, Hang Seng, Shanghai, KOSPI",
+      centralBank: "BOJ, PBOC",
+      currency: "USD/JPY, USD/CNY",
+    },
+    US: {
+      focus: "US markets (S&P 500, NASDAQ, Dow Jones, Russell 2000)",
+      indices: "S&P 500, NASDAQ, Dow Jones, Russell 2000",
+      centralBank: "Federal Reserve",
+      currency: "DXY, USD",
+    },
+  };
+  return regionMap[region] || regionMap.US;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -58,6 +88,7 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
+    const region = body.region || "All";
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
@@ -126,24 +157,31 @@ serve(async (req) => {
 
     let aiMacro: any = null;
     try {
-      const sp500 = indexData.find(i => i?.name === "S&P 500");
-      const nifty = indexData.find(i => i?.name === "NIFTY 50");
+      const regionCtx = getRegionContext(region === "All" ? "US" : region);
+      
+      // Build region-specific index data for prompt
+      const relevantIndices = region === "All"
+        ? indexData
+        : indexData.filter((i: any) => i?.region === region || region === "All");
+      const indexSummary = relevantIndices.slice(0, 5).map((i: any) => `${i?.name}: ${i?.changePct?.toFixed(2)}%`).join(", ");
 
       const result = await callAI({
         provider,
         systemPrompt: "You are a global macro strategist. Return ONLY valid JSON, no markdown.",
-        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. S&P 500: ${sp500?.changePct?.toFixed(2) || "N/A"}%, NIFTY: ${nifty?.changePct?.toFixed(2) || "N/A"}%, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}
+        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus}.
 
-Provide:
+Key data: ${indexSummary}, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${regionCtx.currency}: ${region === "India" ? realUsdInr.toFixed(2) : region === "Europe" ? realEurUsd.toFixed(4) : "N/A"}
+
+Focus your analysis on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
 {
   "marketMood": "<Bullish|Bearish|Neutral|Cautious|Risk-Off>",
   "moodScore": <-100 to 100>,
-  "fiiFlow": "<direction and magnitude>",
+  "fiiFlow": "<direction and magnitude for ${region === "All" ? "global" : region} markets>",
   "diiFlow": "<direction and magnitude>",
-  "topMovers": [{"name": "<stock/index>", "change": <% number>}],
-  "keyEvents": ["<event1>", "<event2>", "<event3>"],
-  "outlook": "<3 sentence global market outlook>",
-  "sectorRotation": "<inflows vs outflows>",
+  "topMovers": [{"name": "<stock/index relevant to ${region === "All" ? "global" : region}>", "change": <% number>}],
+  "keyEvents": ["<event1 relevant to ${region === "All" ? "global" : region}>", "<event2>", "<event3>"],
+  "outlook": "<3 sentence ${region === "All" ? "global" : region} market outlook>",
+  "sectorRotation": "<inflows vs outflows for ${region === "All" ? "global" : region}>",
   "riskAppetite": "<1 sentence>"
 }`,
         maxTokens: 800,
@@ -151,7 +189,7 @@ Provide:
         provider,
       });
 
-      console.log(`market-data used provider: ${result.provider}`);
+      console.log(`market-data used provider: ${result.provider}, region: ${region}`);
       aiMacro = safeParseJSON(result.text);
     } catch (e) { console.error("AI macro error:", e); }
 
