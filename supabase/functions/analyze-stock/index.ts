@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,36 +169,13 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
       throw e;
     }
 
-    // Robust JSON parsing with truncation repair
+    // Robust JSON parsing with safeParseJSON
     let analysis: any;
     try {
-      analysis = JSON.parse(jsonStr);
-    } catch {
-      console.warn("Direct JSON parse failed, attempting repair...");
-      // Strip markdown fences
-      let cleaned = jsonStr.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      // Find the last complete top-level brace
-      let depth = 0, lastValid = -1;
-      for (let i = 0; i < cleaned.length; i++) {
-        if (cleaned[i] === "{") depth++;
-        else if (cleaned[i] === "}") { depth--; if (depth === 0) { lastValid = i; break; } }
-      }
-      if (lastValid > 0) {
-        try {
-          analysis = JSON.parse(cleaned.substring(0, lastValid + 1));
-          console.log("Repaired truncated JSON successfully");
-        } catch (e2) {
-          // Last resort: regex extract
-          const match = cleaned.match(/\{[\s\S]*\}/);
-          if (match) {
-            analysis = JSON.parse(match[0]);
-          } else {
-            throw e2;
-          }
-        }
-      } else {
-        throw new Error("Could not find valid JSON object in response");
-      }
+      analysis = safeParseJSON(jsonStr);
+    } catch (parseErr: any) {
+      console.error("JSON parse failed even after repair:", parseErr.message);
+      throw new Error(`JSON parse failed: ${parseErr.message}`);
     }
     if (currentPrice > 0) analysis.currentPrice = currentPrice;
     analysis.currency = currency;
