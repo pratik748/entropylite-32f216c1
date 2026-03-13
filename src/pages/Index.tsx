@@ -246,6 +246,7 @@ const IndexContent = () => {
                   <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} currency={analysis.currency} />
                   <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
                   <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
+                  <CompanyIntelligence ticker={analysis.ticker} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
                 </>
               )}
