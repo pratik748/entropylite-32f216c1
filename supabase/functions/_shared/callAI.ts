@@ -11,6 +11,7 @@ interface CallAIOptions {
   toolChoice?: any;
   model?: string;
   provider?: "cloudflare" | "mistral";
+  jsonMode?: boolean;
 }
 
 interface AIResult {
