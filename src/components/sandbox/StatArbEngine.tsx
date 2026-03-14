@@ -1642,7 +1642,7 @@ function ScoreGauge3D({ score }: { score: number }) {
   );
 }
 
-interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; }
+interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; urgency?: string; confidence?: number; entryPrice?: number; stopLoss?: number; takeProfit?: number; timeHorizon?: string; riskReward?: string; category?: string; priority?: number; }
 
 function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfolioVol: number }) {
   return (
