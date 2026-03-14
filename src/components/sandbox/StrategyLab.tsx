@@ -433,8 +433,9 @@ const InstructionGroup = ({ title, icon, instructions }: { title: string; icon: 
 );
 
 const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => {
-  const { holdings, fmt: fmtFn } = useNormalizedPortfolio([]);
-  const fmt = useCallback((v: number) => fmtFn(v), [fmtFn]);
+  const { baseCurrency } = useFX();
+  const sym = getCurrencySymbol(baseCurrency);
+  const fmt = useCallback((v: number) => `${sym}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, [sym]);
   const config = actionConfig[inst.action] || actionConfig.HOLD;
   const ActionIcon = config.icon;
   const urgency = urgencyConfig[inst.urgency] || urgencyConfig.THIS_WEEK;
