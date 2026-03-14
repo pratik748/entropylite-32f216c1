@@ -169,30 +169,31 @@ serve(async (req) => {
 
       const result = await callAI({
         provider,
-        systemPrompt: "You are a real-time geopolitical intelligence analyst for an institutional trading desk. Assess current global threats using the LIVE market data and news headlines provided. Your analysis must reflect the EXACT current conditions — not generic boilerplate. Return ONLY valid JSON, no markdown.",
+        systemPrompt: "You are a real-time geopolitical intelligence analyst. Return ONLY a single valid JSON object — no markdown, no commentary, no code fences.",
         userPrompt: `TIMESTAMP: ${timeStr}
-LIVE MARKET DATA: ${marketContext}
-FOREX STRESS: ${stressedCurrencies || "None >2%"}
-RECENT HEADLINES: ${headlines}
+LIVE MARKET: ${marketContext}
+FX STRESS: ${stressedCurrencies || "None >2%"}
+HEADLINES: ${headlines}
 
-Based on these REAL-TIME signals, provide your current geopolitical threat assessment.
-- If VIX is elevated (>25), risk score should reflect that
-- If gold/crude are surging, factor in safe-haven flows
-- If specific currencies are stressed, identify the geopolitical driver
-- Update conflict severity based on what headlines actually say RIGHT NOW
-
-Return 8-12 current conflicts as JSON:
-{"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.0-1.0,"type":"war|sanctions|unrest|terrorism|trade_war|cyber|energy","affectedAssets":["X"],"summary":"1-2 sentences reflecting CURRENT situation","nearTradeHub":"str","distanceKm":0,"escalationProb":0.0-1.0,"actionableIntel":"specific trading action"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high|medium|low","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":0-100,"regimeSignal":"stable|transition|crisis","keyThreats":["t1","t2","t3","t4"],"capitalFlowDirection":"risk-on|risk-off|mixed","safeHavenDemand":"low|moderate|high|extreme","intelligenceSummary":"3 sentences reflecting CURRENT market+geopolitical state"}`,
-        maxTokens: 2000,
-        temperature: 0.4,
+Assess current threats. Return JSON with this exact schema:
+{"conflicts":[{"name":"str","lat":0,"lng":0,"severity":0.0-1.0,"type":"war|sanctions|unrest|terrorism|trade_war|cyber|energy","affectedAssets":["TICKER"],"summary":"1 sentence","nearTradeHub":"str","distanceKm":0,"escalationProb":0.0-1.0,"actionableIntel":"str"}],"supplyChainRisks":[{"route":"str","startLat":0,"startLng":0,"endLat":0,"endLng":0,"riskLevel":"high|medium|low","reason":"str","affectedCommodities":["x"]}],"globalRiskScore":0-100,"regimeSignal":"stable|transition|crisis","keyThreats":["t1","t2","t3","t4"],"capitalFlowDirection":"risk-on|risk-off|mixed","safeHavenDemand":"low|moderate|high|extreme","intelligenceSummary":"2 sentences on current state"}
+Include 6-8 conflicts. Keep summaries SHORT.`,
+        maxTokens: 3500,
+        temperature: 0.3,
+        jsonMode: true,
         provider,
       });
 
       console.log(`geopolitical-data used provider: ${result.provider}`);
+      console.log(`AI response length: ${result.text.length}, first 200 chars: ${result.text.slice(0, 200)}`);
       const parsed = safeParseJSON(result.text);
-      if (parsed) {
+      if (parsed && parsed.conflicts?.length > 0) {
         geopoliticalInsights = parsed;
-        if (parsed.conflicts?.length > 0) conflictEvents = parsed.conflicts;
+        conflictEvents = parsed.conflicts;
+        console.log(`Parsed ${conflictEvents.length} conflicts successfully`);
+      } else if (parsed) {
+        geopoliticalInsights = parsed;
+        console.log("Parsed JSON but no conflicts array found, using fallback conflicts");
       } else {
         console.error("Failed to parse AI response, using fallback");
       }
