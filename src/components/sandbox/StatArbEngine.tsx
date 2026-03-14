@@ -1478,76 +1478,132 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
   );
 }
 
-/** 3D Forecast Surface — renders percentile bands as ridge lines in 3D space */
+/** 3D Probability Cone — professional Monte Carlo visualization */
 function ForecastSurface3D({ percentiles, buyPrice, currentPrice }: { percentiles: { day: number; p5: number; p25: number; p50: number; p75: number; p95: number }[]; buyPrice: number; currentPrice: number }) {
-  const { bands, priceMin, priceMax } = useMemo(() => {
+  const meshRef = useRef<THREE.Group>(null);
+
+  const { medianLine, innerGeo, outerGeo, priceMin, priceMax, buyY, curY } = useMemo(() => {
     const days = percentiles.length;
     const allPrices = percentiles.flatMap(p => [p.p5, p.p95]);
-    const priceMin = Math.min(...allPrices, buyPrice) * 0.95;
-    const priceMax = Math.max(...allPrices, buyPrice) * 1.05;
+    const priceMin = Math.min(...allPrices, buyPrice, currentPrice) * 0.97;
+    const priceMax = Math.max(...allPrices, buyPrice, currentPrice) * 1.03;
+    const priceRange = priceMax - priceMin || 1;
+    const xScale = 10 / (days - 1 || 1);
+    const yScale = 6 / priceRange;
+    const norm = (p: number) => (p - priceMin) * yScale - 3;
 
-    const bandKeys: (keyof typeof percentiles[0])[] = ["p5", "p25", "p50", "p75", "p95"];
-    const bands = bandKeys.map(key =>
-      percentiles.map((p, d) => ({
-        x: (d / (days - 1)) * 10 - 5,
-        y: ((p[key] as number) - priceMin) / (priceMax - priceMin) * 6 - 1,
-        price: p[key] as number,
-      }))
-    );
-    return { bands, priceMin, priceMax };
-  }, [percentiles, buyPrice]);
+    // Median line points
+    const medianLine = percentiles.map((p, d) => new THREE.Vector3(d * xScale - 5, norm(p.p50), 0));
 
-  const bandColors = ["#ef4444", "#f97316", "#22c55e", "#f97316", "#ef4444"];
-  const bandLabels = ["5th", "25th", "Median", "75th", "95th"];
-  const buyY = ((buyPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
-  const curY = ((currentPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
+    // Inner cone (25th-75th) as tube geometry
+    const innerShape: THREE.Vector3[] = [];
+    for (let d = 0; d < days; d++) {
+      innerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p25), -1));
+    }
+    for (let d = days - 1; d >= 0; d--) {
+      innerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p75), -1));
+    }
+
+    // Outer cone (5th-95th)
+    const outerShape: THREE.Vector3[] = [];
+    for (let d = 0; d < days; d++) {
+      outerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p5), 1));
+    }
+    for (let d = days - 1; d >= 0; d--) {
+      outerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p95), 1));
+    }
+
+    // Build buffer geometries for filled surfaces
+    const buildGeo = (topKey: "p75" | "p95", botKey: "p25" | "p5", zOff: number) => {
+      const verts: number[] = [];
+      const colors: number[] = [];
+      const step = 1;
+      for (let d = 0; d < days - step; d += step) {
+        const x0 = d * xScale - 5, x1 = (d + step) * xScale - 5;
+        const top0 = norm(percentiles[d][topKey]), top1 = norm(percentiles[d + step][topKey]);
+        const bot0 = norm(percentiles[d][botKey]), bot1 = norm(percentiles[d + step][botKey]);
+        const mid0 = (percentiles[d][topKey] + percentiles[d][botKey]) / 2;
+        const aboveBuy = mid0 > buyPrice;
+        const r = aboveBuy ? 0.13 : 0.85, g = aboveBuy ? 0.77 : 0.22, b = aboveBuy ? 0.37 : 0.22;
+        // Triangle 1
+        verts.push(x0, bot0, zOff, x1, bot1, zOff, x0, top0, zOff);
+        // Triangle 2
+        verts.push(x0, top0, zOff, x1, bot1, zOff, x1, top1, zOff);
+        for (let t = 0; t < 6; t++) colors.push(r, g, b);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      return geo;
+    };
+
+    const innerGeo = buildGeo("p75", "p25", 0);
+    const outerGeo = buildGeo("p95", "p5", 0);
+    const buyY = norm(buyPrice);
+    const curY = norm(currentPrice);
+
+    return { medianLine, innerGeo, outerGeo, priceMin, priceMax, buyY, curY };
+  }, [percentiles, buyPrice, currentPrice]);
+
+  // Animate pulse
+  useFrame(({ clock }) => {
+    if (meshRef.current) {
+      meshRef.current.children.forEach(child => {
+        if ((child as any).material?.opacity !== undefined && (child as any).userData?.pulse) {
+          (child as any).material.opacity = 0.06 + Math.sin(clock.getElapsedTime() * 2) * 0.02;
+        }
+      });
+    }
+  });
 
   return (
-    <group>
-      <Grid position={[0, -1.5, 0]} args={[12, 8]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
+    <group ref={meshRef}>
+      <Grid position={[0, -3.5, 0]} args={[14, 6]} cellSize={1} cellThickness={0.3} cellColor="#222" sectionSize={5} sectionThickness={0.8} sectionColor="#444" fadeDistance={30} infiniteGrid={false} />
 
-      {bands.map((band, bi) => {
-        const points = band.map(b => new THREE.Vector3(b.x, b.y, (bi - 2) * 1.5));
+      {/* Outer probability cone (5th-95th) */}
+      <mesh geometry={outerGeo}>
+        <meshStandardMaterial vertexColors transparent opacity={0.08} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {/* Inner probability cone (25th-75th) */}
+      <mesh geometry={innerGeo}>
+        <meshStandardMaterial vertexColors transparent opacity={0.2} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {/* Percentile ridge lines */}
+      {(["p5", "p25", "p50", "p75", "p95"] as const).map((key, bi) => {
+        const lineColors = ["#ef4444", "#f59e0b", "#22c55e", "#f59e0b", "#ef4444"];
+        const widths = [1, 1.5, 3, 1.5, 1];
+        const labels = ["5th", "25th", "Median", "75th", "95th"];
+        const allP = percentiles.flatMap(p => [p.p5, p.p95]);
+        const pMin = Math.min(...allP, buyPrice, currentPrice) * 0.97;
+        const pMax = Math.max(...allP, buyPrice, currentPrice) * 1.03;
+        const pRange = pMax - pMin || 1;
+        const norm = (v: number) => (v - pMin) * (6 / pRange) - 3;
+        const xScale = 10 / (percentiles.length - 1 || 1);
+        const pts = percentiles.map((p, d) => new THREE.Vector3(d * xScale - 5, norm(p[key]), bi === 2 ? 0.01 : 0));
         return (
-          <group key={bi}>
-            <DreiLine points={points} color={bandColors[bi]} lineWidth={bi === 2 ? 3 : 1.5} transparent opacity={bi === 2 ? 1 : 0.6} />
-            <Text position={[5.5, band[band.length - 1].y, (bi - 2) * 1.5]} fontSize={0.2} color={bandColors[bi]} anchorX="left">
-              {bandLabels[bi]}
-            </Text>
+          <group key={key}>
+            <DreiLine points={pts} color={lineColors[bi]} lineWidth={widths[bi]} transparent opacity={bi === 2 ? 1 : 0.5} />
+            <Text position={[5.3, pts[pts.length - 1].y, 0]} fontSize={0.18} color={lineColors[bi]} anchorX="left">{labels[bi]}</Text>
           </group>
         );
       })}
 
-      {(() => {
-        const p25 = bands[1];
-        const p75 = bands[3];
-        const step = Math.max(1, Math.floor(p25.length / 20));
-        return p25.filter((_, i) => i % step === 0).map((_, idx) => {
-          const i = idx * step;
-          if (i >= p25.length) return null;
-          return (
-            <mesh key={i} position={[p25[i].x, (p25[i].y + p75[i].y) / 2, 0]}>
-              <boxGeometry args={[10 / p25.length * step, Math.abs(p75[i].y - p25[i].y), 3]} />
-              <meshStandardMaterial color="#22c55e" transparent opacity={0.04} />
-            </mesh>
-          );
-        });
-      })()}
+      {/* Buy price reference */}
+      <DreiLine points={[new THREE.Vector3(-5, buyY, 0), new THREE.Vector3(5, buyY, 0)]} color="#eab308" lineWidth={1} dashed dashSize={0.2} gapSize={0.1} transparent opacity={0.5} />
+      <Text position={[-5.5, buyY, 0]} fontSize={0.18} color="#eab308" anchorX="right">Entry {buyPrice.toFixed(0)}</Text>
 
-      <mesh position={[0, buyY, 0]}>
-        <planeGeometry args={[10, 6]} />
-        <meshBasicMaterial color="#eab308" transparent opacity={0.06} side={THREE.DoubleSide} />
-      </mesh>
-      <Text position={[-5.3, buyY, 0]} fontSize={0.2} color="#eab308" anchorX="right">Entry</Text>
-
-      <Sphere args={[0.12, 12, 12]} position={[-5, curY, 0]}>
-        <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.8} />
+      {/* Current price marker */}
+      <Sphere args={[0.1, 16, 16]} position={[-5, curY, 0]}>
+        <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={1} />
       </Sphere>
-      <Text position={[-5.3, curY, 0]} fontSize={0.2} color="#3b82f6" anchorX="right">Now</Text>
+      <Text position={[-5.5, curY, 0]} fontSize={0.18} color="#3b82f6" anchorX="right">Now {currentPrice.toFixed(0)}</Text>
 
-      <Text position={[0, -2.2, -4]} fontSize={0.25} color="#666" anchorX="center">Trading Days →</Text>
-      <Text position={[-6, 2, 0]} fontSize={0.25} color="#666" rotation={[0, 0, Math.PI / 2]}>Price Level</Text>
-      <Text position={[0, -2.2, 4]} fontSize={0.25} color="#666" anchorX="center">Percentile Band</Text>
+      {/* Axis labels */}
+      <Text position={[0, -4, 0]} fontSize={0.2} color="#555" anchorX="center">Trading Days →</Text>
+      <Text position={[-6, 0, 0]} fontSize={0.2} color="#555" rotation={[0, 0, Math.PI / 2]}>Price Level</Text>
     </group>
   );
 }
