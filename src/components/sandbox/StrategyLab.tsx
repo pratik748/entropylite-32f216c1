@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Brain, Zap, AlertTriangle, Clock, Target, XCircle, CheckCircle, RefreshCw,
   Trash2, History, TrendingUp, TrendingDown, Shield, Activity, ArrowUpRight,
@@ -11,6 +11,8 @@ import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { getCurrencySymbol } from "@/lib/currency";
+import { useFX } from "@/hooks/useFX";
 import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -152,8 +154,8 @@ const StrategyLab = ({ stocks }: Props) => {
             type: inst.category,
             regime_fit: regime.regime,
             rationale: inst.rationale,
-            entry_rule: inst.entry_price ? `Enter at $${inst.entry_price}` : "Market order",
-            exit_rule: inst.take_profit_price ? `TP at $${inst.take_profit_price}` : "Trailing",
+            entry_rule: inst.entry_price ? `Enter at ${fmt(inst.entry_price)}` : "Market order",
+            exit_rule: inst.take_profit_price ? `TP at ${fmt(inst.take_profit_price)}` : "Trailing",
             stop_loss_pct: inst.stop_loss_price && inst.entry_price ? -Math.abs(((inst.stop_loss_price - inst.entry_price) / inst.entry_price) * 100) : -3,
             take_profit_pct: inst.take_profit_price && inst.entry_price ? ((inst.take_profit_price - inst.entry_price) / inst.entry_price) * 100 : 8,
             position_size_pct: 10,
@@ -433,6 +435,9 @@ const InstructionGroup = ({ title, icon, instructions }: { title: string; icon: 
 );
 
 const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => {
+  const { baseCurrency } = useFX();
+  const sym = getCurrencySymbol(baseCurrency);
+  const fmt = useCallback((v: number) => `${sym}${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, [sym]);
   const config = actionConfig[inst.action] || actionConfig.HOLD;
   const ActionIcon = config.icon;
   const urgency = urgencyConfig[inst.urgency] || urgencyConfig.THIS_WEEK;
@@ -495,19 +500,19 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
           <DetailCell label="Quantity" value={`${inst.quantity} shares`} />
         )}
         {inst.dollar_amount != null && inst.dollar_amount > 0 && (
-          <DetailCell label="Amount" value={`$${inst.dollar_amount.toLocaleString()}`} />
+          <DetailCell label="Amount" value={fmt(inst.dollar_amount)} />
         )}
         {inst.entry_price != null && inst.entry_price > 0 && (
-          <DetailCell label="Entry" value={`$${inst.entry_price.toFixed(2)}`} />
+          <DetailCell label="Entry" value={fmt(inst.entry_price)} />
         )}
         {inst.entry_zone_low != null && inst.entry_zone_high != null && inst.entry_zone_low > 0 && (
-          <DetailCell label="Entry Zone" value={`$${inst.entry_zone_low.toFixed(2)} – $${inst.entry_zone_high.toFixed(2)}`} />
+          <DetailCell label="Entry Zone" value={`${fmt(inst.entry_zone_low)} – ${fmt(inst.entry_zone_high)}`} />
         )}
         {inst.stop_loss_price != null && inst.stop_loss_price > 0 && (
-          <DetailCell label="Stop Loss" value={`$${inst.stop_loss_price.toFixed(2)}`} highlight="loss" />
+          <DetailCell label="Stop Loss" value={fmt(inst.stop_loss_price)} highlight="loss" />
         )}
         {inst.take_profit_price != null && inst.take_profit_price > 0 && (
-          <DetailCell label="Take Profit" value={`$${inst.take_profit_price.toFixed(2)}`} highlight="gain" />
+          <DetailCell label="Take Profit" value={fmt(inst.take_profit_price)} highlight="gain" />
         )}
         <DetailCell label="R:R" value={inst.risk_reward} />
         <DetailCell label="Horizon" value={inst.time_horizon} />
@@ -550,7 +555,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="absolute top-0" style={{ left: `${slPct}%`, transform: "translateX(-50%)" }}>
           <div className="w-[2px] h-9 mx-auto" style={{ background: LOSS_COLOR }} />
           <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: LOSS_COLOR }}>
-            SL ${levels.sl!.toFixed(0)}
+            SL {levels.sl!.toFixed(0)}
           </p>
         </div>
       )}
@@ -560,7 +565,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="w-2 h-2 rounded-full mx-auto border-2" style={{ borderColor: "hsl(0 0% 96%)", background: "hsl(0 0% 5%)" }} />
         <div className="w-[2px] h-6 mx-auto" style={{ background: "hsl(0 0% 60%)" }} />
         <p className="text-[8px] font-mono text-center whitespace-nowrap text-foreground font-bold">
-          ${levels.entry.toFixed(0)}
+          {levels.entry.toFixed(0)}
         </p>
       </div>
 
@@ -569,7 +574,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="absolute top-0" style={{ left: `${tpPct}%`, transform: "translateX(-50%)" }}>
           <div className="w-[2px] h-9 mx-auto" style={{ background: GAIN_COLOR }} />
           <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: GAIN_COLOR }}>
-            TP ${levels.tp!.toFixed(0)}
+            TP {levels.tp!.toFixed(0)}
           </p>
         </div>
       )}
