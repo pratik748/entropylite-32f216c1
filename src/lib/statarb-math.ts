@@ -807,3 +807,106 @@ export function omegaRatio(returns: number[], threshold = 0): number {
   const losses = returns.filter(r => r <= threshold).reduce((s, r) => s + (threshold - r), 0);
   return losses > 0 ? gains / losses : gains > 0 ? Infinity : 1;
 }
+
+// ─── 12. Multi-Horizon Forecast ─────────────────────────────────────
+
+export interface HorizonForecast {
+  horizon: number;
+  medianPrice: number;
+  pProfit: number;
+  pUp10: number;
+  pDown10: number;
+  expectedMove: number;
+  ci90: [number, number];
+}
+
+/** Multi-horizon GBM forecast with probability estimates */
+export function multiHorizonForecast(
+  price: number, mu: number, vol: number, horizons = [30, 60, 90]
+): HorizonForecast[] {
+  const nSims = 2000;
+  return horizons.map(h => {
+    const dt = h / 252;
+    const finals: number[] = [];
+    for (let i = 0; i < nSims; i++) {
+      const z = gaussianRandom();
+      const S = price * Math.exp((mu - 0.5 * vol * vol) * dt + vol * Math.sqrt(dt) * z);
+      finals.push(S);
+    }
+    finals.sort((a, b) => a - b);
+    const median = percentile(finals, 50);
+    return {
+      horizon: h,
+      medianPrice: median,
+      pProfit: finals.filter(v => v > price).length / nSims,
+      pUp10: finals.filter(v => v > price * 1.10).length / nSims,
+      pDown10: finals.filter(v => v < price * 0.90).length / nSims,
+      expectedMove: (median - price) / price,
+      ci90: [percentile(finals, 5), percentile(finals, 95)] as [number, number],
+    };
+  });
+}
+
+/** Direction & magnitude with arrow symbol */
+export function directionMagnitude(
+  mu: number, vol: number, horizon: number,
+  mrSignal?: { z: number; snapProb: number; isStationary: boolean }
+): { arrow: string; direction: string; magnitude: number; confidence: number } {
+  const dt = horizon / 252;
+  const expectedMove = (Math.exp(mu * dt) - 1) * 100;
+  let adjustedMove = expectedMove;
+
+  // Incorporate mean reversion signal
+  if (mrSignal && mrSignal.isStationary && Math.abs(mrSignal.z) > 1) {
+    const mrPull = -mrSignal.z * mrSignal.snapProb * 3; // % pull toward mean
+    adjustedMove = expectedMove * 0.5 + mrPull;
+  }
+
+  const volPct = vol * Math.sqrt(dt) * 100;
+  const snr = volPct > 0 ? Math.abs(adjustedMove) / volPct : 0;
+  const confidence = Math.min(0.95, 0.3 + snr * 0.4);
+
+  let arrow: string;
+  if (adjustedMove > 5) arrow = "↑";
+  else if (adjustedMove > 1.5) arrow = "↗";
+  else if (adjustedMove > -1.5) arrow = "→";
+  else if (adjustedMove > -5) arrow = "↘";
+  else arrow = "↓";
+
+  const direction = adjustedMove > 1 ? "Bullish" : adjustedMove < -1 ? "Bearish" : "Neutral";
+
+  return { arrow, direction, magnitude: adjustedMove, confidence };
+}
+
+/** Generate Monte Carlo fan paths for 3D surface visualization */
+export function forecastFanPaths(
+  price: number, mu: number, vol: number, days: number, nPaths: number
+): { paths: number[][]; percentiles: { day: number; p5: number; p25: number; p50: number; p75: number; p95: number }[] } {
+  const paths: number[][] = [];
+  const dayValues: number[][] = Array.from({ length: days + 1 }, () => []);
+  dayValues[0] = Array(nPaths).fill(price);
+
+  for (let p = 0; p < nPaths; p++) {
+    const path = [price];
+    let S = price;
+    for (let d = 1; d <= days; d++) {
+      const dW = gaussianRandom() * Math.sqrt(1 / 252);
+      S = S * Math.exp((mu - 0.5 * vol * vol) / 252 + vol * dW);
+      S = Math.max(S, 0.001);
+      path.push(S);
+      dayValues[d].push(S);
+    }
+    paths.push(path);
+  }
+
+  const percentiles = dayValues.map((vals, d) => ({
+    day: d,
+    p5: vals.length > 0 ? percentile(vals, 5) : price,
+    p25: vals.length > 0 ? percentile(vals, 25) : price,
+    p50: vals.length > 0 ? percentile(vals, 50) : price,
+    p75: vals.length > 0 ? percentile(vals, 75) : price,
+    p95: vals.length > 0 ? percentile(vals, 95) : price,
+  }));
+
+  return { paths, percentiles };
+}
