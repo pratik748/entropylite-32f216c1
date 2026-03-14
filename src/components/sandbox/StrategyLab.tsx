@@ -550,7 +550,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="absolute top-0" style={{ left: `${slPct}%`, transform: "translateX(-50%)" }}>
           <div className="w-[2px] h-9 mx-auto" style={{ background: LOSS_COLOR }} />
           <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: LOSS_COLOR }}>
-            SL ${levels.sl!.toFixed(0)}
+            SL {levels.sl!.toFixed(0)}
           </p>
         </div>
       )}
@@ -560,7 +560,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="w-2 h-2 rounded-full mx-auto border-2" style={{ borderColor: "hsl(0 0% 96%)", background: "hsl(0 0% 5%)" }} />
         <div className="w-[2px] h-6 mx-auto" style={{ background: "hsl(0 0% 60%)" }} />
         <p className="text-[8px] font-mono text-center whitespace-nowrap text-foreground font-bold">
-          ${levels.entry.toFixed(0)}
+          {levels.entry.toFixed(0)}
         </p>
       </div>
 
@@ -569,7 +569,7 @@ const PriceLevelChart = ({ levels, ticker }: { levels: { entry: number; sl: numb
         <div className="absolute top-0" style={{ left: `${tpPct}%`, transform: "translateX(-50%)" }}>
           <div className="w-[2px] h-9 mx-auto" style={{ background: GAIN_COLOR }} />
           <p className="text-[8px] font-mono text-center whitespace-nowrap" style={{ color: GAIN_COLOR }}>
-            TP ${levels.tp!.toFixed(0)}
+            TP {levels.tp!.toFixed(0)}
           </p>
         </div>
       )}

@@ -635,9 +635,9 @@ export default function CompanyIntelligence({ ticker }: Props) {
                           { label: "Median", value: data.narrative.analystTargets.median, fill: "hsl(30,90%,55%)" },
                           { label: "High", value: data.narrative.analystTargets.high, fill: "hsl(120,60%,45%)" },
                         ]} layout="vertical">
-                          <XAxis type="number" tick={{ fontSize: 9, fill: "hsl(220,10%,55%)" }} tickFormatter={v => `$${v}`} />
+                          <XAxis type="number" tick={{ fontSize: 9, fill: "hsl(220,10%,55%)" }} tickFormatter={v => `${getCurrencySymbol(data.narrative?.currency)}${v}`} />
                           <YAxis dataKey="label" type="category" tick={{ fontSize: 9, fill: "hsl(220,10%,55%)" }} width={50} />
-                          <Tooltip contentStyle={{ background: "hsl(220,12%,13%)", border: "1px solid hsl(220,12%,20%)", fontSize: 10 }} formatter={(v: number) => `$${v}`} />
+                          <Tooltip contentStyle={{ background: "hsl(220,12%,13%)", border: "1px solid hsl(220,12%,20%)", fontSize: 10 }} formatter={(v: number) => `${getCurrencySymbol(data.narrative?.currency)}${v}`} />
                           <Bar dataKey="value" radius={[0, 3, 3, 0]}>
                             <Cell fill="hsl(0,70%,55%)" />
                             <Cell fill="hsl(30,90%,55%)" />
