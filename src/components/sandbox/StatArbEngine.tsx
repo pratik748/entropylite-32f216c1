@@ -1118,6 +1118,63 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     };
   }, [assets, totalValue, portfolioMu, portfolioVol]);
 
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTrades, setAiTrades] = useState<any>(null);
+
+  const executeAIStrategy = useCallback(async () => {
+    if (!foresight) return;
+    setAiLoading(true);
+    try {
+      const body = {
+        regime: foresight.regimeLabel,
+        vix: (foresight.fragility * 18).toFixed(0),
+        moodScore: Math.round(foresight.compositeScore),
+        sectors: assets.map(a => ({ name: a.sector || a.ticker, changePct: a.pnlPct })),
+        portfolio: assets.map(a => ({
+          ticker: a.ticker,
+          quantity: Math.round(a.value / (a.price || 1)),
+          currentPrice: a.price,
+          buyPrice: a.buyPrice,
+          pnlPct: a.pnlPct,
+          weightPct: a.weight * 100,
+        })),
+        keyEvents: [`Regime: ${foresight.regimeLabel}`, `Fragility: ${foresight.fragility.toFixed(2)}`, `VaR95: ${fmt(foresight.hVar95)}`],
+        outlook: `Composite Score ${foresight.compositeScore.toFixed(0)}/100 · P(profit)=${(foresight.profitProb * 100).toFixed(0)}% · Sharpe=${foresight.sharpe.toFixed(2)}`,
+        provider: "google",
+      };
+      const { data, error } = await governedInvoke<any>("strategy-generate", { body });
+      if (error || !data?.instructions) {
+        toast.error("AI strategy generation failed");
+        // Fallback to math-based trades
+        executeRebalance();
+      } else {
+        setAiTrades(data);
+        const trades: TradeInstruction[] = (data.instructions || []).map((inst: any) => ({
+          ticker: inst.ticker,
+          action: inst.action,
+          shares: inst.quantity || 0,
+          dollarAmount: inst.dollar_amount || 0,
+          reason: inst.rationale || "",
+          urgency: inst.urgency,
+          confidence: inst.confidence,
+          entryPrice: inst.entry_price,
+          stopLoss: inst.stop_loss_price,
+          takeProfit: inst.take_profit_price,
+          timeHorizon: inst.time_horizon,
+          riskReward: inst.risk_reward,
+          category: inst.category,
+          priority: inst.priority,
+        }));
+        setTradeCards(trades);
+        toast.success(`AI generated ${trades.length} institutional-grade trades`);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Strategy generation failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [foresight, assets, fmt, totalValue]);
+
   const executeRebalance = useCallback(() => {
     if (!foresight) return;
     const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
@@ -1128,39 +1185,6 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     }).filter(t => t.shares > 0);
     setTradeCards(trades);
     toast.success(`Generated ${trades.length} rebalance trades`);
-  }, [foresight, totalValue]);
-
-  const executeVerdicts = useCallback(() => {
-    if (!foresight) return;
-    const trades: TradeInstruction[] = foresight.assetVerdicts.filter(av => av.verdict !== "HOLD").map(av => {
-      const pct = av.verdict === "ACCUMULATE" ? 0.25 : av.verdict === "REDUCE" ? 0.5 : 1.0;
-      const dollarAmt = av.value * pct;
-      return { ticker: av.ticker, action: av.verdict === "ACCUMULATE" ? "BUY" : "SELL", shares: Math.round(dollarAmt / (av.price || 1)), dollarAmount: dollarAmt, reason: av.reason };
-    });
-    setTradeCards(trades);
-    toast.success(`Generated ${trades.length} verdict trades`);
-  }, [foresight]);
-
-  const executeHedge = useCallback(() => {
-    if (!foresight) return;
-    const hedgeSize = foresight.mcVar * 1.2;
-    const contracts = Math.max(1, Math.round(hedgeSize / 54000));
-    setTradeCards([
-      { ticker: "SPY", action: "BUY PUT", shares: contracts, dollarAmount: contracts * 540 * 0.03 * 100, reason: `Hedge ${fmt(hedgeSize)} VaR · ${contracts} ATM puts` },
-      { ticker: "SH", action: "BUY", shares: Math.round(hedgeSize * 0.3 / 40), dollarAmount: hedgeSize * 0.3, reason: "Inverse S&P 500 · 30% hedge" },
-    ]);
-    toast.success("Generated hedge portfolio");
-  }, [foresight, fmt]);
-
-  const executeKelly = useCallback(() => {
-    if (!foresight) return;
-    const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
-      const kellyW = foresight.kellyFracs[i] * 0.5;
-      const delta = kellyW * totalValue - av.weight * totalValue;
-      return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares: Math.abs(Math.round(delta / (av.price || 1))), dollarAmount: Math.abs(delta), reason: `½-Kelly: ${(av.weight * 100).toFixed(1)}% → ${(kellyW * 100).toFixed(1)}%` };
-    }).filter(t => t.shares > 0);
-    setTradeCards(trades);
-    toast.success(`Generated ${trades.length} Kelly trades`);
   }, [foresight, totalValue]);
 
   const copyTrade = useCallback((t: TradeInstruction) => {
