@@ -1002,6 +1002,7 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
 function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [tradeCards, setTradeCards] = useState<TradeInstruction[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<number>(0);
 
   const foresight = useMemo(() => {
     if (assets.length === 0) return null;
@@ -1054,7 +1055,6 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
     const tailDepMatrix = SA.tailDependenceMatrix(returnSeries);
     const cov = SA.covarianceMatrix(returnSeries);
-    const corr = cov.map((row, i) => row.map((v, j) => v / (Math.sqrt(cov[i][i]) * Math.sqrt(cov[j][j]) || 1)));
     const rpWeights = SA.riskParityWeights(cov);
     const kellyFracs = assets.map(a => SA.kellyCriterion(a.mu > 0 ? 0.55 + a.mu * 0.5 : 0.45, 1 + a.mu));
 
@@ -1062,6 +1062,15 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
       weights, assets.map(a => [a.beta, 0.3, 0.2, 0.3, 0.1]),
       { name: "Black Swan", shocks: { Market: -0.25, Size: -0.20, Value: -0.10, Momentum: -0.15, Quality: -0.05 } }
     );
+
+    // Per-asset forecasts with direction & magnitude
+    const assetForecasts = assets.map((a, i) => {
+      const mr = mrSignals[i];
+      const forecasts = SA.multiHorizonForecast(a.price, a.mu, a.vol, [30, 60, 90]);
+      const dm = SA.directionMagnitude(a.mu, a.vol, 60, { z: mr.z, snapProb: mr.snapProb, isStationary: mr.isStationary });
+      const fan = SA.forecastFanPaths(a.price, a.mu, a.vol, 60, 200);
+      return { forecasts, dm, fan };
+    });
 
     const profitScore = profitProb * 25;
     const sharpeScore = Math.min(15, Math.max(0, (sharpe + 1) * 7.5));
@@ -1072,37 +1081,39 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     const fragilityPenalty = fragility > 1.5 ? -5 : fragility > 1.2 ? -2 : 0;
     const compositeScore = Math.min(100, Math.max(0, profitScore + sharpeScore + mrScore + regimeScore + stressScore + diversificationScore + fragilityPenalty));
 
+    // Dynamic verdicts using multi-signal synthesis
     const assetVerdicts = assets.map((a, i) => {
       const mr = mrSignals[i];
+      const fc = assetForecasts[i];
+      const dm = fc.dm;
+      const f60 = fc.forecasts.find(f => f.horizon === 60);
+
       let verdict: "ACCUMULATE" | "HOLD" | "REDUCE" | "EXIT" = "HOLD";
       let reason = "";
-      if (mr.isStationary && mr.z < -1.5) { verdict = "ACCUMULATE"; reason = `Mean-reverting (H=${mr.hurst.toFixed(2)}), oversold (Z=${mr.z.toFixed(1)}), snap-back ${(mr.snapProb * 100).toFixed(0)}%`; }
-      else if (mr.isStationary && mr.z > 2) { verdict = "REDUCE"; reason = `Overbought (Z=${mr.z.toFixed(1)}), revert half-life ${SA.meanReversionHalfLife(mr.ou.theta).toFixed(0)}d`; }
-      else if (a.pnlPct < -20) { verdict = "EXIT"; reason = `Deep loss (${a.pnlPct.toFixed(1)}%), trending (H=${mr.hurst.toFixed(2)})`; }
-      else if (a.mu > 0.08 && a.pnlPct > 0) { verdict = "ACCUMULATE"; reason = `Strong drift (μ=${(a.mu*100).toFixed(0)}%), positive momentum`; }
-      else { reason = `Neutral. Vol=${(a.vol*100).toFixed(0)}%, β=${a.beta.toFixed(2)}`; }
-      const rpDelta = rpWeights[i] - a.weight;
-      return { ...a, verdict, reason, rpDelta, mr, kellyFrac: kellyFracs[i], optHorizon: mr.optHorizon };
-    });
 
-    const riskSurfaceData = assets.map((a, i) => ({
-      ticker: a.ticker, x: i, y: a.weight * a.vol, z: a.mu, weight: a.weight, verdict: assetVerdicts[i].verdict,
-      color: assetVerdicts[i].verdict === "ACCUMULATE" ? "#22c55e" : assetVerdicts[i].verdict === "HOLD" ? "#eab308" : assetVerdicts[i].verdict === "REDUCE" ? "#f97316" : "#ef4444",
-    }));
+      const bullScore = ((f60?.pProfit || 0.5) - 0.5) * 40 + dm.magnitude * 2 + (currentRegime === 2 ? 5 : currentRegime === 0 ? -5 : 0) + (mr.isStationary && mr.z < -1 ? mr.snapProb * 15 : 0);
+      const bearScore = (0.5 - (f60?.pProfit || 0.5)) * 40 - dm.magnitude * 2 - (currentRegime === 2 ? 5 : currentRegime === 0 ? -5 : 0) + (mr.isStationary && mr.z > 1.5 ? 10 : 0) + (fragility > 1.4 ? 5 : 0);
 
-    const corrEdges: { from: number; to: number; corr: number }[] = [];
-    for (let i = 0; i < assets.length; i++) {
-      for (let j = i + 1; j < assets.length; j++) {
-        if (Math.abs(corr[i][j]) > 0.15) corrEdges.push({ from: i, to: j, corr: corr[i][j] });
+      if (bullScore > 12) {
+        verdict = "ACCUMULATE";
+        reason = `${dm.arrow} ${dm.direction} · P(profit)=${((f60?.pProfit || 0) * 100).toFixed(0)}% · Expected ${dm.magnitude > 0 ? "+" : ""}${dm.magnitude.toFixed(1)}% · ${mr.isStationary ? `MR Z=${mr.z.toFixed(1)}` : `Trend H=${mr.hurst.toFixed(2)}`}`;
+      } else if (bearScore > 12) {
+        verdict = a.pnlPct < -15 && bearScore > 18 ? "EXIT" : "REDUCE";
+        reason = `${dm.arrow} ${dm.direction} · P(loss)=${((1 - (f60?.pProfit || 0.5)) * 100).toFixed(0)}% · Expected ${dm.magnitude.toFixed(1)}% · Fragility=${fragility.toFixed(1)}`;
+      } else {
+        reason = `${dm.arrow} Neutral · P(profit)=${((f60?.pProfit || 0.5) * 100).toFixed(0)}% · Vol=${(a.vol * 100).toFixed(0)}% · β=${a.beta.toFixed(2)}`;
       }
-    }
+
+      const rpDelta = rpWeights[i] - a.weight;
+      return { ...a, verdict, reason, rpDelta, mr, kellyFrac: kellyFracs[i], optHorizon: mr.optHorizon, dm: fc.dm, forecasts: fc.forecasts };
+    });
 
     return {
       compositeScore, profitProb, medianReturn, sharpe, sortino, calmar, omega,
       regimeLabel, currentRegime, entropy, eRatio, fragility, kurt,
       mcVar: mcVar.var, hVar95, worstStress: worstStress.portfolioImpact,
       avgMaxDD, assetVerdicts, rpWeights, kellyFracs, rcVaR,
-      tailDepMatrix, riskSurfaceData, corrEdges, corr, transitionMatrix, mc,
+      tailDepMatrix, transitionMatrix, mc, assetForecasts,
     };
   }, [assets, totalValue, portfolioMu, portfolioVol]);
 
@@ -1159,8 +1170,11 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
 
   if (!foresight || assets.length === 0) return <EmptyMsg msg="Add assets to generate unified foresight" />;
 
-  const scoreColor = foresight.compositeScore > 65 ? "text-gain" : foresight.compositeScore > 40 ? "text-warning" : "text-loss";
   const scoreBorder = foresight.compositeScore > 65 ? "border-gain/30" : foresight.compositeScore > 40 ? "border-warning/30" : "border-loss/30";
+  const sel = Math.min(selectedAsset, assets.length - 1);
+  const selAsset = assets[sel];
+  const selForecast = foresight.assetForecasts[sel];
+  const selVerdict = foresight.assetVerdicts[sel];
 
   return (
     <div className="space-y-5">
@@ -1169,8 +1183,8 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
           <Brain className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Foresight Command Center</h3>
-          <p className="text-[9px] text-muted-foreground font-mono">MC · VaR · OU · HMM · ENTROPY · FRAGILITY · KELLY · TAIL-DEP · REGIME-CVAR</p>
+          <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Foresight — The Future Machine</h3>
+          <p className="text-[9px] text-muted-foreground font-mono">MC-FORECAST · DIRECTION-MAG · OU-MEAN-REVERSION · REGIME-CVAR · FRAGILITY · KELLY</p>
         </div>
       </div>
 
@@ -1202,39 +1216,77 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
         </div>
       </div>
 
-      {/* 3D Risk Surface */}
+      {/* Asset Selector */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <p className="text-[10px] font-bold text-foreground uppercase">Forecast Asset:</p>
+        {assets.map((a, i) => (
+          <button key={a.ticker} onClick={() => setSelectedAsset(i)}
+            className={`rounded-lg px-3 py-1.5 text-[10px] font-mono font-bold transition-all border ${sel === i ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/40"}`}>
+            {a.ticker}
+          </button>
+        ))}
+      </div>
+
+      {/* 3D Directional Forecast Surface */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">3D Risk-Return Surface</p>
-        <div className="h-[300px] sm:h-[400px] rounded-lg border border-border bg-background overflow-hidden">
-          <Canvas camera={{ position: [6, 4, 8], fov: 50 }}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] font-bold text-foreground uppercase">3D Forecast Surface — {selAsset.ticker}</p>
+          <div className="flex items-center gap-2">
+            <span className={`text-lg ${selVerdict.dm.magnitude > 0 ? "text-gain" : "text-loss"}`}>{selVerdict.dm.arrow}</span>
+            <span className={`text-[11px] font-bold ${selVerdict.dm.direction === "Bullish" ? "text-gain" : selVerdict.dm.direction === "Bearish" ? "text-loss" : "text-warning"}`}>
+              {selVerdict.dm.direction} · {selVerdict.dm.magnitude > 0 ? "+" : ""}{selVerdict.dm.magnitude.toFixed(1)}%
+            </span>
+            <span className="text-[9px] text-muted-foreground font-mono">conf: {(selVerdict.dm.confidence * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+        <div className="h-[320px] sm:h-[420px] rounded-lg border border-border bg-background overflow-hidden">
+          <Canvas camera={{ position: [8, 5, 12], fov: 45 }}>
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={0.8} />
-            <Grid position={[0, -2, 0]} args={[12, 12]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
-            {foresight.riskSurfaceData.map((d, i) => {
-              const x = (d.x / Math.max(1, assets.length - 1)) * 8 - 4;
-              const y = d.y * 30 - 1;
-              const z = d.z * 10;
-              const size = 0.15 + d.weight * 2;
-              return (
-                <group key={d.ticker} position={[x, y, z]}>
-                  <Sphere args={[size, 16, 16]}>
-                    <meshStandardMaterial color={d.color} emissive={d.color} emissiveIntensity={0.4} transparent opacity={0.85} />
-                  </Sphere>
-                  <Text position={[0, size + 0.2, 0]} fontSize={0.25} color="#ccc" anchorX="center">{d.ticker}</Text>
-                </group>
-              );
-            })}
-            <mesh position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[10, 10]} />
-              <meshBasicMaterial color="#444" transparent opacity={0.05} side={THREE.DoubleSide} />
-            </mesh>
-            <Text position={[0, -2.5, -6]} fontSize={0.3} color="#666" anchorX="center">Asset Index</Text>
-            <Text position={[-5.5, 0, 0]} fontSize={0.3} color="#666" rotation={[0, Math.PI / 2, 0]}>Risk</Text>
-            <Text position={[0, -2.5, 6]} fontSize={0.3} color="#666" anchorX="center">Return</Text>
-            <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.3} />
+            <ForecastSurface3D
+              percentiles={selForecast.fan.percentiles}
+              buyPrice={selAsset.buyPrice}
+              currentPrice={selAsset.price}
+            />
+            <OrbitControls enablePan enableZoom enableRotate autoRotate autoRotateSpeed={0.2} />
           </Canvas>
         </div>
-        <p className="text-[8px] text-muted-foreground text-center mt-1">Sphere size = weight · 🟢 Accumulate · 🟡 Hold · 🟠 Reduce · 🔴 Exit</p>
+        <p className="text-[8px] text-muted-foreground text-center mt-1">
+          X = Trading Days · Y = Price Level · Z = Percentile Band · 🟢 Above entry · 🔴 Below entry · 200 MC paths
+        </p>
+      </div>
+
+      {/* Forecast Summary Cards */}
+      <div>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Forecast Summary — {selAsset.ticker} @ {fmt(selAsset.price)}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {selVerdict.forecasts.map(f => (
+            <div key={f.horizon} className="rounded-lg border border-border p-2.5 text-center">
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{f.horizon}d Target</p>
+              <p className={`font-mono text-sm font-bold ${f.medianPrice > selAsset.price ? "text-gain" : "text-loss"}`}>{fmt(f.medianPrice)}</p>
+              <p className="text-[8px] text-muted-foreground mt-0.5">P(profit): {(f.pProfit * 100).toFixed(0)}%</p>
+            </div>
+          ))}
+          {selVerdict.forecasts[1] && (
+            <>
+              <div className="rounded-lg border border-border p-2.5 text-center">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground">P(+10%)</p>
+                <p className="font-mono text-sm font-bold text-gain">{(selVerdict.forecasts[1].pUp10 * 100).toFixed(0)}%</p>
+                <p className="text-[8px] text-muted-foreground mt-0.5">60d horizon</p>
+              </div>
+              <div className="rounded-lg border border-border p-2.5 text-center">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground">P(−10%)</p>
+                <p className="font-mono text-sm font-bold text-loss">{(selVerdict.forecasts[1].pDown10 * 100).toFixed(0)}%</p>
+                <p className="text-[8px] text-muted-foreground mt-0.5">60d horizon</p>
+              </div>
+              <div className="rounded-lg border border-border p-2.5 text-center">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Optimal Entry</p>
+                <p className="font-mono text-sm font-bold text-foreground">{fmt(selVerdict.mr.ou.mu)}</p>
+                <p className="text-[8px] text-muted-foreground mt-0.5">OU mean ± 1σ</p>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Regime-Conditional VaR + Transition + Tail Dep */}
@@ -1293,9 +1345,9 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
         </div>
       </div>
 
-      {/* Per-Asset Verdicts */}
+      {/* Per-Asset Dynamic Verdicts */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-3">Per-Asset Verdict + Optimal Horizon</p>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-3">Dynamic Verdicts — Direction · Magnitude · Confidence</p>
         <div className="space-y-2">
           {foresight.assetVerdicts.map((av, i) => {
             const vc: Record<string, string> = { ACCUMULATE: "bg-gain/15 text-gain border-gain/30", HOLD: "bg-warning/10 text-warning border-warning/30", REDUCE: "bg-loss/10 text-loss border-loss/30", EXIT: "bg-loss/20 text-loss border-loss/40" };
@@ -1303,14 +1355,16 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
               <div key={av.ticker} className={`rounded-lg border p-3 ${vc[av.verdict] || ""}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
+                    <span className="text-lg">{av.dm.arrow}</span>
                     <span className="text-xs font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{av.ticker}</span>
                     <span className={`rounded px-2 py-0.5 text-[9px] font-mono font-bold uppercase ${vc[av.verdict]}`}>{av.verdict}</span>
                   </div>
                   <div className="flex items-center gap-3 text-[9px] font-mono">
+                    <span className={av.dm.magnitude > 0 ? "text-gain" : "text-loss"}>{av.dm.magnitude > 0 ? "+" : ""}{av.dm.magnitude.toFixed(1)}%</span>
+                    <span>Conf: {(av.dm.confidence * 100).toFixed(0)}%</span>
                     <span>Kelly: {(av.kellyFrac * 100).toFixed(0)}%</span>
                     <span>Horizon: {av.optHorizon.optimalDays}d</span>
                     <span className={av.optHorizon.riskRewardRatio > 1 ? "text-gain" : "text-loss"}>R/R: {av.optHorizon.riskRewardRatio.toFixed(1)}</span>
-                    <span className={av.rpDelta > 0.02 ? "text-gain" : av.rpDelta < -0.02 ? "text-loss" : "text-muted-foreground"}>RP Δ: {av.rpDelta > 0 ? "+" : ""}{(av.rpDelta * 100).toFixed(1)}%</span>
                   </div>
                 </div>
                 <p className="text-[10px] opacity-80">{av.reason}</p>
@@ -1365,36 +1419,76 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
   );
 }
 
-function ScoreGauge3D({ score }: { score: number }) {
-  const ringRef = useRef<THREE.Mesh>(null);
-  const particlesRef = useRef<THREE.Points>(null);
-  useFrame(({ clock }) => {
-    if (ringRef.current) ringRef.current.rotation.z = clock.getElapsedTime() * 0.3;
-    if (particlesRef.current) particlesRef.current.rotation.y = clock.getElapsedTime() * 0.5;
-  });
-  const scoreAngle = (score / 100) * Math.PI * 2;
-  const color = score > 65 ? "#22c55e" : score > 40 ? "#eab308" : "#ef4444";
-  const particlePositions = useMemo(() => {
-    const pos = new Float32Array(60 * 3);
-    for (let i = 0; i < 60; i++) {
-      const angle = (i / 60) * Math.PI * 2;
-      const r = 1.6 + Math.random() * 0.4;
-      pos[i * 3] = Math.cos(angle) * r;
-      pos[i * 3 + 1] = Math.sin(angle) * r;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
-    }
-    return pos;
-  }, []);
+/** 3D Forecast Surface — renders percentile bands as ridge lines in 3D space */
+function ForecastSurface3D({ percentiles, buyPrice, currentPrice }: { percentiles: { day: number; p5: number; p25: number; p50: number; p75: number; p95: number }[]; buyPrice: number; currentPrice: number }) {
+  const { bands, priceMin, priceMax } = useMemo(() => {
+    const days = percentiles.length;
+    const allPrices = percentiles.flatMap(p => [p.p5, p.p95]);
+    const priceMin = Math.min(...allPrices, buyPrice) * 0.95;
+    const priceMax = Math.max(...allPrices, buyPrice) * 1.05;
+
+    const bandKeys: (keyof typeof percentiles[0])[] = ["p5", "p25", "p50", "p75", "p95"];
+    const bands = bandKeys.map(key =>
+      percentiles.map((p, d) => ({
+        x: (d / (days - 1)) * 10 - 5,
+        y: ((p[key] as number) - priceMin) / (priceMax - priceMin) * 6 - 1,
+        price: p[key] as number,
+      }))
+    );
+    return { bands, priceMin, priceMax };
+  }, [percentiles, buyPrice]);
+
+  const bandColors = ["#ef4444", "#f97316", "#22c55e", "#f97316", "#ef4444"];
+  const bandLabels = ["5th", "25th", "Median", "75th", "95th"];
+  const buyY = ((buyPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
+  const curY = ((currentPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
+
   return (
     <group>
-      <mesh><torusGeometry args={[1.5, 0.08, 8, 64]} /><meshStandardMaterial color="#333" transparent opacity={0.3} /></mesh>
-      <mesh ref={ringRef}><torusGeometry args={[1.5, 0.12, 8, 64, scoreAngle]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} /></mesh>
-      <Text position={[0, 0.15, 0.1]} fontSize={0.7} color={color} anchorX="center" anchorY="middle" font={undefined}>{score.toFixed(0)}</Text>
-      <Text position={[0, -0.35, 0.1]} fontSize={0.2} color="#888" anchorX="center">/ 100</Text>
-      <points ref={particlesRef}>
-        <bufferGeometry><bufferAttribute attach="attributes-position" count={60} array={particlePositions} itemSize={3} /></bufferGeometry>
-        <pointsMaterial size={0.04} color={color} transparent opacity={0.4} />
-      </points>
+      <Grid position={[0, -1.5, 0]} args={[12, 8]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
+
+      {bands.map((band, bi) => {
+        const points = band.map(b => new THREE.Vector3(b.x, b.y, (bi - 2) * 1.5));
+        return (
+          <group key={bi}>
+            <DreiLine points={points} color={bandColors[bi]} lineWidth={bi === 2 ? 3 : 1.5} transparent opacity={bi === 2 ? 1 : 0.6} />
+            <Text position={[5.5, band[band.length - 1].y, (bi - 2) * 1.5]} fontSize={0.2} color={bandColors[bi]} anchorX="left">
+              {bandLabels[bi]}
+            </Text>
+          </group>
+        );
+      })}
+
+      {(() => {
+        const p25 = bands[1];
+        const p75 = bands[3];
+        const step = Math.max(1, Math.floor(p25.length / 20));
+        return p25.filter((_, i) => i % step === 0).map((_, idx) => {
+          const i = idx * step;
+          if (i >= p25.length) return null;
+          return (
+            <mesh key={i} position={[p25[i].x, (p25[i].y + p75[i].y) / 2, 0]}>
+              <boxGeometry args={[10 / p25.length * step, Math.abs(p75[i].y - p25[i].y), 3]} />
+              <meshStandardMaterial color="#22c55e" transparent opacity={0.04} />
+            </mesh>
+          );
+        });
+      })()}
+
+      <mesh position={[0, buyY, 0]}>
+        <planeGeometry args={[10, 6]} />
+        <meshBasicMaterial color="#eab308" transparent opacity={0.06} side={THREE.DoubleSide} />
+      </mesh>
+      <Text position={[-5.3, buyY, 0]} fontSize={0.2} color="#eab308" anchorX="right">Entry</Text>
+
+      <Sphere args={[0.12, 12, 12]} position={[-5, curY, 0]}>
+        <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.8} />
+      </Sphere>
+      <Text position={[-5.3, curY, 0]} fontSize={0.2} color="#3b82f6" anchorX="right">Now</Text>
+
+      <Text position={[0, -2.2, -4]} fontSize={0.25} color="#666" anchorX="center">Trading Days →</Text>
+      <Text position={[-6, 2, 0]} fontSize={0.25} color="#666" rotation={[0, 0, Math.PI / 2]}>Price Level</Text>
+      <Text position={[0, -2.2, 4]} fontSize={0.25} color="#666" anchorX="center">Percentile Band</Text>
     </group>
   );
 }
