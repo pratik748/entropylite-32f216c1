@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Brain, Zap, AlertTriangle, Clock, Target, XCircle, CheckCircle, RefreshCw,
   Trash2, History, TrendingUp, TrendingDown, Shield, Activity, ArrowUpRight,
