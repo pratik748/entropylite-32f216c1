@@ -495,19 +495,19 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
           <DetailCell label="Quantity" value={`${inst.quantity} shares`} />
         )}
         {inst.dollar_amount != null && inst.dollar_amount > 0 && (
-          <DetailCell label="Amount" value={`$${inst.dollar_amount.toLocaleString()}`} />
+          <DetailCell label="Amount" value={fmt(inst.dollar_amount)} />
         )}
         {inst.entry_price != null && inst.entry_price > 0 && (
-          <DetailCell label="Entry" value={`$${inst.entry_price.toFixed(2)}`} />
+          <DetailCell label="Entry" value={fmt(inst.entry_price)} />
         )}
         {inst.entry_zone_low != null && inst.entry_zone_high != null && inst.entry_zone_low > 0 && (
-          <DetailCell label="Entry Zone" value={`$${inst.entry_zone_low.toFixed(2)} – $${inst.entry_zone_high.toFixed(2)}`} />
+          <DetailCell label="Entry Zone" value={`${fmt(inst.entry_zone_low)} – ${fmt(inst.entry_zone_high)}`} />
         )}
         {inst.stop_loss_price != null && inst.stop_loss_price > 0 && (
-          <DetailCell label="Stop Loss" value={`$${inst.stop_loss_price.toFixed(2)}`} highlight="loss" />
+          <DetailCell label="Stop Loss" value={fmt(inst.stop_loss_price)} highlight="loss" />
         )}
         {inst.take_profit_price != null && inst.take_profit_price > 0 && (
-          <DetailCell label="Take Profit" value={`$${inst.take_profit_price.toFixed(2)}`} highlight="gain" />
+          <DetailCell label="Take Profit" value={fmt(inst.take_profit_price)} highlight="gain" />
         )}
         <DetailCell label="R:R" value={inst.risk_reward} />
         <DetailCell label="Horizon" value={inst.time_horizon} />
