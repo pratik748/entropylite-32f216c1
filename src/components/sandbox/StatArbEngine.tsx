@@ -1003,7 +1003,7 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
 }
 
 /** FUTURE GRAPH MACHINE — 2D Predictive Chart */
-function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
+function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sym }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt; sym: string }) {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [tradeCards, setTradeCards] = useState<TradeInstruction[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<number>(0);

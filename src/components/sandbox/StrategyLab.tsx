@@ -433,6 +433,8 @@ const InstructionGroup = ({ title, icon, instructions }: { title: string; icon: 
 );
 
 const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => {
+  const { holdings, fmt: fmtFn } = useNormalizedPortfolio([]);
+  const fmt = useCallback((v: number) => fmtFn(v), [fmtFn]);
   const config = actionConfig[inst.action] || actionConfig.HOLD;
   const ActionIcon = config.icon;
   const urgency = urgencyConfig[inst.urgency] || urgencyConfig.THIS_WEEK;
