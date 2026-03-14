@@ -185,10 +185,15 @@ Include 6-8 conflicts. Keep summaries SHORT.`,
       });
 
       console.log(`geopolitical-data used provider: ${result.provider}`);
+      console.log(`AI response length: ${result.text.length}, first 200 chars: ${result.text.slice(0, 200)}`);
       const parsed = safeParseJSON(result.text);
-      if (parsed) {
+      if (parsed && parsed.conflicts?.length > 0) {
         geopoliticalInsights = parsed;
-        if (parsed.conflicts?.length > 0) conflictEvents = parsed.conflicts;
+        conflictEvents = parsed.conflicts;
+        console.log(`Parsed ${conflictEvents.length} conflicts successfully`);
+      } else if (parsed) {
+        geopoliticalInsights = parsed;
+        console.log("Parsed JSON but no conflicts array found, using fallback conflicts");
       } else {
         console.error("Failed to parse AI response, using fallback");
       }
