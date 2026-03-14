@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Building2, Link2, Users, Briefcase, Handshake, Swords, Package, Scale, TrendingUp, MessageCircle, Loader2, AlertTriangle, BarChart3 } from "lucide-react";
+import { getCurrencySymbol } from "@/lib/currency";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useCompanyIntelligence, type CompanyIntelligence as CIData } from "@/hooks/useCompanyIntelligence";
