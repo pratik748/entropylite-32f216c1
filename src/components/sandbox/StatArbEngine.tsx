@@ -1493,6 +1493,40 @@ function ForecastSurface3D({ percentiles, buyPrice, currentPrice }: { percentile
   );
 }
 
+function ScoreGauge3D({ score }: { score: number }) {
+  const ringRef = useRef<THREE.Mesh>(null);
+  const particlesRef = useRef<THREE.Points>(null);
+  useFrame(({ clock }) => {
+    if (ringRef.current) ringRef.current.rotation.z = clock.getElapsedTime() * 0.3;
+    if (particlesRef.current) particlesRef.current.rotation.y = clock.getElapsedTime() * 0.5;
+  });
+  const scoreAngle = (score / 100) * Math.PI * 2;
+  const color = score > 65 ? "#22c55e" : score > 40 ? "#eab308" : "#ef4444";
+  const particlePositions = useMemo(() => {
+    const pos = new Float32Array(60 * 3);
+    for (let i = 0; i < 60; i++) {
+      const angle = (i / 60) * Math.PI * 2;
+      const r = 1.6 + Math.random() * 0.4;
+      pos[i * 3] = Math.cos(angle) * r;
+      pos[i * 3 + 1] = Math.sin(angle) * r;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+    }
+    return pos;
+  }, []);
+  return (
+    <group>
+      <mesh><torusGeometry args={[1.5, 0.08, 8, 64]} /><meshStandardMaterial color="#333" transparent opacity={0.3} /></mesh>
+      <mesh ref={ringRef}><torusGeometry args={[1.5, 0.12, 8, 64, scoreAngle]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} /></mesh>
+      <Text position={[0, 0.15, 0.1]} fontSize={0.7} color={color} anchorX="center" anchorY="middle" font={undefined}>{score.toFixed(0)}</Text>
+      <Text position={[0, -0.35, 0.1]} fontSize={0.2} color="#888" anchorX="center">/ 100</Text>
+      <points ref={particlesRef}>
+        <bufferGeometry><bufferAttribute attach="attributes-position" count={60} array={particlePositions} itemSize={3} /></bufferGeometry>
+        <pointsMaterial size={0.04} color={color} transparent opacity={0.4} />
+      </points>
+    </group>
+  );
+}
+
 interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; }
 
 function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfolioVol: number }) {
