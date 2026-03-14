@@ -998,7 +998,7 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   );
 }
 
-/** 3D FORESIGHT COMMAND CENTER — The Hub */
+/** 3D FORESIGHT COMMAND CENTER — The Future Machine */
 function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [tradeCards, setTradeCards] = useState<TradeInstruction[]>([]);
