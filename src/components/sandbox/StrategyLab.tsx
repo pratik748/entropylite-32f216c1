@@ -11,6 +11,8 @@ import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { getCurrencySymbol } from "@/lib/currency";
+import { useFX } from "@/hooks/useFX";
 import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
