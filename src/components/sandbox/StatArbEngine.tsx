@@ -1399,42 +1399,76 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
         </div>
       </div>
 
-      {/* Command Console */}
+      {/* AI Command Console */}
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <p className="text-[10px] font-bold text-foreground uppercase mb-3 flex items-center gap-2">
-          <Zap className="h-3.5 w-3.5 text-primary" /> Executable Command Console
+          <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Strategy Command Console
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { fn: executeRebalance, icon: Shield, color: "primary", title: "Risk Parity Rebalance", desc: "Equalize risk contributions" },
-            { fn: executeVerdicts, icon: TrendingUp, color: "gain", title: "Execute Verdicts", desc: "Trade on math signals" },
-            { fn: executeHedge, icon: Shield, color: "loss", title: "Hedge Portfolio", desc: "SPY puts + inverse ETFs" },
-            { fn: executeKelly, icon: BarChart3, color: "warning", title: "Optimize Kelly", desc: "Half-Kelly sizing" },
-          ].map(cmd => (
-            <button key={cmd.title} onClick={cmd.fn} className={`rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-${cmd.color}/40 hover:bg-${cmd.color}/5 transition-all`}>
-              <cmd.icon className={`h-3.5 w-3.5 text-${cmd.color} mb-1`} />
-              <p className="text-[10px] font-bold text-foreground">{cmd.title}</p>
-              <p className="text-[8px] text-muted-foreground">{cmd.desc}</p>
-            </button>
-          ))}
+        {aiTrades?.portfolio_assessment && (
+          <div className="rounded-lg border border-border bg-card p-3 mb-3">
+            <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">AI Portfolio Assessment</p>
+            <p className="text-[11px] text-foreground leading-relaxed">{aiTrades.portfolio_assessment}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <button onClick={executeAIStrategy} disabled={aiLoading}
+            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-3 text-left hover:bg-primary/20 transition-all col-span-2 sm:col-span-1 relative overflow-hidden">
+            {aiLoading ? <Loader2 className="h-4 w-4 text-primary mb-1 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary mb-1" />}
+            <p className="text-[10px] font-bold text-foreground">{aiLoading ? "Generating..." : "AI Strategy Generate"}</p>
+            <p className="text-[8px] text-muted-foreground">Full AI-driven trade instructions</p>
+          </button>
+          <button onClick={executeRebalance} className="rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary/5 transition-all">
+            <Shield className="h-3.5 w-3.5 text-primary mb-1" />
+            <p className="text-[10px] font-bold text-foreground">Risk Parity</p>
+            <p className="text-[8px] text-muted-foreground">Equalize risk contributions</p>
+          </button>
+          <button onClick={() => {
+            if (!foresight) return;
+            const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
+              const kellyW = foresight.kellyFracs[i] * 0.5;
+              const delta = kellyW * totalValue - av.weight * totalValue;
+              return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares: Math.abs(Math.round(delta / (av.price || 1))), dollarAmount: Math.abs(delta), reason: `½-Kelly: ${(av.weight * 100).toFixed(1)}% → ${(kellyW * 100).toFixed(1)}%` };
+            }).filter(t => t.shares > 0);
+            setTradeCards(trades);
+          }} className="rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-warning/40 hover:bg-warning/5 transition-all">
+            <BarChart3 className="h-3.5 w-3.5 text-warning mb-1" />
+            <p className="text-[10px] font-bold text-foreground">Kelly Optimal</p>
+            <p className="text-[8px] text-muted-foreground">Half-Kelly sizing</p>
+          </button>
         </div>
         {tradeCards.length > 0 && (
           <div className="mt-3 space-y-1.5">
-            <p className="text-[9px] font-bold text-foreground uppercase">Generated Trade Instructions</p>
-            {tradeCards.map((t, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${t.action.includes("BUY") ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}>{t.action}</span>
-                  <span className="text-[11px] font-bold text-foreground">{t.ticker}</span>
-                  <span className="text-[10px] text-muted-foreground font-mono">{t.shares} shares</span>
-                  <span className="text-[10px] text-muted-foreground font-mono">~{fmt(t.dollarAmount)}</span>
+            <p className="text-[9px] font-bold text-foreground uppercase">
+              {aiTrades ? "AI-Generated Trade Instructions" : "Generated Trade Instructions"}
+              {aiTrades && <span className="text-primary ml-2 font-normal">· Powered by institutional AI</span>}
+            </p>
+            {tradeCards.map((t: any, i: number) => (
+              <div key={i} className="rounded-lg border border-border bg-card px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${t.action?.includes("BUY") || t.action === "ADD" || t.action === "ACCUMULATE" ? "bg-gain/15 text-gain" : t.action === "HOLD" ? "bg-warning/15 text-warning" : "bg-loss/15 text-loss"}`}>{t.action}</span>
+                    <span className="text-[11px] font-bold text-foreground">{t.ticker}</span>
+                    {t.shares > 0 && <span className="text-[10px] text-muted-foreground font-mono">{t.shares} shares</span>}
+                    {t.dollarAmount > 0 && <span className="text-[10px] text-muted-foreground font-mono">~{fmt(t.dollarAmount)}</span>}
+                    {t.urgency && <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${t.urgency === "IMMEDIATE" ? "bg-loss/15 text-loss" : "bg-muted text-muted-foreground"}`}>{t.urgency}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {t.confidence != null && <span className="text-[9px] font-mono text-muted-foreground">Conf: {t.confidence}%</span>}
+                    {t.riskReward && <span className="text-[9px] font-mono text-gain">R/R: {t.riskReward}</span>}
+                    <button onClick={() => { navigator.clipboard.writeText(`${t.action} ${t.shares} ${t.ticker} (~${fmt(t.dollarAmount)}) — ${t.reason}`); setCopiedCmd(t.ticker); setTimeout(() => setCopiedCmd(null), 2000); }} className="rounded p-1 hover:bg-muted transition-colors">
+                      {copiedCmd === t.ticker ? <Check className="h-3 w-3 text-gain" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-muted-foreground max-w-[200px] truncate">{t.reason}</span>
-                  <button onClick={() => copyTrade(t)} className="rounded p-1 hover:bg-muted transition-colors">
-                    {copiedCmd === t.ticker ? <Check className="h-3 w-3 text-gain" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                  </button>
-                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">{t.reason}</p>
+                {(t.entryPrice || t.stopLoss || t.takeProfit) && (
+                  <div className="flex gap-3 mt-1 text-[9px] font-mono">
+                    {t.entryPrice && <span className="text-foreground">Entry: {fmt(t.entryPrice)}</span>}
+                    {t.stopLoss && <span className="text-loss">SL: {fmt(t.stopLoss)}</span>}
+                    {t.takeProfit && <span className="text-gain">TP: {fmt(t.takeProfit)}</span>}
+                    {t.timeHorizon && <span className="text-muted-foreground">{t.timeHorizon}</span>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
