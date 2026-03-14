@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
 } from "recharts";
-import { ScatterChart as ScatterIcon, Brain, Copy, Check, Zap, Shield, TrendingUp, BarChart3 } from "lucide-react";
+import { ScatterChart as ScatterIcon, Brain, Copy, Check, Zap, Shield, TrendingUp, BarChart3, Loader2, Sparkles } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Line as DreiLine, Grid, Sphere, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,6 +11,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
 import { toast } from "@/components/ui/sonner";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface Props { stocks: PortfolioStock[]; }
 
