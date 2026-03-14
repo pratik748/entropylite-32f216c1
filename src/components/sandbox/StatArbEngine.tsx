@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
 } from "recharts";
-import { ScatterChart as ScatterIcon, Brain, Copy, Check, Zap, Shield, TrendingUp, BarChart3 } from "lucide-react";
+import { ScatterChart as ScatterIcon, Brain, Copy, Check, Zap, Shield, TrendingUp, BarChart3, Loader2, Sparkles } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Line as DreiLine, Grid, Sphere, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,6 +11,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
 import { toast } from "@/components/ui/sonner";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -1117,6 +1118,63 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     };
   }, [assets, totalValue, portfolioMu, portfolioVol]);
 
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiTrades, setAiTrades] = useState<any>(null);
+
+  const executeAIStrategy = useCallback(async () => {
+    if (!foresight) return;
+    setAiLoading(true);
+    try {
+      const body = {
+        regime: foresight.regimeLabel,
+        vix: (foresight.fragility * 18).toFixed(0),
+        moodScore: Math.round(foresight.compositeScore),
+        sectors: assets.map(a => ({ name: a.sector || a.ticker, changePct: a.pnlPct })),
+        portfolio: assets.map(a => ({
+          ticker: a.ticker,
+          quantity: Math.round(a.value / (a.price || 1)),
+          currentPrice: a.price,
+          buyPrice: a.buyPrice,
+          pnlPct: a.pnlPct,
+          weightPct: a.weight * 100,
+        })),
+        keyEvents: [`Regime: ${foresight.regimeLabel}`, `Fragility: ${foresight.fragility.toFixed(2)}`, `VaR95: ${fmt(foresight.hVar95)}`],
+        outlook: `Composite Score ${foresight.compositeScore.toFixed(0)}/100 · P(profit)=${(foresight.profitProb * 100).toFixed(0)}% · Sharpe=${foresight.sharpe.toFixed(2)}`,
+        provider: "google",
+      };
+      const { data, error } = await governedInvoke<any>("strategy-generate", { body });
+      if (error || !data?.instructions) {
+        toast.error("AI strategy generation failed");
+        // Fallback to math-based trades
+        executeRebalance();
+      } else {
+        setAiTrades(data);
+        const trades: TradeInstruction[] = (data.instructions || []).map((inst: any) => ({
+          ticker: inst.ticker,
+          action: inst.action,
+          shares: inst.quantity || 0,
+          dollarAmount: inst.dollar_amount || 0,
+          reason: inst.rationale || "",
+          urgency: inst.urgency,
+          confidence: inst.confidence,
+          entryPrice: inst.entry_price,
+          stopLoss: inst.stop_loss_price,
+          takeProfit: inst.take_profit_price,
+          timeHorizon: inst.time_horizon,
+          riskReward: inst.risk_reward,
+          category: inst.category,
+          priority: inst.priority,
+        }));
+        setTradeCards(trades);
+        toast.success(`AI generated ${trades.length} institutional-grade trades`);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Strategy generation failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [foresight, assets, fmt, totalValue]);
+
   const executeRebalance = useCallback(() => {
     if (!foresight) return;
     const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
@@ -1127,39 +1185,6 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
     }).filter(t => t.shares > 0);
     setTradeCards(trades);
     toast.success(`Generated ${trades.length} rebalance trades`);
-  }, [foresight, totalValue]);
-
-  const executeVerdicts = useCallback(() => {
-    if (!foresight) return;
-    const trades: TradeInstruction[] = foresight.assetVerdicts.filter(av => av.verdict !== "HOLD").map(av => {
-      const pct = av.verdict === "ACCUMULATE" ? 0.25 : av.verdict === "REDUCE" ? 0.5 : 1.0;
-      const dollarAmt = av.value * pct;
-      return { ticker: av.ticker, action: av.verdict === "ACCUMULATE" ? "BUY" : "SELL", shares: Math.round(dollarAmt / (av.price || 1)), dollarAmount: dollarAmt, reason: av.reason };
-    });
-    setTradeCards(trades);
-    toast.success(`Generated ${trades.length} verdict trades`);
-  }, [foresight]);
-
-  const executeHedge = useCallback(() => {
-    if (!foresight) return;
-    const hedgeSize = foresight.mcVar * 1.2;
-    const contracts = Math.max(1, Math.round(hedgeSize / 54000));
-    setTradeCards([
-      { ticker: "SPY", action: "BUY PUT", shares: contracts, dollarAmount: contracts * 540 * 0.03 * 100, reason: `Hedge ${fmt(hedgeSize)} VaR · ${contracts} ATM puts` },
-      { ticker: "SH", action: "BUY", shares: Math.round(hedgeSize * 0.3 / 40), dollarAmount: hedgeSize * 0.3, reason: "Inverse S&P 500 · 30% hedge" },
-    ]);
-    toast.success("Generated hedge portfolio");
-  }, [foresight, fmt]);
-
-  const executeKelly = useCallback(() => {
-    if (!foresight) return;
-    const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
-      const kellyW = foresight.kellyFracs[i] * 0.5;
-      const delta = kellyW * totalValue - av.weight * totalValue;
-      return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares: Math.abs(Math.round(delta / (av.price || 1))), dollarAmount: Math.abs(delta), reason: `½-Kelly: ${(av.weight * 100).toFixed(1)}% → ${(kellyW * 100).toFixed(1)}%` };
-    }).filter(t => t.shares > 0);
-    setTradeCards(trades);
-    toast.success(`Generated ${trades.length} Kelly trades`);
   }, [foresight, totalValue]);
 
   const copyTrade = useCallback((t: TradeInstruction) => {
@@ -1374,42 +1399,76 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
         </div>
       </div>
 
-      {/* Command Console */}
+      {/* AI Command Console */}
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <p className="text-[10px] font-bold text-foreground uppercase mb-3 flex items-center gap-2">
-          <Zap className="h-3.5 w-3.5 text-primary" /> Executable Command Console
+          <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Strategy Command Console
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { fn: executeRebalance, icon: Shield, color: "primary", title: "Risk Parity Rebalance", desc: "Equalize risk contributions" },
-            { fn: executeVerdicts, icon: TrendingUp, color: "gain", title: "Execute Verdicts", desc: "Trade on math signals" },
-            { fn: executeHedge, icon: Shield, color: "loss", title: "Hedge Portfolio", desc: "SPY puts + inverse ETFs" },
-            { fn: executeKelly, icon: BarChart3, color: "warning", title: "Optimize Kelly", desc: "Half-Kelly sizing" },
-          ].map(cmd => (
-            <button key={cmd.title} onClick={cmd.fn} className={`rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-${cmd.color}/40 hover:bg-${cmd.color}/5 transition-all`}>
-              <cmd.icon className={`h-3.5 w-3.5 text-${cmd.color} mb-1`} />
-              <p className="text-[10px] font-bold text-foreground">{cmd.title}</p>
-              <p className="text-[8px] text-muted-foreground">{cmd.desc}</p>
-            </button>
-          ))}
+        {aiTrades?.portfolio_assessment && (
+          <div className="rounded-lg border border-border bg-card p-3 mb-3">
+            <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">AI Portfolio Assessment</p>
+            <p className="text-[11px] text-foreground leading-relaxed">{aiTrades.portfolio_assessment}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <button onClick={executeAIStrategy} disabled={aiLoading}
+            className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-3 text-left hover:bg-primary/20 transition-all col-span-2 sm:col-span-1 relative overflow-hidden">
+            {aiLoading ? <Loader2 className="h-4 w-4 text-primary mb-1 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary mb-1" />}
+            <p className="text-[10px] font-bold text-foreground">{aiLoading ? "Generating..." : "AI Strategy Generate"}</p>
+            <p className="text-[8px] text-muted-foreground">Full AI-driven trade instructions</p>
+          </button>
+          <button onClick={executeRebalance} className="rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-primary/40 hover:bg-primary/5 transition-all">
+            <Shield className="h-3.5 w-3.5 text-primary mb-1" />
+            <p className="text-[10px] font-bold text-foreground">Risk Parity</p>
+            <p className="text-[8px] text-muted-foreground">Equalize risk contributions</p>
+          </button>
+          <button onClick={() => {
+            if (!foresight) return;
+            const trades: TradeInstruction[] = foresight.assetVerdicts.map((av, i) => {
+              const kellyW = foresight.kellyFracs[i] * 0.5;
+              const delta = kellyW * totalValue - av.weight * totalValue;
+              return { ticker: av.ticker, action: delta > 0 ? "BUY" : "SELL", shares: Math.abs(Math.round(delta / (av.price || 1))), dollarAmount: Math.abs(delta), reason: `½-Kelly: ${(av.weight * 100).toFixed(1)}% → ${(kellyW * 100).toFixed(1)}%` };
+            }).filter(t => t.shares > 0);
+            setTradeCards(trades);
+          }} className="rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-warning/40 hover:bg-warning/5 transition-all">
+            <BarChart3 className="h-3.5 w-3.5 text-warning mb-1" />
+            <p className="text-[10px] font-bold text-foreground">Kelly Optimal</p>
+            <p className="text-[8px] text-muted-foreground">Half-Kelly sizing</p>
+          </button>
         </div>
         {tradeCards.length > 0 && (
           <div className="mt-3 space-y-1.5">
-            <p className="text-[9px] font-bold text-foreground uppercase">Generated Trade Instructions</p>
-            {tradeCards.map((t, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${t.action.includes("BUY") ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"}`}>{t.action}</span>
-                  <span className="text-[11px] font-bold text-foreground">{t.ticker}</span>
-                  <span className="text-[10px] text-muted-foreground font-mono">{t.shares} shares</span>
-                  <span className="text-[10px] text-muted-foreground font-mono">~{fmt(t.dollarAmount)}</span>
+            <p className="text-[9px] font-bold text-foreground uppercase">
+              {aiTrades ? "AI-Generated Trade Instructions" : "Generated Trade Instructions"}
+              {aiTrades && <span className="text-primary ml-2 font-normal">· Powered by institutional AI</span>}
+            </p>
+            {tradeCards.map((t: any, i: number) => (
+              <div key={i} className="rounded-lg border border-border bg-card px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold ${t.action?.includes("BUY") || t.action === "ADD" || t.action === "ACCUMULATE" ? "bg-gain/15 text-gain" : t.action === "HOLD" ? "bg-warning/15 text-warning" : "bg-loss/15 text-loss"}`}>{t.action}</span>
+                    <span className="text-[11px] font-bold text-foreground">{t.ticker}</span>
+                    {t.shares > 0 && <span className="text-[10px] text-muted-foreground font-mono">{t.shares} shares</span>}
+                    {t.dollarAmount > 0 && <span className="text-[10px] text-muted-foreground font-mono">~{fmt(t.dollarAmount)}</span>}
+                    {t.urgency && <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${t.urgency === "IMMEDIATE" ? "bg-loss/15 text-loss" : "bg-muted text-muted-foreground"}`}>{t.urgency}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {t.confidence != null && <span className="text-[9px] font-mono text-muted-foreground">Conf: {t.confidence}%</span>}
+                    {t.riskReward && <span className="text-[9px] font-mono text-gain">R/R: {t.riskReward}</span>}
+                    <button onClick={() => { navigator.clipboard.writeText(`${t.action} ${t.shares} ${t.ticker} (~${fmt(t.dollarAmount)}) — ${t.reason}`); setCopiedCmd(t.ticker); setTimeout(() => setCopiedCmd(null), 2000); }} className="rounded p-1 hover:bg-muted transition-colors">
+                      {copiedCmd === t.ticker ? <Check className="h-3 w-3 text-gain" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-muted-foreground max-w-[200px] truncate">{t.reason}</span>
-                  <button onClick={() => copyTrade(t)} className="rounded p-1 hover:bg-muted transition-colors">
-                    {copiedCmd === t.ticker ? <Check className="h-3 w-3 text-gain" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                  </button>
-                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">{t.reason}</p>
+                {(t.entryPrice || t.stopLoss || t.takeProfit) && (
+                  <div className="flex gap-3 mt-1 text-[9px] font-mono">
+                    {t.entryPrice && <span className="text-foreground">Entry: {fmt(t.entryPrice)}</span>}
+                    {t.stopLoss && <span className="text-loss">SL: {fmt(t.stopLoss)}</span>}
+                    {t.takeProfit && <span className="text-gain">TP: {fmt(t.takeProfit)}</span>}
+                    {t.timeHorizon && <span className="text-muted-foreground">{t.timeHorizon}</span>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1419,76 +1478,132 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: 
   );
 }
 
-/** 3D Forecast Surface — renders percentile bands as ridge lines in 3D space */
+/** 3D Probability Cone — professional Monte Carlo visualization */
 function ForecastSurface3D({ percentiles, buyPrice, currentPrice }: { percentiles: { day: number; p5: number; p25: number; p50: number; p75: number; p95: number }[]; buyPrice: number; currentPrice: number }) {
-  const { bands, priceMin, priceMax } = useMemo(() => {
+  const meshRef = useRef<THREE.Group>(null);
+
+  const { medianLine, innerGeo, outerGeo, priceMin, priceMax, buyY, curY } = useMemo(() => {
     const days = percentiles.length;
     const allPrices = percentiles.flatMap(p => [p.p5, p.p95]);
-    const priceMin = Math.min(...allPrices, buyPrice) * 0.95;
-    const priceMax = Math.max(...allPrices, buyPrice) * 1.05;
+    const priceMin = Math.min(...allPrices, buyPrice, currentPrice) * 0.97;
+    const priceMax = Math.max(...allPrices, buyPrice, currentPrice) * 1.03;
+    const priceRange = priceMax - priceMin || 1;
+    const xScale = 10 / (days - 1 || 1);
+    const yScale = 6 / priceRange;
+    const norm = (p: number) => (p - priceMin) * yScale - 3;
 
-    const bandKeys: (keyof typeof percentiles[0])[] = ["p5", "p25", "p50", "p75", "p95"];
-    const bands = bandKeys.map(key =>
-      percentiles.map((p, d) => ({
-        x: (d / (days - 1)) * 10 - 5,
-        y: ((p[key] as number) - priceMin) / (priceMax - priceMin) * 6 - 1,
-        price: p[key] as number,
-      }))
-    );
-    return { bands, priceMin, priceMax };
-  }, [percentiles, buyPrice]);
+    // Median line points
+    const medianLine = percentiles.map((p, d) => new THREE.Vector3(d * xScale - 5, norm(p.p50), 0));
 
-  const bandColors = ["#ef4444", "#f97316", "#22c55e", "#f97316", "#ef4444"];
-  const bandLabels = ["5th", "25th", "Median", "75th", "95th"];
-  const buyY = ((buyPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
-  const curY = ((currentPrice - priceMin) / (priceMax - priceMin)) * 6 - 1;
+    // Inner cone (25th-75th) as tube geometry
+    const innerShape: THREE.Vector3[] = [];
+    for (let d = 0; d < days; d++) {
+      innerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p25), -1));
+    }
+    for (let d = days - 1; d >= 0; d--) {
+      innerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p75), -1));
+    }
+
+    // Outer cone (5th-95th)
+    const outerShape: THREE.Vector3[] = [];
+    for (let d = 0; d < days; d++) {
+      outerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p5), 1));
+    }
+    for (let d = days - 1; d >= 0; d--) {
+      outerShape.push(new THREE.Vector3(d * xScale - 5, norm(percentiles[d].p95), 1));
+    }
+
+    // Build buffer geometries for filled surfaces
+    const buildGeo = (topKey: "p75" | "p95", botKey: "p25" | "p5", zOff: number) => {
+      const verts: number[] = [];
+      const colors: number[] = [];
+      const step = 1;
+      for (let d = 0; d < days - step; d += step) {
+        const x0 = d * xScale - 5, x1 = (d + step) * xScale - 5;
+        const top0 = norm(percentiles[d][topKey]), top1 = norm(percentiles[d + step][topKey]);
+        const bot0 = norm(percentiles[d][botKey]), bot1 = norm(percentiles[d + step][botKey]);
+        const mid0 = (percentiles[d][topKey] + percentiles[d][botKey]) / 2;
+        const aboveBuy = mid0 > buyPrice;
+        const r = aboveBuy ? 0.13 : 0.85, g = aboveBuy ? 0.77 : 0.22, b = aboveBuy ? 0.37 : 0.22;
+        // Triangle 1
+        verts.push(x0, bot0, zOff, x1, bot1, zOff, x0, top0, zOff);
+        // Triangle 2
+        verts.push(x0, top0, zOff, x1, bot1, zOff, x1, top1, zOff);
+        for (let t = 0; t < 6; t++) colors.push(r, g, b);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      return geo;
+    };
+
+    const innerGeo = buildGeo("p75", "p25", 0);
+    const outerGeo = buildGeo("p95", "p5", 0);
+    const buyY = norm(buyPrice);
+    const curY = norm(currentPrice);
+
+    return { medianLine, innerGeo, outerGeo, priceMin, priceMax, buyY, curY };
+  }, [percentiles, buyPrice, currentPrice]);
+
+  // Animate pulse
+  useFrame(({ clock }) => {
+    if (meshRef.current) {
+      meshRef.current.children.forEach(child => {
+        if ((child as any).material?.opacity !== undefined && (child as any).userData?.pulse) {
+          (child as any).material.opacity = 0.06 + Math.sin(clock.getElapsedTime() * 2) * 0.02;
+        }
+      });
+    }
+  });
 
   return (
-    <group>
-      <Grid position={[0, -1.5, 0]} args={[12, 8]} cellSize={1} cellThickness={0.5} cellColor="#333" sectionSize={5} sectionThickness={1} sectionColor="#555" fadeDistance={30} infiniteGrid={false} />
+    <group ref={meshRef}>
+      <Grid position={[0, -3.5, 0]} args={[14, 6]} cellSize={1} cellThickness={0.3} cellColor="#222" sectionSize={5} sectionThickness={0.8} sectionColor="#444" fadeDistance={30} infiniteGrid={false} />
 
-      {bands.map((band, bi) => {
-        const points = band.map(b => new THREE.Vector3(b.x, b.y, (bi - 2) * 1.5));
+      {/* Outer probability cone (5th-95th) */}
+      <mesh geometry={outerGeo}>
+        <meshStandardMaterial vertexColors transparent opacity={0.08} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {/* Inner probability cone (25th-75th) */}
+      <mesh geometry={innerGeo}>
+        <meshStandardMaterial vertexColors transparent opacity={0.2} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {/* Percentile ridge lines */}
+      {(["p5", "p25", "p50", "p75", "p95"] as const).map((key, bi) => {
+        const lineColors = ["#ef4444", "#f59e0b", "#22c55e", "#f59e0b", "#ef4444"];
+        const widths = [1, 1.5, 3, 1.5, 1];
+        const labels = ["5th", "25th", "Median", "75th", "95th"];
+        const allP = percentiles.flatMap(p => [p.p5, p.p95]);
+        const pMin = Math.min(...allP, buyPrice, currentPrice) * 0.97;
+        const pMax = Math.max(...allP, buyPrice, currentPrice) * 1.03;
+        const pRange = pMax - pMin || 1;
+        const norm = (v: number) => (v - pMin) * (6 / pRange) - 3;
+        const xScale = 10 / (percentiles.length - 1 || 1);
+        const pts = percentiles.map((p, d) => new THREE.Vector3(d * xScale - 5, norm(p[key]), bi === 2 ? 0.01 : 0));
         return (
-          <group key={bi}>
-            <DreiLine points={points} color={bandColors[bi]} lineWidth={bi === 2 ? 3 : 1.5} transparent opacity={bi === 2 ? 1 : 0.6} />
-            <Text position={[5.5, band[band.length - 1].y, (bi - 2) * 1.5]} fontSize={0.2} color={bandColors[bi]} anchorX="left">
-              {bandLabels[bi]}
-            </Text>
+          <group key={key}>
+            <DreiLine points={pts} color={lineColors[bi]} lineWidth={widths[bi]} transparent opacity={bi === 2 ? 1 : 0.5} />
+            <Text position={[5.3, pts[pts.length - 1].y, 0]} fontSize={0.18} color={lineColors[bi]} anchorX="left">{labels[bi]}</Text>
           </group>
         );
       })}
 
-      {(() => {
-        const p25 = bands[1];
-        const p75 = bands[3];
-        const step = Math.max(1, Math.floor(p25.length / 20));
-        return p25.filter((_, i) => i % step === 0).map((_, idx) => {
-          const i = idx * step;
-          if (i >= p25.length) return null;
-          return (
-            <mesh key={i} position={[p25[i].x, (p25[i].y + p75[i].y) / 2, 0]}>
-              <boxGeometry args={[10 / p25.length * step, Math.abs(p75[i].y - p25[i].y), 3]} />
-              <meshStandardMaterial color="#22c55e" transparent opacity={0.04} />
-            </mesh>
-          );
-        });
-      })()}
+      {/* Buy price reference */}
+      <DreiLine points={[new THREE.Vector3(-5, buyY, 0), new THREE.Vector3(5, buyY, 0)]} color="#eab308" lineWidth={1} dashed dashSize={0.2} gapSize={0.1} transparent opacity={0.5} />
+      <Text position={[-5.5, buyY, 0]} fontSize={0.18} color="#eab308" anchorX="right">Entry {buyPrice.toFixed(0)}</Text>
 
-      <mesh position={[0, buyY, 0]}>
-        <planeGeometry args={[10, 6]} />
-        <meshBasicMaterial color="#eab308" transparent opacity={0.06} side={THREE.DoubleSide} />
-      </mesh>
-      <Text position={[-5.3, buyY, 0]} fontSize={0.2} color="#eab308" anchorX="right">Entry</Text>
-
-      <Sphere args={[0.12, 12, 12]} position={[-5, curY, 0]}>
-        <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.8} />
+      {/* Current price marker */}
+      <Sphere args={[0.1, 16, 16]} position={[-5, curY, 0]}>
+        <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={1} />
       </Sphere>
-      <Text position={[-5.3, curY, 0]} fontSize={0.2} color="#3b82f6" anchorX="right">Now</Text>
+      <Text position={[-5.5, curY, 0]} fontSize={0.18} color="#3b82f6" anchorX="right">Now {currentPrice.toFixed(0)}</Text>
 
-      <Text position={[0, -2.2, -4]} fontSize={0.25} color="#666" anchorX="center">Trading Days →</Text>
-      <Text position={[-6, 2, 0]} fontSize={0.25} color="#666" rotation={[0, 0, Math.PI / 2]}>Price Level</Text>
-      <Text position={[0, -2.2, 4]} fontSize={0.25} color="#666" anchorX="center">Percentile Band</Text>
+      {/* Axis labels */}
+      <Text position={[0, -4, 0]} fontSize={0.2} color="#555" anchorX="center">Trading Days →</Text>
+      <Text position={[-6, 0, 0]} fontSize={0.2} color="#555" rotation={[0, 0, Math.PI / 2]}>Price Level</Text>
     </group>
   );
 }
@@ -1527,7 +1642,7 @@ function ScoreGauge3D({ score }: { score: number }) {
   );
 }
 
-interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; }
+interface TradeInstruction { ticker: string; action: string; shares: number; dollarAmount: number; reason: string; urgency?: string; confidence?: number; entryPrice?: number; stopLoss?: number; takeProfit?: number; timeHorizon?: string; riskReward?: string; category?: string; priority?: number; }
 
 function RealTimePanel({ assets, portfolioVol }: { assets: AssetDatum[]; portfolioVol: number }) {
   return (
