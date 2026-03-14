@@ -179,6 +179,10 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     if (opts.toolChoice) body.tool_choice = opts.toolChoice;
   }
 
+  if (opts.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
   const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
