@@ -2,8 +2,11 @@ import { useMemo, useState, useRef, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
+  ComposedChart,
 } from "recharts";
 import { ScatterChart as ScatterIcon, Brain, Copy, Check, Zap, Shield, TrendingUp, BarChart3, Loader2, Sparkles } from "lucide-react";
+import * as FGM from "@/lib/future-graph-machine";
+import { type FGMModel, type FGMProjection, type FGMParameters } from "@/lib/future-graph-machine";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Text, Line as DreiLine, Grid, Sphere, Html } from "@react-three/drei";
 import * as THREE from "three";
