@@ -88,7 +88,7 @@ serve(async (req) => {
           const meta = yahooData?.chart?.result?.[0]?.meta;
           if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
             currentPrice = meta.regularMarketPrice;
-            if (!isIndian && !looksIndian) currency = meta.currency || currency;
+            if (!isIndian) currency = meta.currency || currency;
             prevClose = meta.chartPreviousClose || meta.previousClose || 0;
             dayHigh = meta.regularMarketDayHigh || 0;
             dayLow = meta.regularMarketDayLow || 0;
