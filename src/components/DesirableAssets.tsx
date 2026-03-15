@@ -50,7 +50,7 @@ const tagColors: Record<string, string> = {
 
 const MAX_RETRIES = 2;
 const DA_CACHE_KEY = "da_recommendations";
-const DA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const DA_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 function getCachedDA(): { recommendations: Recommendation[]; marketCondition: string; regimeType: string; timestamp: number } | null {
   try {
