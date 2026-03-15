@@ -135,7 +135,7 @@ serve(async (req) => {
           const p = pm?.regularMarketPrice?.raw;
           if (p && p > 0) {
             currentPrice = p;
-            if (!isIndian && !looksIndian) currency = pm?.currency || currency;
+            if (!isIndian) currency = pm?.currency || currency;
             prevClose = pm?.regularMarketPreviousClose?.raw || 0;
             dayHigh = pm?.regularMarketDayHigh?.raw || 0;
             dayLow = pm?.regularMarketDayLow?.raw || 0;
