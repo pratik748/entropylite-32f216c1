@@ -189,7 +189,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Desirable Assets</h2>
             <p className="text-[10px] text-muted-foreground font-mono tracking-wider">
-              AI + QUANT HYBRID · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
+              AI + QUANT HYBRID · {REGION_LABELS[baseCurrency] || "Global"} · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
               {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
