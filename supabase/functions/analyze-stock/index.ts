@@ -186,7 +186,7 @@ REAL-TIME MARKET DATA:
 - 52-Week Range: ${currencySymbol}${fiftyTwoWeekLow} - ${currencySymbol}${fiftyTwoWeekHigh}
 - Distance from 52W High: ${from52High}%
 
-Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : (isIndian || looksIndian) ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
+Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
