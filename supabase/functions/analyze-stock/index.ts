@@ -17,10 +17,11 @@ async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevC
   const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
   if (!apiKey) return null;
   try {
-    // Strip .NS/.BO suffix for Alpha Vantage — it uses BSE: or NSE: prefix format
-    const cleanSymbol = symbol.replace(/\.(NS|BO)$/, "");
-    const exchange = symbol.endsWith(".BO") ? "BSE" : "NSE";
-    const avSymbol = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
+    // Strip .NS/.BO (and legacy .NSE/.BSE) suffix for Alpha Vantage — it uses BSE:/NSE: prefix format
+    const normalized = normalizeTickerInput(symbol);
+    const cleanSymbol = normalized.replace(/\.(NS|BO)$/, "");
+    const exchange = normalized.endsWith(".BO") ? "BSE" : "NSE";
+    const avSymbol = normalized.endsWith(".NS") || normalized.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
 
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
     const res = await fetch(url);
