@@ -9,6 +9,37 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+/** Alpha Vantage fallback for when Yahoo is blocked */
+async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
+  const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
+  if (!apiKey) return null;
+  try {
+    // Strip .NS/.BO suffix for Alpha Vantage — it uses BSE: or NSE: prefix format
+    const cleanSymbol = symbol.replace(/\.(NS|BO)$/, "");
+    const exchange = symbol.endsWith(".BO") ? "BSE" : "NSE";
+    const avSymbol = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
+
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const q = data?.["Global Quote"];
+    if (!q || !q["05. price"]) return null;
+    return {
+      price: parseFloat(q["05. price"]),
+      prevClose: parseFloat(q["08. previous close"] || "0"),
+      high: parseFloat(q["03. high"] || "0"),
+      low: parseFloat(q["04. low"] || "0"),
+      volume: parseInt(q["06. volume"] || "0"),
+    };
+  } catch (e) {
+    console.error(`AlphaVantage error for ${symbol}:`, e);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -37,11 +68,12 @@ serve(async (req) => {
     const isCrypto = ticker.includes("-USD") || ticker.includes("-EUR");
     const isForex = ticker.includes("=X");
     const isCommodity = ticker.includes("=F");
+    // Force INR for Indian tickers regardless of what Yahoo returns
     if (isIndian) currency = "INR";
 
     // Known Indian stocks without suffix — auto-try .NS and .BO
-    const KNOWN_INDIAN = ["WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY","CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP","HINDALCO","VEDL","MRF","IRCTC","ZOMATO","PAYTM","NYKAA"];
-    const looksIndian = KNOWN_INDIAN.includes(ticker) || /^[A-Z]{2,20}$/.test(ticker);
+    const KNOWN_INDIAN = ["WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY","CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP","HINDALCO","VEDL","MRF","IRCTC","ZOMATO","PAYTM","NYKAA","DMART","TRENT","JIOFIN","ETERNAL"];
+    const looksIndian = KNOWN_INDIAN.includes(ticker) || KNOWN_INDIAN.includes(ticker.replace(/\.(NS|BO)$/, ""));
 
     const symbolsToTry = isIndian
       ? [ticker, ticker.replace(".NS", ".BO"), ticker.replace(".BO", ".NS")]
@@ -49,12 +81,14 @@ serve(async (req) => {
         ? [ticker, `${ticker}.NS`, `${ticker}.BO`]
         : [ticker];
 
-    const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    // If it's a known Indian ticker without suffix, force INR
+    if (looksIndian && !isIndian) currency = "INR";
 
+    // ─── Yahoo Finance attempts ───
     for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
-      
-      // Try v8 chart endpoint
+
+      // v8 chart
       try {
         const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
         const yahooRes = await fetch(yahooUrl, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
@@ -64,7 +98,7 @@ serve(async (req) => {
           const meta = yahooData?.chart?.result?.[0]?.meta;
           if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
             currentPrice = meta.regularMarketPrice;
-            currency = meta.currency || currency;
+            if (!isIndian && !looksIndian) currency = meta.currency || currency;
             prevClose = meta.chartPreviousClose || meta.previousClose || 0;
             dayHigh = meta.regularMarketDayHigh || 0;
             dayLow = meta.regularMarketDayLow || 0;
@@ -72,12 +106,12 @@ serve(async (req) => {
             fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || 0;
             fiftyTwoWeekLow = meta.fiftyTwoWeekLow || 0;
             console.log(`✓ ${symbol} via v8: ${currency} ${currentPrice}`);
-            continue;
+            break;
           }
         }
       } catch (e) { console.error(`Yahoo v8 error for ${symbol}:`, e); }
 
-      // Fallback: v6 quote
+      // v6 quote
       try {
         const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`;
         const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
@@ -87,7 +121,7 @@ serve(async (req) => {
           const q = data?.quoteResponse?.result?.[0];
           if (q?.regularMarketPrice && q.regularMarketPrice > 0) {
             currentPrice = q.regularMarketPrice;
-            currency = q.currency || currency;
+            if (!isIndian && !looksIndian) currency = q.currency || currency;
             prevClose = q.regularMarketPreviousClose || 0;
             dayHigh = q.regularMarketDayHigh || 0;
             dayLow = q.regularMarketDayLow || 0;
@@ -95,12 +129,12 @@ serve(async (req) => {
             fiftyTwoWeekHigh = q.fiftyTwoWeekHigh || 0;
             fiftyTwoWeekLow = q.fiftyTwoWeekLow || 0;
             console.log(`✓ ${symbol} via v6: ${currency} ${currentPrice}`);
-            continue;
+            break;
           }
         }
       } catch (e) { console.error(`Yahoo v6 error for ${symbol}:`, e); }
 
-      // Fallback: v10 quoteSummary
+      // v10 quoteSummary
       try {
         const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
         const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
@@ -111,7 +145,7 @@ serve(async (req) => {
           const p = pm?.regularMarketPrice?.raw;
           if (p && p > 0) {
             currentPrice = p;
-            currency = pm?.currency || currency;
+            if (!isIndian && !looksIndian) currency = pm?.currency || currency;
             prevClose = pm?.regularMarketPreviousClose?.raw || 0;
             dayHigh = pm?.regularMarketDayHigh?.raw || 0;
             dayLow = pm?.regularMarketDayLow?.raw || 0;
@@ -119,9 +153,27 @@ serve(async (req) => {
             fiftyTwoWeekHigh = pm?.fiftyTwoWeekHigh?.raw || 0;
             fiftyTwoWeekLow = pm?.fiftyTwoWeekLow?.raw || 0;
             console.log(`✓ ${symbol} via v10: ${currency} ${currentPrice}`);
+            break;
           }
         }
       } catch (e) { console.error(`Yahoo v10 error for ${symbol}:`, e); }
+    }
+
+    // ─── Alpha Vantage fallback when Yahoo fails ───
+    if (currentPrice <= 0) {
+      console.log("Yahoo failed for all symbols, trying Alpha Vantage...");
+      for (const symbol of symbolsToTry) {
+        if (currentPrice > 0) break;
+        const av = await fetchAlphaVantage(symbol);
+        if (av && av.price > 0) {
+          currentPrice = av.price;
+          prevClose = av.prevClose;
+          dayHigh = av.high;
+          dayLow = av.low;
+          volume = av.volume;
+          console.log(`✓ ${symbol} via AlphaVantage: ${currency} ${currentPrice}`);
+        }
+      }
     }
 
     console.log(`Price resolution for ${ticker}: ${currentPrice > 0 ? `${currency} ${currentPrice}` : "FAILED — all endpoints returned no data"}`);
@@ -133,11 +185,9 @@ serve(async (req) => {
     const priceUnavailable = currentPrice <= 0;
     const prompt = `Today is ${new Date().toISOString().split('T')[0]}. 
 Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
-${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price. Set "currentPrice" to your best estimate. If this is an Indian stock, use INR values.\n` : ""}
-Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
-
+${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price in ${currency}. Set "currentPrice" to your best estimate in ${currency}. ${isIndian || looksIndian ? "This is an Indian stock listed on NSE/BSE — ALL prices MUST be in INR (Indian Rupees), NOT USD." : ""}\n` : ""}
 REAL-TIME MARKET DATA:
-- Current Price: ${currentPrice > 0 ? `${currencySymbol}${currentPrice}` : "unavailable"}
+- Current Price: ${currentPrice > 0 ? `${currencySymbol}${currentPrice}` : "unavailable — use your knowledge"}
 - Currency: ${currency}
 - Day Change: ${dayChange}%
 - Previous Close: ${currencySymbol}${prevClose}
@@ -146,11 +196,11 @@ REAL-TIME MARKET DATA:
 - 52-Week Range: ${currencySymbol}${fiftyTwoWeekLow} - ${currencySymbol}${fiftyTwoWeekHigh}
 - Distance from 52W High: ${from52High}%
 
-Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE)" : "Global equity"}
+Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : (isIndian || looksIndian) ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
-  "currentPrice": <number>,
+  "currentPrice": <number in ${currency}>,
   "currency": "${currency}",
   "riskLevel": "<High | Medium | Low>",
   "riskScore": <0-100>,
@@ -180,12 +230,13 @@ Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
   "technicals": { "rsi": <number>, "support": <number>, "resistance": <number>, "trend": "<bullish|bearish|sideways>", "maSignal": "<above_200dma|below_200dma|crossing>" },
   "news": [{ "headline": "<real headline>", "category": "<Company|Sector|Macro>", "sentiment": <-100 to 100>, "shortTermImpact": <% number>, "longTermImpact": <% number>, "confidence": <0-100>, "explanation": "<2 sentence>" }]
 }
+ALL price values (currentPrice, support, resistance, bullRange, bearRange, neutralRange) MUST be in ${currency}.
 Include 6-8 news items with REAL recent headlines. Every data point must reflect current market reality.`;
 
     let jsonStr: string;
     try {
       const result = await callAI({
-        systemPrompt: "You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation.",
+        systemPrompt: `You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.`,
         userPrompt: prompt,
         maxTokens: 8192,
         provider,
@@ -208,6 +259,7 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
       throw new Error(`JSON parse failed: ${parseErr.message}`);
     }
     if (currentPrice > 0) analysis.currentPrice = currentPrice;
+    // Always enforce correct currency
     analysis.currency = currency;
 
     return new Response(JSON.stringify(analysis), {
