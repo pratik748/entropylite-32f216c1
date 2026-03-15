@@ -157,17 +157,20 @@ const IndexContent = () => {
   );
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {
-    const existing = stocks.find((s) => s.ticker === ticker.toUpperCase());
+    const normalizedTicker = normalizeUserTicker(ticker);
+    if (!normalizedTicker) return;
+
+    const existing = stocks.find((s) => s.ticker === normalizedTicker);
     if (existing) {
       setStocks((prev) => prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s)));
       setActiveStockId(existing.id);
-      analyzeStock(existing.id, ticker.toUpperCase(), buyPrice, quantity);
+      analyzeStock(existing.id, normalizedTicker, buyPrice, quantity);
     } else {
       const newId = crypto.randomUUID();
-      const newStock: PortfolioStock = { id: newId, ticker: ticker.toUpperCase(), buyPrice, quantity, isLoading: false };
+      const newStock: PortfolioStock = { id: newId, ticker: normalizedTicker, buyPrice, quantity, isLoading: false };
       setStocks((prev) => [...prev, newStock]);
       setActiveStockId(newId);
-      analyzeStock(newId, ticker.toUpperCase(), buyPrice, quantity);
+      analyzeStock(newId, normalizedTicker, buyPrice, quantity);
     }
   };
 
