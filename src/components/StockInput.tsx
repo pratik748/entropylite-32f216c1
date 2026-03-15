@@ -13,6 +13,7 @@ interface StockInputProps {
 const QUICK_TICKERS = [
   { label: "RELIANCE", ticker: "RELIANCE.NS" },
   { label: "TCS", ticker: "TCS.NS" },
+  { label: "ZOMATO", ticker: "ZOMATO.NS" },
   { label: "AAPL", ticker: "AAPL" },
   { label: "TSLA", ticker: "TSLA" },
   { label: "MSFT", ticker: "MSFT" },

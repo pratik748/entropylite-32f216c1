@@ -130,7 +130,10 @@ serve(async (req) => {
     const dayChange = prevClose > 0 ? ((currentPrice - prevClose) / prevClose * 100).toFixed(2) : "N/A";
     const from52High = fiftyTwoWeekHigh > 0 ? ((currentPrice - fiftyTwoWeekHigh) / fiftyTwoWeekHigh * 100).toFixed(1) : "N/A";
 
+    const priceUnavailable = currentPrice <= 0;
     const prompt = `Today is ${new Date().toISOString().split('T')[0]}. 
+Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
+${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price. Set "currentPrice" to your best estimate. If this is an Indian stock, use INR values.\n` : ""}
 Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
 
 REAL-TIME MARKET DATA:
