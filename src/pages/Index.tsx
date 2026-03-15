@@ -36,6 +36,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
+import { normalizeUserTicker } from "@/lib/ticker";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
