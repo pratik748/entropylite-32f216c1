@@ -49,7 +49,8 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
     const provider = rawBody.provider;
-    const ticker = (rawBody.ticker || "").toString().trim().toUpperCase();
+    const requestedTicker = (rawBody.ticker || "").toString();
+    const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = rawBody.buyPrice;
     const quantity = rawBody.quantity;
     if (!ticker || !buyPrice || !quantity) {
@@ -58,7 +59,8 @@ serve(async (req) => {
 
     const t = Date.now();
     let currentPrice = 0;
-    let currency = "USD";
+    const isIndian = isIndianTicker(ticker);
+    let currency = isIndian ? "INR" : "USD";
     let prevClose = 0;
     let dayHigh = 0;
     let dayLow = 0;
@@ -66,25 +68,11 @@ serve(async (req) => {
     let fiftyTwoWeekHigh = 0;
     let fiftyTwoWeekLow = 0;
 
-    const isIndian = ticker.endsWith(".NS") || ticker.endsWith(".BO");
     const isCrypto = ticker.includes("-USD") || ticker.includes("-EUR");
     const isForex = ticker.includes("=X");
     const isCommodity = ticker.includes("=F");
-    // Force INR for Indian tickers regardless of what Yahoo returns
-    if (isIndian) currency = "INR";
-
-    // Known Indian stocks without suffix — auto-try .NS and .BO
-    const KNOWN_INDIAN = ["WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY","CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP","HINDALCO","VEDL","MRF","IRCTC","ZOMATO","PAYTM","NYKAA","DMART","TRENT","JIOFIN","ETERNAL"];
-    const looksIndian = KNOWN_INDIAN.includes(ticker) || KNOWN_INDIAN.includes(ticker.replace(/\.(NS|BO)$/, ""));
-
-    const symbolsToTry = isIndian
-      ? [ticker, ticker.replace(".NS", ".BO"), ticker.replace(".BO", ".NS")]
-      : looksIndian && !isCrypto && !isForex && !isCommodity && !ticker.startsWith("^")
-        ? [ticker, `${ticker}.NS`, `${ticker}.BO`]
-        : [ticker];
-
-    // If it's a known Indian ticker without suffix, force INR
-    if (looksIndian && !isIndian) currency = "INR";
+    const symbolsToTry = buildTickerCandidates(ticker);
+    console.log(`Ticker normalized: "${requestedTicker}" -> "${ticker}"; candidates: ${symbolsToTry.join(", ")}`);
 
     // ─── Yahoo Finance attempts ───
     for (const symbol of symbolsToTry) {
