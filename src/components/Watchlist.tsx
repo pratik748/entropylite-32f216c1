@@ -7,6 +7,7 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { normalizeUserTicker } from "@/lib/ticker";
 
 export interface WatchlistItem {
   id: string;
