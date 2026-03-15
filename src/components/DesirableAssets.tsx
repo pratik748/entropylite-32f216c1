@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
+import { useFX } from "@/hooks/useFX";
 
 interface Recommendation {
   ticker: string;
@@ -49,7 +50,7 @@ const tagColors: Record<string, string> = {
 
 const MAX_RETRIES = 2;
 const DA_CACHE_KEY = "da_recommendations";
-const DA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const DA_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 function getCachedDA(): { recommendations: Recommendation[]; marketCondition: string; regimeType: string; timestamp: number } | null {
   try {
@@ -70,6 +71,12 @@ function setCachedDA(recommendations: Recommendation[], marketCondition: string,
   } catch { /* ignore */ }
 }
 
+const REGION_LABELS: Record<string, string> = {
+  INR: "India + Global", EUR: "Europe + Global", GBP: "UK + Global", JPY: "Japan + Global",
+  CNY: "China + Global", KRW: "Korea + Global", AUD: "Australia + Global", CAD: "Canada + Global",
+  BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
+};
+
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
@@ -79,6 +86,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number | null>(null);
   const retryCount = useRef(0);
+  const { baseCurrency } = useFX();
 
   const existingTickers = stocks.map(s => s.ticker);
 
@@ -101,7 +109,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
       const { data, error: fnError } = await governedInvoke("desirable-assets", {
-        body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000 },
+        body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000, baseCurrency },
       });
 
       if (fnError) {
@@ -145,7 +153,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [stocks.length]);
+  }, [stocks.length, baseCurrency]);
 
   useEffect(() => {
     fetchRecommendations();
@@ -181,7 +189,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Desirable Assets</h2>
             <p className="text-[10px] text-muted-foreground font-mono tracking-wider">
-              AI + QUANT HYBRID · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
+              AI + QUANT HYBRID · {REGION_LABELS[baseCurrency] || "Global"} · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
               {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
@@ -191,7 +199,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground">Cached 6h</span>
+          <span className="text-[9px] font-mono text-muted-foreground">Cached 2h</span>
           <Button size="sm" variant="ghost" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
