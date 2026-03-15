@@ -71,6 +71,12 @@ function setCachedDA(recommendations: Recommendation[], marketCondition: string,
   } catch { /* ignore */ }
 }
 
+const REGION_LABELS: Record<string, string> = {
+  INR: "India + Global", EUR: "Europe + Global", GBP: "UK + Global", JPY: "Japan + Global",
+  CNY: "China + Global", KRW: "Korea + Global", AUD: "Australia + Global", CAD: "Canada + Global",
+  BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
+};
+
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
@@ -80,6 +86,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number | null>(null);
   const retryCount = useRef(0);
+  const { baseCurrency } = useFX();
 
   const existingTickers = stocks.map(s => s.ticker);
 
