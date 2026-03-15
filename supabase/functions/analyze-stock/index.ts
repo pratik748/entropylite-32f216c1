@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
+import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,10 +17,11 @@ async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevC
   const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
   if (!apiKey) return null;
   try {
-    // Strip .NS/.BO suffix for Alpha Vantage — it uses BSE: or NSE: prefix format
-    const cleanSymbol = symbol.replace(/\.(NS|BO)$/, "");
-    const exchange = symbol.endsWith(".BO") ? "BSE" : "NSE";
-    const avSymbol = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
+    // Strip .NS/.BO (and legacy .NSE/.BSE) suffix for Alpha Vantage — it uses BSE:/NSE: prefix format
+    const normalized = normalizeTickerInput(symbol);
+    const cleanSymbol = normalized.replace(/\.(NS|BO)$/, "");
+    const exchange = normalized.endsWith(".BO") ? "BSE" : "NSE";
+    const avSymbol = normalized.endsWith(".NS") || normalized.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
 
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
     const res = await fetch(url);
@@ -47,7 +49,8 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
     const provider = rawBody.provider;
-    const ticker = (rawBody.ticker || "").toString().trim().toUpperCase();
+    const requestedTicker = (rawBody.ticker || "").toString();
+    const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = rawBody.buyPrice;
     const quantity = rawBody.quantity;
     if (!ticker || !buyPrice || !quantity) {
@@ -56,7 +59,8 @@ serve(async (req) => {
 
     const t = Date.now();
     let currentPrice = 0;
-    let currency = "USD";
+    const isIndian = isIndianTicker(ticker);
+    let currency = isIndian ? "INR" : "USD";
     let prevClose = 0;
     let dayHigh = 0;
     let dayLow = 0;
@@ -64,25 +68,11 @@ serve(async (req) => {
     let fiftyTwoWeekHigh = 0;
     let fiftyTwoWeekLow = 0;
 
-    const isIndian = ticker.endsWith(".NS") || ticker.endsWith(".BO");
     const isCrypto = ticker.includes("-USD") || ticker.includes("-EUR");
     const isForex = ticker.includes("=X");
     const isCommodity = ticker.includes("=F");
-    // Force INR for Indian tickers regardless of what Yahoo returns
-    if (isIndian) currency = "INR";
-
-    // Known Indian stocks without suffix — auto-try .NS and .BO
-    const KNOWN_INDIAN = ["WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY","CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP","HINDALCO","VEDL","MRF","IRCTC","ZOMATO","PAYTM","NYKAA","DMART","TRENT","JIOFIN","ETERNAL"];
-    const looksIndian = KNOWN_INDIAN.includes(ticker) || KNOWN_INDIAN.includes(ticker.replace(/\.(NS|BO)$/, ""));
-
-    const symbolsToTry = isIndian
-      ? [ticker, ticker.replace(".NS", ".BO"), ticker.replace(".BO", ".NS")]
-      : looksIndian && !isCrypto && !isForex && !isCommodity && !ticker.startsWith("^")
-        ? [ticker, `${ticker}.NS`, `${ticker}.BO`]
-        : [ticker];
-
-    // If it's a known Indian ticker without suffix, force INR
-    if (looksIndian && !isIndian) currency = "INR";
+    const symbolsToTry = buildTickerCandidates(ticker);
+    console.log(`Ticker normalized: "${requestedTicker}" -> "${ticker}"; candidates: ${symbolsToTry.join(", ")}`);
 
     // ─── Yahoo Finance attempts ───
     for (const symbol of symbolsToTry) {
@@ -98,7 +88,7 @@ serve(async (req) => {
           const meta = yahooData?.chart?.result?.[0]?.meta;
           if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
             currentPrice = meta.regularMarketPrice;
-            if (!isIndian && !looksIndian) currency = meta.currency || currency;
+            if (!isIndian) currency = meta.currency || currency;
             prevClose = meta.chartPreviousClose || meta.previousClose || 0;
             dayHigh = meta.regularMarketDayHigh || 0;
             dayLow = meta.regularMarketDayLow || 0;
@@ -121,7 +111,7 @@ serve(async (req) => {
           const q = data?.quoteResponse?.result?.[0];
           if (q?.regularMarketPrice && q.regularMarketPrice > 0) {
             currentPrice = q.regularMarketPrice;
-            if (!isIndian && !looksIndian) currency = q.currency || currency;
+            if (!isIndian) currency = q.currency || currency;
             prevClose = q.regularMarketPreviousClose || 0;
             dayHigh = q.regularMarketDayHigh || 0;
             dayLow = q.regularMarketDayLow || 0;
@@ -145,7 +135,7 @@ serve(async (req) => {
           const p = pm?.regularMarketPrice?.raw;
           if (p && p > 0) {
             currentPrice = p;
-            if (!isIndian && !looksIndian) currency = pm?.currency || currency;
+            if (!isIndian) currency = pm?.currency || currency;
             prevClose = pm?.regularMarketPreviousClose?.raw || 0;
             dayHigh = pm?.regularMarketDayHigh?.raw || 0;
             dayLow = pm?.regularMarketDayLow?.raw || 0;
@@ -185,7 +175,7 @@ serve(async (req) => {
     const priceUnavailable = currentPrice <= 0;
     const prompt = `Today is ${new Date().toISOString().split('T')[0]}. 
 Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
-${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price in ${currency}. Set "currentPrice" to your best estimate in ${currency}. ${isIndian || looksIndian ? "This is an Indian stock listed on NSE/BSE — ALL prices MUST be in INR (Indian Rupees), NOT USD." : ""}\n` : ""}
+${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price in ${currency}. Set "currentPrice" to your best estimate in ${currency}. ${isIndian ? "This is an Indian stock listed on NSE/BSE — ALL prices MUST be in INR (Indian Rupees), NOT USD." : ""}\n` : ""}
 REAL-TIME MARKET DATA:
 - Current Price: ${currentPrice > 0 ? `${currencySymbol}${currentPrice}` : "unavailable — use your knowledge"}
 - Currency: ${currency}
@@ -196,7 +186,7 @@ REAL-TIME MARKET DATA:
 - 52-Week Range: ${currencySymbol}${fiftyTwoWeekLow} - ${currencySymbol}${fiftyTwoWeekHigh}
 - Distance from 52W High: ${from52High}%
 
-Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : (isIndian || looksIndian) ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
+Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {

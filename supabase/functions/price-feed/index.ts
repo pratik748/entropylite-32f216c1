@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,20 +116,25 @@ serve(async (req) => {
 
     await Promise.allSettled(
       tickers.map(async (rawTicker: string) => {
-        const ticker = rawTicker.trim();
+        const requestKey = rawTicker.trim().toUpperCase();
+        const ticker = normalizeTickerInput(rawTicker);
         if (!ticker) return;
 
-        // Try the ticker as-is first, then .NS and .BO for plain alpha tickers
-        const hasSpecialChars = /[.\-=^]/.test(ticker);
-        const symbolsToTry = hasSpecialChars ? [ticker] : [ticker, `${ticker}.NS`, `${ticker}.BO`];
+        const symbolsToTry = buildTickerCandidates(ticker);
+        const sanityKey = ticker.replace(/\.(NS|BO)$/, "");
 
         for (const sym of symbolsToTry) {
-          if (results[ticker]) break;
+          if (results[requestKey] || results[ticker]) break;
           const result = await fetchPrice(sym);
-          if (result && sanityCheck(ticker, result.price)) {
-            results[ticker] = result;
+          if (result && sanityCheck(sanityKey, result.price)) {
+            const normalizedResult = {
+              price: result.price,
+              currency: isIndianTicker(sym) ? "INR" : (result.currency || "USD"),
+            };
+            results[requestKey] = normalizedResult;
+            results[ticker] = normalizedResult;
           } else if (result) {
-            console.warn(`Sanity check failed for ${ticker}: got $${result.price}, rejecting`);
+            console.warn(`Sanity check failed for ${ticker}: got ${result.currency || "USD"} ${result.price}, rejecting`);
           }
         }
       })

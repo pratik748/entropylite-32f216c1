@@ -7,6 +7,7 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { normalizeUserTicker } from "@/lib/ticker";
 
 export interface WatchlistItem {
   id: string;
@@ -35,7 +36,8 @@ const Watchlist = () => {
 
   const handleAdd = () => {
     if (!newTicker.trim()) return;
-    const ticker = newTicker.toUpperCase();
+    const ticker = normalizeUserTicker(newTicker);
+    if (!ticker) return;
     if (items.find((i) => i.ticker === ticker)) {
       toast({ title: "Already in watchlist", variant: "destructive" });
       return;
