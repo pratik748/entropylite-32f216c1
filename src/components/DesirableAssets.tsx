@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
+import { useFX } from "@/hooks/useFX";
 
 interface Recommendation {
   ticker: string;
