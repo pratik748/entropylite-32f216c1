@@ -36,7 +36,8 @@ const Watchlist = () => {
 
   const handleAdd = () => {
     if (!newTicker.trim()) return;
-    const ticker = newTicker.toUpperCase();
+    const ticker = normalizeUserTicker(newTicker);
+    if (!ticker) return;
     if (items.find((i) => i.ticker === ticker)) {
       toast({ title: "Already in watchlist", variant: "destructive" });
       return;
