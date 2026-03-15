@@ -111,7 +111,7 @@ serve(async (req) => {
           const q = data?.quoteResponse?.result?.[0];
           if (q?.regularMarketPrice && q.regularMarketPrice > 0) {
             currentPrice = q.regularMarketPrice;
-            if (!isIndian && !looksIndian) currency = q.currency || currency;
+            if (!isIndian) currency = q.currency || currency;
             prevClose = q.regularMarketPreviousClose || 0;
             dayHigh = q.regularMarketDayHigh || 0;
             dayLow = q.regularMarketDayLow || 0;
