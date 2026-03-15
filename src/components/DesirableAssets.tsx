@@ -109,7 +109,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
       const { data, error: fnError } = await governedInvoke("desirable-assets", {
-        body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000 },
+        body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000, baseCurrency },
       });
 
       if (fnError) {
