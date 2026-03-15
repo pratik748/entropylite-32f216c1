@@ -49,15 +49,16 @@ serve(async (req) => {
         ? [ticker, `${ticker}.NS`, `${ticker}.BO`]
         : [ticker];
 
+    const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
     for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
       
       // Try v8 chart endpoint
       try {
         const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
-        const yahooRes = await fetch(yahooUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Cache-Control": "no-cache, no-store" },
-        });
+        const yahooRes = await fetch(yahooUrl, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+        console.log(`v8 ${symbol}: HTTP ${yahooRes.status}`);
         if (yahooRes.ok) {
           const yahooData = await yahooRes.json();
           const meta = yahooData?.chart?.result?.[0]?.meta;
@@ -70,17 +71,40 @@ serve(async (req) => {
             volume = meta.regularMarketVolume || 0;
             fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || 0;
             fiftyTwoWeekLow = meta.fiftyTwoWeekLow || 0;
+            console.log(`✓ ${symbol} via v8: ${currency} ${currentPrice}`);
             continue;
           }
         }
       } catch (e) { console.error(`Yahoo v8 error for ${symbol}:`, e); }
 
+      // Fallback: v6 quote
+      try {
+        const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`;
+        const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+        console.log(`v6 ${symbol}: HTTP ${res.status}`);
+        if (res.ok) {
+          const data = await res.json();
+          const q = data?.quoteResponse?.result?.[0];
+          if (q?.regularMarketPrice && q.regularMarketPrice > 0) {
+            currentPrice = q.regularMarketPrice;
+            currency = q.currency || currency;
+            prevClose = q.regularMarketPreviousClose || 0;
+            dayHigh = q.regularMarketDayHigh || 0;
+            dayLow = q.regularMarketDayLow || 0;
+            volume = q.regularMarketVolume || 0;
+            fiftyTwoWeekHigh = q.fiftyTwoWeekHigh || 0;
+            fiftyTwoWeekLow = q.fiftyTwoWeekLow || 0;
+            console.log(`✓ ${symbol} via v6: ${currency} ${currentPrice}`);
+            continue;
+          }
+        }
+      } catch (e) { console.error(`Yahoo v6 error for ${symbol}:`, e); }
+
       // Fallback: v10 quoteSummary
       try {
         const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
-        const res = await fetch(url, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "Cache-Control": "no-cache, no-store" },
-        });
+        const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+        console.log(`v10 ${symbol}: HTTP ${res.status}`);
         if (res.ok) {
           const data = await res.json();
           const pm = data?.quoteSummary?.result?.[0]?.price;
@@ -94,10 +118,13 @@ serve(async (req) => {
             volume = pm?.regularMarketVolume?.raw || 0;
             fiftyTwoWeekHigh = pm?.fiftyTwoWeekHigh?.raw || 0;
             fiftyTwoWeekLow = pm?.fiftyTwoWeekLow?.raw || 0;
+            console.log(`✓ ${symbol} via v10: ${currency} ${currentPrice}`);
           }
         }
       } catch (e) { console.error(`Yahoo v10 error for ${symbol}:`, e); }
     }
+
+    console.log(`Price resolution for ${ticker}: ${currentPrice > 0 ? `${currency} ${currentPrice}` : "FAILED — all endpoints returned no data"}`);
 
     const currencySymbol = currency === "INR" ? "₹" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "JPY" ? "¥" : "$";
     const dayChange = prevClose > 0 ? ((currentPrice - prevClose) / prevClose * 100).toFixed(2) : "N/A";
