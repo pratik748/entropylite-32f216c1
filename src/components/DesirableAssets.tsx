@@ -153,7 +153,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [stocks.length]);
+  }, [stocks.length, baseCurrency]);
 
   useEffect(() => {
     fetchRecommendations();
