@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna,
+  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna, LineChart,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useAIProvider } from "@/hooks/useAIProvider";
@@ -16,6 +16,7 @@ import CrownLayer from "./CrownLayer";
 import CausalEffectsEngine from "./CausalEffectsEngine";
 import StatArbEngine from "./StatArbEngine";
 import StrategyFactory from "./StrategyFactory";
+import DerivativesEngine from "./DerivativesEngine";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -33,6 +34,7 @@ const sections = [
   { id: "command", label: "Command Center", icon: Layers, desc: "Portfolio heatmap, risk constellation, liquidity radar" },
   { id: "scar", label: "Scar Memory", icon: Skull, desc: "Track past mistakes and lessons — never repeat errors" },
   { id: "factory", label: "Strategy Factory", icon: Dna, desc: "AI evolution machine — autonomous strategy discovery & ranking" },
+  { id: "derivatives", label: "Derivatives", icon: LineChart, desc: "Correlations, pair trades, options intel, futures, hedging" },
 ] as const;
 
 type SectionId = typeof sections[number]["id"];
@@ -55,6 +57,7 @@ const EntropySandbox = ({ stocks }: Props) => {
       case "command": return <PortfolioCommandCenter stocks={stocks} />;
       case "scar": return <ScarMemory />;
       case "factory": return <StrategyFactory stocks={stocks} />;
+      case "derivatives": return <DerivativesEngine stocks={stocks} />;
     }
   };
 
