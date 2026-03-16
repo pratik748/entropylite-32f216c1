@@ -35,6 +35,15 @@ export interface AlpacaAccount {
   status: string;
 }
 
+export interface AlpacaPortfolioHistory {
+  timestamp: number[];
+  equity: number[];
+  profit_loss: number[];
+  profit_loss_pct: number[];
+  base_value: number;
+  timeframe: string;
+}
+
 async function alpacaCall<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke("alpaca-trading", {
     body: { action, ...params },
@@ -48,6 +57,7 @@ export function useAlpacaTrading() {
   const [account, setAccount] = useState<AlpacaAccount | null>(null);
   const [positions, setPositions] = useState<AlpacaPosition[]>([]);
   const [orders, setOrders] = useState<AlpacaOrder[]>([]);
+  const [portfolioHistory, setPortfolioHistory] = useState<AlpacaPortfolioHistory | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
@@ -65,6 +75,15 @@ export function useAlpacaTrading() {
       setError(null);
     } catch (e: any) {
       setError(e.message);
+    }
+  }, []);
+
+  const fetchHistory = useCallback(async (period = "1W", timeframe = "15Min") => {
+    try {
+      const data = await alpacaCall<AlpacaPortfolioHistory>("portfolio_history", { period, timeframe });
+      setPortfolioHistory(data);
+    } catch (e: any) {
+      console.error("Portfolio history error:", e.message);
     }
   }, []);
 
@@ -108,12 +127,13 @@ export function useAlpacaTrading() {
   // Auto-refresh every 15s
   useEffect(() => {
     refresh();
-    pollRef.current = setInterval(refresh, 15_000);
+    fetchHistory();
+    pollRef.current = setInterval(() => { refresh(); fetchHistory(); }, 15_000);
     return () => clearInterval(pollRef.current);
-  }, [refresh]);
+  }, [refresh, fetchHistory]);
 
   return {
-    account, positions, orders, loading, error,
-    submitOrder, cancelOrder, closePosition, closeAll, refresh,
+    account, positions, orders, portfolioHistory, loading, error,
+    submitOrder, cancelOrder, closePosition, closeAll, refresh, fetchHistory,
   };
 }
