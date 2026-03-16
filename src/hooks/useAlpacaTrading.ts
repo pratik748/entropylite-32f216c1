@@ -35,6 +35,15 @@ export interface AlpacaAccount {
   status: string;
 }
 
+export interface AlpacaPortfolioHistory {
+  timestamp: number[];
+  equity: number[];
+  profit_loss: number[];
+  profit_loss_pct: number[];
+  base_value: number;
+  timeframe: string;
+}
+
 async function alpacaCall<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke("alpaca-trading", {
     body: { action, ...params },
