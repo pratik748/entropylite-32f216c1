@@ -16,6 +16,7 @@ import CrownLayer from "./CrownLayer";
 import CausalEffectsEngine from "./CausalEffectsEngine";
 import StatArbEngine from "./StatArbEngine";
 import StrategyFactory from "./StrategyFactory";
+import DerivativesEngine from "./DerivativesEngine";
 
 interface Props {
   stocks: PortfolioStock[];
