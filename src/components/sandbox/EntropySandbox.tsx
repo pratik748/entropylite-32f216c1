@@ -34,6 +34,7 @@ const sections = [
   { id: "command", label: "Command Center", icon: Layers, desc: "Portfolio heatmap, risk constellation, liquidity radar" },
   { id: "scar", label: "Scar Memory", icon: Skull, desc: "Track past mistakes and lessons — never repeat errors" },
   { id: "factory", label: "Strategy Factory", icon: Dna, desc: "AI evolution machine — autonomous strategy discovery & ranking" },
+  { id: "derivatives", label: "Derivatives", icon: LineChart, desc: "Correlations, pair trades, options intel, futures, hedging" },
 ] as const;
 
 type SectionId = typeof sections[number]["id"];
