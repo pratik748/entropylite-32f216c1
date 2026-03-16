@@ -67,7 +67,21 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
             if (vol === "Medium") return 0.25;
             return 0.15;
           }),
-          sectors: analyzed.map(s => s.analysis?.recommendation?.includes("tech") ? "Technology" : "Unknown"),
+          sectors: analyzed.map(s => {
+            // Extract sector from analysis if available
+            const rec = s.analysis?.recommendation || "";
+            if (/tech|software|semi/i.test(rec)) return "Technology";
+            if (/financ|bank/i.test(rec)) return "Financials";
+            if (/health|pharma|bio/i.test(rec)) return "Healthcare";
+            if (/energy|oil|gas/i.test(rec)) return "Energy";
+            if (/consumer|retail/i.test(rec)) return "Consumer";
+            if (/industrial|manufact/i.test(rec)) return "Industrials";
+            if (/util/i.test(rec)) return "Utilities";
+            if (/real.*estate|reit/i.test(rec)) return "Real Estate";
+            if (/material|mining/i.test(rec)) return "Materials";
+            if (/telecom|comm/i.test(rec)) return "Communication";
+            return "Unknown";
+          }),
           baseCurrency: "USD",
         },
       });

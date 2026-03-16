@@ -53,6 +53,11 @@ const DerivativesEngine = ({ stocks }: Props) => {
     if (analyzed.length > 0 && !data && !loading) analyze();
   }, [analyzed.length]);
 
+  const assetCount = analyzed.length;
+  const optionsCount = data?.options_intel?.length ?? 0;
+  const pairsCount = data?.correlations?.pairs?.length ?? 0;
+  const oppsCount = data?.opportunities?.length ?? 0;
+
   // Client-side correlation matrix
   const corrMatrix = useMemo(() => {
     if (analyzed.length < 2) return null;
@@ -623,6 +628,11 @@ const DerivativesEngine = ({ stocks }: Props) => {
             );
           })}
           <div className="flex-1" />
+          {data && (
+            <span className="text-[9px] font-mono text-muted-foreground mr-2">
+              {optionsCount}/{assetCount} assets · {pairsCount} pairs · {oppsCount} opps
+            </span>
+          )}
           <button
             onClick={() => analyze(true)}
             disabled={loading}
@@ -633,6 +643,14 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </button>
         </div>
       </div>
+
+      {/* Coverage warning */}
+      {data && optionsCount < assetCount && (
+        <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400 flex items-center gap-2">
+          <Zap className="h-3 w-3" />
+          AI covered {optionsCount}/{assetCount} assets. Click ANALYZE to refresh for full coverage.
+        </div>
+      )}
 
       {/* Content */}
       <div className="animate-fade-in">
