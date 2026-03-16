@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.company-intelligence]
 verify_jwt = false
+
+[functions.derivatives-intelligence]
+verify_jwt = false
