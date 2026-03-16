@@ -31,23 +31,33 @@ serve(async (req) => {
       sector: sectors?.[i] ?? "Unknown",
     }));
 
+    const n = tickers.length;
+    const pairCount = Math.max(5, Math.min(n * (n - 1) / 2, 15));
+    const pairTradeCount = Math.max(3, Math.min(Math.floor(n / 2), 8));
+    const futuresCount = Math.max(2, Math.min(n, 6));
+    const oppCount = Math.max(5, Math.min(n * 2, 12));
+    const simCount = Math.max(3, Math.min(n, 8));
     const seed = Math.floor(Math.random() * 99999);
 
-    const systemPrompt = `You are a derivatives intelligence engine for institutional portfolio management. Return ONLY valid JSON. No commentary.
+    // Scale maxTokens with portfolio size
+    const maxTokens = Math.min(12000, 4000 + n * 600);
+
+    const systemPrompt = `You are a derivatives intelligence engine for institutional portfolio management. Return ONLY valid JSON. No commentary, no markdown.
 
 CRITICAL RULES:
 - All numeric values must be plain numbers (no +, ~, ≈, "approximately")
 - All probabilities 0-1, percentages 0-100
 - Confidence scores 0-1
 - Use null for unavailable data, never hallucinate
+- You MUST generate data for EVERY ticker in the portfolio, not just the first few
 - Seed=${seed} for variety`;
 
-    const userPrompt = `Analyze this portfolio for derivatives opportunities:
+    const userPrompt = `Analyze this FULL portfolio of ${n} assets for derivatives opportunities:
 
-PORTFOLIO: ${JSON.stringify(portfolioSummary)}
+PORTFOLIO (${n} assets): ${JSON.stringify(portfolioSummary)}
 BASE CURRENCY: ${baseCurrency || "USD"}
 
-Return this exact JSON structure:
+Return this exact JSON structure. IMPORTANT: Generate data for ALL ${n} tickers, not just 5.
 
 {
   "correlations": {
@@ -128,21 +138,21 @@ Return this exact JSON structure:
   ]
 }
 
-Generate AT LEAST:
-- 5 correlation pairs (mix of positive and inverse)
-- 2 divergence signals
-- 3 pair trades
-- Options intel for each ticker
-- 2 futures opportunities
-- 5 ranked opportunities
-- 3 strategy simulations
+MANDATORY MINIMUMS — generate AT LEAST these counts:
+- ${pairCount} correlation pairs (mix of positive and inverse, covering ALL tickers)
+- ${Math.max(2, Math.floor(n / 3))} divergence signals
+- ${pairTradeCount} pair trades (using different ticker combinations)
+- Options intel for EVERY ticker (${n} entries, one per ticker: ${tickers.join(", ")})
+- ${futuresCount} futures opportunities
+- ${oppCount} ranked opportunities (mix of categories: pair_trade, vol_arb, correlation_breakdown, options_mispricing, futures_efficiency)
+- ${simCount} strategy simulations
 
-Use real market knowledge for these tickers. Be specific and actionable.`;
+Use real market knowledge for these tickers. Be specific and actionable. Each ticker must appear in options_intel.`;
 
     const result = await callAI({
       systemPrompt,
       userPrompt,
-      maxTokens: 5000,
+      maxTokens,
       temperature: 0.5,
       provider: provider || "mistral",
       jsonMode: true,
