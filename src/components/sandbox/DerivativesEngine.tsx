@@ -53,6 +53,11 @@ const DerivativesEngine = ({ stocks }: Props) => {
     if (analyzed.length > 0 && !data && !loading) analyze();
   }, [analyzed.length]);
 
+  const assetCount = analyzed.length;
+  const optionsCount = data?.options_intel?.length ?? 0;
+  const pairsCount = data?.correlations?.pairs?.length ?? 0;
+  const oppsCount = data?.opportunities?.length ?? 0;
+
   // Client-side correlation matrix
   const corrMatrix = useMemo(() => {
     if (analyzed.length < 2) return null;
