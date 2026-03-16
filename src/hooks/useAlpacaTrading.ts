@@ -57,6 +57,7 @@ export function useAlpacaTrading() {
   const [account, setAccount] = useState<AlpacaAccount | null>(null);
   const [positions, setPositions] = useState<AlpacaPosition[]>([]);
   const [orders, setOrders] = useState<AlpacaOrder[]>([]);
+  const [portfolioHistory, setPortfolioHistory] = useState<AlpacaPortfolioHistory | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
@@ -74,6 +75,15 @@ export function useAlpacaTrading() {
       setError(null);
     } catch (e: any) {
       setError(e.message);
+    }
+  }, []);
+
+  const fetchHistory = useCallback(async (period = "1W", timeframe = "15Min") => {
+    try {
+      const data = await alpacaCall<AlpacaPortfolioHistory>("portfolio_history", { period, timeframe });
+      setPortfolioHistory(data);
+    } catch (e: any) {
+      console.error("Portfolio history error:", e.message);
     }
   }, []);
 
