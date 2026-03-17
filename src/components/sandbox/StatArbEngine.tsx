@@ -35,19 +35,40 @@ const PATH_COLORS = [
 const StatArbEngine = ({ stocks }: Props) => {
   const [tab, setTab] = useState<Tab>("Price Dynamics");
   const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
+  const { prices: historicalPrices, loading: histLoading, fetchHistorical } = useHistoricalPrices();
+
+  // Fetch historical prices on mount
+  const analyzed = stocks.filter(s => s.analysis);
+  useEffect(() => {
+    if (analyzed.length > 0) {
+      fetchHistorical(analyzed.map(s => s.ticker));
+    }
+  }, [analyzed.length]);
 
   const assetData = useMemo(() => {
     return holdings.map(h => {
-      const vol = (h.risk / 100) * 0.3;
-      const mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
+      const histData = historicalPrices[h.rawTicker];
+      // Derive real μ and σ from historical data if available
+      let vol = (h.risk / 100) * 0.3;
+      let mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
+      
+      if (histData?.closes?.length > 20) {
+        const logRets = SA.returns(histData.closes);
+        const dailyMu = SA.mean(logRets);
+        const dailySigma = SA.stddev(logRets);
+        mu = dailyMu * 252; // Annualize
+        vol = dailySigma * Math.sqrt(252); // Annualize
+      }
+      
       const price = h.price;
       const weight = totalValue > 0 ? h.value / totalValue : 1 / (holdings.length || 1);
       return {
         ticker: h.ticker, price, vol, mu, weight, risk: h.risk, beta: h.beta,
         value: h.value, buyPrice: h.buyPrice, pnlPct: h.pnlPct, sector: h.sector,
+        rawTicker: h.rawTicker,
       };
     });
-  }, [holdings, totalValue]);
+  }, [holdings, totalValue, historicalPrices]);
 
   const portfolioMu = useMemo(() => assetData.reduce((s, a) => s + a.weight * a.mu, 0), [assetData]);
   const portfolioVol = useMemo(() => {
