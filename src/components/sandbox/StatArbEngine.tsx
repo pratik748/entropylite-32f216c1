@@ -954,15 +954,23 @@ function StressTestPanel({ assets, fmt, totalValue, historicalPrices }: { assets
   );
 }
 
-function StructuralFlowPanel({ assets }: { assets: AssetDatum[] }) {
+function StructuralFlowPanel({ assets, historicalPrices }: { assets: AssetDatum[]; historicalPrices: HistPrices }) {
   const flows = useMemo(() => {
     const today = new Date().getDate();
     return assets.flatMap(a => {
-      const prices = Array.from({ length: 30 }, (_, i) => a.price * (1 + 0.01 * SA.gaussianRandom() * (30 - i)));
-      const volumes = Array.from({ length: 30 }, () => a.value * (8 + Math.random() * 4));
+      const histData = historicalPrices[a.rawTicker];
+      let prices: number[];
+      let volumes: number[];
+      if (histData?.closes?.length > 10) {
+        prices = histData.closes.slice(-30);
+        volumes = histData.volumes.slice(-30);
+      } else {
+        prices = Array.from({ length: 30 }, (_, i) => a.price * (1 + 0.01 * SA.gaussianRandom() * (30 - i)));
+        volumes = Array.from({ length: 30 }, () => a.value * (8 + Math.random() * 4));
+      }
       return SA.detectStructuralFlows(prices, volumes, today).map(f => ({ ...f, ticker: a.ticker }));
     });
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   return (
     <div className="space-y-5">
