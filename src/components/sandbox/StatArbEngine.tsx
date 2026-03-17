@@ -553,13 +553,35 @@ function TimeSeriesPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum
   );
 }
 
-function FactorModelPanel({ assets }: { assets: AssetDatum[] }) {
+function FactorModelPanel({ assets, historicalPrices }: { assets: AssetDatum[]; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const factorNames = ["Market", "Size", "Value", "Momentum", "Quality"];
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    
     const results = assets.map(a => {
-      const assetRet = Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom());
-      const factorRet = factorNames.map(() => Array.from({ length: 60 }, () => 0.0002 + 0.01 * SA.gaussianRandom()));
+      let assetRet: number[];
+      let factorRet: number[][];
+      
+      if (hasReal) {
+        const closes = historicalPrices[a.rawTicker].closes;
+        assetRet = SA.returns(closes);
+        const n = assetRet.length;
+        // Derive factor proxies from the asset's own returns + cross-sectional data
+        const marketRet = assetRet; // Market proxy from own returns (best we can do without SPY data)
+        const sizeRet = assetRet.map((r, i) => r * (a.value < 5000 ? 1.2 : 0.8)); // Size tilt
+        const valueRet = assetRet.map((r) => r * (a.pnlPct < 0 ? 1.3 : 0.7)); // Value proxy
+        const momRet = assetRet.map((r, i) => i > 20 ? SA.mean(assetRet.slice(Math.max(0, i - 20), i)) : r); // Momentum
+        const qualRet = assetRet.map((r) => r * (a.beta < 1 ? 1.1 : 0.9)); // Quality proxy
+        factorRet = [marketRet, sizeRet, valueRet, momRet, qualRet];
+      } else {
+        assetRet = Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom());
+        factorRet = factorNames.map(() => Array.from({ length: 60 }, () => 0.0002 + 0.01 * SA.gaussianRandom()));
+      }
+      
+      const reg = SA.factorRegression(assetRet, factorRet);
+      return { ticker: a.ticker, ...reg, factorNames };
+    });
       const reg = SA.factorRegression(assetRet, factorRet);
       return { ticker: a.ticker, ...reg, factorNames };
     });
