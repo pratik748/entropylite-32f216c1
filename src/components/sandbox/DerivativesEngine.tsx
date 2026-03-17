@@ -7,18 +7,21 @@ import {
 import {
   Activity, GitBranch, Layers, Radio, Crosshair, Target, BarChart3,
   TrendingUp, TrendingDown, Shield, Zap, RefreshCw, ArrowUpRight, ArrowDownRight,
+  Eye, Globe, Newspaper, DollarSign,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
-import { useDerivativesIntelligence, type DerivativesData } from "@/hooks/useDerivativesIntelligence";
+import { useDerivativesIntelligence, type DerivativesData, type DiscoveryOpportunity } from "@/hooks/useDerivativesIntelligence";
 import {
   covarianceMatrix, returns, mean, stddev, zScore,
 } from "@/lib/statarb-math";
+import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 
 interface Props {
   stocks: PortfolioStock[];
 }
 
 const subTabs = [
+  { id: "discoveries", label: "God's Eye", icon: Eye },
   { id: "correlations", label: "Correlations", icon: Activity },
   { id: "pairs", label: "Pair Trades", icon: GitBranch },
   { id: "options", label: "Options Intel", icon: Layers },
@@ -42,50 +45,152 @@ function confidenceBadge(c: number) {
   return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400">LOW</span>;
 }
 
+function catalystBadge(catalyst: string) {
+  const map: Record<string, { bg: string; text: string; icon: any }> = {
+    geopolitical: { bg: "bg-red-500/20", text: "text-red-400", icon: Globe },
+    news: { bg: "bg-blue-500/20", text: "text-blue-400", icon: Newspaper },
+    macro: { bg: "bg-purple-500/20", text: "text-purple-400", icon: BarChart3 },
+    earnings: { bg: "bg-green-500/20", text: "text-green-400", icon: DollarSign },
+    structural: { bg: "bg-yellow-500/20", text: "text-yellow-400", icon: Zap },
+  };
+  const c = map[catalyst] || map.structural;
+  const Icon = c.icon;
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex items-center gap-1 ${c.bg} ${c.text}`}>
+      <Icon className="h-2.5 w-2.5" />
+      {catalyst}
+    </span>
+  );
+}
+
 function pctFmt(v: number) { return `${(v * 100).toFixed(1)}%`; }
 
 const DerivativesEngine = ({ stocks }: Props) => {
-  const [activeTab, setActiveTab] = useState<SubTab>("correlations");
+  const [activeTab, setActiveTab] = useState<SubTab>("discoveries");
   const { data, loading, error, analyze } = useDerivativesIntelligence(stocks);
+  const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const analyzed = stocks.filter(s => s.analysis);
 
   useEffect(() => {
     if (analyzed.length > 0 && !data && !loading) analyze();
   }, [analyzed.length]);
 
+  // Fetch historical prices for real correlation matrix
+  useEffect(() => {
+    if (analyzed.length > 0) {
+      fetchHistorical(analyzed.map(s => s.ticker));
+    }
+  }, [analyzed.length]);
+
   const assetCount = analyzed.length;
   const optionsCount = data?.options_intel?.length ?? 0;
   const pairsCount = data?.correlations?.pairs?.length ?? 0;
   const oppsCount = data?.opportunities?.length ?? 0;
+  const discoveryCount = data?.discoveries?.length ?? 0;
 
-  // Client-side correlation matrix
+  // Client-side correlation matrix from REAL historical data
   const corrMatrix = useMemo(() => {
     if (analyzed.length < 2) return null;
-    // Generate synthetic returns from volatilities for correlation display
-    const n = 60;
-    const series = analyzed.map((s) => {
-      const vol = s.analysis?.riskLevel === "High" ? 0.4 : s.analysis?.riskLevel === "Medium" ? 0.25 : 0.15;
-      const mu = 0.05;
-      const r: number[] = [];
-      for (let i = 0; i < n; i++) {
-        let u = 0, v = 0;
-        while (u === 0) u = Math.random();
-        while (v === 0) v = Math.random();
-        const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-        r.push(mu / 252 + (vol / Math.sqrt(252)) * z);
-      }
-      return r;
-    });
-    const cov = covarianceMatrix(series);
-    const stds = series.map(s => stddev(s));
-    const corr: number[][] = cov.map((row, i) =>
-      row.map((c, j) => {
-        const d = stds[i] * stds[j];
-        return d > 0 ? c / d : 0;
-      })
+    const tickers = analyzed.map(s => s.ticker);
+    const allHaveData = tickers.every(t => historicalPrices[t]?.closes?.length > 10);
+    
+    if (allHaveData) {
+      // Use real historical data
+      const minLen = Math.min(...tickers.map(t => historicalPrices[t].closes.length));
+      const series = tickers.map(t => {
+        const closes = historicalPrices[t].closes.slice(-minLen);
+        return returns(closes);
+      });
+      const cov = covarianceMatrix(series);
+      const stds = series.map(s => stddev(s));
+      return cov.map((row, i) =>
+        row.map((c, j) => {
+          const d = stds[i] * stds[j];
+          return d > 0 ? c / d : 0;
+        })
+      );
+    }
+    
+    return null;
+  }, [analyzed, historicalPrices]);
+
+  const renderDiscoveries = () => {
+    const discoveries = data?.discoveries || [];
+
+    if (discoveries.length === 0 && !loading) {
+      return (
+        <div className="text-center py-12">
+          <Eye className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">God's Eye is scanning the market...</p>
+          <p className="text-[10px] text-muted-foreground/60 mt-1">Click ANALYZE to discover opportunities beyond your portfolio</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="glass-panel rounded-xl p-3 flex items-center gap-2 text-[10px] text-muted-foreground border border-primary/20">
+          <Eye className="h-3.5 w-3.5 text-primary" />
+          <span className="font-bold text-primary">GOD'S EYE MODE</span>
+          <span className="text-muted-foreground">— {discoveries.length} cross-market opportunities discovered beyond your portfolio</span>
+        </div>
+
+        {discoveries.map((d, i) => (
+          <div key={i} className="glass-panel rounded-xl p-4 border border-primary/10 hover:border-primary/30 transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono uppercase font-bold">
+                  {d.type?.replace(/_/g, " ")}
+                </span>
+                {catalystBadge(d.catalyst)}
+              </div>
+              <div className="flex items-center gap-2">
+                {d.urgency === "high" && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold animate-pulse">URGENT</span>}
+                {confidenceBadge(d.confidence)}
+              </div>
+            </div>
+
+            <p className="text-sm font-bold text-foreground mb-2">{d.thesis}</p>
+
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="glass-subtle rounded-lg px-3 py-2">
+                <div className="text-[8px] text-muted-foreground uppercase">Instrument A</div>
+                <div className="text-xs font-mono font-bold text-green-400">{d.instrument_a}</div>
+                <div className="text-[9px] text-muted-foreground">{d.asset_a}</div>
+              </div>
+              <div className="glass-subtle rounded-lg px-3 py-2">
+                <div className="text-[8px] text-muted-foreground uppercase">Instrument B</div>
+                <div className="text-xs font-mono font-bold text-blue-400">{d.instrument_b}</div>
+                <div className="text-[9px] text-muted-foreground">{d.asset_b}</div>
+              </div>
+            </div>
+
+            <div className="glass-subtle rounded-lg px-3 py-2 mb-3">
+              <div className="text-[8px] text-muted-foreground uppercase mb-1">Structure</div>
+              <div className="text-[11px] font-medium text-foreground">{d.structure}</div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <div className="text-center">
+                <div className="text-[8px] text-muted-foreground">Capital Eff.</div>
+                <div className="text-xs font-bold text-primary">{d.capital_efficiency?.toFixed(1)}x</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[8px] text-muted-foreground">R:R</div>
+                <div className="text-xs font-bold text-foreground">{d.risk_reward?.toFixed(1)}x</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[8px] text-muted-foreground">Confidence</div>
+                <div className="text-xs font-bold text-foreground">{(d.confidence * 100).toFixed(0)}%</div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground leading-relaxed">{d.reasoning}</p>
+          </div>
+        ))}
+      </div>
     );
-    return corr;
-  }, [analyzed]);
+  };
 
   const renderCorrelations = () => {
     const pairs = data?.correlations?.pairs || [];
@@ -93,10 +198,10 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
     return (
       <div className="space-y-4">
-        {/* Client-side correlation heatmap */}
         {corrMatrix && (
           <div className="glass-panel rounded-xl p-4">
-            <h3 className="text-sm font-bold text-foreground mb-3">Correlation Heatmap (Portfolio)</h3>
+            <h3 className="text-sm font-bold text-foreground mb-1">Correlation Heatmap (Real Historical Data)</h3>
+            <p className="text-[9px] text-muted-foreground mb-3">Computed from 3-month daily returns via Pearson correlation</p>
             <div className="overflow-x-auto">
               <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `80px repeat(${analyzed.length}, 52px)` }}>
                 <div />
@@ -124,7 +229,12 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* AI-enriched correlations */}
+        {!corrMatrix && analyzed.length >= 2 && (
+          <div className="glass-panel rounded-xl p-4 text-center">
+            <p className="text-[10px] text-muted-foreground">Loading historical price data for correlation matrix...</p>
+          </div>
+        )}
+
         {pairs.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">Top Correlated Pairs (AI)</h3>
@@ -154,7 +264,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* Divergences */}
         {divergences.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
@@ -208,7 +317,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
               </div>
             </div>
 
-            {/* Z-score gauge */}
             <div className="mb-3">
               <div className="flex justify-between text-[9px] text-muted-foreground mb-1">
                 <span>Z-Score</span>
@@ -270,7 +378,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
     return (
       <div className="space-y-4">
-        {/* IV Rank bars */}
         {chartData.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">IV Rank & Percentile</h3>
@@ -287,7 +394,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* IV vs HV comparison */}
         {chartData.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">Implied vs Historical Volatility</h3>
@@ -304,7 +410,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* Signal cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {options.map((o, i) => (
             <div key={i} className="glass-panel rounded-xl p-3">
@@ -403,7 +508,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
     return (
       <div className="space-y-4">
-        {/* Beta gauge */}
         <div className="glass-panel rounded-xl p-4">
           <h3 className="text-sm font-bold text-foreground mb-2">Portfolio Beta Exposure</h3>
           <div className="flex items-center gap-4">
@@ -423,7 +527,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         </div>
 
-        {/* Sector tilts */}
         {sectorData.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">Sector Tilts vs Benchmark</h3>
@@ -443,7 +546,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* Hedge suggestions */}
         {n.hedge_suggestions?.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
@@ -529,7 +631,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
     return (
       <div className="space-y-4">
-        {/* P&L range chart */}
         {chartData.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">Expected Return Range (%)</h3>
@@ -547,7 +648,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </div>
         )}
 
-        {/* Strategy cards */}
         {sims.map((s, i) => (
           <div key={i} className="glass-panel rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
@@ -590,12 +690,13 @@ const DerivativesEngine = ({ stocks }: Props) => {
       return (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <RefreshCw className="h-8 w-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Running derivatives intelligence analysis…</p>
+          <p className="text-sm text-muted-foreground">Running God's Eye derivatives intelligence…</p>
         </div>
       );
     }
 
     switch (activeTab) {
+      case "discoveries": return renderDiscoveries();
       case "correlations": return renderCorrelations();
       case "pairs": return renderPairTrades();
       case "options": return renderOptionsIntel();
@@ -608,7 +709,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-3">
-      {/* Sub-tab selector */}
       <div className="glass-panel rounded-xl p-2">
         <div className="flex items-center gap-1 overflow-x-auto">
           {subTabs.map((t) => {
@@ -630,7 +730,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
           <div className="flex-1" />
           {data && (
             <span className="text-[9px] font-mono text-muted-foreground mr-2">
-              {optionsCount}/{assetCount} assets · {pairsCount} pairs · {oppsCount} opps
+              {optionsCount}/{assetCount} assets · {pairsCount} pairs · {discoveryCount} discoveries
             </span>
           )}
           <button
@@ -644,7 +744,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* Coverage warning */}
       {data && optionsCount < assetCount && (
         <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400 flex items-center gap-2">
           <Zap className="h-3 w-3" />
@@ -652,7 +751,6 @@ const DerivativesEngine = ({ stocks }: Props) => {
         </div>
       )}
 
-      {/* Content */}
       <div className="animate-fade-in">
         {renderContent()}
       </div>
