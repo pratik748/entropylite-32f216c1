@@ -235,10 +235,18 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   );
 }
 
-function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioVol: number; portfolioMu: number; fmt: Fmt }) {
+function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt, historicalPrices }: { assets: AssetDatum[]; totalValue: number; portfolioVol: number; portfolioMu: number; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
-    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    // Use real historical returns if available, else fallback to synthetic
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    let returnSeries: number[][];
+    if (hasReal) {
+      const minLen = Math.min(...assets.map(a => historicalPrices[a.rawTicker].closes.length));
+      returnSeries = assets.map(a => SA.returns(historicalPrices[a.rawTicker].closes.slice(-minLen)));
+    } else {
+      returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    }
     const cov = SA.covarianceMatrix(returnSeries);
     const mcVar = SA.monteCarloVaR(totalValue, portfolioMu, portfolioVol, 10, 5000);
     const hVar95 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.95) * totalValue * Math.sqrt(10);
