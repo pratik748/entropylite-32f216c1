@@ -591,7 +591,7 @@ function FactorModelPanel({ assets, historicalPrices }: { assets: AssetDatum[]; 
       return point;
     });
     return { results, chartData };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 
