@@ -1002,17 +1002,24 @@ function StructuralFlowPanel({ assets, historicalPrices }: { assets: AssetDatum[
   );
 }
 
-function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function MeanReversionPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const assetMR = assets.map(a => {
-      const n = 120;
-      const totalReturn = Math.log(a.price / a.buyPrice);
-      const dailyDrift = totalReturn / n;
-      const prices: number[] = [a.buyPrice];
-      for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
-      const scale = a.price / prices[n];
-      const scaledPrices = prices.map(p => p * scale);
+      const histData = historicalPrices[a.rawTicker];
+      let scaledPrices: number[];
+      
+      if (histData?.closes?.length > 20) {
+        scaledPrices = histData.closes;
+      } else {
+        const n = 120;
+        const totalReturn = Math.log(a.price / a.buyPrice);
+        const dailyDrift = totalReturn / n;
+        const prices: number[] = [a.buyPrice];
+        for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
+        const scale = a.price / prices[n];
+        scaledPrices = prices.map(p => p * scale);
+      }
       const ou = SA.estimateOU(scaledPrices);
       const halfLife = SA.meanReversionHalfLife(ou.theta);
       const hurst = SA.hurstExponent(scaledPrices);
