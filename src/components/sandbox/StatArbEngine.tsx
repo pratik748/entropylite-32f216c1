@@ -881,7 +881,17 @@ function StressTestPanel({ assets, fmt, totalValue, historicalPrices }: { assets
 
   const results = useMemo(() => {
     const weights = assets.map(a => a.weight);
-    const betas = assets.map(a => [a.beta, SA.gaussianRandom() * 0.5, SA.gaussianRandom() * 0.3, SA.gaussianRandom() * 0.4, SA.gaussianRandom() * 0.2]);
+    // Derive betas from real data if available
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    const betas = assets.map(a => {
+      if (hasReal) {
+        const closes = historicalPrices[a.rawTicker].closes;
+        const rets = SA.returns(closes);
+        const vol = SA.stddev(rets);
+        return [a.beta, vol * 10, vol * 6, vol * 8, vol * 4]; // Scaled from real vol
+      }
+      return [a.beta, SA.gaussianRandom() * 0.5, SA.gaussianRandom() * 0.3, SA.gaussianRandom() * 0.4, SA.gaussianRandom() * 0.2];
+    });
     return scenarios.map(s => {
       const r = SA.stressTest(weights, betas, s);
       return { name: s.name, impact: r.portfolioImpact, dollarImpact: r.portfolioImpact * totalValue, assetImpacts: r.assetImpacts };
