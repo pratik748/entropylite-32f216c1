@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
@@ -15,6 +15,7 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
 import { toast } from "@/components/ui/sonner";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { useHistoricalPrices, type HistoricalData } from "@/hooks/useHistoricalPrices";
 
 interface Props { stocks: PortfolioStock[]; }
 
