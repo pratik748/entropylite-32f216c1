@@ -582,9 +582,6 @@ function FactorModelPanel({ assets, historicalPrices }: { assets: AssetDatum[]; 
       const reg = SA.factorRegression(assetRet, factorRet);
       return { ticker: a.ticker, ...reg, factorNames };
     });
-      const reg = SA.factorRegression(assetRet, factorRet);
-      return { ticker: a.ticker, ...reg, factorNames };
-    });
     const chartData = factorNames.map((f, fi) => {
       const point: Record<string, any> = { factor: f };
       results.forEach(r => { point[r.ticker] = r.betas[fi] || 0; });
