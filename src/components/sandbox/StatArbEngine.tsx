@@ -375,11 +375,18 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
   );
 }
 
-function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function OptimizationPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length < 2) return null;
     const expRet = assets.map(a => a.mu);
-    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    let returnSeries: number[][];
+    if (hasReal) {
+      const minLen = Math.min(...assets.map(a => historicalPrices[a.rawTicker].closes.length));
+      returnSeries = assets.map(a => SA.returns(historicalPrices[a.rawTicker].closes.slice(-minLen)));
+    } else {
+      returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    }
     const cov = SA.covarianceMatrix(returnSeries);
     const frontier = SA.markowitzFrontier(expRet, cov, 30);
     const rpWeights = SA.riskParityWeights(cov);
