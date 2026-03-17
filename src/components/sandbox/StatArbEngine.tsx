@@ -110,8 +110,10 @@ const StatArbEngine = ({ stocks }: Props) => {
 interface AssetDatum {
   ticker: string; price: number; vol: number; mu: number; weight: number;
   risk: number; beta: number; value: number; buyPrice: number; pnlPct: number; sector: string;
+  rawTicker: string;
 }
 type Fmt = (v: number) => string;
+type HistPrices = Record<string, HistoricalData>;
 
 /** PORTFOLIO-WIDE Price Dynamics — GBM + Jump Diffusion for ALL assets */
 function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
