@@ -691,7 +691,8 @@ function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[
           <div key={d.ticker} className="rounded-lg border border-border p-3">
             <p className="text-[10px] font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{d.ticker}</p>
             <p className={`font-mono text-sm font-bold ${d.obi > 0 ? "text-gain" : "text-loss"}`}>OBI: {(d.obi * 100).toFixed(1)}%</p>
-            <p className="text-[8px] text-muted-foreground">{d.obi > 0 ? "Bid pressure" : "Ask pressure"}</p>
+            <p className="text-[8px] text-muted-foreground">{d.obi > 0 ? "Buy pressure" : "Sell pressure"}</p>
+            <p className="text-[8px] text-muted-foreground">ADV: {d.adv > 1e6 ? `${(d.adv / 1e6).toFixed(1)}M` : `${(d.adv / 1e3).toFixed(0)}K`}</p>
           </div>
         ))}
       </div>
