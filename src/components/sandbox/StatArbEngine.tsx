@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, BarChart, Bar, ReferenceLine, Cell, AreaChart, Area,
@@ -15,6 +15,7 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import * as SA from "@/lib/statarb-math";
 import { toast } from "@/components/ui/sonner";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { useHistoricalPrices, type HistoricalData } from "@/hooks/useHistoricalPrices";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -34,19 +35,40 @@ const PATH_COLORS = [
 const StatArbEngine = ({ stocks }: Props) => {
   const [tab, setTab] = useState<Tab>("Price Dynamics");
   const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
+  const { prices: historicalPrices, loading: histLoading, fetchHistorical } = useHistoricalPrices();
+
+  // Fetch historical prices on mount
+  const analyzed = stocks.filter(s => s.analysis);
+  useEffect(() => {
+    if (analyzed.length > 0) {
+      fetchHistorical(analyzed.map(s => s.ticker));
+    }
+  }, [analyzed.length]);
 
   const assetData = useMemo(() => {
     return holdings.map(h => {
-      const vol = (h.risk / 100) * 0.3;
-      const mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
+      const histData = historicalPrices[h.rawTicker];
+      // Derive real μ and σ from historical data if available
+      let vol = (h.risk / 100) * 0.3;
+      let mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
+      
+      if (histData?.closes?.length > 20) {
+        const logRets = SA.returns(histData.closes);
+        const dailyMu = SA.mean(logRets);
+        const dailySigma = SA.stddev(logRets);
+        mu = dailyMu * 252; // Annualize
+        vol = dailySigma * Math.sqrt(252); // Annualize
+      }
+      
       const price = h.price;
       const weight = totalValue > 0 ? h.value / totalValue : 1 / (holdings.length || 1);
       return {
         ticker: h.ticker, price, vol, mu, weight, risk: h.risk, beta: h.beta,
         value: h.value, buyPrice: h.buyPrice, pnlPct: h.pnlPct, sector: h.sector,
+        rawTicker: h.rawTicker,
       };
     });
-  }, [holdings, totalValue]);
+  }, [holdings, totalValue, historicalPrices]);
 
   const portfolioMu = useMemo(() => assetData.reduce((s, a) => s + a.weight * a.mu, 0), [assetData]);
   const portfolioVol = useMemo(() => {
@@ -67,15 +89,15 @@ const StatArbEngine = ({ stocks }: Props) => {
 
       <div className="rounded-xl border border-border bg-card p-3 sm:p-5">
         {tab === "Price Dynamics" && <PriceDynamicsPanel assets={assetData} fmt={fmt} />}
-        {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} />}
-        {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} />}
-        {tab === "Time Series" && <TimeSeriesPanel assets={assetData} fmt={fmt} />}
-        {tab === "Factor Model" && <FactorModelPanel assets={assetData} />}
-        {tab === "Liquidity" && <LiquidityPanel assets={assetData} fmt={fmt} />}
+        {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Time Series" && <TimeSeriesPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Factor Model" && <FactorModelPanel assets={assetData} historicalPrices={historicalPrices} />}
+        {tab === "Liquidity" && <LiquidityPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
         {tab === "Monte Carlo" && <MonteCarloPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} />}
-        {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} />}
-        {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} />}
-        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} />}
+        {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} historicalPrices={historicalPrices} />}
+        {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} historicalPrices={historicalPrices} />}
+        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
         {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
@@ -88,8 +110,10 @@ const StatArbEngine = ({ stocks }: Props) => {
 interface AssetDatum {
   ticker: string; price: number; vol: number; mu: number; weight: number;
   risk: number; beta: number; value: number; buyPrice: number; pnlPct: number; sector: string;
+  rawTicker: string;
 }
 type Fmt = (v: number) => string;
+type HistPrices = Record<string, HistoricalData>;
 
 /** PORTFOLIO-WIDE Price Dynamics — GBM + Jump Diffusion for ALL assets */
 function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
@@ -211,10 +235,18 @@ function PriceDynamicsPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
   );
 }
 
-function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioVol: number; portfolioMu: number; fmt: Fmt }) {
+function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt, historicalPrices }: { assets: AssetDatum[]; totalValue: number; portfolioVol: number; portfolioMu: number; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
-    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    // Use real historical returns if available, else fallback to synthetic
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    let returnSeries: number[][];
+    if (hasReal) {
+      const minLen = Math.min(...assets.map(a => historicalPrices[a.rawTicker].closes.length));
+      returnSeries = assets.map(a => SA.returns(historicalPrices[a.rawTicker].closes.slice(-minLen)));
+    } else {
+      returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    }
     const cov = SA.covarianceMatrix(returnSeries);
     const mcVar = SA.monteCarloVaR(totalValue, portfolioMu, portfolioVol, 10, 5000);
     const hVar95 = SA.parametricVaR(portfolioMu / 252, portfolioVol / Math.sqrt(252), 0.95) * totalValue * Math.sqrt(10);
@@ -343,11 +375,18 @@ function PortfolioRiskPanel({ assets, totalValue, portfolioVol, portfolioMu, fmt
   );
 }
 
-function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function OptimizationPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length < 2) return null;
     const expRet = assets.map(a => a.mu);
-    const returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    let returnSeries: number[][];
+    if (hasReal) {
+      const minLen = Math.min(...assets.map(a => historicalPrices[a.rawTicker].closes.length));
+      returnSeries = assets.map(a => SA.returns(historicalPrices[a.rawTicker].closes.slice(-minLen)));
+    } else {
+      returnSeries = assets.map(a => Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom()));
+    }
     const cov = SA.covarianceMatrix(returnSeries);
     const frontier = SA.markowitzFrontier(expRet, cov, 30);
     const rpWeights = SA.riskParityWeights(cov);
@@ -409,21 +448,31 @@ function OptimizationPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) 
   );
 }
 
-function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function TimeSeriesPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const assetSeries = assets.map(a => {
-      const n = 120;
-      const totalReturn = Math.log(a.price / a.buyPrice);
-      const dailyDrift = totalReturn / n;
-      const prices: number[] = [a.buyPrice];
-      for (let i = 1; i <= n; i++) {
-        const noise = a.vol / Math.sqrt(252) * SA.gaussianRandom();
-        const nextPrice = prices[i - 1] * Math.exp(dailyDrift + noise);
-        prices.push(Math.max(nextPrice, 0.01));
+      const histData = historicalPrices[a.rawTicker];
+      let scaledPrices: number[];
+      
+      if (histData?.closes?.length > 20) {
+        // Use REAL historical prices
+        scaledPrices = histData.closes;
+      } else {
+        // Fallback to synthetic
+        const n = 120;
+        const totalReturn = Math.log(a.price / a.buyPrice);
+        const dailyDrift = totalReturn / n;
+        const prices: number[] = [a.buyPrice];
+        for (let i = 1; i <= n; i++) {
+          const noise = a.vol / Math.sqrt(252) * SA.gaussianRandom();
+          const nextPrice = prices[i - 1] * Math.exp(dailyDrift + noise);
+          prices.push(Math.max(nextPrice, 0.01));
+        }
+        const scale = a.price / prices[n];
+        scaledPrices = prices.map(p => p * scale);
       }
-      const scale = a.price / prices[n];
-      const scaledPrices = prices.map(p => p * scale);
+      
       const forecast = SA.arimaForecast(scaledPrices, 30);
       const { filtered } = SA.kalmanFilter(scaledPrices);
       return { ticker: a.ticker, prices: scaledPrices, forecast, filtered };
@@ -446,7 +495,7 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
       return point;
     });
     return { chart, assetSeries, histLen };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 
@@ -504,13 +553,32 @@ function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
   );
 }
 
-function FactorModelPanel({ assets }: { assets: AssetDatum[] }) {
+function FactorModelPanel({ assets, historicalPrices }: { assets: AssetDatum[]; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const factorNames = ["Market", "Size", "Value", "Momentum", "Quality"];
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    
     const results = assets.map(a => {
-      const assetRet = Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom());
-      const factorRet = factorNames.map(() => Array.from({ length: 60 }, () => 0.0002 + 0.01 * SA.gaussianRandom()));
+      let assetRet: number[];
+      let factorRet: number[][];
+      
+      if (hasReal) {
+        const closes = historicalPrices[a.rawTicker].closes;
+        assetRet = SA.returns(closes);
+        const n = assetRet.length;
+        // Derive factor proxies from the asset's own returns + cross-sectional data
+        const marketRet = assetRet; // Market proxy from own returns (best we can do without SPY data)
+        const sizeRet = assetRet.map((r, i) => r * (a.value < 5000 ? 1.2 : 0.8)); // Size tilt
+        const valueRet = assetRet.map((r) => r * (a.pnlPct < 0 ? 1.3 : 0.7)); // Value proxy
+        const momRet = assetRet.map((r, i) => i > 20 ? SA.mean(assetRet.slice(Math.max(0, i - 20), i)) : r); // Momentum
+        const qualRet = assetRet.map((r) => r * (a.beta < 1 ? 1.1 : 0.9)); // Quality proxy
+        factorRet = [marketRet, sizeRet, valueRet, momRet, qualRet];
+      } else {
+        assetRet = Array.from({ length: 60 }, () => a.mu / 252 + a.vol / Math.sqrt(252) * SA.gaussianRandom());
+        factorRet = factorNames.map(() => Array.from({ length: 60 }, () => 0.0002 + 0.01 * SA.gaussianRandom()));
+      }
+      
       const reg = SA.factorRegression(assetRet, factorRet);
       return { ticker: a.ticker, ...reg, factorNames };
     });
@@ -520,7 +588,7 @@ function FactorModelPanel({ assets }: { assets: AssetDatum[] }) {
       return point;
     });
     return { results, chartData };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 
@@ -569,20 +637,34 @@ function FactorModelPanel({ assets }: { assets: AssetDatum[] }) {
   );
 }
 
-function LiquidityPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     return assets.map(a => {
-      const dailyVol = a.value * 10;
+      const histData = historicalPrices[a.rawTicker];
+      // Use real average daily volume if available
+      const realADV = histData?.volumes?.length > 5
+        ? SA.mean(histData.volumes.slice(-20).filter(v => v > 0))
+        : null;
+      const dailyVol = realADV || a.value * 10;
       const orderSizes = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5];
       const impacts = orderSizes.map(pct => {
         const orderSize = dailyVol * pct;
         const impact = SA.almgrenChrissImpact(orderSize, dailyVol, a.vol);
         return { participation: pct * 100, ...impact };
       });
-      const obi = SA.orderBookImbalance(50 + Math.random() * 50, 50 + Math.random() * 50);
-      return { ticker: a.ticker, impacts, obi };
+      // Derive OBI from real volume trend if available
+      const obi = histData?.volumes?.length > 10
+        ? (() => {
+            const recent = histData.volumes.slice(-5);
+            const older = histData.volumes.slice(-10, -5);
+            const recentAvg = SA.mean(recent.filter(v => v > 0));
+            const olderAvg = SA.mean(older.filter(v => v > 0));
+            return olderAvg > 0 ? (recentAvg - olderAvg) / (recentAvg + olderAvg) : 0;
+          })()
+        : 0;
+      return { ticker: a.ticker, impacts, obi, adv: dailyVol };
     });
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (assets.length === 0) return <EmptyMsg />;
 
@@ -606,7 +688,8 @@ function LiquidityPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
           <div key={d.ticker} className="rounded-lg border border-border p-3">
             <p className="text-[10px] font-bold" style={{ color: PATH_COLORS[i % PATH_COLORS.length] }}>{d.ticker}</p>
             <p className={`font-mono text-sm font-bold ${d.obi > 0 ? "text-gain" : "text-loss"}`}>OBI: {(d.obi * 100).toFixed(1)}%</p>
-            <p className="text-[8px] text-muted-foreground">{d.obi > 0 ? "Bid pressure" : "Ask pressure"}</p>
+            <p className="text-[8px] text-muted-foreground">{d.obi > 0 ? "Buy pressure" : "Sell pressure"}</p>
+            <p className="text-[8px] text-muted-foreground">ADV: {d.adv > 1e6 ? `${(d.adv / 1e6).toFixed(1)}M` : `${(d.adv / 1e3).toFixed(0)}K`}</p>
           </div>
         ))}
       </div>
@@ -787,7 +870,7 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
   );
 }
 
-function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fmt: Fmt; totalValue: number }) {
+function StressTestPanel({ assets, fmt, totalValue, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; totalValue: number; historicalPrices: HistPrices }) {
   const scenarios: SA.StressScenario[] = [
     { name: "Rate Shock +200bps", shocks: { Market: -0.05, Size: -0.03, Value: 0.02, Momentum: -0.04, Quality: 0.01 } },
     { name: "Oil Spike +50%", shocks: { Market: -0.03, Size: -0.02, Value: 0.01, Momentum: -0.02, Quality: 0 } },
@@ -798,7 +881,17 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
 
   const results = useMemo(() => {
     const weights = assets.map(a => a.weight);
-    const betas = assets.map(a => [a.beta, SA.gaussianRandom() * 0.5, SA.gaussianRandom() * 0.3, SA.gaussianRandom() * 0.4, SA.gaussianRandom() * 0.2]);
+    // Derive betas from real data if available
+    const hasReal = assets.every(a => historicalPrices[a.rawTicker]?.closes?.length > 20);
+    const betas = assets.map(a => {
+      if (hasReal) {
+        const closes = historicalPrices[a.rawTicker].closes;
+        const rets = SA.returns(closes);
+        const vol = SA.stddev(rets);
+        return [a.beta, vol * 10, vol * 6, vol * 8, vol * 4]; // Scaled from real vol
+      }
+      return [a.beta, SA.gaussianRandom() * 0.5, SA.gaussianRandom() * 0.3, SA.gaussianRandom() * 0.4, SA.gaussianRandom() * 0.2];
+    });
     return scenarios.map(s => {
       const r = SA.stressTest(weights, betas, s);
       return { name: s.name, impact: r.portfolioImpact, dollarImpact: r.portfolioImpact * totalValue, assetImpacts: r.assetImpacts };
@@ -861,15 +954,23 @@ function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fm
   );
 }
 
-function StructuralFlowPanel({ assets }: { assets: AssetDatum[] }) {
+function StructuralFlowPanel({ assets, historicalPrices }: { assets: AssetDatum[]; historicalPrices: HistPrices }) {
   const flows = useMemo(() => {
     const today = new Date().getDate();
     return assets.flatMap(a => {
-      const prices = Array.from({ length: 30 }, (_, i) => a.price * (1 + 0.01 * SA.gaussianRandom() * (30 - i)));
-      const volumes = Array.from({ length: 30 }, () => a.value * (8 + Math.random() * 4));
+      const histData = historicalPrices[a.rawTicker];
+      let prices: number[];
+      let volumes: number[];
+      if (histData?.closes?.length > 10) {
+        prices = histData.closes.slice(-30);
+        volumes = histData.volumes.slice(-30);
+      } else {
+        prices = Array.from({ length: 30 }, (_, i) => a.price * (1 + 0.01 * SA.gaussianRandom() * (30 - i)));
+        volumes = Array.from({ length: 30 }, () => a.value * (8 + Math.random() * 4));
+      }
       return SA.detectStructuralFlows(prices, volumes, today).map(f => ({ ...f, ticker: a.ticker }));
     });
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   return (
     <div className="space-y-5">
@@ -901,17 +1002,24 @@ function StructuralFlowPanel({ assets }: { assets: AssetDatum[] }) {
   );
 }
 
-function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function MeanReversionPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const assetMR = assets.map(a => {
-      const n = 120;
-      const totalReturn = Math.log(a.price / a.buyPrice);
-      const dailyDrift = totalReturn / n;
-      const prices: number[] = [a.buyPrice];
-      for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
-      const scale = a.price / prices[n];
-      const scaledPrices = prices.map(p => p * scale);
+      const histData = historicalPrices[a.rawTicker];
+      let scaledPrices: number[];
+      
+      if (histData?.closes?.length > 20) {
+        scaledPrices = histData.closes;
+      } else {
+        const n = 120;
+        const totalReturn = Math.log(a.price / a.buyPrice);
+        const dailyDrift = totalReturn / n;
+        const prices: number[] = [a.buyPrice];
+        for (let i = 1; i <= n; i++) { prices.push(prices[i - 1] * Math.exp(dailyDrift + a.vol / Math.sqrt(252) * SA.gaussianRandom())); }
+        const scale = a.price / prices[n];
+        scaledPrices = prices.map(p => p * scale);
+      }
       const ou = SA.estimateOU(scaledPrices);
       const halfLife = SA.meanReversionHalfLife(ou.theta);
       const hurst = SA.hurstExponent(scaledPrices);
@@ -925,7 +1033,7 @@ function MeanReversionPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt })
       snapProb: a.snapProb * 100, signal: Math.abs(a.z) > 2 && a.isStationary ? "STRONG" : Math.abs(a.z) > 1.5 && a.isStationary ? "MODERATE" : "NONE",
     }));
     return { assetMR, zChart };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 

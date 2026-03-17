@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.derivatives-intelligence]
 verify_jwt = false
+
+[functions.historical-prices]
+verify_jwt = false

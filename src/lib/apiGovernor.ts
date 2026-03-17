@@ -69,6 +69,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "institutional-flows":     "slow",
   "data-pipeline-status":    "frequent",
   "derivatives-intelligence":"ai",
+  "historical-prices":        "slow",
   // company-intelligence removed — uses its own 24h localStorage cache
 };
 
