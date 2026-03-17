@@ -870,7 +870,7 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
   );
 }
 
-function StressTestPanel({ assets, fmt, totalValue }: { assets: AssetDatum[]; fmt: Fmt; totalValue: number }) {
+function StressTestPanel({ assets, fmt, totalValue, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; totalValue: number; historicalPrices: HistPrices }) {
   const scenarios: SA.StressScenario[] = [
     { name: "Rate Shock +200bps", shocks: { Market: -0.05, Size: -0.03, Value: 0.02, Momentum: -0.04, Quality: 0.01 } },
     { name: "Oil Spike +50%", shocks: { Market: -0.03, Size: -0.02, Value: 0.01, Momentum: -0.02, Quality: 0 } },
