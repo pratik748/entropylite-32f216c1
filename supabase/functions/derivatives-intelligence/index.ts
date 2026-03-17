@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const { user } = await requireAuth(req, corsHeaders);
-    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider } = await req.json();
+    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context } = await req.json();
 
     if (!tickers?.length) {
       return new Response(JSON.stringify({ error: "No tickers provided" }), {
@@ -37,12 +37,48 @@ serve(async (req) => {
     const futuresCount = Math.max(2, Math.min(n, 6));
     const oppCount = Math.max(5, Math.min(n * 2, 12));
     const simCount = Math.max(3, Math.min(n, 8));
+    const discoveryCount = discovery_mode ? Math.max(5, Math.min(n * 2, 10)) : 0;
     const seed = Math.floor(Math.random() * 99999);
 
-    // Scale maxTokens with portfolio size
-    const maxTokens = Math.min(12000, 4000 + n * 600);
+    const maxTokens = Math.min(16000, 5000 + n * 600 + (discovery_mode ? 3000 : 0));
 
-    const systemPrompt = `You are a derivatives intelligence engine for institutional portfolio management. Return ONLY valid JSON. No commentary, no markdown.
+    const discoveryContext = discovery_mode ? `
+
+MARKET CONTEXT FOR GOD'S EYE DISCOVERY:
+${news_context ? `Recent news themes: ${news_context.slice(0, 500)}` : "Use your knowledge of current market themes, geopolitical events, and sector trends."}
+${macro_context ? `Macro regime: ${macro_context.slice(0, 300)}` : "Consider current interest rate environment, inflation, and macro conditions."}
+
+DISCOVERY MODE ACTIVE — You MUST find opportunities BEYOND the portfolio tickers. Think like a hedge fund CIO scanning the entire market:
+- Find correlated ETFs, sector futures, cross-asset plays (e.g., LMT futures + ITA defense ETF for leveraged sector exposure)
+- Identify macro trades triggered by news (e.g., oil shock → long XLE futures / short airline ETF)
+- Spot relative value: if portfolio holds NVDA, suggest SOXX/SMH ETF pair trades or correlated semiconductor futures
+- Look for riskless leverage via futures + ETF combinations in the same sector
+- Consider commodity futures (gold, oil, copper) that hedge or amplify portfolio exposures
+- Find cross-border opportunities (e.g., US defense stocks + European defense ETFs like EUAD)
+` : "";
+
+    const discoverySchema = discovery_mode ? `,
+  "discoveries": [
+    {
+      "asset_a": "LMT", "asset_b": "ITA",
+      "type": "futures_etf_leverage|sector_pair|macro_hedge|relative_value|cross_asset",
+      "thesis": "Defence spending escalation creates leveraged opportunity...",
+      "instrument_a": "LMT futures (front month)",
+      "instrument_b": "ITA ETF (iShares US Aerospace & Defense)",
+      "structure": "Long LMT futures / Long ITA for capital-efficient sector exposure",
+      "capital_efficiency": 4.5,
+      "catalyst": "geopolitical|news|earnings|macro|structural",
+      "confidence": 0.75,
+      "reasoning": "detailed explanation with specific market rationale",
+      "risk_reward": 3.2,
+      "urgency": "high|medium|low"
+    }
+  ]` : "";
+
+    const discoveryMinimum = discovery_mode ? `
+- ${discoveryCount} discovery opportunities BEYOND portfolio tickers (mix of: futures_etf_leverage, sector_pair, macro_hedge, relative_value, cross_asset). These must involve at least one asset NOT in the portfolio. Be specific about instruments (futures contracts, ETF tickers, etc).` : "";
+
+    const systemPrompt = `You are a GOD'S EYE derivatives intelligence engine for institutional portfolio management. You see the ENTIRE market, not just what's in the portfolio. Return ONLY valid JSON. No commentary, no markdown.
 
 CRITICAL RULES:
 - All numeric values must be plain numbers (no +, ~, ≈, "approximately")
@@ -50,12 +86,15 @@ CRITICAL RULES:
 - Confidence scores 0-1
 - Use null for unavailable data, never hallucinate
 - You MUST generate data for EVERY ticker in the portfolio, not just the first few
+- For DISCOVERIES: look BEYOND the portfolio. Find opportunities in correlated assets, sector ETFs, commodity futures, cross-market plays
+- Think like a Bloomberg terminal scanning every market for structural opportunities
 - Seed=${seed} for variety`;
 
-    const userPrompt = `Analyze this FULL portfolio of ${n} assets for derivatives opportunities:
+    const userPrompt = `Analyze this FULL portfolio of ${n} assets AND scan the broader market for derivatives opportunities:
 
 PORTFOLIO (${n} assets): ${JSON.stringify(portfolioSummary)}
 BASE CURRENCY: ${baseCurrency || "USD"}
+${discoveryContext}
 
 Return this exact JSON structure. IMPORTANT: Generate data for ALL ${n} tickers, not just 5.
 
@@ -135,7 +174,7 @@ Return this exact JSON structure. IMPORTANT: Generate data for ALL ${n} tickers,
       "holding_period_days": 20,
       "confidence": 0.7
     }
-  ]
+  ]${discoverySchema}
 }
 
 MANDATORY MINIMUMS — generate AT LEAST these counts:
@@ -145,7 +184,7 @@ MANDATORY MINIMUMS — generate AT LEAST these counts:
 - Options intel for EVERY ticker (${n} entries, one per ticker: ${tickers.join(", ")})
 - ${futuresCount} futures opportunities
 - ${oppCount} ranked opportunities (mix of categories: pair_trade, vol_arb, correlation_breakdown, options_mispricing, futures_efficiency)
-- ${simCount} strategy simulations
+- ${simCount} strategy simulations${discoveryMinimum}
 
 Use real market knowledge for these tickers. Be specific and actionable. Each ticker must appear in options_intel.`;
 

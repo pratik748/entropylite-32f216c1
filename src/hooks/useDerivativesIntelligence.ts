@@ -3,6 +3,22 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "sonner";
 
+export interface DiscoveryOpportunity {
+  asset_a: string;
+  asset_b: string;
+  type: string;
+  thesis: string;
+  instrument_a: string;
+  instrument_b: string;
+  structure: string;
+  capital_efficiency: number;
+  catalyst: string;
+  confidence: number;
+  reasoning: string;
+  risk_reward: number;
+  urgency: string;
+}
+
 export interface DerivativesData {
   correlations: {
     pairs: { asset_a: string; asset_b: string; correlation: number; window: string; stability: number; trend: string }[];
@@ -36,6 +52,7 @@ export interface DerivativesData {
     expected_return_high: number; win_probability: number; sharpe: number; max_dd: number;
     capital_required: number; holding_period_days: number; confidence: number;
   }[];
+  discoveries?: DiscoveryOpportunity[];
   provider?: string;
 }
 
@@ -44,7 +61,7 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const analyze = useCallback(async (force = false) => {
+  const analyze = useCallback(async (force = false, newsContext?: string, macroContext?: string) => {
     const analyzed = stocks.filter(s => s.analysis);
     if (analyzed.length === 0) return;
 
@@ -68,7 +85,6 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
             return 0.15;
           }),
           sectors: analyzed.map(s => {
-            // Extract sector from analysis if available
             const rec = s.analysis?.recommendation || "";
             if (/tech|software|semi/i.test(rec)) return "Technology";
             if (/financ|bank/i.test(rec)) return "Financials";
@@ -83,6 +99,9 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
             return "Unknown";
           }),
           baseCurrency: "USD",
+          discovery_mode: true,
+          news_context: newsContext || "",
+          macro_context: macroContext || "",
         },
       });
 
