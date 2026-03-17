@@ -448,21 +448,31 @@ function OptimizationPanel({ assets, fmt, historicalPrices }: { assets: AssetDat
   );
 }
 
-function TimeSeriesPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function TimeSeriesPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     if (assets.length === 0) return null;
     const assetSeries = assets.map(a => {
-      const n = 120;
-      const totalReturn = Math.log(a.price / a.buyPrice);
-      const dailyDrift = totalReturn / n;
-      const prices: number[] = [a.buyPrice];
-      for (let i = 1; i <= n; i++) {
-        const noise = a.vol / Math.sqrt(252) * SA.gaussianRandom();
-        const nextPrice = prices[i - 1] * Math.exp(dailyDrift + noise);
-        prices.push(Math.max(nextPrice, 0.01));
+      const histData = historicalPrices[a.rawTicker];
+      let scaledPrices: number[];
+      
+      if (histData?.closes?.length > 20) {
+        // Use REAL historical prices
+        scaledPrices = histData.closes;
+      } else {
+        // Fallback to synthetic
+        const n = 120;
+        const totalReturn = Math.log(a.price / a.buyPrice);
+        const dailyDrift = totalReturn / n;
+        const prices: number[] = [a.buyPrice];
+        for (let i = 1; i <= n; i++) {
+          const noise = a.vol / Math.sqrt(252) * SA.gaussianRandom();
+          const nextPrice = prices[i - 1] * Math.exp(dailyDrift + noise);
+          prices.push(Math.max(nextPrice, 0.01));
+        }
+        const scale = a.price / prices[n];
+        scaledPrices = prices.map(p => p * scale);
       }
-      const scale = a.price / prices[n];
-      const scaledPrices = prices.map(p => p * scale);
+      
       const forecast = SA.arimaForecast(scaledPrices, 30);
       const { filtered } = SA.kalmanFilter(scaledPrices);
       return { ticker: a.ticker, prices: scaledPrices, forecast, filtered };
