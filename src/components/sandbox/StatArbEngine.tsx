@@ -495,7 +495,7 @@ function TimeSeriesPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum
       return point;
     });
     return { chart, assetSeries, histLen };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 
