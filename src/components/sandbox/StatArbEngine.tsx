@@ -640,20 +640,34 @@ function FactorModelPanel({ assets, historicalPrices }: { assets: AssetDatum[]; 
   );
 }
 
-function LiquidityPanel({ assets, fmt }: { assets: AssetDatum[]; fmt: Fmt }) {
+function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[]; fmt: Fmt; historicalPrices: HistPrices }) {
   const data = useMemo(() => {
     return assets.map(a => {
-      const dailyVol = a.value * 10;
+      const histData = historicalPrices[a.rawTicker];
+      // Use real average daily volume if available
+      const realADV = histData?.volumes?.length > 5
+        ? SA.mean(histData.volumes.slice(-20).filter(v => v > 0))
+        : null;
+      const dailyVol = realADV || a.value * 10;
       const orderSizes = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5];
       const impacts = orderSizes.map(pct => {
         const orderSize = dailyVol * pct;
         const impact = SA.almgrenChrissImpact(orderSize, dailyVol, a.vol);
         return { participation: pct * 100, ...impact };
       });
-      const obi = SA.orderBookImbalance(50 + Math.random() * 50, 50 + Math.random() * 50);
-      return { ticker: a.ticker, impacts, obi };
+      // Derive OBI from real volume trend if available
+      const obi = histData?.volumes?.length > 10
+        ? (() => {
+            const recent = histData.volumes.slice(-5);
+            const older = histData.volumes.slice(-10, -5);
+            const recentAvg = SA.mean(recent.filter(v => v > 0));
+            const olderAvg = SA.mean(older.filter(v => v > 0));
+            return olderAvg > 0 ? (recentAvg - olderAvg) / (recentAvg + olderAvg) : 0;
+          })()
+        : 0;
+      return { ticker: a.ticker, impacts, obi, adv: dailyVol };
     });
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (assets.length === 0) return <EmptyMsg />;
 
