@@ -89,15 +89,15 @@ const StatArbEngine = ({ stocks }: Props) => {
 
       <div className="rounded-xl border border-border bg-card p-3 sm:p-5">
         {tab === "Price Dynamics" && <PriceDynamicsPanel assets={assetData} fmt={fmt} />}
-        {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} />}
-        {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} />}
-        {tab === "Time Series" && <TimeSeriesPanel assets={assetData} fmt={fmt} />}
-        {tab === "Factor Model" && <FactorModelPanel assets={assetData} />}
-        {tab === "Liquidity" && <LiquidityPanel assets={assetData} fmt={fmt} />}
+        {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Time Series" && <TimeSeriesPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
+        {tab === "Factor Model" && <FactorModelPanel assets={assetData} historicalPrices={historicalPrices} />}
+        {tab === "Liquidity" && <LiquidityPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
         {tab === "Monte Carlo" && <MonteCarloPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} />}
-        {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} />}
-        {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} />}
-        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} />}
+        {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} historicalPrices={historicalPrices} />}
+        {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} historicalPrices={historicalPrices} />}
+        {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
         {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
