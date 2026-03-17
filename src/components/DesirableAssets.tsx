@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
-import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
@@ -28,8 +28,21 @@ interface Recommendation {
   riskReward: string;
   sector: string;
   tags: string[];
+  riskProfile?: string[];
+  strategy?: string;
+  pairedInstrument?: string;
+  pairedStructure?: string;
+  capitalEfficiency?: number;
   priceChange24h: number;
   priceVerified: boolean;
+  sharpeRatio?: number;
+  maxDrawdown?: number;
+  portfolioCorrelation?: number;
+  volatility?: number;
+  zScore?: number;
+  quantScore?: number;
+  closes?: number[];
+  simulationTested?: boolean;
 }
 
 interface Props {
@@ -37,22 +50,33 @@ interface Props {
   onAddToPortfolio: (ticker: string, price: number, qty: number) => void;
 }
 
-const tagColors: Record<string, string> = {
-  momentum: "bg-blue-500/10 text-blue-400",
-  value: "bg-green-500/10 text-green-400",
-  defensive: "bg-amber-500/10 text-amber-400",
-  growth: "bg-purple-500/10 text-purple-400",
-  contrarian: "bg-red-500/10 text-red-400",
-  macro: "bg-cyan-500/10 text-cyan-400",
-  hedge: "bg-orange-500/10 text-orange-400",
+const strategyColors: Record<string, string> = {
+  equity: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  pair_trade: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  futures_leverage: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  vol_arb: "bg-red-500/10 text-red-400 border-red-500/20",
+  sector_hedge: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  correlation_hedge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  mean_reversion: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  momentum: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+};
+
+const riskProfileColors: Record<string, string> = {
+  aggressive: "bg-loss/10 text-loss",
+  conservative: "bg-gain/10 text-gain",
+  short_term: "bg-amber-500/10 text-amber-400",
+  medium_term: "bg-blue-500/10 text-blue-400",
+  long_term: "bg-purple-500/10 text-purple-400",
   income: "bg-emerald-500/10 text-emerald-400",
+  safe_haven: "bg-cyan-500/10 text-cyan-400",
+  high_conviction: "bg-primary/10 text-primary",
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations";
-const DA_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const DA_CACHE_KEY = "da_recommendations_v2";
+const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
 
-function getCachedDA(): { recommendations: Recommendation[]; marketCondition: string; regimeType: string; timestamp: number } | null {
+function getCachedDA() {
   try {
     const raw = localStorage.getItem(DA_CACHE_KEY);
     if (!raw) return null;
@@ -65,9 +89,9 @@ function getCachedDA(): { recommendations: Recommendation[]; marketCondition: st
   } catch { return null; }
 }
 
-function setCachedDA(recommendations: Recommendation[], marketCondition: string, regimeType: string) {
+function setCachedDA(data: any) {
   try {
-    localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ recommendations, marketCondition, regimeType, timestamp: Date.now() }));
+    localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
   } catch { /* ignore */ }
 }
 
@@ -77,6 +101,38 @@ const REGION_LABELS: Record<string, string> = {
   BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
 };
 
+// Mini sparkline component
+const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
+  if (!data || data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const w = 80, h = 24;
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(" ");
+  const isUp = data[data.length - 1] >= data[0];
+  return (
+    <svg width={w} height={h} className={className}>
+      <polyline points={points} fill="none" stroke={isUp ? "hsl(var(--gain))" : "hsl(var(--loss))"} strokeWidth="1.5" />
+    </svg>
+  );
+};
+
+// Correlation color
+function corrColor(corr: number): string {
+  if (corr < -0.2) return "text-gain";
+  if (corr < 0.3) return "text-emerald-400";
+  if (corr < 0.5) return "text-warning";
+  return "text-loss";
+}
+
+function corrLabel(corr: number): string {
+  if (corr < -0.2) return "Inverse";
+  if (corr < 0.1) return "Uncorrelated";
+  if (corr < 0.3) return "Low";
+  if (corr < 0.5) return "Medium";
+  return "High";
+}
+
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
@@ -85,19 +141,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [error, setError] = useState<string | null>(null);
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number | null>(null);
+  const [stats, setStats] = useState({ generated: 0, passed: 0 });
   const retryCount = useRef(0);
   const { baseCurrency } = useFX();
 
   const existingTickers = stocks.map(s => s.ticker);
 
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
-    // Check 6h cache first
     if (!forceRefresh) {
       const cached = getCachedDA();
       if (cached) {
-        setRecommendations(cached.recommendations);
-        setMarketCondition(cached.marketCondition);
-        setRegimeType(cached.regimeType);
+        setRecommendations(cached.recommendations || []);
+        setMarketCondition(cached.marketCondition || "");
+        setRegimeType(cached.regimeType || "");
+        setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
         setLastFetch(cached.timestamp);
         setLoading(false);
         setError(null);
@@ -108,19 +165,30 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) { setLoading(true); setError(null); }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
+
+      // Build weights and sectors maps
+      const portfolioWeights: Record<string, number> = {};
+      const portfolioSectors: Record<string, string> = {};
+      for (const st of stocks) {
+        const val = (st.analysis?.currentPrice || st.buyPrice) * st.quantity;
+        portfolioWeights[st.ticker] = totalValue > 0 ? val / totalValue : 0;
+        portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
+      }
+
       const { data, error: fnError } = await governedInvoke("desirable-assets", {
-        body: { portfolioTickers: existingTickers, portfolioValue: totalValue || 100000, baseCurrency },
+        body: {
+          portfolioTickers: existingTickers,
+          portfolioWeights,
+          portfolioSectors,
+          portfolioValue: totalValue || 100000,
+          baseCurrency,
+        },
       });
 
       if (fnError) {
-        // Handle specific error codes
         const errMsg = fnError.message || "";
-        if (errMsg.includes("429") || errMsg.includes("rate limit")) {
-          throw new Error("Rate limited. Retrying in 15s...");
-        }
-        if (errMsg.includes("402") || errMsg.includes("credits")) {
-          throw new Error("AI credits exhausted. Please try again later.");
-        }
+        if (errMsg.includes("429") || errMsg.includes("rate limit")) throw new Error("Rate limited. Retrying in 15s...");
+        if (errMsg.includes("402") || errMsg.includes("credits")) throw new Error("AI credits exhausted. Please try again later.");
         throw fnError;
       }
 
@@ -130,25 +198,30 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           setTimeout(() => fetchRecommendations(false), 5000);
           return;
         }
-        throw new Error("No recommendations returned. Try refreshing.");
+        throw new Error("No recommendations survived quant filters. Try refreshing.");
       }
 
-      setCachedDA(data.recommendations, data.marketCondition || "", data.regimeType || "");
+      const payload = {
+        recommendations: data.recommendations,
+        marketCondition: data.marketCondition || "",
+        regimeType: data.regimeType || "",
+        candidatesGenerated: data.candidatesGenerated || 0,
+        candidatesPassed: data.candidatesPassed || 0,
+      };
+      setCachedDA(payload);
       setRecommendations(data.recommendations);
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
+      setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
     } catch (e: any) {
       console.error("Desirable assets error:", e);
       setError(e.message || "Failed to load recommendations");
-      
-      // Auto-retry on transient errors
       if (retryCount.current < MAX_RETRIES && !e.message?.includes("credits")) {
         retryCount.current++;
-        const delay = retryCount.current * 5000;
-        setTimeout(() => fetchRecommendations(false), delay);
+        setTimeout(() => fetchRecommendations(false), retryCount.current * 5000);
       }
     } finally {
       setLoading(false);
@@ -157,7 +230,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   useEffect(() => {
     fetchRecommendations();
-    const interval = setInterval(() => fetchRecommendations(false), 600_000); // 10 min
+    const interval = setInterval(() => fetchRecommendations(false), 600_000);
     return () => clearInterval(interval);
   }, [fetchRecommendations]);
 
@@ -172,8 +245,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground font-mono">Scanning global markets for opportunities...</span>
-        <span className="text-[9px] text-muted-foreground/50 font-mono">AI + real-time Yahoo Finance validation</span>
+        <span className="text-sm text-muted-foreground font-mono">Running 3-stage quant funnel...</span>
+        <span className="text-[9px] text-muted-foreground/50 font-mono">AI candidates → Historical validation → Portfolio correlation filter</span>
       </div>
     );
   }
@@ -189,7 +262,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Desirable Assets</h2>
             <p className="text-[10px] text-muted-foreground font-mono tracking-wider">
-              AI + QUANT HYBRID · {REGION_LABELS[baseCurrency] || "Global"} · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
+              QUANT VALIDATED · {REGION_LABELS[baseCurrency] || "Global"} · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
+              {stats.generated > 0 && <span className="ml-2 text-primary">{stats.passed}/{stats.generated} passed</span>}
               {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
@@ -214,13 +288,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <p className="text-sm font-medium text-foreground">{error}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">
-            Retry
-          </Button>
+          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">Retry</Button>
         </div>
       )}
 
-      {/* Market Condition Banner */}
+      {/* Market Condition */}
       {marketCondition && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -231,9 +303,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
-      {/* Recommendation Cards */}
+      {/* Cards */}
       <div className="grid gap-4 md:grid-cols-2">
-      {recommendations.map((rec, i) => {
+        {recommendations.map((rec, i) => {
           const price = rec.realPrice || rec.currentEstPrice || 0;
           const sym = getCurrencySymbol(rec.realCurrency || rec.currency);
           const targetPrice = rec.targetPrice || 0;
@@ -245,51 +317,112 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const priceChange24h = rec.priceChange24h || 0;
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
+          const qs = rec.quantScore || 0;
 
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
-              {/* Header */}
+              {/* Header row */}
               <div className="flex items-center justify-between mb-3 relative z-10">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-base font-bold text-foreground">{rec.ticker}</span>
-                  <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground">{rec.assetClass}</span>
+                  {rec.strategy && (
+                    <span className={`rounded border px-1.5 py-0.5 text-[9px] font-mono ${strategyColors[rec.strategy] || "bg-surface-3 text-muted-foreground border-border"}`}>
+                      {rec.strategy.replace(/_/g, " ").toUpperCase()}
+                    </span>
+                  )}
+                  {rec.simulationTested && (
+                    <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> TESTED
+                    </span>
+                  )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
-                  {rec.priceVerified && <span className="rounded bg-gain/10 px-1 py-0.5 text-[8px] text-gain">✓ LIVE</span>}
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${rec.confidence >= 75 ? "bg-gain/10 text-gain" : rec.confidence >= 50 ? "bg-warning/10 text-warning" : "bg-loss/10 text-loss"}`}>
-                    {rec.confidence}%
+                <div className="flex items-center gap-1.5">
+                  {/* Quant Score badge */}
+                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-mono font-bold ${qs >= 70 ? "bg-gain/10 text-gain" : qs >= 45 ? "bg-warning/10 text-warning" : "bg-loss/10 text-loss"}`}>
+                    Q{qs}
                   </span>
                 </div>
               </div>
 
               <p className="text-xs text-muted-foreground mb-1 relative z-10">{rec.name}</p>
+
+              {/* Paired instrument */}
+              {rec.pairedStructure && (
+                <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 px-3 py-1.5 mb-2 text-[10px] font-mono text-purple-400 relative z-10">
+                  <span className="font-bold">STRUCTURE:</span> {rec.pairedStructure}
+                  {rec.capitalEfficiency && rec.capitalEfficiency > 1 && (
+                    <span className="ml-2 text-amber-400">{rec.capitalEfficiency}x capital efficiency</span>
+                  )}
+                </div>
+              )}
+
               <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{rec.thesis}</p>
 
-              {/* Price Grid */}
-              <div className="grid grid-cols-4 gap-2 mb-3 relative z-10">
-                <div>
-                  <p className="text-[8px] text-muted-foreground uppercase">Current</p>
-                  <p className="font-mono text-sm font-bold text-foreground">{sym}{price.toLocaleString()}</p>
-                  <p className={`font-mono text-[9px] ${priceChange24h >= 0 ? "text-gain" : "text-loss"}`}>
-                    {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(2)}%
-                  </p>
+              {/* Quant Proof Section */}
+              {rec.sharpeRatio !== undefined && (
+                <div className="grid grid-cols-5 gap-1.5 mb-3 rounded-lg bg-surface-2 p-2.5 relative z-10">
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Sharpe</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.sharpeRatio || 0) >= 0.5 ? "text-gain" : (rec.sharpeRatio || 0) >= 0 ? "text-warning" : "text-loss"}`}>
+                      {rec.sharpeRatio?.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Port Corr</p>
+                    <p className={`font-mono text-xs font-bold ${corrColor(rec.portfolioCorrelation || 0)}`}>
+                      {rec.portfolioCorrelation?.toFixed(2)}
+                    </p>
+                    <p className={`text-[7px] ${corrColor(rec.portfolioCorrelation || 0)}`}>
+                      {corrLabel(rec.portfolioCorrelation || 0)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">MaxDD</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.maxDrawdown || 0) < 15 ? "text-gain" : (rec.maxDrawdown || 0) < 25 ? "text-warning" : "text-loss"}`}>
+                      {rec.maxDrawdown?.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Vol</p>
+                    <p className="font-mono text-xs font-bold text-foreground">{rec.volatility?.toFixed(1)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Z-Score</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.zScore || 0) < -1.5 ? "text-gain" : (rec.zScore || 0) > 1.5 ? "text-loss" : "text-foreground"}`}>
+                      {rec.zScore?.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[8px] text-muted-foreground uppercase">Target</p>
-                  <p className="font-mono text-sm font-bold text-gain">{sym}{targetPrice.toLocaleString()}</p>
-                  <p className="font-mono text-[9px] text-gain">+{upside.toFixed(1)}%</p>
+              )}
+
+              {/* Price + Sparkline */}
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="flex-1 grid grid-cols-4 gap-2">
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Current</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{sym}{price.toLocaleString()}</p>
+                    <p className={`font-mono text-[9px] ${priceChange24h >= 0 ? "text-gain" : "text-loss"}`}>
+                      {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Target</p>
+                    <p className="font-mono text-sm font-bold text-gain">{sym}{targetPrice.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-gain">+{upside.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Stop Loss</p>
+                    <p className="font-mono text-sm font-bold text-loss">{sym}{stopLoss.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-loss">{downside.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || "—"}</p>
+                    <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || "—"}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[8px] text-muted-foreground uppercase">Stop Loss</p>
-                  <p className="font-mono text-sm font-bold text-loss">{sym}{stopLoss.toLocaleString()}</p>
-                  <p className="font-mono text-[9px] text-loss">{downside.toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
-                  <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || "—"}</p>
-                  <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || "—"}</p>
-                </div>
+                <Sparkline data={rec.closes || []} />
               </div>
 
               {/* Entry Zone */}
@@ -310,12 +443,12 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 </div>
               </div>
 
-              {/* Tags */}
+              {/* Tags: strategy + risk profile */}
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex flex-wrap gap-1">
-                  {rec.tags?.map(tag => (
-                    <span key={tag} className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${tagColors[tag] || "bg-surface-3 text-muted-foreground"}`}>
-                      {tag}
+                  {rec.riskProfile?.map(tag => (
+                    <span key={tag} className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${riskProfileColors[tag] || "bg-surface-3 text-muted-foreground"}`}>
+                      {tag.replace(/_/g, " ")}
                     </span>
                   ))}
                   <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9px] text-muted-foreground">{rec.sector}</span>
