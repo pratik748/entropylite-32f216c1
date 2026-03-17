@@ -1033,7 +1033,7 @@ function MeanReversionPanel({ assets, fmt, historicalPrices }: { assets: AssetDa
       snapProb: a.snapProb * 100, signal: Math.abs(a.z) > 2 && a.isStationary ? "STRONG" : Math.abs(a.z) > 1.5 && a.isStationary ? "MODERATE" : "NONE",
     }));
     return { assetMR, zChart };
-  }, [assets]);
+  }, [assets, historicalPrices]);
 
   if (!data) return <EmptyMsg />;
 
