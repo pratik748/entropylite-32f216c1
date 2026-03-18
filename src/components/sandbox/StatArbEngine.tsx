@@ -860,12 +860,12 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
         </Canvas>
       </div>
       <p className="text-[9px] text-muted-foreground text-center">
-        Drag to rotate · Scroll to zoom · Yellow = median · {mc.paths.length} paths rendered
+        Drag to rotate · Scroll to zoom · Yellow = median · {mc.paths.length} paths rendered · dS = μSdt + σSdW
       </p>
 
       {/* Percentile Fan Chart */}
       <div>
-        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Confidence Band Fan Chart (5th–95th Percentile)</p>
+        <p className="text-[10px] font-bold text-foreground uppercase mb-2">Confidence Band Fan Chart (5th–95th Percentile) — {horizonLabel}</p>
         <div className="h-48 sm:h-56">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={mc.percentileBands}>
