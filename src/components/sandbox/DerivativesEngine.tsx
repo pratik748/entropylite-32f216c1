@@ -738,7 +738,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             </span>
           )}
           <button
-            onClick={() => analyze(true)}
+            onClick={() => analyze(true, newsHeadlines, "", sentimentMood)}
             disabled={loading}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
           >
