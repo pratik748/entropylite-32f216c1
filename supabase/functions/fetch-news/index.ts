@@ -7,10 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ── Source tiers (institutional ranking) ──
 const TIER_1 = ["reuters", "associated press", "ap news", "bloomberg"];
 const TIER_2 = ["cnbc", "wall street journal", "wsj", "financial times", "ft", "new york times", "nyt", "economist", "bbc"];
-const TIER_3 = ["marketwatch", "seeking alpha", "investopedia", "yahoo finance", "barrons", "cnn"];
+const TIER_3 = ["marketwatch", "seeking alpha", "investopedia", "yahoo finance", "barrons", "cnn", "google news"];
 
 function getSourceTier(source: string): number {
   const s = source.toLowerCase();
@@ -20,12 +19,7 @@ function getSourceTier(source: string): number {
   return 4;
 }
 
-// ── RSS feed definitions ──
-interface RSSSource {
-  url: string;
-  name: string;
-  tier: number;
-}
+interface RSSSource { url: string; name: string; tier: number; }
 
 const RSS_SOURCES: RSSSource[] = [
   { url: "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best", name: "Reuters", tier: 1 },
@@ -34,9 +28,14 @@ const RSS_SOURCES: RSSSource[] = [
   { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", name: "CNBC", tier: 2 },
   { url: "https://rss.cnn.com/rss/money_latest.rss", name: "CNN Business", tier: 3 },
   { url: "https://feeds.marketwatch.com/marketwatch/topstories/", name: "MarketWatch", tier: 3 },
+  // Additional sources for freshness
+  { url: "https://news.google.com/rss/search?q=stock+market+OR+economy+OR+earnings&hl=en-US&gl=US&ceid=US:en", name: "Google News", tier: 3 },
+  { url: "https://finance.yahoo.com/news/rssindex", name: "Yahoo Finance", tier: 3 },
+  { url: "https://feeds.marketwatch.com/marketwatch/marketpulse/", name: "MarketWatch Pulse", tier: 3 },
+  { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258", name: "CNBC Markets", tier: 2 },
+  { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069", name: "CNBC Economy", tier: 2 },
 ];
 
-// ── Junk patterns ──
 const JUNK_PATTERNS = [
   /horoscope/i, /astrology/i, /zodiac/i, /tarot/i,
   /celebrity/i, /bollywood/i, /hollywood/i, /kardashian/i,
@@ -47,7 +46,6 @@ const JUNK_PATTERNS = [
   /MSME awareness/i, /congratulat/i,
 ];
 
-// ── Financial relevance keywords ──
 const FINANCE_KEYWORDS = [
   /\b(stock|equit|share|market|index|indices)\b/i,
   /\b(inflation|cpi|gdp|employment|payroll|jobs report)\b/i,
@@ -73,15 +71,12 @@ function isJunk(title: string, desc: string): boolean {
 function relevanceScore(title: string, desc: string, tier: number): number {
   const text = `${title} ${desc}`;
   const kwScore = FINANCE_KEYWORDS.reduce((s, kw) => s + (kw.test(text) ? 1 : 0), 0);
-  // Boost higher-tier sources
   const tierBoost = tier === 1 ? 5 : tier === 2 ? 3 : tier === 3 ? 1 : 0;
   return kwScore + tierBoost;
 }
 
-// ── Lightweight RSS XML parser (no deps) ──
 function parseRSSXml(xml: string, sourceName: string, tier: number): Article[] {
   const articles: Article[] = [];
-  // Match <item>...</item> blocks
   const itemRegex = /<item[\s>]([\s\S]*?)<\/item>/gi;
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
@@ -90,7 +85,6 @@ function parseRSSXml(xml: string, sourceName: string, tier: number): Article[] {
     const link = extractTag(block, "link") || extractGuid(block);
     const description = stripHtml(extractTag(block, "description") || "");
     const pubDate = extractTag(block, "pubDate") || extractTag(block, "dc:date") || "";
-
     if (title && link) {
       articles.push({
         title: stripCdata(title).trim(),
@@ -114,28 +108,23 @@ function extractTag(block: string, tag: string): string | null {
   const m = block.match(regex);
   return m ? stripCdata(m[1]) : null;
 }
-
 function extractGuid(block: string): string | null {
   const m = block.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
   return m ? stripCdata(m[1]) : null;
 }
-
 function extractImageFromEnclosure(block: string): string | null {
   const m = block.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*>/i);
   if (m) return m[1];
   const media = block.match(/<media:content[^>]*url=["']([^"']+)["'][^>]*>/i);
   return media ? media[1] : null;
 }
-
 function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 }
-
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
 }
 
-// ── Standardized article type ──
 interface Article {
   title: string;
   description: string | null;
@@ -149,7 +138,6 @@ interface Article {
   origin: string;
 }
 
-// ── Fetch all RSS feeds in parallel ──
 async function fetchAllRSS(): Promise<{ articles: Article[]; successCount: number }> {
   const results = await Promise.allSettled(
     RSS_SOURCES.map(async (src) => {
@@ -183,11 +171,10 @@ async function fetchAllRSS(): Promise<{ articles: Article[]; successCount: numbe
   return { articles, successCount };
 }
 
-// ── GDELT API ──
 async function fetchGDELT(query: string): Promise<Article[]> {
   try {
     const q = encodeURIComponent(query || "market OR economy OR stocks");
-    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q} sourcelang:eng&mode=artlist&maxrecords=20&format=json`;
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q} sourcelang:eng&mode=artlist&maxrecords=50&format=json`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, { signal: controller.signal });
@@ -212,7 +199,6 @@ async function fetchGDELT(query: string): Promise<Article[]> {
   }
 }
 
-// ── Newsdata.io (existing) ──
 async function fetchNewsdata(query: string): Promise<Article[]> {
   const NEWSDATA_API_KEY = Deno.env.get("NEWSDATA_API_KEY");
   if (!NEWSDATA_API_KEY) return [];
@@ -239,7 +225,6 @@ async function fetchNewsdata(query: string): Promise<Article[]> {
   }
 }
 
-// ── Deduplication by normalized title similarity ──
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
@@ -248,7 +233,6 @@ function isDuplicate(a: string, existing: string[]): boolean {
   const na = normalize(a);
   if (na.length < 15) return false;
   for (const e of existing) {
-    // Check if titles share 80%+ of words
     const wordsA = new Set(na.split(" "));
     const wordsB = new Set(e.split(" "));
     const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
@@ -270,7 +254,6 @@ function deduplicateArticles(articles: Article[]): Article[] {
   return result;
 }
 
-// ── Main handler ──
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -281,7 +264,6 @@ serve(async (req) => {
     const { ticker, region } = await req.json();
     const cleanTicker = (ticker || "").replace(/\.(NS|BO|BSE)$/i, "").trim();
 
-    // Region-aware query building
     const regionKeywords: Record<string, string> = {
       India: "India OR NSE OR BSE OR Sensex OR Nifty OR RBI OR rupee",
       US: "US OR Wall Street OR Federal Reserve OR S&P 500 OR NASDAQ OR NYSE",
@@ -289,7 +271,7 @@ serve(async (req) => {
       Asia: "Asia OR Nikkei OR Hang Seng OR China OR Japan OR Korea",
     };
     const regionContext = region && region !== "All" ? regionKeywords[region] || "" : "";
-    
+
     let query: string;
     if (cleanTicker) {
       query = regionContext ? `${cleanTicker} stock ${regionContext}` : `${cleanTicker} stock market`;
@@ -299,7 +281,6 @@ serve(async (req) => {
 
     console.log("Multi-source news fetch for:", query);
 
-    // Fetch all sources in parallel
     const [rssResult, gdeltArticles, newsdataArticles] = await Promise.all([
       fetchAllRSS(),
       fetchGDELT(query),
@@ -308,20 +289,32 @@ serve(async (req) => {
 
     const rssFeeds = rssResult.successCount;
 
-    // Merge all sources
     const allArticles = [
       ...rssResult.articles,
       ...gdeltArticles,
       ...newsdataArticles,
     ];
 
-    // Filter junk, deduplicate, score, rank
-    const filtered = allArticles
+    // Sort by pubDate first (newest first), then by relevance
+    const withTimestamps = allArticles
       .filter(a => a.title && !isJunk(a.title, a.description || ""))
-      .sort((a, b) => relevanceScore(b.title, b.description || "", b.sourceTier) - relevanceScore(a.title, a.description || "", a.sourceTier));
+      .map(a => ({
+        ...a,
+        _ts: a.pubDate ? new Date(a.pubDate).getTime() : 0,
+        _rel: relevanceScore(a.title, a.description || "", a.sourceTier),
+      }))
+      .sort((a, b) => {
+        // Primary: recency (newest first), Secondary: relevance
+        if (a._ts && b._ts) {
+          const timeDiff = b._ts - a._ts;
+          if (Math.abs(timeDiff) > 3600_000) return timeDiff; // >1hr difference → sort by time
+        }
+        return b._rel - a._rel;
+      });
 
+    const filtered = withTimestamps.map(({ _ts, _rel, ...article }) => article);
     const deduplicated = deduplicateArticles(filtered);
-    const top = deduplicated.slice(0, 25);
+    const top = deduplicated.slice(0, 40);
 
     const sourcesPolled = rssFeeds + (gdeltArticles.length > 0 ? 1 : 0) + (newsdataArticles.length > 0 ? 1 : 0);
 

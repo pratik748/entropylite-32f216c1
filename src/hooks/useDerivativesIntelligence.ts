@@ -61,7 +61,7 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const analyze = useCallback(async (force = false, newsContext?: string, macroContext?: string) => {
+  const analyze = useCallback(async (force = false, newsContext?: string, macroContext?: string, sentimentContext?: string) => {
     const analyzed = stocks.filter(s => s.analysis);
     if (analyzed.length === 0) return;
 
@@ -102,6 +102,7 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
           discovery_mode: true,
           news_context: newsContext || "",
           macro_context: macroContext || "",
+          sentiment_context: sentimentContext || "",
         },
       });
 

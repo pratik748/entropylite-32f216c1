@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const { user } = await requireAuth(req, corsHeaders);
-    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context } = await req.json();
+    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context, sentiment_context } = await req.json();
 
     if (!tickers?.length) {
       return new Response(JSON.stringify({ error: "No tickers provided" }), {
@@ -37,16 +37,23 @@ serve(async (req) => {
     const futuresCount = Math.max(2, Math.min(n, 6));
     const oppCount = Math.max(5, Math.min(n * 2, 12));
     const simCount = Math.max(3, Math.min(n, 8));
-    const discoveryCount = discovery_mode ? Math.max(5, Math.min(n * 2, 10)) : 0;
+    const discoveryCount = discovery_mode ? Math.max(10, Math.min(n * 3, 20)) : 0;
     const seed = Math.floor(Math.random() * 99999);
 
-    const maxTokens = Math.min(16000, 5000 + n * 600 + (discovery_mode ? 3000 : 0));
+    const maxTokens = Math.min(16000, 5000 + n * 600 + (discovery_mode ? 5000 : 0));
+
+    const sentimentBlock = sentiment_context ? `
+REAL-TIME SENTIMENT CONTEXT:
+${sentiment_context}
+You MUST incorporate this sentiment into every discovery. If sentiment is risk-off/bearish, emphasize hedges, defensive plays, and inverse ETFs. If risk-on/bullish, emphasize leveraged upside, momentum plays, and growth sector futures.
+` : "";
 
     const discoveryContext = discovery_mode ? `
 
 MARKET CONTEXT FOR GOD'S EYE DISCOVERY:
-${news_context ? `Recent news themes: ${news_context.slice(0, 500)}` : "Use your knowledge of current market themes, geopolitical events, and sector trends."}
-${macro_context ? `Macro regime: ${macro_context.slice(0, 300)}` : "Consider current interest rate environment, inflation, and macro conditions."}
+${news_context ? `Recent news headlines: ${news_context.slice(0, 800)}` : "Use your knowledge of current market themes, geopolitical events, and sector trends."}
+${macro_context ? `Macro regime: ${macro_context.slice(0, 500)}` : "Consider current interest rate environment, inflation, and macro conditions."}
+${sentimentBlock}
 
 DISCOVERY MODE ACTIVE — You MUST find opportunities BEYOND the portfolio tickers. Think like a hedge fund CIO scanning the entire market:
 - Find correlated ETFs, sector futures, cross-asset plays (e.g., LMT futures + ITA defense ETF for leveraged sector exposure)
@@ -55,6 +62,15 @@ DISCOVERY MODE ACTIVE — You MUST find opportunities BEYOND the portfolio ticke
 - Look for riskless leverage via futures + ETF combinations in the same sector
 - Consider commodity futures (gold, oil, copper) that hedge or amplify portfolio exposures
 - Find cross-border opportunities (e.g., US defense stocks + European defense ETFs like EUAD)
+- Scan for volatility arbitrage: if IV is elevated, suggest selling premium; if compressed, suggest long gamma
+- Look for calendar spreads, cross-commodity plays, and macro convergence trades
+
+MANDATORY DIVERSITY: You MUST include at least:
+  - 2× futures_etf_leverage (futures paired with ETFs for capital efficiency)
+  - 2× sector_pair (sector rotation or relative value within sectors)  
+  - 2× macro_hedge (hedging macro risk via derivatives)
+  - 2× relative_value (mispricing between related instruments)
+  - 2× cross_asset (cross-market plays: equities vs commodities, bonds vs stocks, etc.)
 ` : "";
 
     const discoverySchema = discovery_mode ? `,
@@ -67,16 +83,16 @@ DISCOVERY MODE ACTIVE — You MUST find opportunities BEYOND the portfolio ticke
       "instrument_b": "ITA ETF (iShares US Aerospace & Defense)",
       "structure": "Long LMT futures / Long ITA for capital-efficient sector exposure",
       "capital_efficiency": 4.5,
-      "catalyst": "geopolitical|news|earnings|macro|structural",
+      "catalyst": "geopolitical|news|earnings|macro|structural|sentiment",
       "confidence": 0.75,
-      "reasoning": "detailed explanation with specific market rationale",
+      "reasoning": "detailed explanation with specific market rationale tied to current sentiment and news",
       "risk_reward": 3.2,
       "urgency": "high|medium|low"
     }
   ]` : "";
 
     const discoveryMinimum = discovery_mode ? `
-- ${discoveryCount} discovery opportunities BEYOND portfolio tickers (mix of: futures_etf_leverage, sector_pair, macro_hedge, relative_value, cross_asset). These must involve at least one asset NOT in the portfolio. Be specific about instruments (futures contracts, ETF tickers, etc).` : "";
+- ${discoveryCount} discovery opportunities BEYOND portfolio tickers (MANDATORY MIX: at least 2 each of futures_etf_leverage, sector_pair, macro_hedge, relative_value, cross_asset). These must involve at least one asset NOT in the portfolio. Be specific about instruments (futures contracts, ETF tickers, etc). Each discovery MUST reference the current market sentiment and news context in its reasoning.` : "";
 
     const systemPrompt = `You are a GOD'S EYE derivatives intelligence engine for institutional portfolio management. You see the ENTIRE market, not just what's in the portfolio. Return ONLY valid JSON. No commentary, no markdown.
 
@@ -88,6 +104,7 @@ CRITICAL RULES:
 - You MUST generate data for EVERY ticker in the portfolio, not just the first few
 - For DISCOVERIES: look BEYOND the portfolio. Find opportunities in correlated assets, sector ETFs, commodity futures, cross-market plays
 - Think like a Bloomberg terminal scanning every market for structural opportunities
+- INCORPORATE REAL-TIME SENTIMENT: adjust confidence, urgency, and trade direction based on market mood
 - Seed=${seed} for variety`;
 
     const userPrompt = `Analyze this FULL portfolio of ${n} assets AND scan the broader market for derivatives opportunities:
