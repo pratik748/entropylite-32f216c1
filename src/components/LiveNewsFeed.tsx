@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Newspaper, ExternalLink, RefreshCw, Radio } from "lucide-react";
+import { ExternalLink, RefreshCw, Radio } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,16 +28,33 @@ interface LiveNewsFeedProps {
   ticker?: string;
   compact?: boolean;
   region?: string;
+  onArticlesUpdate?: (articles: NewsArticle[]) => void;
 }
 
-const NEWS_REFRESH_INTERVAL = 600_000;
+const NEWS_REFRESH_INTERVAL = 120_000; // 2 minutes
 
-const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
+function useTimeAgo(date: Date | null) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!date) return;
+    const interval = setInterval(() => setTick(t => t + 1), 10_000);
+    return () => clearInterval(interval);
+  }, [date]);
+  if (!date) return null;
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / 3600)}h ago`;
+}
+
+const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [sourcesPolled, setSourcesPolled] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeAgo = useTimeAgo(lastFetched);
 
   const fetchNews = async () => {
     setLoading(true);
@@ -46,9 +63,11 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
         body: { ticker: ticker || "", category: "business", region: region || "All" },
       });
       if (error) throw error;
-      setArticles(data.articles || []);
+      const arts = data.articles || [];
+      setArticles(arts);
       setSourcesPolled(data.sourcesPolled || 0);
       setLastFetched(new Date());
+      onArticlesUpdate?.(arts);
     } catch (err) {
       console.error("News fetch error:", err);
     } finally {
@@ -82,13 +101,14 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
             {sourcesPolled > 0 && (
               <span className="text-[7px] text-muted-foreground">{sourcesPolled} feeds</span>
             )}
+            {timeAgo && <span className="text-[7px] text-muted-foreground/60">· {timeAgo}</span>}
           </div>
           <Button size="sm" variant="ghost" onClick={fetchNews} disabled={loading} className="h-4 w-4 p-0">
             <RefreshCw className={`h-2.5 w-2.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
         <div className="flex-1 overflow-auto space-y-0">
-          {articles.slice(0, 25).map((article, i) => {
+          {articles.slice(0, 40).map((article, i) => {
             const tier = getTierBadge(article.sourceTier);
             return (
               <a
@@ -135,9 +155,9 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {lastFetched && (
+          {timeAgo && (
             <span className="text-[10px] text-muted-foreground">
-              {lastFetched.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {timeAgo}
             </span>
           )}
           <Button
@@ -187,6 +207,12 @@ const LiveNewsFeed = ({ ticker, compact, region }: LiveNewsFeedProps) => {
                     <span className="font-medium">{article.source}</span>
                     <span>·</span>
                     <span>{article.pubDate ? new Date(article.pubDate).toLocaleDateString("en-US", { day: "numeric", month: "short" }) : ""}</span>
+                    {article.pubDate && (
+                      <>
+                        <span>·</span>
+                        <span>{new Date(article.pubDate).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                      </>
+                    )}
                     {article.origin && (
                       <>
                         <span>·</span>
