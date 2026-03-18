@@ -389,24 +389,76 @@ Return JSON:
     scored.sort((a, b) => b.quantScore - a.quantScore);
     const top = scored.slice(0, 10);
 
-    const enriched = top.map(s => ({
-      ...s.rec,
-      realPrice: s.realPrice,
-      realCurrency: s.realCurrency,
-      priceChange24h: s.priceChange24h,
-      priceVerified: s.priceVerified,
-      realVolume: s.volume,
-      fiftyTwoHigh: s.fiftyTwoHigh,
-      fiftyTwoLow: s.fiftyTwoLow,
-      sharpeRatio: s.sharpeRatio,
-      maxDrawdown: s.maxDrawdown,
-      portfolioCorrelation: s.portfolioCorrelation,
-      volatility: s.volatility,
-      zScore: s.zScore,
-      quantScore: s.quantScore,
-      closes: s.closes,
-      simulationTested: true,
-    }));
+    const enriched = top.map(s => {
+      const realPrice = s.realPrice;
+      let targetPrice = s.rec.targetPrice;
+      let stopLoss = s.rec.stopLoss;
+      let entryZone = s.rec.entryZone;
+
+      // Server-side validation: target must be above current price for long positions
+      if (targetPrice && realPrice && targetPrice < realPrice) {
+        // Fix nonsensical target: set to +15-30% above current price based on confidence
+        const uplift = 0.15 + (s.rec.confidence || 50) / 1000;
+        targetPrice = Math.round(realPrice * (1 + uplift) * 100) / 100;
+      }
+
+      // Ensure stop loss is below current price (for longs)
+      if (stopLoss && realPrice && stopLoss > realPrice) {
+        stopLoss = Math.round(realPrice * 0.92 * 100) / 100;
+      }
+
+      // Fix entry zone if nonsensical
+      if (entryZone) {
+        if (entryZone[0] > realPrice * 1.5 || entryZone[1] < realPrice * 0.3) {
+          entryZone = [Math.round(realPrice * 0.95 * 100) / 100, Math.round(realPrice * 1.02 * 100) / 100];
+        }
+      }
+
+      // Fix hedging strategy - never return empty or "no hedge"
+      let hedgingStrategy = s.rec.hedgingStrategy || "";
+      if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.trim().length < 5) {
+        const sector = s.rec.sector || "broad market";
+        const assetClass = s.rec.assetClass || "Equity";
+        if (assetClass === "ETF" || assetClass === "Equity") {
+          hedgingStrategy = `Buy ${s.rec.ticker} protective put at 95% strike (${s.rec.timeHorizon || "3M"} expiry) or pair with inverse sector ETF for ${sector} exposure neutralization`;
+        } else if (assetClass === "Crypto") {
+          hedgingStrategy = `Reduce position size to 2-3% of portfolio; set trailing stop at -8%; hedge with BTC/ETH put options or short perpetual futures`;
+        } else if (assetClass === "Commodity") {
+          hedgingStrategy = `Use commodity futures calendar spread or pair with USD-denominated hedge (UUP/DXY) to offset dollar-denominated commodity risk`;
+        } else {
+          hedgingStrategy = `Position-size to max 3% portfolio weight; set hard stop at ${stopLoss ? '$' + stopLoss : '-8%'}; consider protective puts or collar strategy`;
+        }
+      }
+
+      // Compute risk-reward string from validated numbers
+      const riskReward = realPrice && targetPrice && stopLoss
+        ? `1:${((targetPrice - realPrice) / (realPrice - stopLoss)).toFixed(1)}`
+        : s.rec.riskReward || "—";
+
+      return {
+        ...s.rec,
+        targetPrice,
+        stopLoss,
+        entryZone,
+        hedgingStrategy,
+        riskReward,
+        realPrice: s.realPrice,
+        realCurrency: s.realCurrency,
+        priceChange24h: s.priceChange24h,
+        priceVerified: s.priceVerified,
+        realVolume: s.volume,
+        fiftyTwoHigh: s.fiftyTwoHigh,
+        fiftyTwoLow: s.fiftyTwoLow,
+        sharpeRatio: s.sharpeRatio,
+        maxDrawdown: s.maxDrawdown,
+        portfolioCorrelation: s.portfolioCorrelation,
+        volatility: s.volatility,
+        zScore: s.zScore,
+        quantScore: s.quantScore,
+        closes: s.closes,
+        simulationTested: true,
+      };
+    });
 
     console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed quant filters`);
 

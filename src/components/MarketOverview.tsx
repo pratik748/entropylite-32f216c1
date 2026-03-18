@@ -202,7 +202,7 @@ const MarketOverview = () => {
             {data.macro.topMovers?.length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Movers</p>
-                {data.macro.topMovers.slice(0, 5).map((m, i) => (
+                {data.macro.topMovers.map((m, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{m.name}</span>
                     <span className={`font-mono font-semibold ${m.change >= 0 ? "text-gain" : "text-loss"}`}>

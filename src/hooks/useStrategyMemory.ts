@@ -39,7 +39,7 @@ export function useStrategyMemory() {
     return memory
       .filter(m => m.regime === regime || Math.abs(m.conditions.vix - vix) < 5)
       .sort((a, b) => b.pnlPct - a.pnlPct)
-      .slice(0, 5);
+      .slice(0, 20);
   }, [memory]);
 
   const getWinRate = useCallback(() => {
