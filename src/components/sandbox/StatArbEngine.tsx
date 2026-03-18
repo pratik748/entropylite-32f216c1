@@ -698,9 +698,17 @@ function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[
 }
 
 function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
+  const [horizon, setHorizon] = useState<number>(252);
+  const horizonOptions = [
+    { label: "30d", value: 30 },
+    { label: "90d", value: 90 },
+    { label: "180d", value: 180 },
+    { label: "1Y (252d)", value: 252 },
+  ];
+
   const mc = useMemo(() => {
-    return SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, 252, 10000, 60, true);
-  }, [totalValue, portfolioMu, portfolioVol]);
+    return SA.runMonteCarlo(totalValue, portfolioMu, portfolioVol, horizon, 10000, 60, true);
+  }, [totalValue, portfolioMu, portfolioVol, horizon]);
 
   const medianPath = useMemo(() => {
     const steps = mc.paths[0]?.length || 0;
@@ -739,21 +747,18 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     });
   }, [medianPath, mc]);
 
-  // Additional statistics
   const stats = useMemo(() => {
     const profitPaths = mc.finalValues.filter(v => v > totalValue).length;
     const profitProb = profitPaths / mc.finalValues.length;
     const medianFinal = SA.percentile(mc.finalValues, 50);
-    const sortedFinals = [...mc.finalValues].sort((a, b) => a - b);
     const m = SA.mean(mc.finalValues);
     const s = SA.stddev(mc.finalValues);
     const n = mc.finalValues.length;
     const skewness = mc.finalValues.reduce((acc, v) => acc + Math.pow((v - m) / s, 3), 0) / n;
-    const sharpe = portfolioVol > 0 ? (portfolioMu - 0.04) / portfolioVol : 0; // rf=4%
+    const sharpe = portfolioVol > 0 ? (portfolioMu - 0.04) / portfolioVol : 0;
     return { profitProb, medianFinal, skewness, sharpe };
   }, [mc, totalValue, portfolioMu, portfolioVol]);
 
-  // Histogram of final values
   const histogramData = useMemo(() => {
     const vals = mc.finalValues;
     const min = Math.min(...vals), max = Math.max(...vals);
@@ -765,7 +770,6 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     });
   }, [mc, totalValue]);
 
-  // Max Drawdown distribution
   const ddHistData = useMemo(() => {
     const vals = mc.maxDrawdownDist.map(v => v * 100);
     const min = Math.min(...vals), max = Math.max(...vals);
@@ -776,9 +780,54 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
     });
   }, [mc]);
 
+  const rfRate = 0.04;
+  const horizonLabel = horizon <= 30 ? "30 Trading Days" : horizon <= 90 ? "90 Trading Days" : horizon <= 180 ? "6 Months" : "1 Year (252 Days)";
+
   return (
     <div className="space-y-5">
-      <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths (3D)</h3>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">Full Monte Carlo — 10K Paths (3D)</h3>
+        <div className="flex gap-1">
+          {horizonOptions.map(h => (
+            <button key={h.value} onClick={() => setHorizon(h.value)}
+              className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold transition-all ${horizon === h.value ? "bg-primary text-primary-foreground" : "bg-muted/30 text-muted-foreground hover:text-foreground"}`}>
+              {h.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Simulation Parameters Card */}
+      <div className="glass-panel rounded-xl p-3 grid grid-cols-3 sm:grid-cols-7 gap-2 text-center border border-primary/20">
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Model</div>
+          <div className="text-[11px] font-mono font-bold text-primary">GBM</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Horizon</div>
+          <div className="text-[11px] font-mono font-bold text-foreground">{horizonLabel}</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Paths</div>
+          <div className="text-[11px] font-mono font-bold text-foreground">10,000</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Rendered</div>
+          <div className="text-[11px] font-mono font-bold text-foreground">60</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Drift (μ)</div>
+          <div className={`text-[11px] font-mono font-bold ${portfolioMu > 0 ? "text-gain" : "text-loss"}`}>{(portfolioMu * 100).toFixed(2)}%</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Vol (σ)</div>
+          <div className="text-[11px] font-mono font-bold text-warning">{(portfolioVol * 100).toFixed(2)}%</div>
+        </div>
+        <div>
+          <div className="text-[8px] text-muted-foreground uppercase">Risk-Free</div>
+          <div className="text-[11px] font-mono font-bold text-muted-foreground">{(rfRate * 100).toFixed(1)}%</div>
+        </div>
+      </div>
       
       {/* Extended metrics */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
