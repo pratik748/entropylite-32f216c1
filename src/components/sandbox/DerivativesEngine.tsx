@@ -131,12 +131,40 @@ const DerivativesEngine = ({ stocks }: Props) => {
       );
     }
 
+    // Compute sentiment summary from discoveries
+    const urgentCount = discoveries.filter(d => d.urgency === "high").length;
+    const avgConfidence = discoveries.length > 0 ? discoveries.reduce((s, d) => s + d.confidence, 0) / discoveries.length : 0;
+    const typeBreakdown = discoveries.reduce((acc, d) => { acc[d.type] = (acc[d.type] || 0) + 1; return acc; }, {} as Record<string, number>);
+
     return (
       <div className="space-y-3">
-        <div className="glass-panel rounded-xl p-3 flex items-center gap-2 text-[10px] text-muted-foreground border border-primary/20">
-          <Eye className="h-3.5 w-3.5 text-primary" />
-          <span className="font-bold text-primary">GOD'S EYE MODE</span>
-          <span className="text-muted-foreground">— {discoveries.length} cross-market opportunities discovered beyond your portfolio</span>
+        {/* Sentiment-aware header */}
+        <div className="glass-panel rounded-xl p-3 border border-primary/20">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Eye className="h-3.5 w-3.5 text-primary" />
+              <span className="font-bold text-primary text-[11px]">GOD'S EYE MODE</span>
+              <span className="text-muted-foreground text-[10px]">— {discoveries.length} cross-market opportunities</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {urgentCount > 0 && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-loss/20 text-loss font-bold animate-pulse">{urgentCount} URGENT</span>
+              )}
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">Avg Conf: {(avgConfidence * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+          {sentimentMood && (
+            <div className="text-[9px] text-muted-foreground mt-1">
+              <span className="font-bold text-foreground">Market Sentiment:</span> {sentimentMood}
+            </div>
+          )}
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {Object.entries(typeBreakdown).map(([type, count]) => (
+              <span key={type} className="text-[8px] px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground font-mono">
+                {type.replace(/_/g, " ")}: {count}
+              </span>
+            ))}
+          </div>
         </div>
 
         {discoveries.map((d, i) => (
