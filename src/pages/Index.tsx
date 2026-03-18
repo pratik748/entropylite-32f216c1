@@ -77,7 +77,10 @@ const IndexContent = () => {
     triggerRefresh();
   }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
-  
+
+  // Sell notification system — monitors positions for profit drawdowns and sell signals
+  useSellNotifications(stocks);
+
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);
