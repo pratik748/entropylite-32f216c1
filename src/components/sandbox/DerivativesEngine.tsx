@@ -67,12 +67,16 @@ function pctFmt(v: number) { return `${(v * 100).toFixed(1)}%`; }
 
 const DerivativesEngine = ({ stocks }: Props) => {
   const [activeTab, setActiveTab] = useState<SubTab>("discoveries");
+  const [newsHeadlines, setNewsHeadlines] = useState<string>("");
+  const [sentimentMood, setSentimentMood] = useState<string>("");
   const { data, loading, error, analyze } = useDerivativesIntelligence(stocks);
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const analyzed = stocks.filter(s => s.analysis);
 
   useEffect(() => {
-    if (analyzed.length > 0 && !data && !loading) analyze();
+    if (analyzed.length > 0 && !data && !loading) {
+      analyze(false, newsHeadlines, "", sentimentMood);
+    }
   }, [analyzed.length]);
 
   // Fetch historical prices for real correlation matrix
