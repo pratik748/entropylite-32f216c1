@@ -350,7 +350,7 @@ const SentimentDashboard = ({ ticker, compact }: Props) => {
             <span className="text-[10px] font-bold text-warning">{data.wikiAttention.spikeRatio}x</span>
           </div>
         )}
-        {data.sourceBreakdown.slice(0, 5).map((s, i) => <SourceBar key={i} source={s} />)}
+        {data.sourceBreakdown.map((s, i) => <SourceBar key={i} source={s} />)}
       </div>
     );
   }

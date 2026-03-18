@@ -41,6 +41,7 @@ import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
+import { useSellNotifications } from "@/hooks/useSellNotifications";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk";
 
@@ -76,7 +77,10 @@ const IndexContent = () => {
     triggerRefresh();
   }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
-  
+
+  // Sell notification system — monitors positions for profit drawdowns and sell signals
+  useSellNotifications(stocks);
+
 
   const stocksRef = useRef(stocks);
   useEffect(() => { stocksRef.current = stocks; }, [stocks]);

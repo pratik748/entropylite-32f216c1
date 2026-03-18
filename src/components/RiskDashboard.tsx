@@ -162,12 +162,12 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const { provider, toggle } = useAIProvider();
 
   const CORR_LABELS = analyzed.length > 0 
-    ? analyzed.slice(0, 5).map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
-    : ["Asset 1", "Asset 2", "Asset 3", "Asset 4", "Asset 5"];
+    ? analyzed.map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
+    : ["Asset 1", "Asset 2"];
 
   const corrMatrix = useMemo(() => {
-    const betas = analyzed.slice(0, 5).map(s => s.analysis?.beta || 1);
-    const n = Math.min(betas.length, 5);
+    const betas = analyzed.map(s => s.analysis?.beta || 1);
+    const n = betas.length;
     const matrix: number[][] = [];
     for (let i = 0; i < n; i++) {
       matrix[i] = [];

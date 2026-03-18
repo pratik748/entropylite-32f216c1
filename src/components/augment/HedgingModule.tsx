@@ -59,7 +59,7 @@ const HedgingModule = ({ stocks }: Props) => {
     }
 
     // Per-position tail risk
-    const topRisk = [...holdings].sort((a, b) => b.risk * b.value - a.risk * a.value).filter(h => h.risk >= cfg.minUrgency).slice(0, 5);
+    const topRisk = [...holdings].sort((a, b) => b.risk * b.value - a.risk * a.value).filter(h => h.risk >= cfg.minUrgency);
     topRisk.forEach(h => {
       const posVol = (h.risk / 100) * 0.018 * Math.sqrt(252);
       const putDelta = -0.30 * (h.risk / 50);
