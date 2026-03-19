@@ -257,7 +257,7 @@ Return ONLY valid JSON.`,
 
 ${portfolioContext}
 ${antiRepeatBlock}
-Generate exactly 15 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
+Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
 
 ## PORTFOLIO-RELATIVE REQUIREMENTS:
 - Each asset must REDUCE overall portfolio risk or fill a SECTOR/GEOGRAPHY GAP
