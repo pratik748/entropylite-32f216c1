@@ -272,6 +272,12 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       }
     } finally {
       setLoading(false);
+      setLoadingProgress(100);
+      setLoadingStage("Complete");
+      if (progressTimer.current) {
+        clearInterval(progressTimer.current);
+        progressTimer.current = null;
+      }
     }
   }, [stocks.length, baseCurrency]);
 
