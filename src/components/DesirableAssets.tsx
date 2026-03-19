@@ -197,6 +197,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioSectors,
           portfolioValue: totalValue || 100000,
           baseCurrency,
+          previousTickers: getPreviousTickers(),
         },
       });
 
