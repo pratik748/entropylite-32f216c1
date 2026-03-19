@@ -226,8 +226,6 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Force Mistral — Cloudflare consistently 408s on this heavy prompt
-    const effectiveProvider = "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
@@ -257,7 +255,7 @@ Return ONLY valid JSON.`,
 
 ${portfolioContext}
 ${antiRepeatBlock}
-Generate exactly 15 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
+Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
 
 ## PORTFOLIO-RELATIVE REQUIREMENTS:
 - Each asset must REDUCE overall portfolio risk or fill a SECTOR/GEOGRAPHY GAP
@@ -265,13 +263,13 @@ Generate exactly 15 asset recommendations that COMPLEMENT this portfolio. You MU
 - MINIMUM 5 DERIVATIVE/PAIR/STRUCTURED STRATEGIES — these are the most valuable
 - At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
 
-## MANDATORY DISTRIBUTION (15 total):
-1. HOME MARKET: 3 stocks from ${isUSUser ? "US" : regionInfo.region} from DIFFERENT sectors
-2. GLOBAL EQUITIES: 2-3 stocks from different countries outside home market
-3. ETFs: 2 thematic/sector ETFs targeting portfolio gaps
-4. PAIRS & STRUCTURES: 3 derivative pair strategies (pair_trade, futures_leverage, vol_arb)
-5. HEDGES: 2 sector_hedge and correlation_hedge plays
-6. ALTERNATIVES: 1-2 crypto, commodities, or defensive plays
+## MANDATORY DISTRIBUTION (25 total):
+1. HOME MARKET: ${homeMarketRule}
+2. GLOBAL EQUITIES: 4-5 stocks from different countries outside home market
+3. ETFs: 3-4 thematic/sector ETFs targeting portfolio gaps
+4. PAIRS & STRUCTURES: 5-6 derivative pair strategies with specific instruments (pair_trade, futures_leverage, vol_arb)
+5. HEDGES: 3-4 sector_hedge and correlation_hedge plays
+6. ALTERNATIVES: 2-3 crypto, commodities, or defensive plays
 
 ## STRATEGY TYPES (tag each — MUST use at least 5 different types):
 - "equity" — standalone equity position
@@ -339,10 +337,9 @@ Return JSON:
     "marketCap": "<mega|large|mid|small|micro>"
   }]
 }`,
-      maxTokens: 6000,
-      temperature: 0.75,
-      provider: effectiveProvider,
-      jsonMode: true,
+      maxTokens: 9000,
+      temperature: 0.75, // higher for variety
+      provider,
     });
 
     console.log(`desirable-assets Stage 1 done, provider: ${result.provider}, seed: ${seed}`);
@@ -362,19 +359,12 @@ Return JSON:
     ];
     const uniqueTickers = [...new Set(allTickers)];
 
-    // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
-    const BATCH_SIZE = 6;
-    const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
-    for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
-      const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map(async (ticker) => {
-          const data = await fetchYahooChart(ticker);
-          return { ticker, data };
-        })
-      );
-      priceResults.push(...batchResults);
-    }
+    const priceResults = await Promise.allSettled(
+      uniqueTickers.map(async (ticker) => {
+        const data = await fetchYahooChart(ticker);
+        return { ticker, data };
+      })
+    );
 
     const tickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
     for (const r of priceResults) {
