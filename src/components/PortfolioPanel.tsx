@@ -1,5 +1,6 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
