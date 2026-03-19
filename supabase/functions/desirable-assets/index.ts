@@ -339,7 +339,7 @@ Return JSON:
     "marketCap": "<mega|large|mid|small|micro>"
   }]
 }`,
-      maxTokens: 6000,
+      maxTokens: 8000,
       temperature: 0.75,
       provider: effectiveProvider,
       jsonMode: true,
