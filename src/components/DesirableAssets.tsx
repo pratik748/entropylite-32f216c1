@@ -415,6 +415,29 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 </div>
               )}
 
+              {/* Max Profit Target */}
+              {(rec as any).maxProfitTarget && (rec as any).maxProfitTarget > price && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 mb-3 relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Target className="h-3 w-3 text-primary" />
+                      <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Quant Max Profit</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground">
+                      {(rec as any).maxProfitConfidence}% confidence · {(rec as any).maxProfitMethod}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="font-mono text-sm font-bold text-primary">
+                      {sym}{(rec as any).maxProfitTarget.toLocaleString()}
+                    </span>
+                    <span className="font-mono text-[10px] text-gain">
+                      +{(((rec as any).maxProfitTarget - price) / price * 100).toFixed(1)}% from current
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Price + Sparkline */}
               <div className="flex items-center gap-3 mb-3 relative z-10">
                 <div className="flex-1 grid grid-cols-4 gap-2">
