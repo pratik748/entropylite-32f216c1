@@ -226,6 +226,8 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
+    // Force Mistral — Cloudflare consistently 408s on this heavy prompt
+    const effectiveProvider = "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
