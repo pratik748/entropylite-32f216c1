@@ -73,8 +73,23 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v2";
+const DA_CACHE_KEY = "da_recommendations_v3";
+const DA_PREV_TICKERS_KEY = "da_previous_tickers";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
+
+function getPreviousTickers(): string[] {
+  try {
+    const raw = localStorage.getItem(DA_PREV_TICKERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePreviousTickers(tickers: string[]) {
+  try {
+    // Keep last 30 tickers to prevent repeats across refreshes
+    localStorage.setItem(DA_PREV_TICKERS_KEY, JSON.stringify(tickers.slice(-30)));
+  } catch { /* ignore */ }
+}
 
 function getCachedDA() {
   try {
