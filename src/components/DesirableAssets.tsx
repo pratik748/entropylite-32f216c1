@@ -73,8 +73,23 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v2";
+const DA_CACHE_KEY = "da_recommendations_v3";
+const DA_PREV_TICKERS_KEY = "da_previous_tickers";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
+
+function getPreviousTickers(): string[] {
+  try {
+    const raw = localStorage.getItem(DA_PREV_TICKERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePreviousTickers(tickers: string[]) {
+  try {
+    // Keep last 30 tickers to prevent repeats across refreshes
+    localStorage.setItem(DA_PREV_TICKERS_KEY, JSON.stringify(tickers.slice(-30)));
+  } catch { /* ignore */ }
+}
 
 function getCachedDA() {
   try {
@@ -182,6 +197,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioSectors,
           portfolioValue: totalValue || 100000,
           baseCurrency,
+          previousTickers: getPreviousTickers(),
         },
       });
 
@@ -209,6 +225,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         candidatesPassed: data.candidatesPassed || 0,
       };
       setCachedDA(payload);
+      // Save tickers for anti-repeat on next refresh
+      const newTickers = data.recommendations.map((r: any) => r.ticker);
+      savePreviousTickers([...getPreviousTickers(), ...newTickers]);
       setRecommendations(data.recommendations);
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
@@ -392,6 +411,29 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     <p className={`font-mono text-xs font-bold ${(rec.zScore || 0) < -1.5 ? "text-gain" : (rec.zScore || 0) > 1.5 ? "text-loss" : "text-foreground"}`}>
                       {rec.zScore?.toFixed(2)}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Max Profit Target */}
+              {(rec as any).maxProfitTarget && (rec as any).maxProfitTarget > price && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 mb-3 relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Target className="h-3 w-3 text-primary" />
+                      <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Quant Max Profit</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground">
+                      {(rec as any).maxProfitConfidence}% confidence · {(rec as any).maxProfitMethod}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="font-mono text-sm font-bold text-primary">
+                      {sym}{(rec as any).maxProfitTarget.toLocaleString()}
+                    </span>
+                    <span className="font-mono text-[10px] text-gain">
+                      +{(((rec as any).maxProfitTarget - price) / price * 100).toFixed(1)}% from current
+                    </span>
                   </div>
                 </div>
               )}
