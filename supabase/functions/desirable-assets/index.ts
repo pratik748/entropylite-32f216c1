@@ -337,9 +337,10 @@ Return JSON:
     "marketCap": "<mega|large|mid|small|micro>"
   }]
 }`,
-      maxTokens: 9000,
-      temperature: 0.75, // higher for variety
-      provider,
+      maxTokens: 6000,
+      temperature: 0.75,
+      provider: effectiveProvider,
+      jsonMode: true,
     });
 
     console.log(`desirable-assets Stage 1 done, provider: ${result.provider}, seed: ${seed}`);
