@@ -362,12 +362,19 @@ Return JSON:
     ];
     const uniqueTickers = [...new Set(allTickers)];
 
-    const priceResults = await Promise.allSettled(
-      uniqueTickers.map(async (ticker) => {
-        const data = await fetchYahooChart(ticker);
-        return { ticker, data };
-      })
-    );
+    // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
+    const BATCH_SIZE = 6;
+    const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
+    for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
+      const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (ticker) => {
+          const data = await fetchYahooChart(ticker);
+          return { ticker, data };
+        })
+      );
+      priceResults.push(...batchResults);
+    }
 
     const tickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
     for (const r of priceResults) {
