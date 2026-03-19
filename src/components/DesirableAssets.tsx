@@ -181,7 +181,31 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       }
     }
 
-    if (showLoading) { setLoading(true); setError(null); }
+    if (showLoading) {
+      setLoading(true);
+      setError(null);
+      setLoadingProgress(0);
+      setLoadingStage("Initializing quant funnel...");
+      // Simulate progress through stages
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      const stages = [
+        { at: 5, label: "Querying AI strategist..." },
+        { at: 20, label: "Generating candidates..." },
+        { at: 40, label: "Fetching real-time prices..." },
+        { at: 55, label: "Running Sharpe & drawdown filters..." },
+        { at: 70, label: "Computing portfolio correlation..." },
+        { at: 82, label: "Scoring & ranking assets..." },
+        { at: 90, label: "Enforcing strategy diversity..." },
+      ];
+      let idx = 0;
+      progressTimer.current = setInterval(() => {
+        if (idx < stages.length) {
+          setLoadingProgress(stages[idx].at);
+          setLoadingStage(stages[idx].label);
+          idx++;
+        }
+      }, 3500);
+    }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
 
