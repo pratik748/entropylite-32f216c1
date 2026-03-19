@@ -1,6 +1,5 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
@@ -143,98 +142,63 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
             ? convertToBase(stock.analysis.currentPrice, cur)
             : null;
 
-          // Max profit progress
-          const maxTarget = stock.analysis?.targetPrice || 0;
-          const hasMaxTarget = maxTarget > stock.buyPrice && stock.analysis?.currentPrice;
-          const maxProgress = hasMaxTarget
-            ? Math.max(0, Math.min(100, ((stock.analysis.currentPrice - stock.buyPrice) / (maxTarget - stock.buyPrice)) * 100))
-            : 0;
-          const maxUpsideLeft = hasMaxTarget ? ((maxTarget - stock.analysis.currentPrice) / stock.analysis.currentPrice * 100) : 0;
-
           return (
             <div
               key={stock.id}
               onClick={() => onSelectStock(stock.id)}
-              className={`group rounded-lg border p-3 cursor-pointer transition-all ${
+              className={`group flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-all ${
                 isActive ? "border-primary/40 bg-primary/5" : "border-border/50 bg-surface-2 hover:border-border hover:bg-surface-3"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-foreground truncate">{stock.ticker}</span>
-                    {stock.isLoading && <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
-                    {stock.analysis && (
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                        stock.analysis.suggestion === "Add" ? "bg-gain/10 text-gain" :
-                        stock.analysis.suggestion === "Exit" ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"
-                      }`}>{stock.analysis.suggestion}</span>
-                    )}
-                    {cur && cur !== baseCurrency && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
-                    {stock.analysis && <FreshnessIndicator status={freshness} />}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                    <span>{stock.quantity} qty</span>
-                    <span>@ {s}{stock.buyPrice.toLocaleString()}</span>
-                  </div>
-                </div>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-foreground truncate">{stock.ticker}</span>
+                  {stock.isLoading && <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
                   {stock.analysis && (
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        {pnl >= 0 ? <TrendingUp className="h-3 w-3 text-gain" /> : <TrendingDown className="h-3 w-3 text-loss" />}
-                        <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                          {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(1)}%
-                        </span>
-                      </div>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {s}{stock.analysis.currentPrice.toLocaleString()}
-                      </span>
-                      {convertedPrice !== null && (
-                        <span className="block font-mono text-[8px] text-muted-foreground/70">
-                          ≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </span>
-                      )}
-                      {pnlBase !== null && (
-                        <span className={`block font-mono text-[8px] ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
-                          {pnlBase >= 0 ? "+" : ""}{baseSym}{Math.abs(pnlBase).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </span>
-                      )}
-                    </div>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                      stock.analysis.suggestion === "Add" ? "bg-gain/10 text-gain" :
+                      stock.analysis.suggestion === "Exit" ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"
+                    }`}>{stock.analysis.suggestion}</span>
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onRemoveStock(stock.id); }}
-                    className="ml-1 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-loss/10 hover:text-loss"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {cur && cur !== baseCurrency && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
+                  {stock.analysis && <FreshnessIndicator status={freshness} />}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                  <span>{stock.quantity} qty</span>
+                  <span>@ {s}{stock.buyPrice.toLocaleString()}</span>
                 </div>
               </div>
-              {/* Max Profit Progress */}
-              {hasMaxTarget && (
-                <div className="mt-2 pt-2 border-t border-border/20">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1">
-                      <Target className="h-2.5 w-2.5 text-primary" />
-                      <span className="text-[8px] font-mono text-muted-foreground uppercase">Max Profit</span>
+              <div className="flex items-center gap-2">
+                {stock.analysis && (
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      {pnl >= 0 ? <TrendingUp className="h-3 w-3 text-gain" /> : <TrendingDown className="h-3 w-3 text-loss" />}
+                      <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                        {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(1)}%
+                      </span>
                     </div>
-                    <span className="text-[8px] font-mono text-muted-foreground">
-                      {s}{maxTarget.toLocaleString()} ({maxUpsideLeft > 0 ? `${maxUpsideLeft.toFixed(1)}% left` : "reached"})
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {s}{stock.analysis.currentPrice.toLocaleString()}
                     </span>
+                    {convertedPrice !== null && (
+                      <span className="block font-mono text-[8px] text-muted-foreground/70">
+                        ≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    {pnlBase !== null && (
+                      <span className={`block font-mono text-[8px] ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
+                        {pnlBase >= 0 ? "+" : ""}{baseSym}{Math.abs(pnlBase).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
                   </div>
-                  <Progress
-                    value={maxProgress}
-                    className={`h-1.5 bg-surface-3 [&>div]:transition-all ${
-                      maxProgress >= 90 ? "[&>div]:bg-gain" : maxProgress >= 60 ? "[&>div]:bg-primary" : "[&>div]:bg-muted-foreground"
-                    }`}
-                  />
-                  <div className="flex justify-between mt-0.5 text-[7px] font-mono text-muted-foreground/60">
-                    <span>{s}{stock.buyPrice.toLocaleString()}</span>
-                    <span className={`font-semibold ${maxProgress >= 90 ? "text-gain" : "text-primary"}`}>{maxProgress.toFixed(0)}%</span>
-                    <span>{s}{maxTarget.toLocaleString()}</span>
-                  </div>
-                </div>
-              )}
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemoveStock(stock.id); }}
+                  className="ml-1 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-loss/10 hover:text-loss"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           );
         })}
