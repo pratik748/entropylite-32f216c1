@@ -296,10 +296,26 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   if (loading && recommendations.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground font-mono">Running 3-stage quant funnel...</span>
-        <span className="text-[9px] text-muted-foreground/50 font-mono">AI candidates → Historical validation → Portfolio correlation filter</span>
+      <div className="flex flex-col items-center justify-center py-16 gap-4 max-w-md mx-auto">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+          <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+        </div>
+        <div className="w-full space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-foreground font-medium">{loadingStage}</span>
+            <span className="font-mono text-muted-foreground">{loadingProgress}%</span>
+          </div>
+          <Progress value={loadingProgress} className="h-2.5 bg-surface-2" />
+          <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
+            <span>AI Candidates</span>
+            <span>Price Verify</span>
+            <span>Quant Filter</span>
+            <span>Rank</span>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground/60 font-mono text-center mt-2">
+          3-stage funnel: AI generation → Historical validation → Portfolio correlation
+        </p>
       </div>
     );
   }
