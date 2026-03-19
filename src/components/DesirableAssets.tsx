@@ -225,6 +225,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         candidatesPassed: data.candidatesPassed || 0,
       };
       setCachedDA(payload);
+      // Save tickers for anti-repeat on next refresh
+      const newTickers = data.recommendations.map((r: any) => r.ticker);
+      savePreviousTickers([...getPreviousTickers(), ...newTickers]);
       setRecommendations(data.recommendations);
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
