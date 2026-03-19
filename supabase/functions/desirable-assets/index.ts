@@ -263,13 +263,13 @@ Generate exactly 15 asset recommendations that COMPLEMENT this portfolio. You MU
 - MINIMUM 5 DERIVATIVE/PAIR/STRUCTURED STRATEGIES — these are the most valuable
 - At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
 
-## MANDATORY DISTRIBUTION (25 total):
-1. HOME MARKET: ${homeMarketRule}
-2. GLOBAL EQUITIES: 4-5 stocks from different countries outside home market
-3. ETFs: 3-4 thematic/sector ETFs targeting portfolio gaps
-4. PAIRS & STRUCTURES: 5-6 derivative pair strategies with specific instruments (pair_trade, futures_leverage, vol_arb)
-5. HEDGES: 3-4 sector_hedge and correlation_hedge plays
-6. ALTERNATIVES: 2-3 crypto, commodities, or defensive plays
+## MANDATORY DISTRIBUTION (15 total):
+1. HOME MARKET: 3 stocks from ${isUSUser ? "US" : regionInfo.region} from DIFFERENT sectors
+2. GLOBAL EQUITIES: 2-3 stocks from different countries outside home market
+3. ETFs: 2 thematic/sector ETFs targeting portfolio gaps
+4. PAIRS & STRUCTURES: 3 derivative pair strategies (pair_trade, futures_leverage, vol_arb)
+5. HEDGES: 2 sector_hedge and correlation_hedge plays
+6. ALTERNATIVES: 1-2 crypto, commodities, or defensive plays
 
 ## STRATEGY TYPES (tag each — MUST use at least 5 different types):
 - "equity" — standalone equity position
