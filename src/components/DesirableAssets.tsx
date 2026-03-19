@@ -158,7 +158,10 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number | null>(null);
   const [stats, setStats] = useState({ generated: 0, passed: 0 });
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStage, setLoadingStage] = useState("");
   const retryCount = useRef(0);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
 
   const existingTickers = stocks.map(s => s.ticker);
