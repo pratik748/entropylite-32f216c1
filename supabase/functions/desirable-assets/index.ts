@@ -40,6 +40,8 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
     const volumes: number[] = [];
     const rawCloses = result.indicators?.quote?.[0]?.close || [];
     const rawVolumes = result.indicators?.quote?.[0]?.volume || [];
+    const highs: number[] = result.indicators?.quote?.[0]?.high || [];
+    const lows: number[] = result.indicators?.quote?.[0]?.low || [];
 
     for (let i = 0; i < rawCloses.length; i++) {
       if (rawCloses[i] != null && rawCloses[i] > 0) {
@@ -58,6 +60,8 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
       fiftyTwoLow: meta.fiftyTwoWeekLow || 0,
       closes,
       volumes,
+      highs: highs.filter(h => h != null && h > 0),
+      lows: lows.filter(l => l != null && l > 0),
     };
   } catch { return null; }
 }
@@ -126,6 +130,54 @@ function annualizedVol(returns: number[]): number {
   return stddev(returns) * Math.sqrt(252) * 100;
 }
 
+// ── Max profit target using quant methods ──────────────────────────
+function computeMaxProfitTarget(
+  closes: number[],
+  highs: number[],
+  price: number,
+  vol: number,
+  sr: number,
+): { maxTarget: number; confidence: number; method: string } {
+  if (closes.length < 20 || price <= 0) {
+    return { maxTarget: price * 1.1, confidence: 20, method: "fallback" };
+  }
+
+  // Method 1: Statistical resistance — 90th percentile of recent highs
+  const recentHighs = highs.length > 0 ? highs.slice(-60) : closes.slice(-60);
+  const sorted = [...recentHighs].sort((a, b) => a - b);
+  const p90 = sorted[Math.floor(sorted.length * 0.9)];
+  const p95 = sorted[Math.floor(sorted.length * 0.95)];
+
+  // Method 2: Drift-based target — expected price using GBM over 60 trading days
+  const returns = logReturns(closes);
+  const mu = mean(returns);
+  const sigma = stddev(returns);
+  const driftTarget = price * Math.exp((mu - 0.5 * sigma * sigma) * 60 + sigma * Math.sqrt(60) * 1.28); // 90th percentile path
+
+  // Method 3: Fibonacci extension from recent swing
+  const low20 = Math.min(...closes.slice(-20));
+  const high20 = Math.max(...closes.slice(-20));
+  const fib161 = low20 + (high20 - low20) * 1.618;
+
+  // Weight by Sharpe quality
+  const sharpeWeight = Math.max(0, Math.min(sr / 2, 1));
+  const maxTarget = Math.round(
+    (p90 * 0.3 + driftTarget * (0.3 + sharpeWeight * 0.15) + fib161 * (0.4 - sharpeWeight * 0.15)) * 100
+  ) / 100;
+
+  // Confidence based on how achievable the target is
+  const upliftPct = ((maxTarget - price) / price) * 100;
+  const confidence = Math.round(
+    Math.max(20, Math.min(90, 80 - upliftPct * 1.5 + sr * 10 - vol * 0.3))
+  );
+
+  return {
+    maxTarget: Math.max(maxTarget, price * 1.03), // minimum 3% upside
+    confidence: Math.max(15, Math.min(95, confidence)),
+    method: "resistance+drift+fibonacci",
+  };
+}
+
 // ── Composite portfolio return series ──────────────────────────────
 function portfolioReturnSeries(
   tickerCloses: Record<string, number[]>,
@@ -152,6 +204,10 @@ function portfolioReturnSeries(
   return series;
 }
 
+// ── Strategy diversity enforcement ─────────────────────────────────
+const REQUIRED_STRATEGIES = ["pair_trade", "sector_hedge", "correlation_hedge"];
+const MIN_STRATEGY_TYPES = 4; // Must have at least 4 different strategy types
+
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -165,6 +221,7 @@ serve(async (req) => {
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = body.provider || "mistral";
+    const previousTickers: string[] = body.previousTickers || []; // anti-repeat
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
@@ -179,29 +236,42 @@ serve(async (req) => {
       ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
       : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
-    // ── STAGE 1: AI generates ~20 candidates ──────────────────────
+    // Anti-repeat instruction
+    const antiRepeatBlock = previousTickers.length > 0
+      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+      : "";
+
+    // ── STAGE 1: AI generates ~25 candidates ──────────────────────
     const result = await callAI({
-      systemPrompt: "You are an elite multi-asset portfolio strategist and derivatives specialist at a $50B+ global asset manager. You recommend assets RELATIVE to the client's existing portfolio, maximizing diversification and risk-adjusted returns. Include derivative pair strategies where appropriate. Return ONLY valid JSON.",
+      systemPrompt: `You are an elite multi-asset portfolio strategist and derivatives specialist at a $50B+ global asset manager. You recommend assets RELATIVE to the client's existing portfolio, maximizing diversification and risk-adjusted returns.
+
+CRITICAL RULES:
+1. Target prices MUST be ABOVE current price (for long positions). A target below current price is NONSENSICAL.
+2. Every recommendation MUST have a SPECIFIC hedging strategy — never say "no hedge" or "none". Always specify: protective puts at specific strike %, inverse ETF tickers, collar strategies, or paired short positions.
+3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities.
+4. Only recommend assets with STRONG quantitative backing — positive expected returns, reasonable risk.
+Return ONLY valid JSON.`,
       userPrompt: `[SEED:${seed}] Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Base currency: ${baseCurrency}.
 
 ${portfolioContext}
-
-Generate exactly 20 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
+${antiRepeatBlock}
+Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
 
 ## PORTFOLIO-RELATIVE REQUIREMENTS:
 - Each asset must REDUCE overall portfolio risk or fill a SECTOR/GEOGRAPHY GAP
 - Avoid sectors already heavily represented: ${existingSectors.join(", ") || "none"}
-- Include at least 3 DERIVATIVE/PAIR STRATEGIES (e.g., "Long LMT futures + iShares Defence ETF for leveraged sector exposure", "Long gold futures + short DXY for inflation hedge", "Long XLE calls + short USO puts for energy convergence")
-- Include at least 2 CORRELATION HEDGES — assets negatively correlated to the portfolio
+- MINIMUM 5 DERIVATIVE/PAIR/STRUCTURED STRATEGIES — these are the most valuable
+- At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
 
-## MANDATORY DISTRIBUTION:
+## MANDATORY DISTRIBUTION (25 total):
 1. HOME MARKET: ${homeMarketRule}
-2. GLOBAL EQUITIES: 3-4 stocks from different countries outside home market
-3. ETFs: 2-3 thematic/sector ETFs targeting portfolio gaps
-4. DERIVATIVES/PAIRS: 3-4 derivative pair strategies with specific instruments
-5. ALTERNATIVES: 2-3 crypto, commodities, or defensive plays
+2. GLOBAL EQUITIES: 4-5 stocks from different countries outside home market
+3. ETFs: 3-4 thematic/sector ETFs targeting portfolio gaps
+4. PAIRS & STRUCTURES: 5-6 derivative pair strategies with specific instruments (pair_trade, futures_leverage, vol_arb)
+5. HEDGES: 3-4 sector_hedge and correlation_hedge plays
+6. ALTERNATIVES: 2-3 crypto, commodities, or defensive plays
 
-## STRATEGY TYPES (tag each recommendation):
+## STRATEGY TYPES (tag each — MUST use at least 5 different types):
 - "equity" — standalone equity position
 - "pair_trade" — long/short pair for relative value
 - "futures_leverage" — futures + ETF for capital-efficient exposure
@@ -211,21 +281,29 @@ Generate exactly 20 asset recommendations that COMPLEMENT this portfolio. You MU
 - "mean_reversion" — statistically oversold/overbought play
 - "momentum" — trend-following opportunity
 
+## HEDGING STRATEGY RULES (MANDATORY — no exceptions):
+- For equities: "Buy [TICKER] protective put at [X]% strike, [timeframe] expiry" OR "Pair with [INVERSE_ETF] at [ratio]"
+- For pairs: "Built-in hedge via long/short structure; additional protection via [specific instrument]"
+- For ETFs: "Collar strategy: sell [X]% OTM call, buy [Y]% OTM put" OR "Pair with [INVERSE_ETF]"
+- For crypto: "Reduce to 2% portfolio weight; trailing stop at -8%; hedge via BTC put options at [strike]"
+- For commodities: "Calendar spread [front/back months] or pair with [DXY/UUP] for USD hedge"
+- NEVER output "no hedge", "none", "N/A", or empty string
+
+## PRICE RULES (CRITICAL):
+- targetPrice MUST be ABOVE currentEstPrice (you are recommending LONGS)
+- stopLoss MUST be BELOW currentEstPrice
+- entryZone must bracket currentEstPrice (within ±5%)
+- riskReward ratio must be at least 1:2
+
 ## RISK PROFILE TAGS (assign 1-2 per asset):
-- "aggressive" — high risk/reward, speculative
-- "conservative" — stable, defensive
-- "short_term" — 1W-1M horizon
-- "medium_term" — 1M-6M horizon  
-- "long_term" — 6M-1Y+ horizon
-- "income" — dividend/yield focused
-- "safe_haven" — crisis protection
-- "high_conviction" — strong thesis
+- "aggressive", "conservative", "short_term", "medium_term", "long_term", "income", "safe_haven", "high_conviction"
 
 ## CRITICAL:
 - Use CORRECT Yahoo Finance tickers with exchange suffixes
 - For derivative pairs, list BOTH instruments
 - Vary picks — not just mega-caps
 - Include contrarian and beaten-down recovery plays
+- Every single recommendation needs a REAL, ACTIONABLE hedging strategy
 
 Return JSON:
 {
@@ -239,14 +317,14 @@ Return JSON:
     "currency": "<currency code>",
     "currentEstPrice": <number>,
     "entryZone": [<low>, <high>],
-    "targetPrice": <number>,
-    "stopLoss": <number>,
+    "targetPrice": <number — MUST be above currentEstPrice>,
+    "stopLoss": <number — MUST be below currentEstPrice>,
     "timeHorizon": "<1W|1M|3M|6M|1Y>",
     "suggestedQty": <number>,
     "confidence": <0-100>,
     "thesis": "<3-4 sentence rationale>",
     "catalyst": "<specific catalyst>",
-    "hedgingStrategy": "<specific hedge>",
+    "hedgingStrategy": "<SPECIFIC hedge — never empty/none>",
     "riskReward": "<e.g. 1:3.5>",
     "sector": "<sector>",
     "tags": ["<tag>"],
@@ -259,8 +337,8 @@ Return JSON:
     "marketCap": "<mega|large|mid|small|micro>"
   }]
 }`,
-      maxTokens: 7000,
-      temperature: 0.65,
+      maxTokens: 9000,
+      temperature: 0.75, // higher for variety
       provider,
     });
 
@@ -310,7 +388,7 @@ Return JSON:
     }
     const portReturns = portfolioReturnSeries(portfolioCloses, weights);
 
-    // ── STAGE 3: Quantitative validation ──────────────────────────
+    // ── STAGE 3: STRICT quantitative validation ───────────────────
     interface ScoredRec {
       rec: any;
       sharpeRatio: number;
@@ -327,6 +405,10 @@ Return JSON:
       fiftyTwoHigh: number;
       fiftyTwoLow: number;
       closes: number[];
+      highs: number[];
+      maxProfitTarget: number;
+      maxProfitConfidence: number;
+      maxProfitMethod: string;
     }
 
     const scored: ScoredRec[] = [];
@@ -348,22 +430,41 @@ Return JSON:
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // Filters
-      if (Math.abs(portCorr) > 0.7 && portCorr > 0) continue; // Too correlated
-      if (sr < -0.5) continue; // Terrible risk-adjusted returns
-      if (mdd > 40) continue; // Excessive drawdown
+      // ── STRICT FILTERS — only the fittest survive ──
+      // Filter 1: Too correlated to portfolio (unless it's a hedge)
+      const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
+      if (!isHedge && portCorr > 0.65) continue;
 
-      // Composite score
-      const normSharpe = Math.min(Math.max(sr / 3, -1), 1); // normalize to [-1, 1]
+      // Filter 2: Negative Sharpe = losing money historically
+      if (sr < -0.3) continue;
+
+      // Filter 3: Excessive drawdown
+      if (mdd > 35) continue;
+
+      // Filter 4: Price sanity — target must be above current price
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) continue;
+
+      // Filter 5: Too volatile without compensating returns
+      if (vol > 60 && sr < 0.3) continue;
+
+      // Compute max profit target using quant methods
+      const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+
+      // Composite score — much stricter weighting
+      const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
       const conf = (rec.confidence || 50) / 100;
+      // Bonus for hedge strategies when portfolio is correlated
+      const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
 
       const quantScore = Math.round(
-        (0.35 * (normSharpe + 1) / 2 + // 0-1 range
+        (0.30 * (normSharpe + 1) / 2 +
          0.30 * diversification +
-         0.20 * conf +
-         0.15 * Math.min(capEff / 5, 1)) * 100
+         0.15 * conf +
+         0.10 * Math.min(capEff / 5, 1) +
+         0.15 * Math.max(0, 1 - mdd / 35) + // reward low drawdown
+         hedgeBonus) * 100
       );
 
       scored.push({
@@ -381,64 +482,110 @@ Return JSON:
         volume: td.volume,
         fiftyTwoHigh: td.fiftyTwoHigh,
         fiftyTwoLow: td.fiftyTwoLow,
-        closes: td.closes.slice(-60), // Last 60 days for sparkline
+        closes: td.closes.slice(-60),
+        highs: (td.highs || []).slice(-60),
+        maxProfitTarget: mpt.maxTarget,
+        maxProfitConfidence: mpt.confidence,
+        maxProfitMethod: mpt.method,
       });
     }
 
-    // Sort by quantScore descending, take top 10
+    // ── STAGE 4: Diversity enforcement ────────────────────────────
+    // Sort by quantScore descending
     scored.sort((a, b) => b.quantScore - a.quantScore);
-    const top = scored.slice(0, 10);
 
-    const enriched = top.map(s => {
+    // Ensure strategy diversity: pick best from each required strategy first
+    const strategyBuckets: Record<string, ScoredRec[]> = {};
+    for (const s of scored) {
+      const strat = s.rec.strategy || "equity";
+      if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
+      strategyBuckets[strat].push(s);
+    }
+
+    const selected: ScoredRec[] = [];
+    const selectedTickers = new Set<string>();
+
+    // First: ensure at least 1 from each required strategy
+    for (const requiredStrat of REQUIRED_STRATEGIES) {
+      const bucket = strategyBuckets[requiredStrat] || [];
+      for (const s of bucket) {
+        if (!selectedTickers.has(s.rec.ticker) && selected.length < 15) {
+          selected.push(s);
+          selectedTickers.add(s.rec.ticker);
+          break;
+        }
+      }
+    }
+
+    // Then fill remaining slots by quantScore
+    for (const s of scored) {
+      if (selected.length >= 15) break;
+      if (!selectedTickers.has(s.rec.ticker)) {
+        selected.push(s);
+        selectedTickers.add(s.rec.ticker);
+      }
+    }
+
+    // Verify strategy diversity
+    const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
+    console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
+
+    const enriched = selected.map(s => {
       const realPrice = s.realPrice;
       let targetPrice = s.rec.targetPrice;
       let stopLoss = s.rec.stopLoss;
       let entryZone = s.rec.entryZone;
 
-      // Server-side validation: target must be above current price for long positions
-      if (targetPrice && realPrice && targetPrice < realPrice) {
-        // Fix nonsensical target: set to +15-30% above current price based on confidence
-        const uplift = 0.15 + (s.rec.confidence || 50) / 1000;
-        targetPrice = Math.round(realPrice * (1 + uplift) * 100) / 100;
+      // Server-side validation: target must be above current price
+      if (!targetPrice || targetPrice < realPrice) {
+        // Use quant-computed max profit target instead of arbitrary uplift
+        targetPrice = s.maxProfitTarget;
       }
 
-      // Ensure stop loss is below current price (for longs)
-      if (stopLoss && realPrice && stopLoss > realPrice) {
-        stopLoss = Math.round(realPrice * 0.92 * 100) / 100;
+      // Ensure stop loss is below current price
+      if (!stopLoss || stopLoss > realPrice) {
+        // Dynamic stop based on volatility
+        const volFactor = Math.max(0.05, Math.min(0.15, s.volatility / 100 * 2));
+        stopLoss = Math.round(realPrice * (1 - volFactor) * 100) / 100;
       }
 
       // Fix entry zone if nonsensical
-      if (entryZone) {
-        if (entryZone[0] > realPrice * 1.5 || entryZone[1] < realPrice * 0.3) {
-          entryZone = [Math.round(realPrice * 0.95 * 100) / 100, Math.round(realPrice * 1.02 * 100) / 100];
-        }
+      if (!entryZone || entryZone[0] > realPrice * 1.5 || entryZone[1] < realPrice * 0.3) {
+        entryZone = [Math.round(realPrice * 0.97 * 100) / 100, Math.round(realPrice * 1.02 * 100) / 100];
       }
 
-      // Fix hedging strategy - never return empty or "no hedge"
+      // Fix hedging strategy — NEVER return empty or "no hedge"
       let hedgingStrategy = s.rec.hedgingStrategy || "";
-      if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.trim().length < 5) {
+      if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
         const sector = s.rec.sector || "broad market";
         const assetClass = s.rec.assetClass || "Equity";
-        if (assetClass === "ETF" || assetClass === "Equity") {
-          hedgingStrategy = `Buy ${s.rec.ticker} protective put at 95% strike (${s.rec.timeHorizon || "3M"} expiry) or pair with inverse sector ETF for ${sector} exposure neutralization`;
+        const strategy = s.rec.strategy || "equity";
+        const stopPct = realPrice > 0 ? Math.round((1 - stopLoss / realPrice) * 100) : 8;
+
+        if (strategy === "pair_trade" || strategy === "sector_hedge") {
+          hedgingStrategy = `Built-in hedge via long/short structure. Additional protection: buy ${s.rec.ticker} protective put at ${100 - stopPct}% strike (${s.rec.timeHorizon || "3M"} expiry) to cap downside at ${stopPct}%`;
+        } else if (strategy === "correlation_hedge") {
+          hedgingStrategy = `Position serves as portfolio hedge. Size to max 4% of portfolio. Set hard stop at $${stopLoss}. Roll if correlation regime shifts.`;
+        } else if (assetClass === "ETF") {
+          hedgingStrategy = `Collar strategy: sell ${Math.round(((targetPrice / realPrice) - 1) * 100)}% OTM call, buy ${stopPct}% OTM put (${s.rec.timeHorizon || "3M"} expiry). Alternative: pair with inverse ${sector} ETF at 30% ratio.`;
         } else if (assetClass === "Crypto") {
-          hedgingStrategy = `Reduce position size to 2-3% of portfolio; set trailing stop at -8%; hedge with BTC/ETH put options or short perpetual futures`;
+          hedgingStrategy = `Reduce to 2-3% portfolio weight. Set trailing stop at -8%. Hedge with BTC/ETH put options at 90% strike or short perpetual futures at 50% notional.`;
         } else if (assetClass === "Commodity") {
-          hedgingStrategy = `Use commodity futures calendar spread or pair with USD-denominated hedge (UUP/DXY) to offset dollar-denominated commodity risk`;
+          hedgingStrategy = `Use commodity futures calendar spread (long front, short back). Pair with UUP/DXY at 25% ratio to offset dollar-denominated risk. Stop at $${stopLoss}.`;
         } else {
-          hedgingStrategy = `Position-size to max 3% portfolio weight; set hard stop at ${stopLoss ? '$' + stopLoss : '-8%'}; consider protective puts or collar strategy`;
+          hedgingStrategy = `Buy ${s.rec.ticker} protective put at ${100 - stopPct}% strike (${s.rec.timeHorizon || "3M"} expiry). Alternative: collar strategy selling ${Math.round(((targetPrice / realPrice) - 1) * 100)}% OTM call to fund put purchase. Hard stop at $${stopLoss}.`;
         }
       }
 
       // Compute risk-reward string from validated numbers
-      const riskReward = realPrice && targetPrice && stopLoss
+      const riskReward = realPrice && targetPrice && stopLoss && (realPrice - stopLoss) > 0
         ? `1:${((targetPrice - realPrice) / (realPrice - stopLoss)).toFixed(1)}`
         : s.rec.riskReward || "—";
 
       return {
         ...s.rec,
-        targetPrice,
-        stopLoss,
+        targetPrice: Math.round(targetPrice * 100) / 100,
+        stopLoss: Math.round(stopLoss * 100) / 100,
         entryZone,
         hedgingStrategy,
         riskReward,
@@ -457,10 +604,14 @@ Return JSON:
         quantScore: s.quantScore,
         closes: s.closes,
         simulationTested: true,
+        // Max profit fields
+        maxProfitTarget: Math.round(s.maxProfitTarget * 100) / 100,
+        maxProfitConfidence: s.maxProfitConfidence,
+        maxProfitMethod: s.maxProfitMethod,
       };
     });
 
-    console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed quant filters`);
+    console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed strict quant filters`);
 
     return new Response(JSON.stringify({
       marketCondition: parsed.marketCondition,

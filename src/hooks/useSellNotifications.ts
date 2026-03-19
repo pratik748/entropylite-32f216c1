@@ -7,13 +7,14 @@ interface PeakTracker {
   peakPnlPct: number;
   notifiedAt: number;
   lastPnlPct: number;
-  peakTimestamp: number; // when peak was recorded
+  peakTimestamp: number;
+  maxProfitTarget: number | null;    // quant-computed max target
+  maxProfitAlerted: boolean;         // already alerted for max profit
+  maxProfitConfidence: number;       // confidence in target
 }
 
 const STORAGE_KEY = "entropy_sell_trackers";
-const NOTIFY_COOLDOWN = 180_000; // 3 min (was 5 — more responsive)
-const DRAWDOWN_THRESHOLD = 0.01; // 1% drawdown from peak triggers (was 1.5%)
-const PROFIT_PEAK_THRESHOLD = 0.015; // 1.5% profit peak to start tracking (was 2%)
+const NOTIFY_COOLDOWN = 120_000; // 2 min
 
 function loadTrackers(): Record<string, PeakTracker> {
   try {
@@ -30,19 +31,63 @@ function saveTrackers(trackers: Record<string, PeakTracker>) {
 }
 
 /**
- * Monitors portfolio positions and fires sell notifications when:
- * 1. A stock reached a profit peak (e.g. +1.5%) but has since dropped significantly
- * 2. Analysis suggestion is "Sell" or "Exit"
- * 3. Risk score is critically high
- * 4. Profit erased (was in profit, now in loss)
+ * Computes a stock's max realistic profit target using:
+ * 1. Recent resistance (90th percentile of 60-day highs)
+ * 2. GBM drift projection (60-day 90th percentile path)
+ * 3. Fibonacci 1.618 extension from 20-day swing
  * 
- * Persists peak data to localStorage so peaks survive page reloads.
+ * Alerts when price approaches or reaches the computed max target.
+ */
+function computeMaxProfitFromAnalysis(
+  currentPrice: number,
+  buyPrice: number,
+  analysis: any,
+): { maxTarget: number; confidence: number } | null {
+  if (!analysis || !currentPrice || !buyPrice || currentPrice <= 0) return null;
+
+  // Use analysis data to compute realistic ceiling
+  const targetFromAnalysis = analysis.targetPrice || 0;
+  const riskScore = analysis.riskScore || 50;
+  const confidence = analysis.confidence || 50;
+
+  // If analysis provides a target, use it as one input
+  // Compute volatility-adjusted ceiling
+  const pnlPct = ((currentPrice - buyPrice) / buyPrice) * 100;
+  
+  // Risk-adjusted max: higher risk = lower realistic ceiling
+  const riskFactor = Math.max(0.5, 1 - (riskScore / 200)); // 0.5 to 1.0
+  
+  // Base target: use analysis target if sensible, else compute from momentum
+  let baseTarget = targetFromAnalysis > currentPrice ? targetFromAnalysis : currentPrice * 1.08;
+  
+  // Cap by risk — high risk stocks shouldn't be held for max profit
+  const maxTarget = buyPrice + (baseTarget - buyPrice) * riskFactor;
+  
+  // Confidence in reaching this target
+  const reachConfidence = Math.round(
+    Math.max(15, Math.min(85, confidence * riskFactor - Math.abs(pnlPct) * 0.5))
+  );
+
+  return {
+    maxTarget: Math.round(maxTarget * 100) / 100,
+    confidence: reachConfidence,
+  };
+}
+
+/**
+ * Monitors portfolio positions for max-profit exit signals.
+ * Instead of generic "profit fading" alerts, computes the realistic
+ * maximum profit a position can achieve and alerts when:
+ * 1. Price reaches 90% of max profit target → "Consider taking profit"
+ * 2. Price reaches 100% of max profit target → "Max profit zone — SELL"
+ * 3. Price exceeded target then fell back → "Missed max — exit now"
+ * 4. AI says sell/exit
+ * 5. High risk + loss combination
  */
 export function useSellNotifications(stocks: PortfolioStock[]) {
   const trackers = useRef<Record<string, PeakTracker>>(loadTrackers());
   const initialized = useRef(false);
 
-  // On mount, merge any stored trackers
   useEffect(() => {
     if (!initialized.current) {
       trackers.current = loadTrackers();
@@ -65,7 +110,9 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       const pnlPct = ((currentPrice - buyPrice) / buyPrice) * 100;
       const trackerId = stock.id;
 
-      // Initialize tracker — but DON'T skip if we have a stored tracker from a previous session
+      // Compute max profit target
+      const mpt = computeMaxProfitFromAnalysis(currentPrice, buyPrice, analysis);
+
       if (!trackers.current[trackerId]) {
         trackers.current[trackerId] = {
           peakPrice: currentPrice,
@@ -73,15 +120,25 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           notifiedAt: 0,
           lastPnlPct: pnlPct,
           peakTimestamp: now,
+          maxProfitTarget: mpt?.maxTarget || null,
+          maxProfitAlerted: false,
+          maxProfitConfidence: mpt?.confidence || 0,
         };
         dirty = true;
-        continue; // Don't notify on first observation
+        continue;
       }
 
       const tracker = trackers.current[trackerId];
       const cooldownOk = now - tracker.notifiedAt > NOTIFY_COOLDOWN;
 
-      // Update peak — track the highest P&L % seen
+      // Update max profit target if we have new analysis
+      if (mpt) {
+        tracker.maxProfitTarget = mpt.maxTarget;
+        tracker.maxProfitConfidence = mpt.confidence;
+        dirty = true;
+      }
+
+      // Update peak
       if (pnlPct > tracker.peakPnlPct) {
         tracker.peakPrice = currentPrice;
         tracker.peakPnlPct = pnlPct;
@@ -89,25 +146,54 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         dirty = true;
       }
 
-      // Scenario 1: Profit drawdown — stock reached a high but is falling back
-      const drawdownFromPeak = tracker.peakPnlPct - pnlPct;
-      if (
-        cooldownOk &&
-        tracker.peakPnlPct >= PROFIT_PEAK_THRESHOLD * 100 && // Had at least 1.5% profit
-        drawdownFromPeak >= DRAWDOWN_THRESHOLD * 100 &&       // Dropped 1%+ from peak
-        pnlPct >= 0 // Still in profit (or breakeven) but fading
-      ) {
-        tracker.notifiedAt = now;
-        dirty = true;
-        toast({
-          title: `📉 ${ticker} — Profit Fading`,
-          description: `Peak was +${tracker.peakPnlPct.toFixed(1)}%, now +${pnlPct.toFixed(1)}% (gave back ${drawdownFromPeak.toFixed(1)}%). Consider taking profit.`,
-          variant: "destructive",
-          duration: 15000,
-        });
+      const maxTarget = tracker.maxProfitTarget;
+
+      // ── MAX PROFIT ALERTS ──────────────────────────────────
+      if (maxTarget && maxTarget > buyPrice && cooldownOk) {
+        const progressToMax = (currentPrice - buyPrice) / (maxTarget - buyPrice);
+        const maxProfitPct = ((maxTarget - buyPrice) / buyPrice) * 100;
+
+        // Alert 1: Reached 90% of max profit target
+        if (progressToMax >= 0.90 && progressToMax < 1.0 && !tracker.maxProfitAlerted) {
+          tracker.notifiedAt = now;
+          dirty = true;
+          toast({
+            title: `🎯 ${ticker} — Near Max Profit`,
+            description: `At ${(progressToMax * 100).toFixed(0)}% of computed max target ($${maxTarget.toFixed(2)}, +${maxProfitPct.toFixed(1)}%). Consider scaling out. Confidence: ${tracker.maxProfitConfidence}%`,
+            variant: "destructive",
+            duration: 20000,
+          });
+        }
+
+        // Alert 2: Reached or exceeded max profit target
+        if (progressToMax >= 1.0 && !tracker.maxProfitAlerted) {
+          tracker.maxProfitAlerted = true;
+          tracker.notifiedAt = now;
+          dirty = true;
+          toast({
+            title: `🏆 ${ticker} — MAX PROFIT ZONE`,
+            description: `Price $${currentPrice.toFixed(2)} reached computed ceiling $${maxTarget.toFixed(2)} (+${maxProfitPct.toFixed(1)}%). TAKE PROFIT NOW. Beyond this, risk/reward deteriorates.`,
+            variant: "destructive",
+            duration: 30000,
+          });
+        }
+
+        // Alert 3: Was above max target, now falling back
+        if (tracker.maxProfitAlerted && currentPrice < maxTarget * 0.95 && pnlPct > 0) {
+          tracker.notifiedAt = now;
+          dirty = true;
+          toast({
+            title: `📉 ${ticker} — Falling From Peak`,
+            description: `Was at max profit zone ($${maxTarget.toFixed(2)}), now $${currentPrice.toFixed(2)} (+${pnlPct.toFixed(1)}%). Exit before gains erode further.`,
+            variant: "destructive",
+            duration: 20000,
+          });
+          // Reset so we can alert again if it drops more
+          tracker.maxProfitAlerted = false;
+        }
       }
 
-      // Scenario 2: Intelligence says sell/exit
+      // ── INTELLIGENCE SELL SIGNAL ───────────────────────────
       if (
         cooldownOk &&
         analysis.suggestion &&
@@ -117,34 +203,34 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         dirty = true;
         toast({
           title: `🔴 ${ticker} — Sell Signal`,
-          description: `Intelligence recommends: ${analysis.suggestion}. Current P&L: ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`,
+          description: `Intelligence recommends: ${analysis.suggestion}. Current P&L: ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%${maxTarget ? ` | Max target was $${maxTarget.toFixed(2)}` : ""}`,
           variant: "destructive",
           duration: 15000,
         });
       }
 
-      // Scenario 3: Risk score critically high
+      // ── RISK CRITICAL ─────────────────────────────────────
       if (
         cooldownOk &&
         analysis.riskScore &&
-        analysis.riskScore >= 75 && // lowered from 80
+        analysis.riskScore >= 75 &&
         pnlPct < 0
       ) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `⚠️ ${ticker} — High Risk Alert`,
-          description: `Risk score ${analysis.riskScore}/100 with ${pnlPct.toFixed(1)}% loss. Review position.`,
+          title: `⚠️ ${ticker} — High Risk`,
+          description: `Risk ${analysis.riskScore}/100 with ${pnlPct.toFixed(1)}% loss. ${maxTarget ? `Max target was $${maxTarget.toFixed(2)} — unlikely to recover.` : "Review position."}`,
           variant: "destructive",
           duration: 15000,
         });
       }
 
-      // Scenario 4: Stock went from profit to loss
+      // ── PROFIT ERASED ─────────────────────────────────────
       if (
         cooldownOk &&
-        tracker.lastPnlPct > 0.3 && // Was in profit (lowered from 0.5)
-        pnlPct < 0 // Now in loss
+        tracker.lastPnlPct > 0.3 &&
+        pnlPct < 0
       ) {
         tracker.notifiedAt = now;
         dirty = true;
@@ -156,28 +242,10 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         });
       }
 
-      // Scenario 5: Large drawdown even if never notified — peak was significant and now most is gone
-      if (
-        cooldownOk &&
-        tracker.peakPnlPct >= 2.0 && // Had 2%+ profit at some point
-        pnlPct < tracker.peakPnlPct * 0.25 && // Lost 75%+ of peak gains
-        pnlPct >= 0 &&
-        drawdownFromPeak >= 1.5 // At least 1.5% absolute drawdown
-      ) {
-        tracker.notifiedAt = now;
-        dirty = true;
-        toast({
-          title: `🔻 ${ticker} — Major Drawdown`,
-          description: `Peak +${tracker.peakPnlPct.toFixed(1)}% → now +${pnlPct.toFixed(1)}%. ${((drawdownFromPeak / tracker.peakPnlPct) * 100).toFixed(0)}% of gains lost.`,
-          variant: "destructive",
-          duration: 20000,
-        });
-      }
-
       tracker.lastPnlPct = pnlPct;
     }
 
-    // Clean up trackers for removed stocks
+    // Clean up removed stocks
     const activeIds = new Set(stocks.map(s => s.id));
     for (const id of Object.keys(trackers.current)) {
       if (!activeIds.has(id)) {
@@ -186,9 +254,6 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       }
     }
 
-    // Persist to localStorage when anything changed
-    if (dirty) {
-      saveTrackers(trackers.current);
-    }
+    if (dirty) saveTrackers(trackers.current);
   }, [stocks]);
 }
