@@ -205,8 +205,8 @@ function portfolioReturnSeries(
 }
 
 // ── Strategy diversity enforcement ─────────────────────────────────
-const REQUIRED_STRATEGIES = ["pair_trade", "sector_hedge", "correlation_hedge"];
-const MIN_STRATEGY_TYPES = 4; // Must have at least 4 different strategy types
+const REQUIRED_STRATEGIES = ["pair_trade", "sector_hedge", "correlation_hedge", "mean_reversion", "vol_arb"];
+const MIN_STRATEGY_TYPES = 5; // Must have at least 5 different strategy types
 
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
