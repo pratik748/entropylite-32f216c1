@@ -577,6 +577,15 @@ Return JSON:
 
       // Fix hedging strategy — NEVER return empty or "no hedge"
       let hedgingStrategy = s.rec.hedgingStrategy || "";
+      // Strip markdown artifacts from Mistral (**bold**, &(, ##, etc.)
+      hedgingStrategy = hedgingStrategy
+        .replace(/\*{1,3}/g, "")
+        .replace(/&\(/g, "(")
+        .replace(/#{1,4}\s*/g, "")
+        .replace(/`/g, "")
+        .replace(/\n+/g, " ")
+        .trim();
+
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
         const sector = s.rec.sector || "broad market";
         const assetClass = s.rec.assetClass || "Equity";
