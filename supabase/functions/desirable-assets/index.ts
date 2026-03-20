@@ -554,6 +554,16 @@ Return JSON:
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
+    // Helper to strip markdown artifacts from any AI text field
+    const sanitizeText = (t: string): string =>
+      (t || "")
+        .replace(/\*{1,3}/g, "")
+        .replace(/&\(/g, "(")
+        .replace(/#{1,4}\s*/g, "")
+        .replace(/`/g, "")
+        .replace(/\n+/g, " ")
+        .trim();
+
     const enriched = selected.map(s => {
       const realPrice = s.realPrice;
       let targetPrice = s.rec.targetPrice;
