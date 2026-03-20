@@ -202,8 +202,8 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
 const RETRY_DELAYS = [0, 1000, 3000];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  // Default to Mistral — only use Cloudflare if explicitly requested
-  const provider = opts.provider || "mistral";
+  // Default to Cloudflare — fallback to Mistral on failure
+  const provider = opts.provider || "cloudflare";
 
   if (provider === "cloudflare") {
     let lastError: any;
