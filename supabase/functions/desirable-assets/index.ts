@@ -250,8 +250,11 @@ serve(async (req) => {
 CRITICAL RULES:
 1. Target prices MUST be ABOVE current price (for long positions). A target below current price is NONSENSICAL.
 2. Every recommendation MUST have a SPECIFIC hedging strategy — never say "no hedge" or "none". Always specify: protective puts at specific strike %, inverse ETF tickers, collar strategies, or paired short positions.
-3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities.
+3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities or ETFs.
 4. Only recommend assets with STRONG quantitative backing — positive expected returns, reasonable risk.
+5. OUTPUT PLAIN TEXT ONLY — absolutely NO markdown formatting (no **, no ##, no backticks, no &(). Write clean sentences.
+6. MINIMIZE ETFs — max 3. Focus on individual equities, derivative pairs, and structured strategies.
+7. Include at least 6 individual equities across different market caps (small, mid, large, mega).
 Return ONLY valid JSON.`,
       userPrompt: `[SEED:${seed}] Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Base currency: ${baseCurrency}.
 
@@ -266,10 +269,10 @@ Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MU
 - At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
 
 ## MANDATORY DISTRIBUTION (25 total):
-1. HOME MARKET: 5-6 stocks from ${isUSUser ? "US" : regionInfo.region} from DIFFERENT sectors and market caps (must include small/mid-cap)
-2. GLOBAL EQUITIES: 4-5 stocks from at LEAST 3 different countries outside home market
-3. ETFs: 3-4 thematic/sector/commodity ETFs targeting portfolio gaps (e.g. clean energy, AI, healthcare, emerging markets)
-4. PAIRS & STRUCTURES: 4-5 derivative pair strategies — each MUST use DIFFERENT instruments and DIFFERENT sectors (pair_trade, futures_leverage, vol_arb, mean_reversion)
+1. HOME MARKET: 6-7 individual stocks from ${isUSUser ? "US" : regionInfo.region} — DIFFERENT sectors and market caps (MUST include 2+ small/mid-cap under $10B)
+2. GLOBAL EQUITIES: 5-6 individual stocks from at LEAST 4 different countries outside home market
+3. ETFs: 2-3 thematic/sector/commodity ETFs ONLY (keep ETF count low — focus on real equities)
+4. PAIRS & STRUCTURES: 5-6 derivative pair strategies — each MUST use DIFFERENT instruments and DIFFERENT sectors (pair_trade, futures_leverage, vol_arb, mean_reversion)
 5. HEDGES: 3-4 sector_hedge and correlation_hedge plays — each hedge MUST target a DIFFERENT risk factor (rates, FX, sector, volatility, geopolitical) with UNIQUE instruments
 6. ALTERNATIVES: 2-3 crypto, commodities, REITs, or defensive plays
 
@@ -446,22 +449,27 @@ Return JSON:
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── STRICT FILTERS — only the fittest survive ──
-      // Filter 1: Too correlated to portfolio (unless it's a hedge)
+      // ── RELAXED FILTERS — let more diverse candidates through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
-      if (!isHedge && portCorr > 0.65) continue;
+      const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 2: Negative Sharpe = losing money historically
-      if (sr < -0.3) continue;
+      // Filter 1: Too correlated to portfolio (unless hedge/pair)
+      if (!isHedge && !isPair && portCorr > 0.75) continue;
 
-      // Filter 3: Excessive drawdown
-      if (mdd > 35) continue;
+      // Filter 2: Very negative Sharpe only
+      if (sr < -0.8) continue;
+
+      // Filter 3: Extreme drawdown only
+      if (mdd > 50) continue;
 
       // Filter 4: Price sanity — target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) continue;
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.85) continue;
 
-      // Filter 5: Too volatile without compensating returns
-      if (vol > 60 && sr < 0.3) continue;
+      // Filter 5: Extreme vol without any returns
+      if (vol > 80 && sr < 0) continue;
+
+      // Filter 6: Skip tickers already in portfolio
+      if (portfolioTickers.includes(rec.ticker)) continue;
 
       // Compute max profit target using quant methods
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
@@ -533,9 +541,9 @@ Return JSON:
       }
     }
 
-    // Then fill remaining slots by quantScore
+    // Then fill remaining slots by quantScore — allow up to 20
     for (const s of scored) {
-      if (selected.length >= 15) break;
+      if (selected.length >= 20) break;
       if (!selectedTickers.has(s.rec.ticker)) {
         selected.push(s);
         selectedTickers.add(s.rec.ticker);
@@ -572,6 +580,15 @@ Return JSON:
 
       // Fix hedging strategy — NEVER return empty or "no hedge"
       let hedgingStrategy = s.rec.hedgingStrategy || "";
+      // Strip markdown artifacts from Mistral (**bold**, &(, ##, etc.)
+      hedgingStrategy = hedgingStrategy
+        .replace(/\*{1,3}/g, "")
+        .replace(/&\(/g, "(")
+        .replace(/#{1,4}\s*/g, "")
+        .replace(/`/g, "")
+        .replace(/\n+/g, " ")
+        .trim();
+
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
         const sector = s.rec.sector || "broad market";
         const assetClass = s.rec.assetClass || "Equity";

@@ -426,7 +426,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 </div>
               )}
 
-              <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{rec.thesis}</p>
+              <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{(rec.thesis || "").replace(/\*{1,3}/g, "").replace(/&\(/g, "(").replace(/#{1,4}\s*/g, "").replace(/`/g, "")}</p>
 
               {/* Quant Proof Section */}
               {rec.sharpeRatio !== undefined && (
@@ -531,7 +531,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2">
                   <p className="text-muted-foreground mb-0.5 flex items-center gap-1"><Shield className="h-2.5 w-2.5" /> Hedge</p>
-                  <p className="text-foreground">{rec.hedgingStrategy}</p>
+                  <p className="text-foreground">{(rec.hedgingStrategy || "").replace(/\*{1,3}/g, "").replace(/&\(/g, "(").replace(/#{1,4}\s*/g, "").replace(/`/g, "")}</p>
                 </div>
               </div>
 
