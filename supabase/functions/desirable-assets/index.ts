@@ -435,7 +435,7 @@ Return JSON:
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
       if (!td) continue; // No price data — phantom ticker, skip
-      if (td.closes.length < 20) continue; // Not enough data points
+      if (td.closes.length < 10) continue; // Lowered from 20 — allow newer/thinner tickers
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
@@ -449,24 +449,24 @@ Return JSON:
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── RELAXED FILTERS — let more diverse candidates through ──
+      // ── VERY RELAXED FILTERS — maximize pass-through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 1: Too correlated to portfolio (unless hedge/pair)
-      if (!isHedge && !isPair && portCorr > 0.75) continue;
+      // Filter 1: Too correlated to portfolio (unless hedge/pair) — raised to 0.85
+      if (!isHedge && !isPair && portCorr > 0.85) continue;
 
-      // Filter 2: Very negative Sharpe only
-      if (sr < -0.8) continue;
+      // Filter 2: Only filter truly catastrophic Sharpe
+      if (sr < -1.5) continue;
 
-      // Filter 3: Extreme drawdown only
-      if (mdd > 50) continue;
+      // Filter 3: Only extreme drawdown
+      if (mdd > 65) continue;
 
-      // Filter 4: Price sanity — target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.85) continue;
+      // Filter 4: Price sanity — target must be above current price (very lenient)
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.7) continue;
 
       // Filter 5: Extreme vol without any returns
-      if (vol > 80 && sr < 0) continue;
+      if (vol > 100 && sr < -0.5) continue;
 
       // Filter 6: Skip tickers already in portfolio
       if (portfolioTickers.includes(rec.ticker)) continue;
