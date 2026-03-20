@@ -226,8 +226,8 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Force Mistral — Cloudflare consistently 408s on this heavy prompt
-    const effectiveProvider = "mistral";
+    // Use Cloudflare as default — falls back to Mistral on failure
+    const effectiveProvider = "cloudflare";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
@@ -432,10 +432,11 @@ Return JSON:
 
     const scored: ScoredRec[] = [];
 
+    let noData = 0, thinData = 0, filtered = 0;
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
-      if (!td) continue; // No price data — phantom ticker, skip
-      if (td.closes.length < 20) continue; // Not enough data points
+      if (!td) { noData++; continue; }
+      if (td.closes.length < 10) { thinData++; continue; }
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
@@ -449,24 +450,24 @@ Return JSON:
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── RELAXED FILTERS — let more diverse candidates through ──
+      // ── VERY RELAXED FILTERS — maximize pass-through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 1: Too correlated to portfolio (unless hedge/pair)
-      if (!isHedge && !isPair && portCorr > 0.75) continue;
+      // Filter 1: Too correlated to portfolio (unless hedge/pair) — raised to 0.85
+      if (!isHedge && !isPair && portCorr > 0.85) continue;
 
-      // Filter 2: Very negative Sharpe only
-      if (sr < -0.8) continue;
+      // Filter 2: Only filter truly catastrophic Sharpe
+      if (sr < -1.5) continue;
 
-      // Filter 3: Extreme drawdown only
-      if (mdd > 50) continue;
+      // Filter 3: Only extreme drawdown
+      if (mdd > 65) continue;
 
-      // Filter 4: Price sanity — target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.85) continue;
+      // Filter 4: Price sanity — target must be above current price (very lenient)
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.7) continue;
 
       // Filter 5: Extreme vol without any returns
-      if (vol > 80 && sr < 0) continue;
+      if (vol > 100 && sr < -0.5) continue;
 
       // Filter 6: Skip tickers already in portfolio
       if (portfolioTickers.includes(rec.ticker)) continue;
@@ -514,36 +515,30 @@ Return JSON:
       });
     }
 
-    // ── STAGE 4: Diversity enforcement ────────────────────────────
-    // Sort by quantScore descending
+    // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
-    // Ensure strategy diversity: pick best from each required strategy first
+    const selected: ScoredRec[] = [];
+    const selectedTickers = new Set<string>();
+
+    // First: try to pick one from each available strategy bucket for diversity
     const strategyBuckets: Record<string, ScoredRec[]> = {};
     for (const s of scored) {
       const strat = s.rec.strategy || "equity";
       if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
       strategyBuckets[strat].push(s);
     }
-
-    const selected: ScoredRec[] = [];
-    const selectedTickers = new Set<string>();
-
-    // First: ensure at least 1 from each required strategy
-    for (const requiredStrat of REQUIRED_STRATEGIES) {
-      const bucket = strategyBuckets[requiredStrat] || [];
-      for (const s of bucket) {
-        if (!selectedTickers.has(s.rec.ticker) && selected.length < 15) {
-          selected.push(s);
-          selectedTickers.add(s.rec.ticker);
-          break;
-        }
+    for (const strat of Object.keys(strategyBuckets)) {
+      const bucket = strategyBuckets[strat];
+      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
+        selected.push(bucket[0]);
+        selectedTickers.add(bucket[0].rec.ticker);
       }
     }
 
-    // Then fill remaining slots by quantScore — allow up to 20
+    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
     for (const s of scored) {
-      if (selected.length >= 20) break;
+      if (selected.length >= 25) break;
       if (!selectedTickers.has(s.rec.ticker)) {
         selected.push(s);
         selectedTickers.add(s.rec.ticker);
@@ -552,6 +547,7 @@ Return JSON:
 
     // Verify strategy diversity
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
+    console.log(`desirable-assets: ${candidates.length} candidates, ${noData} no Yahoo data, ${thinData} thin data, ${scored.length} scored, ${selected.length} selected`);
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
     // Helper to strip markdown artifacts from any AI text field
