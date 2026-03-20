@@ -132,7 +132,19 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
     };
   }
 
-  const raw = (result.response || result.content || "").trim();
+  // result.response can be a string, array, or object depending on model
+  let raw: string;
+  if (typeof result.response === "string") {
+    raw = result.response.trim();
+  } else if (typeof result.content === "string") {
+    raw = result.content.trim();
+  } else if (result.response != null) {
+    raw = JSON.stringify(result.response);
+  } else if (result.content != null) {
+    raw = JSON.stringify(result.content);
+  } else {
+    throw new Error("Empty Cloudflare AI response content");
+  }
   if (!raw) throw new Error("Empty Cloudflare AI response content");
   const text = stripThinkingBlocks(raw);
   return { text, provider: "cloudflare" };

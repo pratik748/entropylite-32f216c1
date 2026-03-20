@@ -26,10 +26,9 @@ export async function requireAuth(
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabase.auth.getClaims(token);
+  const { data, error } = await supabase.auth.getUser();
 
-  if (error || !data?.claims) {
+  if (error || !data?.user) {
     throw new Response(
       JSON.stringify({ error: "Invalid or expired token" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -38,8 +37,8 @@ export async function requireAuth(
 
   return {
     user: {
-      id: data.claims.sub as string,
-      email: data.claims.email as string | undefined,
+      id: data.user.id,
+      email: data.user.email,
     },
   };
 }

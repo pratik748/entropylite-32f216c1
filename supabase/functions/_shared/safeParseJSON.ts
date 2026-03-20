@@ -34,7 +34,37 @@ export function safeParseJSON(raw: string): any {
   }
   if (endPos > 0) cleaned = cleaned.substring(0, endPos + 1);
 
-  // 5. Fix common LLM JSON issues
+  // 5. Strip JS-style single-line comments (// ...) that some models emit
+  // Only strip comments outside of JSON string values
+  {
+    let result = "";
+    let inComment = false;
+    let inJsonStr = false;
+    let escaped = false;
+    for (let i = 0; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (escaped) { result += ch; escaped = false; continue; }
+      if (inJsonStr) {
+        if (ch === "\\") { escaped = true; result += ch; continue; }
+        if (ch === '"') { inJsonStr = false; }
+        result += ch;
+        continue;
+      }
+      if (inComment) {
+        if (ch === "\n") { inComment = false; result += ch; }
+        continue;
+      }
+      if (ch === '"') { inJsonStr = true; result += ch; continue; }
+      if (ch === "/" && i + 1 < cleaned.length && cleaned[i + 1] === "/") {
+        inComment = true;
+        continue;
+      }
+      result += ch;
+    }
+    cleaned = result;
+  }
+
+  // 6. Fix common LLM JSON issues
   cleaned = cleaned
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
