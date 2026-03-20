@@ -1,5 +1,5 @@
 /**
- * AI caller — supports Mistral, Cloudflare Workers AI, and Google Gemini.
+ * AI caller — Cloudflare Workers AI + Mistral, with retry + exponential backoff.
  */
 
 interface CallAIOptions {
@@ -10,13 +10,13 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral" | "gemini";
+  provider?: "cloudflare" | "mistral";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral" | "gemini";
+  provider: "cloudflare" | "mistral";
   toolCall?: any;
 }
 
@@ -78,53 +78,6 @@ function stripThinkingBlocks(text: string): string {
   return cleaned;
 }
 
-// ── Gemini Provider ────────────────────────────────────────────────
-async function callGemini(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("GOOGLE_GEMINI_KEY");
-  if (!apiKey) throw new Error("GOOGLE_GEMINI_KEY not set");
-
-  const model = opts.model || "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const contents = [
-    { role: "user", parts: [{ text: `${opts.systemPrompt}\n\n${opts.userPrompt}` }] },
-  ];
-
-  const body: any = {
-    contents,
-    generationConfig: {
-      temperature: opts.temperature ?? 0.6,
-      maxOutputTokens: opts.maxTokens ?? 8192,
-    },
-  };
-
-  if (opts.jsonMode) {
-    body.generationConfig.responseMimeType = "application/json";
-  }
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Gemini error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const candidate = data.candidates?.[0];
-  if (!candidate) throw new Error("Empty Gemini response");
-
-  const raw = candidate.content?.parts?.map((p: any) => p.text || "").join("") || "";
-  if (!raw.trim()) throw new Error("Empty Gemini response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "gemini" };
-}
-
-// ── Cloudflare Provider ────────────────────────────────────────────
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
@@ -185,7 +138,6 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "cloudflare" };
 }
 
-// ── Mistral Provider ───────────────────────────────────────────────
 async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   const apiKey = Deno.env.get("MISTRAL_API_KEY");
   if (!apiKey) throw new Error("MISTRAL_API_KEY not set");
@@ -247,29 +199,11 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "mistral" };
 }
 
-// ── Main entry with fallback chain ─────────────────────────────────
 const RETRY_DELAYS = [0, 1000, 3000];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const provider = opts.provider || "gemini";
-
-  // Gemini (new default — best JSON reliability)
-  if (provider === "gemini") {
-    try {
-      console.log("callAI → Gemini");
-      return await callGemini(opts);
-    } catch (err: any) {
-      console.error("callAI → Gemini failed:", err.message || err);
-      // Fallback to Mistral
-      console.log("callAI → Gemini failed, falling back to Mistral");
-      try {
-        return await callMistral(opts);
-      } catch (mistralErr: any) {
-        console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
-        throw err;
-      }
-    }
-  }
+  // Default to Mistral — only use Cloudflare if explicitly requested
+  const provider = opts.provider || "mistral";
 
   if (provider === "cloudflare") {
     let lastError: any;
@@ -291,15 +225,18 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
         break;
       }
     }
-    console.log("callAI → Cloudflare exhausted, falling back to Gemini");
+    console.log("callAI → Cloudflare exhausted, falling back to Mistral");
     try {
-      return await callGemini(opts);
-    } catch {
-      try { return await callMistral(opts); } catch { throw lastError; }
+      const result = await callMistral(opts);
+      console.log("callAI → Mistral fallback success");
+      return result;
+    } catch (mistralErr: any) {
+      console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
+      throw lastError;
     }
   }
 
-  // Mistral explicit
-  console.log("callAI → Mistral (forced)");
+  // Mistral (default path)
+  console.log("callAI → Mistral (forced by provider preference)");
   return await callMistral(opts);
 }

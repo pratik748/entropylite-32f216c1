@@ -226,8 +226,8 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Use Gemini for reliable JSON output — Mistral frequently returns malformed JSON on large payloads
-    const effectiveProvider = "gemini";
+    // Force Mistral — Cloudflare consistently 408s on this heavy prompt
+    const effectiveProvider = "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
