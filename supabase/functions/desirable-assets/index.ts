@@ -514,36 +514,30 @@ Return JSON:
       });
     }
 
-    // ── STAGE 4: Diversity enforcement ────────────────────────────
-    // Sort by quantScore descending
+    // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
-    // Ensure strategy diversity: pick best from each required strategy first
+    const selected: ScoredRec[] = [];
+    const selectedTickers = new Set<string>();
+
+    // First: try to pick one from each available strategy bucket for diversity
     const strategyBuckets: Record<string, ScoredRec[]> = {};
     for (const s of scored) {
       const strat = s.rec.strategy || "equity";
       if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
       strategyBuckets[strat].push(s);
     }
-
-    const selected: ScoredRec[] = [];
-    const selectedTickers = new Set<string>();
-
-    // First: ensure at least 1 from each required strategy
-    for (const requiredStrat of REQUIRED_STRATEGIES) {
-      const bucket = strategyBuckets[requiredStrat] || [];
-      for (const s of bucket) {
-        if (!selectedTickers.has(s.rec.ticker) && selected.length < 15) {
-          selected.push(s);
-          selectedTickers.add(s.rec.ticker);
-          break;
-        }
+    for (const strat of Object.keys(strategyBuckets)) {
+      const bucket = strategyBuckets[strat];
+      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
+        selected.push(bucket[0]);
+        selectedTickers.add(bucket[0].rec.ticker);
       }
     }
 
-    // Then fill remaining slots by quantScore — allow up to 20
+    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
     for (const s of scored) {
-      if (selected.length >= 20) break;
+      if (selected.length >= 25) break;
       if (!selectedTickers.has(s.rec.ticker)) {
         selected.push(s);
         selectedTickers.add(s.rec.ticker);
