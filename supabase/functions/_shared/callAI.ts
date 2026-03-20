@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI, with retry + exponential backoff.
+ * AI caller — supports Mistral, Cloudflare Workers AI, and Google Gemini.
  */
 
 interface CallAIOptions {
@@ -10,37 +10,27 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral";
+  provider?: "cloudflare" | "mistral" | "gemini";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral";
+  provider: "cloudflare" | "mistral" | "gemini";
   toolCall?: any;
 }
 
 function stripThinkingBlocks(text: string): string {
-  // Strip <think>...</think> XML blocks
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  // Strip "Thinking..." prefix lines
   cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
-  // Remove markdown code fences
   cleaned = cleaned.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
-  // Extract clean JSON from response
   const jsonStart = cleaned.search(/[\{\[]/);
   if (jsonStart === -1) return cleaned;
 
   cleaned = cleaned.substring(jsonStart);
-  const isArray = cleaned[0] === "[";
 
-  // Find the matching closing bracket/brace by counting depth
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  let endPos = -1;
-
+  let depth = 0, inString = false, escape = false, endPos = -1;
   for (let i = 0; i < cleaned.length; i++) {
     const ch = cleaned[i];
     if (escape) { escape = false; continue; }
@@ -54,11 +44,8 @@ function stripThinkingBlocks(text: string): string {
     }
   }
 
-  if (endPos > 0) {
-    cleaned = cleaned.substring(0, endPos + 1);
-  }
+  if (endPos > 0) cleaned = cleaned.substring(0, endPos + 1);
 
-  // Fix common LLM JSON issues
   cleaned = cleaned
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
@@ -67,16 +54,12 @@ function stripThinkingBlocks(text: string): string {
     .replace(/:\s*approximately\s+(\d)/gi, ': $1')
     .replace(/[\x00-\x1F\x7F]/g, " ");
 
-  // Repair truncated JSON — close unbalanced braces/brackets
   try {
     JSON.parse(cleaned);
   } catch {
-    // Remove trailing incomplete key-value pairs (e.g. `"key": "incompl`)
     cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
     cleaned = cleaned.replace(/,\s*$/, "");
-
-    let braces = 0, brackets = 0;
-    let inStr = false, esc = false;
+    let braces = 0, brackets = 0, inStr = false, esc = false;
     for (let i = 0; i < cleaned.length; i++) {
       const c = cleaned[i];
       if (esc) { esc = false; continue; }
@@ -95,6 +78,53 @@ function stripThinkingBlocks(text: string): string {
   return cleaned;
 }
 
+// ── Gemini Provider ────────────────────────────────────────────────
+async function callGemini(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("GOOGLE_GEMINI_KEY");
+  if (!apiKey) throw new Error("GOOGLE_GEMINI_KEY not set");
+
+  const model = opts.model || "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const contents = [
+    { role: "user", parts: [{ text: `${opts.systemPrompt}\n\n${opts.userPrompt}` }] },
+  ];
+
+  const body: any = {
+    contents,
+    generationConfig: {
+      temperature: opts.temperature ?? 0.6,
+      maxOutputTokens: opts.maxTokens ?? 8192,
+    },
+  };
+
+  if (opts.jsonMode) {
+    body.generationConfig.responseMimeType = "application/json";
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`Gemini error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const candidate = data.candidates?.[0];
+  if (!candidate) throw new Error("Empty Gemini response");
+
+  const raw = candidate.content?.parts?.map((p: any) => p.text || "").join("") || "";
+  if (!raw.trim()) throw new Error("Empty Gemini response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "gemini" };
+}
+
+// ── Cloudflare Provider ────────────────────────────────────────────
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
@@ -135,12 +165,9 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   }
 
   const data = await res.json();
-
-  // Cloudflare Workers AI returns { result: { response: "..." } } or { result: { ... } }
   const result = data.result;
   if (!result) throw new Error("Empty Cloudflare AI response");
 
-  // Handle tool calls if present
   if (result.tool_calls && result.tool_calls.length > 0) {
     const toolCall = result.tool_calls[0];
     return {
@@ -158,6 +185,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "cloudflare" };
 }
 
+// ── Mistral Provider ───────────────────────────────────────────────
 async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   const apiKey = Deno.env.get("MISTRAL_API_KEY");
   if (!apiKey) throw new Error("MISTRAL_API_KEY not set");
@@ -202,7 +230,6 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   const choice = data.choices?.[0];
   if (!choice) throw new Error("Empty Mistral response");
 
-  // Handle tool calls
   if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
     const toolCall = choice.message.tool_calls[0];
     return {
@@ -220,15 +247,32 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "mistral" };
 }
 
+// ── Main entry with fallback chain ─────────────────────────────────
 const RETRY_DELAYS = [0, 1000, 3000];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  // Default to Mistral — only use Cloudflare if explicitly requested
-  const provider = opts.provider || "mistral";
+  const provider = opts.provider || "gemini";
+
+  // Gemini (new default — best JSON reliability)
+  if (provider === "gemini") {
+    try {
+      console.log("callAI → Gemini");
+      return await callGemini(opts);
+    } catch (err: any) {
+      console.error("callAI → Gemini failed:", err.message || err);
+      // Fallback to Mistral
+      console.log("callAI → Gemini failed, falling back to Mistral");
+      try {
+        return await callMistral(opts);
+      } catch (mistralErr: any) {
+        console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
+        throw err;
+      }
+    }
+  }
 
   if (provider === "cloudflare") {
     let lastError: any;
-    // Try Cloudflare with retries
     for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
       if (RETRY_DELAYS[attempt] > 0) {
         console.log(`callAI → retry #${attempt} after ${RETRY_DELAYS[attempt]}ms`);
@@ -247,19 +291,15 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
         break;
       }
     }
-    // Fallback to Mistral
-    console.log("callAI → Cloudflare exhausted, falling back to Mistral");
+    console.log("callAI → Cloudflare exhausted, falling back to Gemini");
     try {
-      const result = await callMistral(opts);
-      console.log("callAI → Mistral fallback success");
-      return result;
-    } catch (mistralErr: any) {
-      console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
-      throw lastError;
+      return await callGemini(opts);
+    } catch {
+      try { return await callMistral(opts); } catch { throw lastError; }
     }
   }
 
-  // Mistral (default path)
-  console.log("callAI → Mistral (forced by provider preference)");
+  // Mistral explicit
+  console.log("callAI → Mistral (forced)");
   return await callMistral(opts);
 }

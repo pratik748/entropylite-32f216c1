@@ -8,8 +8,10 @@ export function safeParseJSON(raw: string): any {
     return JSON.parse(raw);
   } catch { /* continue */ }
 
-  // 2. Strip markdown fences and trim
+  // 2. Strip markdown fences, thinking blocks, and trim
   let cleaned = raw
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/^Thinking[\s\S]*?\n\s*\n/i, "")
     .replace(/```json?\s*\n?/gi, "")
     .replace(/\n?```\s*$/gi, "")
     .trim();
@@ -40,19 +42,28 @@ export function safeParseJSON(raw: string): any {
     .replace(/:\s*[~≈∼]\s*(\d)/g, ": $1")
     .replace(/:\s*approximately\s+(\d)/gi, ": $1")
     .replace(/[\x00-\x1F\x7F]/g, " ")
-    // Fix single-quoted strings → double-quoted
-    .replace(/'/g, '"')
     // Fix unquoted property names: { key: → { "key":
-    .replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
-    // Fix trailing text after JSON (e.g. "} Note: ...")
-    .replace(/}[^}\]]*$/, "}");
+    // (Do NOT blindly replace single quotes — that breaks apostrophes in text)
+    .replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
 
   // 6. Try parse after cleanup
   try {
     return JSON.parse(cleaned);
   } catch { /* continue to deep repair */ }
 
-  // 7. Deep repair: remove trailing incomplete pairs, close unbalanced brackets
+  // 7. Fix NaN, Infinity, undefined literals that are invalid JSON
+  cleaned = cleaned
+    .replace(/:\s*NaN\b/g, ": 0")
+    .replace(/:\s*Infinity\b/g, ": 999999")
+    .replace(/:\s*-Infinity\b/g, ": -999999")
+    .replace(/:\s*undefined\b/g, ": null");
+
+  // 8. Try again
+  try {
+    return JSON.parse(cleaned);
+  } catch { /* continue */ }
+
+  // 9. Deep repair: remove trailing incomplete pairs, close unbalanced brackets
   cleaned = cleaned
     .replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "")
     .replace(/,\s*$/, "");
@@ -73,5 +84,12 @@ export function safeParseJSON(raw: string): any {
   while (brackets > 0) { cleaned += "]"; brackets--; }
   while (braces > 0) { cleaned += "}"; braces--; }
 
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch (finalErr) {
+    // Last resort: try to extract at least partial data
+    console.error("safeParseJSON final failure, attempting line-by-line repair");
+    console.error("First 500 chars:", cleaned.slice(0, 500));
+    throw finalErr;
+  }
 }
