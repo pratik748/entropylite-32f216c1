@@ -250,8 +250,11 @@ serve(async (req) => {
 CRITICAL RULES:
 1. Target prices MUST be ABOVE current price (for long positions). A target below current price is NONSENSICAL.
 2. Every recommendation MUST have a SPECIFIC hedging strategy — never say "no hedge" or "none". Always specify: protective puts at specific strike %, inverse ETF tickers, collar strategies, or paired short positions.
-3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities.
+3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities or ETFs.
 4. Only recommend assets with STRONG quantitative backing — positive expected returns, reasonable risk.
+5. OUTPUT PLAIN TEXT ONLY — absolutely NO markdown formatting (no **, no ##, no backticks, no &(). Write clean sentences.
+6. MINIMIZE ETFs — max 3. Focus on individual equities, derivative pairs, and structured strategies.
+7. Include at least 6 individual equities across different market caps (small, mid, large, mega).
 Return ONLY valid JSON.`,
       userPrompt: `[SEED:${seed}] Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Base currency: ${baseCurrency}.
 
