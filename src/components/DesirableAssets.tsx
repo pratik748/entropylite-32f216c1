@@ -426,7 +426,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 </div>
               )}
 
-              <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{rec.thesis}</p>
+              <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{(rec.thesis || "").replace(/\*{1,3}/g, "").replace(/&\(/g, "(").replace(/#{1,4}\s*/g, "").replace(/`/g, "")}</p>
 
               {/* Quant Proof Section */}
               {rec.sharpeRatio !== undefined && (
