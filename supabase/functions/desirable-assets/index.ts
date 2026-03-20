@@ -226,8 +226,8 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Force Mistral — Cloudflare consistently 408s on this heavy prompt
-    const effectiveProvider = "mistral";
+    // Use Gemini for reliable JSON output — Mistral frequently returns malformed JSON on large payloads
+    const effectiveProvider = "gemini";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
@@ -554,6 +554,16 @@ Return JSON:
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
+    // Helper to strip markdown artifacts from any AI text field
+    const sanitizeText = (t: string): string =>
+      (t || "")
+        .replace(/\*{1,3}/g, "")
+        .replace(/&\(/g, "(")
+        .replace(/#{1,4}\s*/g, "")
+        .replace(/`/g, "")
+        .replace(/\n+/g, " ")
+        .trim();
+
     const enriched = selected.map(s => {
       const realPrice = s.realPrice;
       let targetPrice = s.rec.targetPrice;
@@ -579,15 +589,7 @@ Return JSON:
       }
 
       // Fix hedging strategy — NEVER return empty or "no hedge"
-      let hedgingStrategy = s.rec.hedgingStrategy || "";
-      // Strip markdown artifacts from Mistral (**bold**, &(, ##, etc.)
-      hedgingStrategy = hedgingStrategy
-        .replace(/\*{1,3}/g, "")
-        .replace(/&\(/g, "(")
-        .replace(/#{1,4}\s*/g, "")
-        .replace(/`/g, "")
-        .replace(/\n+/g, " ")
-        .trim();
+      let hedgingStrategy = sanitizeText(s.rec.hedgingStrategy || "");
 
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
         const sector = s.rec.sector || "broad market";
@@ -617,6 +619,8 @@ Return JSON:
 
       return {
         ...s.rec,
+        thesis: sanitizeText(s.rec.thesis || ""),
+        catalyst: sanitizeText(s.rec.catalyst || ""),
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
         entryZone,
@@ -647,7 +651,7 @@ Return JSON:
     console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed strict quant filters`);
 
     return new Response(JSON.stringify({
-      marketCondition: parsed.marketCondition,
+      marketCondition: sanitizeText(parsed.marketCondition || ""),
       regimeType: parsed.regimeType || "transition",
       recommendations: enriched,
       baseCurrency,
