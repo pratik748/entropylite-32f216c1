@@ -269,10 +269,10 @@ Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MU
 - At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
 
 ## MANDATORY DISTRIBUTION (25 total):
-1. HOME MARKET: 5-6 stocks from ${isUSUser ? "US" : regionInfo.region} from DIFFERENT sectors and market caps (must include small/mid-cap)
-2. GLOBAL EQUITIES: 4-5 stocks from at LEAST 3 different countries outside home market
-3. ETFs: 3-4 thematic/sector/commodity ETFs targeting portfolio gaps (e.g. clean energy, AI, healthcare, emerging markets)
-4. PAIRS & STRUCTURES: 4-5 derivative pair strategies — each MUST use DIFFERENT instruments and DIFFERENT sectors (pair_trade, futures_leverage, vol_arb, mean_reversion)
+1. HOME MARKET: 6-7 individual stocks from ${isUSUser ? "US" : regionInfo.region} — DIFFERENT sectors and market caps (MUST include 2+ small/mid-cap under $10B)
+2. GLOBAL EQUITIES: 5-6 individual stocks from at LEAST 4 different countries outside home market
+3. ETFs: 2-3 thematic/sector/commodity ETFs ONLY (keep ETF count low — focus on real equities)
+4. PAIRS & STRUCTURES: 5-6 derivative pair strategies — each MUST use DIFFERENT instruments and DIFFERENT sectors (pair_trade, futures_leverage, vol_arb, mean_reversion)
 5. HEDGES: 3-4 sector_hedge and correlation_hedge plays — each hedge MUST target a DIFFERENT risk factor (rates, FX, sector, volatility, geopolitical) with UNIQUE instruments
 6. ALTERNATIVES: 2-3 crypto, commodities, REITs, or defensive plays
 
