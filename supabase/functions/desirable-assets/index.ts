@@ -538,9 +538,9 @@ Return JSON:
       }
     }
 
-    // Then fill remaining slots by quantScore
+    // Then fill remaining slots by quantScore — allow up to 20
     for (const s of scored) {
-      if (selected.length >= 15) break;
+      if (selected.length >= 20) break;
       if (!selectedTickers.has(s.rec.ticker)) {
         selected.push(s);
         selectedTickers.add(s.rec.ticker);
