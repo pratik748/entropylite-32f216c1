@@ -651,7 +651,7 @@ Return JSON:
     console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed strict quant filters`);
 
     return new Response(JSON.stringify({
-      marketCondition: parsed.marketCondition,
+      marketCondition: sanitizeText(parsed.marketCondition || ""),
       regimeType: parsed.regimeType || "transition",
       recommendations: enriched,
       baseCurrency,
