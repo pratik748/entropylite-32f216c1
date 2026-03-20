@@ -446,22 +446,27 @@ Return JSON:
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── STRICT FILTERS — only the fittest survive ──
-      // Filter 1: Too correlated to portfolio (unless it's a hedge)
+      // ── RELAXED FILTERS — let more diverse candidates through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
-      if (!isHedge && portCorr > 0.65) continue;
+      const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 2: Negative Sharpe = losing money historically
-      if (sr < -0.3) continue;
+      // Filter 1: Too correlated to portfolio (unless hedge/pair)
+      if (!isHedge && !isPair && portCorr > 0.75) continue;
 
-      // Filter 3: Excessive drawdown
-      if (mdd > 35) continue;
+      // Filter 2: Very negative Sharpe only
+      if (sr < -0.8) continue;
+
+      // Filter 3: Extreme drawdown only
+      if (mdd > 50) continue;
 
       // Filter 4: Price sanity — target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) continue;
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.85) continue;
 
-      // Filter 5: Too volatile without compensating returns
-      if (vol > 60 && sr < 0.3) continue;
+      // Filter 5: Extreme vol without any returns
+      if (vol > 80 && sr < 0) continue;
+
+      // Filter 6: Skip tickers already in portfolio
+      if (portfolioTickers.includes(rec.ticker)) continue;
 
       // Compute max profit target using quant methods
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
