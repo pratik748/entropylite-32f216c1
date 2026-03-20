@@ -619,6 +619,8 @@ Return JSON:
 
       return {
         ...s.rec,
+        thesis: sanitizeText(s.rec.thesis || ""),
+        catalyst: sanitizeText(s.rec.catalyst || ""),
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
         entryZone,
