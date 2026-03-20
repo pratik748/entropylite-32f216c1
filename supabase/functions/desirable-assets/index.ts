@@ -432,10 +432,11 @@ Return JSON:
 
     const scored: ScoredRec[] = [];
 
+    let noData = 0, thinData = 0, filtered = 0;
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
-      if (!td) continue; // No price data — phantom ticker, skip
-      if (td.closes.length < 10) continue; // Lowered from 20 — allow newer/thinner tickers
+      if (!td) { noData++; continue; }
+      if (td.closes.length < 10) { thinData++; continue; }
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
