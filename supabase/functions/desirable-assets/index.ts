@@ -396,7 +396,7 @@ Return JSON:
     }
     const portReturns = portfolioReturnSeries(portfolioCloses, weights);
 
-    // ── STAGE 3: STRICT quantitative validation — ELITE FILTER ───
+    // ── STAGE 3: Tiered quantitative validation — ELITE FILTER ───
     interface ScoredRec {
       rec: any;
       sharpeRatio: number;
@@ -420,6 +420,8 @@ Return JSON:
       momentum20d: number;
       momentum5d: number;
       trendStrength: number;
+      winRate: number;
+      filterTier: "strict" | "balanced" | "rescue";
     }
 
     const scored: ScoredRec[] = [];
@@ -473,39 +475,16 @@ Return JSON:
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // ══════════════════════════════════════════════════════════════
-      // ELITE FILTERS — Only profitable, trending, momentum stocks
-      // ══════════════════════════════════════════════════════════════
-
-      // F1: Must have POSITIVE Sharpe (no loss-makers)
-      if (!isHedge && sr < 0) { filtered++; continue; }
-
-      // F2: Max drawdown cap at 40% (no crash-prone stocks)
-      if (mdd > 40) { filtered++; continue; }
-
-      // F3: Price MUST be above 20-day SMA (uptrend confirmation)
-      if (!isHedge && !isPair && price < sma20 * 0.97) { filtered++; continue; }
-
-      // F4: Trend strength — at least 50% of days above SMA
-      if (!isHedge && !isPair && trendStrength < 40) { filtered++; continue; }
-
-      // F5: Recent 20-day cumulative return must not be deeply negative
-      if (!isHedge && cumReturn20d < -15) { filtered++; continue; }
-
-      // F6: 52-week position — reject stocks that crashed >60% from high
-      if (!isHedge && fiftyTwoPos < 20) { filtered++; continue; }
-
-      // F7: Correlation filter
-      if (!isHedge && !isPair && portCorr > 0.75) { filtered++; continue; }
-
-      // F8: Extreme vol without returns
-      if (vol > 80 && sr < 0.2) { filtered++; continue; }
-
-      // F9: Skip portfolio holdings
+      // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
-      // F10: Target must be above current price
+      // F2: Target must be above current price
       if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+
+      // F3: Liquidity + investability guards (avoid tiny/random names)
+      const dollarVolume = (td.volume || 0) * price;
+      if (!isHedge && dollarVolume < 20_000_000) { filtered++; continue; }
+      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
@@ -526,11 +505,53 @@ Return JSON:
       }
       const winRate = (profitablePaths / simPaths) * 100;
 
-      // F11: Monte Carlo — at least 50% of simulated paths must be profitable
-      if (!isHedge && winRate < 45) { filtered++; continue; }
-
       // Compute max profit target
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+      const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
+
+      // F4: Avoid weak upside profiles
+      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
+
+      // Tiered pass logic to avoid empty result sets while preserving quality.
+      const strictPass = isHedge || (
+        sr >= 0.15 &&
+        mdd <= 35 &&
+        (!isPair ? price >= sma20 * 0.99 : true) &&
+        (!isPair ? trendStrength >= 55 : true) &&
+        cumReturn20d >= -8 &&
+        fiftyTwoPos >= 30 &&
+        (!isPair ? portCorr <= 0.75 : true) &&
+        (vol <= 85 || sr >= 0.3) &&
+        winRate >= 48 &&
+        momentum20d > -2
+      );
+
+      const balancedPass = isHedge || (
+        sr >= -0.1 &&
+        mdd <= 50 &&
+        (!isPair ? price >= sma20 * 0.95 : true) &&
+        (!isPair ? trendStrength >= 35 : true) &&
+        cumReturn20d >= -15 &&
+        fiftyTwoPos >= 15 &&
+        (!isPair ? portCorr <= 0.88 : true) &&
+        winRate >= 40 &&
+        momentum20d > -6
+      );
+
+      const rescuePass = isHedge || (
+        sr >= -0.35 &&
+        mdd <= 65 &&
+        (!isPair ? price >= sma20 * 0.9 : true) &&
+        winRate >= 34 &&
+        momentum20d > -12
+      );
+
+      if (!strictPass && !balancedPass && !rescuePass) { filtered++; continue; }
+      const filterTier: "strict" | "balanced" | "rescue" = strictPass
+        ? "strict"
+        : balancedPass
+          ? "balanced"
+          : "rescue";
 
       // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
@@ -541,6 +562,7 @@ Return JSON:
       const trendScore = trendStrength / 100;
       const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
+      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.06;
 
       const quantScore = Math.round(
         (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
@@ -551,7 +573,8 @@ Return JSON:
          0.15 * (momScore + 1) / 2 +         // Momentum (NEW)
          0.10 * trendScore +                 // Trend strength (NEW)
          0.15 * winRateScore +               // Monte Carlo win rate (NEW)
-         hedgeBonus) * 100
+         hedgeBonus +
+         tierBonus) * 100
       );
 
       scored.push({
@@ -577,18 +600,34 @@ Return JSON:
         momentum20d: Math.round(momentum20d * 100) / 100,
         momentum5d: Math.round(momentum5d * 100) / 100,
         trendStrength: Math.round(trendStrength),
+        winRate: Math.round(winRate * 10) / 10,
+        filterTier,
       });
     }
 
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
+    const strictPool = scored.filter((s) => s.filterTier === "strict");
+    const balancedPool = scored.filter((s) => s.filterTier === "strict" || s.filterTier === "balanced");
+    const rescuePool = scored.filter((s) => s.filterTier === "rescue");
+
+    let selectionPool: ScoredRec[];
+    if (strictPool.length >= 8) {
+      selectionPool = strictPool;
+    } else if (balancedPool.length >= 8) {
+      selectionPool = balancedPool;
+    } else {
+      selectionPool = scored.filter((s) => s.quantScore >= 32);
+      if (selectionPool.length === 0) selectionPool = scored;
+    }
+
     const selected: ScoredRec[] = [];
     const selectedTickers = new Set<string>();
 
     // First: try to pick one from each available strategy bucket for diversity
     const strategyBuckets: Record<string, ScoredRec[]> = {};
-    for (const s of scored) {
+    for (const s of selectionPool) {
       const strat = s.rec.strategy || "equity";
       if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
       strategyBuckets[strat].push(s);
@@ -602,7 +641,7 @@ Return JSON:
     }
 
     // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
-    for (const s of scored) {
+    for (const s of selectionPool) {
       if (selected.length >= 25) break;
       if (!selectedTickers.has(s.rec.ticker)) {
         selected.push(s);
@@ -612,7 +651,12 @@ Return JSON:
 
     // Verify strategy diversity
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
+    if (selected.length === 0 && scored.length > 0) {
+      selected.push(...scored.slice(0, Math.min(8, scored.length)));
+    }
+
     console.log(`desirable-assets: ${candidates.length} candidates, ${noData} no Yahoo data, ${thinData} thin data, ${scored.length} scored, ${selected.length} selected`);
+    console.log(`desirable-assets tiers: strict=${strictPool.length}, balanced=${balancedPool.length - strictPool.length}, rescue=${rescuePool.length}`);
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
     // Helper to strip markdown artifacts from any AI text field
