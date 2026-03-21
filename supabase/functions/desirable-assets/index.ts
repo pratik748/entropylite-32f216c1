@@ -208,6 +208,131 @@ function portfolioReturnSeries(
 const REQUIRED_STRATEGIES = ["pair_trade", "sector_hedge", "correlation_hedge", "mean_reversion", "vol_arb"];
 const MIN_STRATEGY_TYPES = 5; // Must have at least 5 different strategy types
 
+const ALLOWED_STRATEGIES = new Set([
+  "equity",
+  "pair_trade",
+  "futures_leverage",
+  "vol_arb",
+  "sector_hedge",
+  "correlation_hedge",
+  "mean_reversion",
+  "momentum",
+]);
+
+const ELITE_FALLBACK_UNIVERSE = [
+  { ticker: "MSFT", name: "Microsoft", sector: "Technology", marketCap: "mega", strategy: "equity" },
+  { ticker: "NVDA", name: "NVIDIA", sector: "Technology", marketCap: "mega", strategy: "momentum" },
+  { ticker: "AMZN", name: "Amazon", sector: "Consumer Discretionary", marketCap: "mega", strategy: "equity" },
+  { ticker: "META", name: "Meta Platforms", sector: "Communication", marketCap: "mega", strategy: "equity" },
+  { ticker: "GOOGL", name: "Alphabet", sector: "Communication", marketCap: "mega", strategy: "equity" },
+  { ticker: "AVGO", name: "Broadcom", sector: "Technology", marketCap: "large", strategy: "momentum" },
+  { ticker: "LLY", name: "Eli Lilly", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", marketCap: "large", strategy: "equity" },
+  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "COST", name: "Costco", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
+  { ticker: "ORCL", name: "Oracle", sector: "Technology", marketCap: "large", strategy: "equity" },
+  { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
+  { ticker: "ASML", name: "ASML", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "V", name: "Visa", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "MA", name: "Mastercard", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "QQQ", name: "Invesco QQQ ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
+  { ticker: "XLE", name: "Energy Select Sector SPDR", sector: "Energy", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+  { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+];
+
+function normalizeCandidate(rec: any): any | null {
+  const ticker = String(rec?.ticker || "").trim().toUpperCase();
+  if (!ticker || ticker.length > 16) return null;
+
+  const strategy = String(rec?.strategy || "equity").toLowerCase();
+  const normalizedStrategy = ALLOWED_STRATEGIES.has(strategy) ? strategy : "equity";
+  const marketCap = String(rec?.marketCap || "large").toLowerCase();
+  const normalizedMarketCap = ["mega", "large", "mid", "small", "micro"].includes(marketCap)
+    ? marketCap
+    : "large";
+
+  const entryZone = Array.isArray(rec?.entryZone) && rec.entryZone.length >= 2
+    ? [Number(rec.entryZone[0]) || 0, Number(rec.entryZone[1]) || 0]
+    : [0, 0];
+
+  return {
+    ticker,
+    name: String(rec?.name || ticker),
+    assetClass: String(rec?.assetClass || "Equity"),
+    exchange: String(rec?.exchange || "NASDAQ"),
+    currency: String(rec?.currency || "USD"),
+    currentEstPrice: Number(rec?.currentEstPrice) || 0,
+    entryZone,
+    targetPrice: Number(rec?.targetPrice) || 0,
+    stopLoss: Number(rec?.stopLoss) || 0,
+    timeHorizon: String(rec?.timeHorizon || "3M"),
+    suggestedQty: Math.max(1, Math.round(Number(rec?.suggestedQty) || 1)),
+    confidence: Math.max(1, Math.min(99, Math.round(Number(rec?.confidence) || 60))),
+    thesis: String(rec?.thesis || "Strong momentum and earnings quality with favorable risk/reward."),
+    catalyst: String(rec?.catalyst || "Earnings and institutional flow support over next quarter."),
+    hedgingStrategy: String(rec?.hedgingStrategy || "Protective put and strict stop-loss discipline."),
+    riskReward: String(rec?.riskReward || "1:2.0"),
+    sector: String(rec?.sector || "Diversified"),
+    tags: Array.isArray(rec?.tags) ? rec.tags.slice(0, 6) : [],
+    riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.slice(0, 6) : [],
+    strategy: normalizedStrategy,
+    pairedInstrument: rec?.pairedInstrument || null,
+    pairedStructure: rec?.pairedStructure || null,
+    capitalEfficiency: Number(rec?.capitalEfficiency) > 0 ? Number(rec.capitalEfficiency) : 1,
+    correlationToPortfolio: String(rec?.correlationToPortfolio || "low"),
+    marketCap: normalizedMarketCap,
+  };
+}
+
+function dedupeCandidates(candidates: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const rec of candidates) {
+    const normalized = normalizeCandidate(rec);
+    if (!normalized) continue;
+    if (seen.has(normalized.ticker)) continue;
+    seen.add(normalized.ticker);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function buildDeterministicCandidates(previousTickers: string[]): any[] {
+  const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
+  return ELITE_FALLBACK_UNIVERSE
+    .filter((c) => !blocked.has(c.ticker))
+    .slice(0, 16)
+    .map((c, i) => ({
+      ticker: c.ticker,
+      name: c.name,
+      assetClass: c.assetClass || "Equity",
+      exchange: "NASDAQ",
+      currency: "USD",
+      currentEstPrice: 0,
+      entryZone: [0, 0],
+      targetPrice: 0,
+      stopLoss: 0,
+      timeHorizon: i % 3 === 0 ? "1M" : "3M",
+      suggestedQty: 1,
+      confidence: 68,
+      thesis: `${c.name} is a liquid institutional-grade name with strong trend persistence and robust balance sheet quality.`,
+      catalyst: "Upcoming earnings and continued institutional flow momentum.",
+      hedgingStrategy: "Use protective puts and hard stop-loss discipline.",
+      riskReward: "1:2.2",
+      sector: c.sector,
+      tags: ["liquid", "institutional", "momentum"],
+      riskProfile: ["medium_term", "high_conviction"],
+      strategy: c.strategy,
+      pairedInstrument: null,
+      pairedStructure: null,
+      capitalEfficiency: 1,
+      correlationToPortfolio: "low",
+      marketCap: c.marketCap,
+    }));
+}
+
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -220,14 +345,14 @@ serve(async (req) => {
     const portfolioSectors: Record<string, string> = body.portfolioSectors || {};
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
-    const provider = body.provider || "mistral";
+    const provider = String(body.provider || "mistral").toLowerCase();
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Use Cloudflare as default — falls back to Mistral on failure
-    const effectiveProvider = "cloudflare";
+    // Reliability-first: avoid Cloudflare free-tier neuron exhaustion loops.
+    const effectiveProvider = provider === "cloudflare" ? "cloudflare" : "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
@@ -243,114 +368,129 @@ serve(async (req) => {
       ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
       : "";
 
-    // ── STAGE 1: AI generates ~25 candidates ──────────────────────
-    const result = await callAI({
-      systemPrompt: `You are an elite quant portfolio strategist managing $50B+ AUM. Your ONLY job is to find stocks that will MAKE MONEY in the next 1-6 months. You are measured purely on P&L.
+    // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
+    const candidateTools = [
+      {
+        type: "function",
+        function: {
+          name: "emit_desirable_assets",
+          description: "Return high-quality, tradeable recommendations in strict JSON.",
+          parameters: {
+            type: "object",
+            properties: {
+              marketCondition: { type: "string" },
+              regimeType: { type: "string", enum: ["risk-on", "risk-off", "transition", "crisis"] },
+              recommendations: {
+                type: "array",
+                minItems: 12,
+                maxItems: 18,
+                items: {
+                  type: "object",
+                  properties: {
+                    ticker: { type: "string" },
+                    name: { type: "string" },
+                    assetClass: { type: "string" },
+                    exchange: { type: "string" },
+                    currency: { type: "string" },
+                    currentEstPrice: { type: "number" },
+                    entryZone: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 2 },
+                    targetPrice: { type: "number" },
+                    stopLoss: { type: "number" },
+                    timeHorizon: { type: "string" },
+                    suggestedQty: { type: "number" },
+                    confidence: { type: "number" },
+                    thesis: { type: "string" },
+                    catalyst: { type: "string" },
+                    hedgingStrategy: { type: "string" },
+                    riskReward: { type: "string" },
+                    sector: { type: "string" },
+                    tags: { type: "array", items: { type: "string" } },
+                    riskProfile: { type: "array", items: { type: "string" } },
+                    strategy: { type: "string", enum: Array.from(ALLOWED_STRATEGIES) },
+                    pairedInstrument: { type: ["string", "null"] },
+                    pairedStructure: { type: ["string", "null"] },
+                    capitalEfficiency: { type: "number" },
+                    correlationToPortfolio: { type: "string", enum: ["low", "medium", "high", "negative"] },
+                    marketCap: { type: "string", enum: ["mega", "large", "mid", "small", "micro"] },
+                  },
+                  required: [
+                    "ticker",
+                    "name",
+                    "assetClass",
+                    "exchange",
+                    "currency",
+                    "timeHorizon",
+                    "confidence",
+                    "thesis",
+                    "catalyst",
+                    "hedgingStrategy",
+                    "riskReward",
+                    "sector",
+                    "strategy",
+                    "marketCap",
+                  ],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["marketCondition", "regimeType", "recommendations"],
+            additionalProperties: false,
+          },
+        },
+      },
+    ];
 
-ABSOLUTE RULES:
-1. ONLY recommend stocks in CONFIRMED UPTRENDS — price above 20-day and 50-day moving averages
-2. NEVER recommend stocks that recently crashed, have negative earnings momentum, or face regulatory headwinds
-3. Focus on: earnings beats, revenue acceleration, sector rotation beneficiaries, institutional accumulation, positive news catalysts
-4. Every stock MUST have a SPECIFIC near-term catalyst (earnings, product launch, FDA approval, contract win, M&A)
-5. Target prices MUST be ABOVE current price. Stop losses BELOW.
-6. Include DIVERSE hedging: protective puts, inverse ETFs, collars, paired shorts — NEVER "no hedge"
-7. OUTPUT PLAIN TEXT — no markdown (no **, ##, backticks)
-8. Minimize ETFs (max 3). Focus on INDIVIDUAL EQUITIES with strong fundamentals + momentum.
-9. AVOID: penny stocks, meme stocks, SPACs, companies with declining revenue, highly leveraged companies, small publishers, niche retailers
-10. PREFER: Companies with >15% revenue growth, positive earnings revisions, institutional buying, sector leadership
-Return ONLY valid JSON.`,
-      userPrompt: `[SEED:${seed}] Today: ${new Date().toISOString().split("T")[0]}. Portfolio: $${portfolioValue.toLocaleString()}. Currency: ${baseCurrency}.
+    let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
+    let candidates: any[] = [];
 
+    try {
+      const result = await callAI({
+        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
+Reject low-quality names, random microcaps, and weak momentum setups.
+Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
+Prefer large/mid-cap leaders, strong earnings trends, and positive sentiment dislocations with recovery setups.
+Use exact tickers supported by Yahoo Finance.
+Do not output markdown.`,
+        userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
+Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
-Generate exactly 25 HIGH-CONVICTION profit-making asset recommendations. These MUST be stocks showing STRONG MOMENTUM and POSITIVE CATALYSTS.
+Home-market rule: ${homeMarketRule}
 
-## STOCK SELECTION CRITERIA (MANDATORY):
-- Revenue growth >10% YoY or accelerating
-- Positive earnings revisions in last 90 days
-- Price above 50-day moving average (UPTREND CONFIRMED)
-- Institutional accumulation signals (rising fund ownership, insider buying)
-- Clear catalyst in next 1-6 months
-- AVOID any stock that recently had a >15% drawdown without recovery
+Create 14-16 recommendations that prioritize:
+1) Positive earnings momentum + institutional participation
+2) Price trend confirmation (above key averages)
+3) Catalyst-driven upside in 1-6 months
+4) Sentiment-aware setups (avoid structural breakdowns)
+5) Liquidity and execution quality
 
-## DISTRIBUTION (25 total):
-1. HOME MARKET MOMENTUM: 6-7 stocks from ${isUSUser ? "US" : regionInfo.region} — MUST be in uptrends with positive earnings momentum. Include 2+ mid-cap growth stocks.
-2. GLOBAL WINNERS: 5-6 stocks from 4+ countries — pick the STRONGEST performers in each market
-3. THEMATIC ETFs: 2-3 ONLY — sector/theme ETFs with positive momentum (AI, energy, defense, biotech)
-4. PAIR STRATEGIES: 5-6 long/short pairs exploiting relative value — each MUST use DIFFERENT sectors
-5. HEDGES: 3-4 portfolio hedges — each targeting DIFFERENT risk factors with UNIQUE instruments
-6. ALTERNATIVES: 2-3 crypto/commodities/REITs — only those in CLEAR uptrends
+Hard constraints:
+- Maximum 3 ETFs
+- No penny stocks / meme stocks / niche illiquid names
+- No deteriorating fundamentals
+- Provide strategy diversity across at least 5 strategy types
 
-## QUALITY CHECK BEFORE INCLUDING:
-For EACH stock, mentally verify:
-- Is it in an uptrend? (YES required)
-- Has it beaten earnings estimates recently? (preferred)
-- Is there institutional buying? (preferred)
-- Is there a specific upcoming catalyst? (YES required)
-- Would a professional fund manager hold this? (YES required)
-If ANY answer is NO for a required check, DO NOT include it.
+Return via the tool call only.`,
+        tools: candidateTools,
+        toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
+        maxTokens: 5200,
+        temperature: 0.35,
+        provider: effectiveProvider,
+      });
 
-## STRATEGY TYPES (use 5+ different types):
-"equity", "pair_trade", "futures_leverage", "vol_arb", "sector_hedge", "correlation_hedge", "mean_reversion", "momentum"
+      parsed = safeParseJSON(result.text);
+      candidates = dedupeCandidates(Array.isArray(parsed?.recommendations) ? parsed.recommendations : []);
+      console.log(`desirable-assets Stage 1 done, provider: ${result.provider}, seed: ${seed}, aiCandidates: ${candidates.length}`);
+    } catch (aiError) {
+      console.error("desirable-assets Stage 1 AI generation failed:", aiError);
+    }
 
-## HEDGING (MANDATORY for every position):
-- Equities: "Buy [TICKER] protective put at [X]% strike, [timeframe] expiry"
-- Pairs: "Built-in long/short hedge; additional: [specific instrument]"
-- ETFs: "Collar: sell [X]% OTM call, buy [Y]% OTM put"
-- Crypto: "Trailing stop -8%; hedge via put options at [strike]"
-
-## PRICE RULES:
-- targetPrice > currentEstPrice (LONGS only)
-- stopLoss < currentEstPrice
-- entryZone brackets currentEstPrice (±5%)
-- Risk-reward minimum 1:2
-
-Return JSON:
-{
-  "marketCondition": "<3-4 sentence regime assessment with specific data points>",
-  "regimeType": "<risk-on|risk-off|transition|crisis>",
-  "recommendations": [{
-    "ticker": "<exact Yahoo Finance ticker>",
-    "name": "<full name>",
-    "assetClass": "<Equity|ETF|Crypto|Commodity|Forex|Derivative>",
-    "exchange": "<exchange>",
-    "currency": "<currency code>",
-    "currentEstPrice": <number>,
-    "entryZone": [<low>, <high>],
-    "targetPrice": <number ABOVE currentEstPrice>,
-    "stopLoss": <number BELOW currentEstPrice>,
-    "timeHorizon": "<1W|1M|3M|6M|1Y>",
-    "suggestedQty": <number>,
-    "confidence": <0-100>,
-    "thesis": "<3-4 sentences: WHY this will make money — earnings, momentum, catalyst>",
-    "catalyst": "<specific near-term catalyst with expected date if possible>",
-    "hedgingStrategy": "<SPECIFIC hedge — never empty>",
-    "riskReward": "<e.g. 1:3.5>",
-    "sector": "<sector>",
-    "tags": ["<tag>"],
-    "riskProfile": ["<risk tag>"],
-    "strategy": "<equity|pair_trade|futures_leverage|vol_arb|sector_hedge|correlation_hedge|mean_reversion|momentum>",
-    "pairedInstrument": "<second ticker if pair, null otherwise>",
-    "pairedStructure": "<combined position description, null if standalone>",
-    "capitalEfficiency": <multiplier, 1.0 for plain equity>,
-    "correlationToPortfolio": "<low|medium|high|negative>",
-    "marketCap": "<mega|large|mid|small|micro>"
-  }]
-}`,
-      maxTokens: 8000,
-      temperature: 0.7,
-      provider: effectiveProvider,
-      jsonMode: true,
-    });
-
-    console.log(`desirable-assets Stage 1 done, provider: ${result.provider}, seed: ${seed}`);
-    const parsed = safeParseJSON(result.text);
-    const candidates = parsed.recommendations || [];
+    // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
+    const deterministicCandidates = buildDeterministicCandidates(previousTickers);
+    candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
 
     if (candidates.length === 0) {
-      return new Response(JSON.stringify({ error: "No candidates generated" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      throw new Error("No candidates available after deterministic fallback");
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
