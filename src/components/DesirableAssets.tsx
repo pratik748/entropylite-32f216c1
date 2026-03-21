@@ -438,7 +438,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground/60 font-mono text-center mt-2">
-          3-stage funnel: AI generation → Historical validation → Portfolio correlation
+          4-stage funnel: AI generation → Momentum + Trend → Monte Carlo sim → Perplexity sentiment
         </p>
       </div>
     );
