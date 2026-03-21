@@ -292,12 +292,14 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       if (progressTimer.current) clearInterval(progressTimer.current);
       const stages = [
         { at: 5, label: "Querying AI strategist..." },
-        { at: 20, label: "Generating candidates..." },
-        { at: 40, label: "Fetching real-time prices..." },
-        { at: 55, label: "Running Sharpe & drawdown filters..." },
-        { at: 70, label: "Computing portfolio correlation..." },
-        { at: 82, label: "Scoring & ranking assets..." },
-        { at: 90, label: "Enforcing strategy diversity..." },
+        { at: 18, label: "Generating momentum candidates..." },
+        { at: 35, label: "Fetching real-time prices..." },
+        { at: 48, label: "Running Sharpe & drawdown filters..." },
+        { at: 58, label: "Momentum & trend validation..." },
+        { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
+        { at: 78, label: "Computing portfolio correlation..." },
+        { at: 85, label: "Scoring & ranking assets..." },
+        { at: 90, label: "Perplexity sentiment validation..." },
       ];
       let idx = 0;
       progressTimer.current = setInterval(() => {
