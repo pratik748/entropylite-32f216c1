@@ -649,11 +649,12 @@ Return JSON:
       }
     }
 
-    // Verify strategy diversity
-    const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
     if (selected.length === 0 && scored.length > 0) {
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
     }
+
+    // Verify strategy diversity
+    const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
 
     console.log(`desirable-assets: ${candidates.length} candidates, ${noData} no Yahoo data, ${thinData} thin data, ${scored.length} scored, ${selected.length} selected`);
     console.log(`desirable-assets tiers: strict=${strictPool.length}, balanced=${balancedPool.length - strictPool.length}, rescue=${rescuePool.length}`);
