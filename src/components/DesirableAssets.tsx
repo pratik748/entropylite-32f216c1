@@ -54,6 +54,12 @@ interface Recommendation {
   quantScore?: number;
   closes?: number[];
   simulationTested?: boolean;
+  momentum20d?: number;
+  momentum5d?: number;
+  trendStrength?: number;
+  sentimentScore?: number;
+  sentimentLabel?: string;
+  sentimentChecked?: boolean;
 }
 
 interface Props {
