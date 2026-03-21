@@ -133,6 +133,92 @@ const REGION_LABELS: Record<string, string> = {
   BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
 };
 
+// ── Puter.js Perplexity Sentiment Gate ──
+const SENTIMENT_CACHE_KEY = "da_sentiment_cache_v1";
+const SENTIMENT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getSentimentCache(): Record<string, { score: number; label: string; ts: number }> {
+  try {
+    const raw = localStorage.getItem(SENTIMENT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function setSentimentCache(cache: Record<string, { score: number; label: string; ts: number }>) {
+  try { localStorage.setItem(SENTIMENT_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+async function checkSentimentViaPuter(ticker: string, name: string): Promise<{ score: number; label: string }> {
+  const cache = getSentimentCache();
+  const cached = cache[ticker];
+  if (cached && Date.now() - cached.ts < SENTIMENT_CACHE_TTL) {
+    return { score: cached.score, label: cached.label };
+  }
+
+  try {
+    if (!window.puter?.ai?.chat) {
+      return { score: 70, label: "unknown" }; // Puter not loaded, pass through
+    }
+
+    const resp = await window.puter.ai.chat(
+      `What is the current market sentiment for ${ticker} (${name}) stock? Is there any recent negative news, earnings miss, regulatory issues, or analyst downgrades? Reply with ONLY a JSON object: {"sentiment": "bullish" or "bearish" or "neutral", "score": 0-100 where 100 is extremely bullish, "reason": "one sentence"}`,
+      { model: "claude-3-5-sonnet" }
+    );
+
+    const text = typeof resp === "string" ? resp : resp?.message?.content || resp?.toString?.() || "";
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const score = typeof parsed.score === "number" ? parsed.score : 50;
+      const label = parsed.sentiment || "neutral";
+      cache[ticker] = { score, label, ts: Date.now() };
+      setSentimentCache(cache);
+      return { score, label };
+    }
+  } catch (e) {
+    console.warn(`Sentiment check failed for ${ticker}:`, e);
+  }
+  return { score: 60, label: "neutral" };
+}
+
+async function validateSentimentBatch(recs: Recommendation[]): Promise<Recommendation[]> {
+  // Check sentiment for each rec in parallel (max 5 concurrent)
+  const BATCH = 5;
+  const results = [...recs];
+  
+  for (let i = 0; i < results.length; i += BATCH) {
+    const batch = results.slice(i, i + BATCH);
+    const sentiments = await Promise.all(
+      batch.map(r => checkSentimentViaPuter(r.ticker, r.name))
+    );
+    for (let j = 0; j < batch.length; j++) {
+      const idx = i + j;
+      results[idx] = {
+        ...results[idx],
+        sentimentScore: sentiments[j].score,
+        sentimentLabel: sentiments[j].label,
+        sentimentChecked: true,
+      };
+    }
+  }
+
+  // Filter out bearish sentiment stocks (score < 30) — they are likely to lose money
+  const filtered = results.filter(r => {
+    if (r.strategy === "correlation_hedge" || r.strategy === "sector_hedge") return true; // hedges can be bearish
+    return (r.sentimentScore || 60) >= 30;
+  });
+
+  // Sort: bullish first, then by quant score
+  filtered.sort((a, b) => {
+    const sentDiff = (b.sentimentScore || 50) - (a.sentimentScore || 50);
+    if (Math.abs(sentDiff) > 20) return sentDiff;
+    return (b.quantScore || 0) - (a.quantScore || 0);
+  });
+
+  return filtered;
+}
+
 // Mini sparkline component
 const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
   if (!data || data.length < 2) return null;
