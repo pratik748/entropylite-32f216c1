@@ -702,10 +702,12 @@ Return JSON:
         quantScore: s.quantScore,
         closes: s.closes,
         simulationTested: true,
-        // Max profit fields
         maxProfitTarget: Math.round(s.maxProfitTarget * 100) / 100,
         maxProfitConfidence: s.maxProfitConfidence,
         maxProfitMethod: s.maxProfitMethod,
+        momentum20d: s.momentum20d,
+        momentum5d: s.momentum5d,
+        trendStrength: s.trendStrength,
       };
     });
 
