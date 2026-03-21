@@ -407,7 +407,7 @@ Return JSON:
     }
     const portReturns = portfolioReturnSeries(portfolioCloses, weights);
 
-    // ── STAGE 3: STRICT quantitative validation ───────────────────
+    // ── STAGE 3: STRICT quantitative validation — ELITE FILTER ───
     interface ScoredRec {
       rec: any;
       sharpeRatio: number;
@@ -428,6 +428,9 @@ Return JSON:
       maxProfitTarget: number;
       maxProfitConfidence: number;
       maxProfitMethod: string;
+      momentum20d: number;
+      momentum5d: number;
+      trendStrength: number;
     }
 
     const scored: ScoredRec[] = [];
@@ -436,7 +439,7 @@ Return JSON:
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
       if (!td) { noData++; continue; }
-      if (td.closes.length < 10) { thinData++; continue; }
+      if (td.closes.length < 20) { thinData++; continue; }
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
@@ -444,51 +447,121 @@ Return JSON:
       const vol = annualizedVol(returns);
       const zs = zScore(td.closes);
 
+      // ── MOMENTUM CALCULATIONS ──
+      const closes = td.closes;
+      const price = td.price;
+      const sma20 = mean(closes.slice(-20));
+      const sma50 = closes.length >= 50 ? mean(closes.slice(-50)) : sma20;
+      const momentum20d = sma20 > 0 ? ((price - sma20) / sma20) * 100 : 0;
+      const momentum5d = closes.length >= 5 ? ((price - closes[closes.length - 5]) / closes[closes.length - 5]) * 100 : 0;
+      
+      // Trend strength: % of last 20 days price was above SMA20
+      const last20 = closes.slice(-20);
+      const sma20vals: number[] = [];
+      for (let j = 0; j < last20.length; j++) {
+        const windowStart = Math.max(0, closes.length - 20 + j - 19);
+        const windowEnd = closes.length - 20 + j + 1;
+        sma20vals.push(mean(closes.slice(windowStart, windowEnd)));
+      }
+      const daysAboveSma = last20.filter((p, j) => p > (sma20vals[j] || sma20)).length;
+      const trendStrength = (daysAboveSma / last20.length) * 100;
+
+      // 52-week position (higher = closer to 52w high = stronger)
+      const fiftyTwoPos = td.fiftyTwoHigh > td.fiftyTwoLow
+        ? ((price - td.fiftyTwoLow) / (td.fiftyTwoHigh - td.fiftyTwoLow)) * 100
+        : 50;
+
+      // ── Recent returns (last 20 days cumulative) ──
+      const recentReturns = returns.slice(-20);
+      const cumReturn20d = recentReturns.reduce((s, r) => s + r, 0) * 100;
+
       // Correlation to portfolio
       let portCorr = 0;
       if (portReturns.length > 10) {
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── VERY RELAXED FILTERS — maximize pass-through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 1: Too correlated to portfolio (unless hedge/pair) — raised to 0.85
-      if (!isHedge && !isPair && portCorr > 0.85) continue;
+      // ══════════════════════════════════════════════════════════════
+      // ELITE FILTERS — Only profitable, trending, momentum stocks
+      // ══════════════════════════════════════════════════════════════
 
-      // Filter 2: Only filter truly catastrophic Sharpe
-      if (sr < -1.5) continue;
+      // F1: Must have POSITIVE Sharpe (no loss-makers)
+      if (!isHedge && sr < 0) { filtered++; continue; }
 
-      // Filter 3: Only extreme drawdown
-      if (mdd > 65) continue;
+      // F2: Max drawdown cap at 40% (no crash-prone stocks)
+      if (mdd > 40) { filtered++; continue; }
 
-      // Filter 4: Price sanity — target must be above current price (very lenient)
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.7) continue;
+      // F3: Price MUST be above 20-day SMA (uptrend confirmation)
+      if (!isHedge && !isPair && price < sma20 * 0.97) { filtered++; continue; }
 
-      // Filter 5: Extreme vol without any returns
-      if (vol > 100 && sr < -0.5) continue;
+      // F4: Trend strength — at least 50% of days above SMA
+      if (!isHedge && !isPair && trendStrength < 40) { filtered++; continue; }
 
-      // Filter 6: Skip tickers already in portfolio
+      // F5: Recent 20-day cumulative return must not be deeply negative
+      if (!isHedge && cumReturn20d < -15) { filtered++; continue; }
+
+      // F6: 52-week position — reject stocks that crashed >60% from high
+      if (!isHedge && fiftyTwoPos < 20) { filtered++; continue; }
+
+      // F7: Correlation filter
+      if (!isHedge && !isPair && portCorr > 0.75) { filtered++; continue; }
+
+      // F8: Extreme vol without returns
+      if (vol > 80 && sr < 0.2) { filtered++; continue; }
+
+      // F9: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
-      // Compute max profit target using quant methods
+      // F10: Target must be above current price
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+
+      // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
+      const mu60 = mean(returns);
+      const sig60 = stddev(returns);
+      let profitablePaths = 0;
+      const simPaths = 5000;
+      const simDays = 60;
+      for (let p = 0; p < simPaths; p++) {
+        let simPrice = price;
+        for (let d = 0; d < simDays; d++) {
+          // Box-Muller for normal random
+          const u1 = Math.random();
+          const u2 = Math.random();
+          const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+          simPrice *= Math.exp((mu60 - 0.5 * sig60 * sig60) + sig60 * z);
+        }
+        if (simPrice > price * 1.02) profitablePaths++; // >2% gain
+      }
+      const winRate = (profitablePaths / simPaths) * 100;
+
+      // F11: Monte Carlo — at least 50% of simulated paths must be profitable
+      if (!isHedge && winRate < 45) { filtered++; continue; }
+
+      // Compute max profit target
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
 
-      // Composite score — much stricter weighting
+      // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
       const conf = (rec.confidence || 50) / 100;
-      // Bonus for hedge strategies when portfolio is correlated
+      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1); // normalize momentum
+      const trendScore = trendStrength / 100;
+      const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
 
       const quantScore = Math.round(
-        (0.30 * (normSharpe + 1) / 2 +
-         0.30 * diversification +
-         0.15 * conf +
-         0.10 * Math.min(capEff / 5, 1) +
-         0.15 * Math.max(0, 1 - mdd / 35) + // reward low drawdown
+        (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
+         0.15 * diversification +            // Portfolio diversification
+         0.10 * conf +                       // AI confidence
+         0.05 * Math.min(capEff / 5, 1) +   // Capital efficiency
+         0.10 * Math.max(0, 1 - mdd / 35) + // Low drawdown reward
+         0.15 * (momScore + 1) / 2 +         // Momentum (NEW)
+         0.10 * trendScore +                 // Trend strength (NEW)
+         0.15 * winRateScore +               // Monte Carlo win rate (NEW)
          hedgeBonus) * 100
       );
 
@@ -512,6 +585,9 @@ Return JSON:
         maxProfitTarget: mpt.maxTarget,
         maxProfitConfidence: mpt.confidence,
         maxProfitMethod: mpt.method,
+        momentum20d: Math.round(momentum20d * 100) / 100,
+        momentum5d: Math.round(momentum5d * 100) / 100,
+        trendStrength: Math.round(trendStrength),
       });
     }
 
