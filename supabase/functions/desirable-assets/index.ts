@@ -789,6 +789,53 @@ Return via the tool call only.`,
       }
     }
 
+    // Reliability backstop: ensure at least 8 output candidates when market filters are too harsh.
+    if (selected.length < 8) {
+      for (const fallbackRec of deterministicCandidates) {
+        if (selected.length >= 8) break;
+        if (selectedTickers.has(fallbackRec.ticker) || portfolioTickers.includes(fallbackRec.ticker)) continue;
+
+        const td = tickerData[fallbackRec.ticker];
+        if (!td || td.closes.length < 20 || td.price <= 0) continue;
+
+        const returns = logReturns(td.closes);
+        const sr = sharpeRatio(returns);
+        const mdd = maxDrawdown(td.closes);
+        const vol = annualizedVol(returns);
+        const zs = zScore(td.closes);
+        const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+        const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
+
+        selected.push({
+          rec: fallbackRec,
+          sharpeRatio: Math.round(sr * 100) / 100,
+          maxDrawdown: Math.round(mdd * 10) / 10,
+          portfolioCorrelation: Math.round(portCorr * 100) / 100,
+          volatility: Math.round(vol * 10) / 10,
+          zScore: Math.round(zs * 100) / 100,
+          quantScore: 42,
+          priceVerified: true,
+          realPrice: td.price,
+          realCurrency: td.currency,
+          priceChange24h: Math.round(td.change * 100) / 100,
+          volume: td.volume,
+          fiftyTwoHigh: td.fiftyTwoHigh,
+          fiftyTwoLow: td.fiftyTwoLow,
+          closes: td.closes.slice(-60),
+          highs: (td.highs || []).slice(-60),
+          maxProfitTarget: mpt.maxTarget,
+          maxProfitConfidence: mpt.confidence,
+          maxProfitMethod: mpt.method,
+          momentum20d: Math.round((((td.price - mean(td.closes.slice(-20))) / mean(td.closes.slice(-20))) * 100) * 100) / 100,
+          momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
+          trendStrength: 50,
+          winRate: 50,
+          filterTier: "rescue" as const,
+        });
+        selectedTickers.add(fallbackRec.ticker);
+      }
+    }
+
     if (selected.length === 0 && scored.length > 0) {
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
     }
