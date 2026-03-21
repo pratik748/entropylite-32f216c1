@@ -354,14 +354,34 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         candidatesGenerated: data.candidatesGenerated || 0,
         candidatesPassed: data.candidatesPassed || 0,
       };
-      setCachedDA(payload);
+      
       // Save tickers for anti-repeat on next refresh
       const newTickers = data.recommendations.map((r: any) => r.ticker);
       savePreviousTickers([...getPreviousTickers(), ...newTickers]);
-      setRecommendations(data.recommendations);
+      
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+      
+      // ── SENTIMENT GATE via Puter.js + Perplexity ──
+      setLoadingStage("Running real-time sentiment validation via Perplexity...");
+      setLoadingProgress(92);
+      
+      let validated: Recommendation[];
+      try {
+        validated = await validateSentimentBatch(data.recommendations);
+        const removed = data.recommendations.length - validated.length;
+        if (removed > 0) {
+          console.log(`Sentiment gate removed ${removed} bearish stocks`);
+          toast({ title: "Sentiment Filter", description: `${removed} stocks removed due to bearish real-time sentiment` });
+        }
+      } catch (e) {
+        console.warn("Sentiment validation failed, using unfiltered:", e);
+        validated = data.recommendations;
+      }
+      
+      setCachedDA({ ...payload, recommendations: validated });
+      setRecommendations(validated);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
