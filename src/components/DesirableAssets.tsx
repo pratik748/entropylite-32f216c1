@@ -49,7 +49,14 @@ interface Recommendation {
   trendStrength?: number;
   sentimentScore?: number;
   sentimentLabel?: string;
-  sentimentChecked?: boolean;
+  earningsSignal?: "bullish" | "neutral" | "bearish";
+  sentimentHeadline?: string;
+  sentimentArticleCount?: number;
+  allocationPct?: number;
+  positionValue?: number;
+  riskBudgetPct?: number;
+  hedgeInstrument?: string;
+  hedgeRatioPct?: number;
 }
 
 interface Props {
@@ -155,6 +162,18 @@ function corrLabel(corr: number): string {
   return "High";
 }
 
+function sentimentColor(score: number): string {
+  if (score >= 15) return "text-gain";
+  if (score <= -15) return "text-loss";
+  return "text-warning";
+}
+
+function earningsSignalColor(signal?: "bullish" | "neutral" | "bearish"): string {
+  if (signal === "bullish") return "text-gain";
+  if (signal === "bearish") return "text-loss";
+  return "text-warning";
+}
+
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
@@ -201,7 +220,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         { at: 48, label: "Running Sharpe & drawdown filters..." },
         { at: 58, label: "Momentum & trend validation..." },
         { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
-        { at: 78, label: "Computing portfolio correlation..." },
+        { at: 78, label: "Injecting live earnings sentiment..." },
         { at: 85, label: "Scoring & ranking assets..." },
         { at: 90, label: "Final quality checks..." },
       ];
@@ -415,6 +434,16 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                       <CheckCircle2 className="h-2.5 w-2.5" /> MC SIM
                     </span>
                   )}
+                  {typeof rec.sentimentScore === "number" && (
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono bg-surface-2 ${sentimentColor(rec.sentimentScore)}`}>
+                      SENT {rec.sentimentScore > 0 ? "+" : ""}{rec.sentimentScore}
+                    </span>
+                  )}
+                  {rec.earningsSignal && (
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono bg-surface-2 ${earningsSignalColor(rec.earningsSignal)}`}>
+                      EARN {rec.earningsSignal.toUpperCase()}
+                    </span>
+                  )}
                   {(rec.momentum20d || 0) > 0 && (
                     <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
                       <TrendingUp className="h-2.5 w-2.5" /> +{rec.momentum20d?.toFixed(1)}%
@@ -538,6 +567,34 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 <span className="font-bold">{inZone ? "✓ IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{entryZone[0].toLocaleString()} – {sym}{entryZone[1].toLocaleString()}
                 {inZone && " · BUY SIGNAL ACTIVE"}
               </div>
+
+              {/* Position Sizing */}
+              <div className="rounded-lg bg-surface-2 px-3 py-2 mb-3 text-[10px] font-mono relative z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Position Size</span>
+                  <span className="text-foreground font-bold">{Math.max(1, rec.suggestedQty || 1)} units</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-muted-foreground">Capital</span>
+                  <span className="text-primary">{sym}{(rec.positionValue || (price * Math.max(1, rec.suggestedQty || 1))).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-muted-foreground">Allocation</span>
+                  <span className="text-foreground">{(rec.allocationPct || 0).toFixed(2)}% · Risk {(rec.riskBudgetPct || 0).toFixed(2)}%</span>
+                </div>
+                {rec.hedgeInstrument && (
+                  <div className="mt-1 text-warning">
+                    Hedge Overlay: {rec.hedgeInstrument} {rec.hedgeRatioPct ? `(~${rec.hedgeRatioPct}% notional)` : ""}
+                  </div>
+                )}
+              </div>
+
+              {rec.sentimentHeadline && (
+                <div className="rounded-lg border border-border bg-card/50 px-3 py-2 mb-3 text-[10px]">
+                  <p className="text-muted-foreground mb-0.5">Live sentiment trigger</p>
+                  <p className="text-foreground">{rec.sentimentHeadline}</p>
+                </div>
+              )}
 
               {/* Catalyst & Hedge */}
               <div className="grid grid-cols-2 gap-2 mb-3 text-[10px] relative z-10">
