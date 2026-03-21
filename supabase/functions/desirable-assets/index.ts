@@ -245,80 +245,69 @@ serve(async (req) => {
 
     // ── STAGE 1: AI generates ~25 candidates ──────────────────────
     const result = await callAI({
-      systemPrompt: `You are an elite multi-asset portfolio strategist and derivatives specialist at a $50B+ global asset manager. You recommend assets RELATIVE to the client's existing portfolio, maximizing diversification and risk-adjusted returns.
+      systemPrompt: `You are an elite quant portfolio strategist managing $50B+ AUM. Your ONLY job is to find stocks that will MAKE MONEY in the next 1-6 months. You are measured purely on P&L.
 
-CRITICAL RULES:
-1. Target prices MUST be ABOVE current price (for long positions). A target below current price is NONSENSICAL.
-2. Every recommendation MUST have a SPECIFIC hedging strategy — never say "no hedge" or "none". Always specify: protective puts at specific strike %, inverse ETF tickers, collar strategies, or paired short positions.
-3. Include DIVERSE strategy types: pairs, triplets, sector hedges, vol plays — NOT just plain equities or ETFs.
-4. Only recommend assets with STRONG quantitative backing — positive expected returns, reasonable risk.
-5. OUTPUT PLAIN TEXT ONLY — absolutely NO markdown formatting (no **, no ##, no backticks, no &(). Write clean sentences.
-6. MINIMIZE ETFs — max 3. Focus on individual equities, derivative pairs, and structured strategies.
-7. Include at least 6 individual equities across different market caps (small, mid, large, mega).
+ABSOLUTE RULES:
+1. ONLY recommend stocks in CONFIRMED UPTRENDS — price above 20-day and 50-day moving averages
+2. NEVER recommend stocks that recently crashed, have negative earnings momentum, or face regulatory headwinds
+3. Focus on: earnings beats, revenue acceleration, sector rotation beneficiaries, institutional accumulation, positive news catalysts
+4. Every stock MUST have a SPECIFIC near-term catalyst (earnings, product launch, FDA approval, contract win, M&A)
+5. Target prices MUST be ABOVE current price. Stop losses BELOW.
+6. Include DIVERSE hedging: protective puts, inverse ETFs, collars, paired shorts — NEVER "no hedge"
+7. OUTPUT PLAIN TEXT — no markdown (no **, ##, backticks)
+8. Minimize ETFs (max 3). Focus on INDIVIDUAL EQUITIES with strong fundamentals + momentum.
+9. AVOID: penny stocks, meme stocks, SPACs, companies with declining revenue, highly leveraged companies, small publishers, niche retailers
+10. PREFER: Companies with >15% revenue growth, positive earnings revisions, institutional buying, sector leadership
 Return ONLY valid JSON.`,
-      userPrompt: `[SEED:${seed}] Today is ${new Date().toISOString().split("T")[0]}. Portfolio value: $${portfolioValue.toLocaleString()}. Base currency: ${baseCurrency}.
+      userPrompt: `[SEED:${seed}] Today: ${new Date().toISOString().split("T")[0]}. Portfolio: $${portfolioValue.toLocaleString()}. Currency: ${baseCurrency}.
 
 ${portfolioContext}
 ${antiRepeatBlock}
-Generate exactly 25 asset recommendations that COMPLEMENT this portfolio. You MUST follow these rules:
+Generate exactly 25 HIGH-CONVICTION profit-making asset recommendations. These MUST be stocks showing STRONG MOMENTUM and POSITIVE CATALYSTS.
 
-## PORTFOLIO-RELATIVE REQUIREMENTS:
-- Each asset must REDUCE overall portfolio risk or fill a SECTOR/GEOGRAPHY GAP
-- Avoid sectors already heavily represented: ${existingSectors.join(", ") || "none"}
-- MINIMUM 5 DERIVATIVE/PAIR/STRUCTURED STRATEGIES — these are the most valuable
-- At least 3 CORRELATION HEDGES — assets negatively correlated to the portfolio
+## STOCK SELECTION CRITERIA (MANDATORY):
+- Revenue growth >10% YoY or accelerating
+- Positive earnings revisions in last 90 days
+- Price above 50-day moving average (UPTREND CONFIRMED)
+- Institutional accumulation signals (rising fund ownership, insider buying)
+- Clear catalyst in next 1-6 months
+- AVOID any stock that recently had a >15% drawdown without recovery
 
-## MANDATORY DISTRIBUTION (25 total):
-1. HOME MARKET: 6-7 individual stocks from ${isUSUser ? "US" : regionInfo.region} — DIFFERENT sectors and market caps (MUST include 2+ small/mid-cap under $10B)
-2. GLOBAL EQUITIES: 5-6 individual stocks from at LEAST 4 different countries outside home market
-3. ETFs: 2-3 thematic/sector/commodity ETFs ONLY (keep ETF count low — focus on real equities)
-4. PAIRS & STRUCTURES: 5-6 derivative pair strategies — each MUST use DIFFERENT instruments and DIFFERENT sectors (pair_trade, futures_leverage, vol_arb, mean_reversion)
-5. HEDGES: 3-4 sector_hedge and correlation_hedge plays — each hedge MUST target a DIFFERENT risk factor (rates, FX, sector, volatility, geopolitical) with UNIQUE instruments
-6. ALTERNATIVES: 2-3 crypto, commodities, REITs, or defensive plays
+## DISTRIBUTION (25 total):
+1. HOME MARKET MOMENTUM: 6-7 stocks from ${isUSUser ? "US" : regionInfo.region} — MUST be in uptrends with positive earnings momentum. Include 2+ mid-cap growth stocks.
+2. GLOBAL WINNERS: 5-6 stocks from 4+ countries — pick the STRONGEST performers in each market
+3. THEMATIC ETFs: 2-3 ONLY — sector/theme ETFs with positive momentum (AI, energy, defense, biotech)
+4. PAIR STRATEGIES: 5-6 long/short pairs exploiting relative value — each MUST use DIFFERENT sectors
+5. HEDGES: 3-4 portfolio hedges — each targeting DIFFERENT risk factors with UNIQUE instruments
+6. ALTERNATIVES: 2-3 crypto/commodities/REITs — only those in CLEAR uptrends
 
-## HEDGE DIVERSITY RULE (CRITICAL):
-- EVERY hedge must be DIFFERENT — different instruments, different risk factors, different structures
-- Example BAD: 3 hedges all using "buy protective put" — this is NOT diverse
-- Example GOOD: 1 via inverse ETF pair, 1 via options collar, 1 via short futures, 1 via commodity exposure
-- Pair trades MUST use different sector pairs — no two pairs from the same industry
+## QUALITY CHECK BEFORE INCLUDING:
+For EACH stock, mentally verify:
+- Is it in an uptrend? (YES required)
+- Has it beaten earnings estimates recently? (preferred)
+- Is there institutional buying? (preferred)
+- Is there a specific upcoming catalyst? (YES required)
+- Would a professional fund manager hold this? (YES required)
+If ANY answer is NO for a required check, DO NOT include it.
 
-## STRATEGY TYPES (tag each — MUST use at least 5 different types):
-- "equity" — standalone equity position
-- "pair_trade" — long/short pair for relative value
-- "futures_leverage" — futures + ETF for capital-efficient exposure
-- "vol_arb" — volatility arbitrage opportunity
-- "sector_hedge" — hedges existing portfolio sector risk
-- "correlation_hedge" — negatively correlated to portfolio
-- "mean_reversion" — statistically oversold/overbought play
-- "momentum" — trend-following opportunity
+## STRATEGY TYPES (use 5+ different types):
+"equity", "pair_trade", "futures_leverage", "vol_arb", "sector_hedge", "correlation_hedge", "mean_reversion", "momentum"
 
-## HEDGING STRATEGY RULES (MANDATORY — no exceptions):
-- For equities: "Buy [TICKER] protective put at [X]% strike, [timeframe] expiry" OR "Pair with [INVERSE_ETF] at [ratio]"
-- For pairs: "Built-in hedge via long/short structure; additional protection via [specific instrument]"
-- For ETFs: "Collar strategy: sell [X]% OTM call, buy [Y]% OTM put" OR "Pair with [INVERSE_ETF]"
-- For crypto: "Reduce to 2% portfolio weight; trailing stop at -8%; hedge via BTC put options at [strike]"
-- For commodities: "Calendar spread [front/back months] or pair with [DXY/UUP] for USD hedge"
-- NEVER output "no hedge", "none", "N/A", or empty string
+## HEDGING (MANDATORY for every position):
+- Equities: "Buy [TICKER] protective put at [X]% strike, [timeframe] expiry"
+- Pairs: "Built-in long/short hedge; additional: [specific instrument]"
+- ETFs: "Collar: sell [X]% OTM call, buy [Y]% OTM put"
+- Crypto: "Trailing stop -8%; hedge via put options at [strike]"
 
-## PRICE RULES (CRITICAL):
-- targetPrice MUST be ABOVE currentEstPrice (you are recommending LONGS)
-- stopLoss MUST be BELOW currentEstPrice
-- entryZone must bracket currentEstPrice (within ±5%)
-- riskReward ratio must be at least 1:2
-
-## RISK PROFILE TAGS (assign 1-2 per asset):
-- "aggressive", "conservative", "short_term", "medium_term", "long_term", "income", "safe_haven", "high_conviction"
-
-## CRITICAL:
-- Use CORRECT Yahoo Finance tickers with exchange suffixes
-- For derivative pairs, list BOTH instruments
-- Vary picks — not just mega-caps
-- Include contrarian and beaten-down recovery plays
-- Every single recommendation needs a REAL, ACTIONABLE hedging strategy
+## PRICE RULES:
+- targetPrice > currentEstPrice (LONGS only)
+- stopLoss < currentEstPrice
+- entryZone brackets currentEstPrice (±5%)
+- Risk-reward minimum 1:2
 
 Return JSON:
 {
-  "marketCondition": "<3-4 sentence regime assessment>",
+  "marketCondition": "<3-4 sentence regime assessment with specific data points>",
   "regimeType": "<risk-on|risk-off|transition|crisis>",
   "recommendations": [{
     "ticker": "<exact Yahoo Finance ticker>",
@@ -328,28 +317,28 @@ Return JSON:
     "currency": "<currency code>",
     "currentEstPrice": <number>,
     "entryZone": [<low>, <high>],
-    "targetPrice": <number — MUST be above currentEstPrice>,
-    "stopLoss": <number — MUST be below currentEstPrice>,
+    "targetPrice": <number ABOVE currentEstPrice>,
+    "stopLoss": <number BELOW currentEstPrice>,
     "timeHorizon": "<1W|1M|3M|6M|1Y>",
     "suggestedQty": <number>,
     "confidence": <0-100>,
-    "thesis": "<3-4 sentence rationale>",
-    "catalyst": "<specific catalyst>",
-    "hedgingStrategy": "<SPECIFIC hedge — never empty/none>",
+    "thesis": "<3-4 sentences: WHY this will make money — earnings, momentum, catalyst>",
+    "catalyst": "<specific near-term catalyst with expected date if possible>",
+    "hedgingStrategy": "<SPECIFIC hedge — never empty>",
     "riskReward": "<e.g. 1:3.5>",
     "sector": "<sector>",
     "tags": ["<tag>"],
     "riskProfile": ["<risk tag>"],
     "strategy": "<equity|pair_trade|futures_leverage|vol_arb|sector_hedge|correlation_hedge|mean_reversion|momentum>",
-    "pairedInstrument": "<second instrument ticker if pair/derivative strategy, null otherwise>",
-    "pairedStructure": "<description of the combined position, null if standalone>",
-    "capitalEfficiency": <multiplier number, 1.0 for plain equity>,
+    "pairedInstrument": "<second ticker if pair, null otherwise>",
+    "pairedStructure": "<combined position description, null if standalone>",
+    "capitalEfficiency": <multiplier, 1.0 for plain equity>,
     "correlationToPortfolio": "<low|medium|high|negative>",
     "marketCap": "<mega|large|mid|small|micro>"
   }]
 }`,
       maxTokens: 8000,
-      temperature: 0.75,
+      temperature: 0.7,
       provider: effectiveProvider,
       jsonMode: true,
     });
@@ -407,7 +396,7 @@ Return JSON:
     }
     const portReturns = portfolioReturnSeries(portfolioCloses, weights);
 
-    // ── STAGE 3: STRICT quantitative validation ───────────────────
+    // ── STAGE 3: STRICT quantitative validation — ELITE FILTER ───
     interface ScoredRec {
       rec: any;
       sharpeRatio: number;
@@ -428,6 +417,9 @@ Return JSON:
       maxProfitTarget: number;
       maxProfitConfidence: number;
       maxProfitMethod: string;
+      momentum20d: number;
+      momentum5d: number;
+      trendStrength: number;
     }
 
     const scored: ScoredRec[] = [];
@@ -436,7 +428,7 @@ Return JSON:
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
       if (!td) { noData++; continue; }
-      if (td.closes.length < 10) { thinData++; continue; }
+      if (td.closes.length < 20) { thinData++; continue; }
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
@@ -444,51 +436,121 @@ Return JSON:
       const vol = annualizedVol(returns);
       const zs = zScore(td.closes);
 
+      // ── MOMENTUM CALCULATIONS ──
+      const closes = td.closes;
+      const price = td.price;
+      const sma20 = mean(closes.slice(-20));
+      const sma50 = closes.length >= 50 ? mean(closes.slice(-50)) : sma20;
+      const momentum20d = sma20 > 0 ? ((price - sma20) / sma20) * 100 : 0;
+      const momentum5d = closes.length >= 5 ? ((price - closes[closes.length - 5]) / closes[closes.length - 5]) * 100 : 0;
+      
+      // Trend strength: % of last 20 days price was above SMA20
+      const last20 = closes.slice(-20);
+      const sma20vals: number[] = [];
+      for (let j = 0; j < last20.length; j++) {
+        const windowStart = Math.max(0, closes.length - 20 + j - 19);
+        const windowEnd = closes.length - 20 + j + 1;
+        sma20vals.push(mean(closes.slice(windowStart, windowEnd)));
+      }
+      const daysAboveSma = last20.filter((p, j) => p > (sma20vals[j] || sma20)).length;
+      const trendStrength = (daysAboveSma / last20.length) * 100;
+
+      // 52-week position (higher = closer to 52w high = stronger)
+      const fiftyTwoPos = td.fiftyTwoHigh > td.fiftyTwoLow
+        ? ((price - td.fiftyTwoLow) / (td.fiftyTwoHigh - td.fiftyTwoLow)) * 100
+        : 50;
+
+      // ── Recent returns (last 20 days cumulative) ──
+      const recentReturns = returns.slice(-20);
+      const cumReturn20d = recentReturns.reduce((s, r) => s + r, 0) * 100;
+
       // Correlation to portfolio
       let portCorr = 0;
       if (portReturns.length > 10) {
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      // ── VERY RELAXED FILTERS — maximize pass-through ──
       const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
-      // Filter 1: Too correlated to portfolio (unless hedge/pair) — raised to 0.85
-      if (!isHedge && !isPair && portCorr > 0.85) continue;
+      // ══════════════════════════════════════════════════════════════
+      // ELITE FILTERS — Only profitable, trending, momentum stocks
+      // ══════════════════════════════════════════════════════════════
 
-      // Filter 2: Only filter truly catastrophic Sharpe
-      if (sr < -1.5) continue;
+      // F1: Must have POSITIVE Sharpe (no loss-makers)
+      if (!isHedge && sr < 0) { filtered++; continue; }
 
-      // Filter 3: Only extreme drawdown
-      if (mdd > 65) continue;
+      // F2: Max drawdown cap at 40% (no crash-prone stocks)
+      if (mdd > 40) { filtered++; continue; }
 
-      // Filter 4: Price sanity — target must be above current price (very lenient)
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.7) continue;
+      // F3: Price MUST be above 20-day SMA (uptrend confirmation)
+      if (!isHedge && !isPair && price < sma20 * 0.97) { filtered++; continue; }
 
-      // Filter 5: Extreme vol without any returns
-      if (vol > 100 && sr < -0.5) continue;
+      // F4: Trend strength — at least 50% of days above SMA
+      if (!isHedge && !isPair && trendStrength < 40) { filtered++; continue; }
 
-      // Filter 6: Skip tickers already in portfolio
+      // F5: Recent 20-day cumulative return must not be deeply negative
+      if (!isHedge && cumReturn20d < -15) { filtered++; continue; }
+
+      // F6: 52-week position — reject stocks that crashed >60% from high
+      if (!isHedge && fiftyTwoPos < 20) { filtered++; continue; }
+
+      // F7: Correlation filter
+      if (!isHedge && !isPair && portCorr > 0.75) { filtered++; continue; }
+
+      // F8: Extreme vol without returns
+      if (vol > 80 && sr < 0.2) { filtered++; continue; }
+
+      // F9: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
-      // Compute max profit target using quant methods
+      // F10: Target must be above current price
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+
+      // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
+      const mu60 = mean(returns);
+      const sig60 = stddev(returns);
+      let profitablePaths = 0;
+      const simPaths = 5000;
+      const simDays = 60;
+      for (let p = 0; p < simPaths; p++) {
+        let simPrice = price;
+        for (let d = 0; d < simDays; d++) {
+          // Box-Muller for normal random
+          const u1 = Math.random();
+          const u2 = Math.random();
+          const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+          simPrice *= Math.exp((mu60 - 0.5 * sig60 * sig60) + sig60 * z);
+        }
+        if (simPrice > price * 1.02) profitablePaths++; // >2% gain
+      }
+      const winRate = (profitablePaths / simPaths) * 100;
+
+      // F11: Monte Carlo — at least 50% of simulated paths must be profitable
+      if (!isHedge && winRate < 45) { filtered++; continue; }
+
+      // Compute max profit target
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
 
-      // Composite score — much stricter weighting
+      // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
       const conf = (rec.confidence || 50) / 100;
-      // Bonus for hedge strategies when portfolio is correlated
+      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1); // normalize momentum
+      const trendScore = trendStrength / 100;
+      const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
 
       const quantScore = Math.round(
-        (0.30 * (normSharpe + 1) / 2 +
-         0.30 * diversification +
-         0.15 * conf +
-         0.10 * Math.min(capEff / 5, 1) +
-         0.15 * Math.max(0, 1 - mdd / 35) + // reward low drawdown
+        (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
+         0.15 * diversification +            // Portfolio diversification
+         0.10 * conf +                       // AI confidence
+         0.05 * Math.min(capEff / 5, 1) +   // Capital efficiency
+         0.10 * Math.max(0, 1 - mdd / 35) + // Low drawdown reward
+         0.15 * (momScore + 1) / 2 +         // Momentum (NEW)
+         0.10 * trendScore +                 // Trend strength (NEW)
+         0.15 * winRateScore +               // Monte Carlo win rate (NEW)
          hedgeBonus) * 100
       );
 
@@ -512,6 +574,9 @@ Return JSON:
         maxProfitTarget: mpt.maxTarget,
         maxProfitConfidence: mpt.confidence,
         maxProfitMethod: mpt.method,
+        momentum20d: Math.round(momentum20d * 100) / 100,
+        momentum5d: Math.round(momentum5d * 100) / 100,
+        trendStrength: Math.round(trendStrength),
       });
     }
 
@@ -637,10 +702,12 @@ Return JSON:
         quantScore: s.quantScore,
         closes: s.closes,
         simulationTested: true,
-        // Max profit fields
         maxProfitTarget: Math.round(s.maxProfitTarget * 100) / 100,
         maxProfitConfidence: s.maxProfitConfidence,
         maxProfitMethod: s.maxProfitMethod,
+        momentum20d: s.momentum20d,
+        momentum5d: s.momentum5d,
+        trendStrength: s.trendStrength,
       };
     });
 
