@@ -523,7 +523,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   )}
                   {rec.simulationTested && (
                     <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
-                      <CheckCircle2 className="h-2.5 w-2.5" /> TESTED
+                      <CheckCircle2 className="h-2.5 w-2.5" /> MC SIM
+                    </span>
+                  )}
+                  {rec.sentimentChecked && (
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                      rec.sentimentLabel === "bullish" ? "bg-gain/10 text-gain" : 
+                      rec.sentimentLabel === "bearish" ? "bg-loss/10 text-loss" : 
+                      "bg-warning/10 text-warning"
+                    }`}>
+                      {rec.sentimentLabel === "bullish" ? "🟢" : rec.sentimentLabel === "bearish" ? "🔴" : "🟡"} {(rec.sentimentScore || 0)}
+                    </span>
+                  )}
+                  {(rec.momentum20d || 0) > 0 && (
+                    <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
+                      <TrendingUp className="h-2.5 w-2.5" /> +{rec.momentum20d?.toFixed(1)}%
                     </span>
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
