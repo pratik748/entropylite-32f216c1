@@ -25,6 +25,282 @@ const CURRENCY_TO_REGION: Record<string, { region: string; exchange: string; suf
   SGD: { region: "Singapore (SGX)", exchange: "SGX", suffix: ".SI" },
 };
 
+const HEDGE_STRATEGIES = new Set(["sector_hedge", "correlation_hedge", "vol_arb"]);
+
+const EARNINGS_KEYWORDS = [
+  "earnings",
+  "guidance",
+  "revenue",
+  "eps",
+  "quarter",
+  "outlook",
+  "results",
+  "forecast",
+  "profit",
+  "margin",
+];
+
+const POSITIVE_EVENT_WORDS = [
+  "beat",
+  "beats",
+  "upside",
+  "raised",
+  "growth",
+  "surge",
+  "record",
+  "strong",
+  "upgrades",
+  "bullish",
+  "outperform",
+  "rebound",
+  "expands",
+];
+
+const NEGATIVE_EVENT_WORDS = [
+  "miss",
+  "misses",
+  "cut",
+  "cuts",
+  "downgrade",
+  "downgraded",
+  "weak",
+  "lawsuit",
+  "probe",
+  "bearish",
+  "slowdown",
+  "warning",
+  "decline",
+  "selloff",
+  "slump",
+];
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+type FilterTier = "strict" | "balanced" | "rescue";
+
+interface RealtimeSentiment {
+  sentimentScore: number;
+  sentimentLabel: string;
+  earningsSignal: "bullish" | "neutral" | "bearish";
+  headline: string;
+  articleCount: number;
+}
+
+function toSentimentLabel(score: number): string {
+  if (score >= 35) return "Bullish";
+  if (score >= 12) return "Mild Bullish";
+  if (score <= -35) return "Bearish";
+  if (score <= -12) return "Mild Bearish";
+  return "Neutral";
+}
+
+function parseTone(toneRaw: unknown): number {
+  if (typeof toneRaw === "number") return toneRaw;
+  if (typeof toneRaw === "string") {
+    const first = toneRaw.split(",")[0];
+    const parsed = Number(first);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function lexicalHeadlineScore(headline: string): number {
+  const text = headline.toLowerCase();
+  let score = 0;
+  for (const w of POSITIVE_EVENT_WORDS) if (text.includes(w)) score += 1;
+  for (const w of NEGATIVE_EVENT_WORDS) if (text.includes(w)) score -= 1;
+  return score;
+}
+
+async function fetchTickerRealtimeSentiment(ticker: string, name?: string): Promise<RealtimeSentiment | null> {
+  try {
+    const safeTicker = ticker.replace(/"/g, "").trim();
+    const safeName = (name || "").replace(/"/g, "").trim();
+    const tickerQuery = `"${safeTicker}" OR "$${safeTicker}"`;
+    const nameQuery = safeName && safeName.toUpperCase() !== safeTicker ? ` OR "${safeName}"` : "";
+    const query = `${tickerQuery}${nameQuery} (earnings OR guidance OR outlook OR revenue OR analyst)`;
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&maxrecords=24&format=json&sort=DateDesc`;
+
+    const res = await fetch(url, { headers: { "User-Agent": UA } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const articles = Array.isArray(data?.articles) ? data.articles.slice(0, 20) : [];
+    if (articles.length === 0) return null;
+
+    let toneWeightedSum = 0;
+    let lexicalWeightedSum = 0;
+    let weightSum = 0;
+    let earningsLexicalSum = 0;
+    let earningsHits = 0;
+
+    for (let i = 0; i < articles.length; i++) {
+      const article = articles[i];
+      const headline = String(article?.title || "");
+      const lowerHeadline = headline.toLowerCase();
+      const weight = Math.max(0.35, 1 - i * 0.05);
+      const tone = parseTone(article?.tone);
+      const lexical = lexicalHeadlineScore(headline);
+
+      toneWeightedSum += tone * weight;
+      lexicalWeightedSum += lexical * weight;
+      weightSum += weight;
+
+      if (EARNINGS_KEYWORDS.some((k) => lowerHeadline.includes(k))) {
+        earningsHits += 1;
+        earningsLexicalSum += lexical;
+      }
+    }
+
+    const avgTone = weightSum > 0 ? toneWeightedSum / weightSum : 0;
+    const avgLexical = weightSum > 0 ? lexicalWeightedSum / weightSum : 0;
+    const avgEarningsLexical = earningsHits > 0 ? earningsLexicalSum / earningsHits : 0;
+
+    const sentimentScore = clamp(
+      Math.round(avgTone * 7 + avgLexical * 9 + avgEarningsLexical * 12),
+      -100,
+      100,
+    );
+
+    const earningsSignal: "bullish" | "neutral" | "bearish" =
+      avgEarningsLexical > 0.5 || sentimentScore > 20
+        ? "bullish"
+        : avgEarningsLexical < -0.5 || sentimentScore < -20
+          ? "bearish"
+          : "neutral";
+
+    return {
+      sentimentScore,
+      sentimentLabel: toSentimentLabel(sentimentScore),
+      earningsSignal,
+      headline: String(articles[0]?.title || "").slice(0, 180),
+      articleCount: articles.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function computeOptimalPositionSize(params: {
+  portfolioValue: number;
+  price: number;
+  stopLoss: number;
+  confidence: number;
+  volatility: number;
+  filterTier: FilterTier;
+  isHedge: boolean;
+  sentimentScore: number;
+}): {
+  suggestedQty: number;
+  allocationPct: number;
+  positionValue: number;
+  riskBudgetPct: number;
+} {
+  const {
+    portfolioValue,
+    price,
+    stopLoss,
+    confidence,
+    volatility,
+    filterTier,
+    isHedge,
+    sentimentScore,
+  } = params;
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return { suggestedQty: 1, allocationPct: 0, positionValue: price || 0, riskBudgetPct: 0 };
+  }
+
+  const safePortfolio = Math.max(10_000, Number.isFinite(portfolioValue) ? portfolioValue : 100_000);
+  const baseRiskPctByTier: Record<FilterTier, number> = {
+    strict: 0.012,
+    balanced: 0.009,
+    rescue: 0.006,
+  };
+  const maxAllocPctByTier: Record<FilterTier, number> = {
+    strict: 0.13,
+    balanced: 0.10,
+    rescue: 0.075,
+  };
+
+  const confidenceFactor = clamp(confidence / 70, 0.65, 1.35);
+  const sentimentFactor = clamp(1 + sentimentScore / 240, 0.7, 1.25);
+  const volFactor = clamp(30 / Math.max(volatility || 25, 12), 0.55, 1.25);
+
+  let riskBudgetPct = baseRiskPctByTier[filterTier] * confidenceFactor * sentimentFactor * volFactor;
+  if (isHedge) riskBudgetPct *= 0.85;
+  riskBudgetPct = clamp(riskBudgetPct, isHedge ? 0.004 : 0.005, isHedge ? 0.011 : 0.018);
+
+  const stopDistancePct = clamp((price - stopLoss) / price, 0.03, 0.25);
+  const riskBudgetDollar = safePortfolio * riskBudgetPct;
+
+  const qtyByRisk = Math.floor(riskBudgetDollar / (price * stopDistancePct));
+  const maxAllocPct = clamp(maxAllocPctByTier[filterTier] * confidenceFactor * (isHedge ? 0.8 : 1), 0.04, isHedge ? 0.12 : 0.18);
+  const qtyByAllocation = Math.floor((safePortfolio * maxAllocPct) / price);
+  const hardCapQty = Math.floor((safePortfolio * 0.2) / price);
+
+  const suggestedQty = Math.max(1, Math.min(Math.max(1, qtyByRisk), Math.max(1, qtyByAllocation), Math.max(1, hardCapQty)));
+  const positionValue = suggestedQty * price;
+  const allocationPct = (positionValue / safePortfolio) * 100;
+
+  return {
+    suggestedQty,
+    allocationPct: Math.round(allocationPct * 100) / 100,
+    positionValue: Math.round(positionValue * 100) / 100,
+    riskBudgetPct: Math.round(riskBudgetPct * 10000) / 100,
+  };
+}
+
+function deriveHedgePlan(params: {
+  strategy: string;
+  sector: string;
+  regimeType: string;
+  sentimentScore: number;
+  volatility: number;
+}): { hedgeInstrument: string; hedgeRatioPct: number; hedgeOverlay: string } {
+  const strategy = (params.strategy || "equity").toLowerCase();
+  const sector = (params.sector || "").toLowerCase();
+
+  if (HEDGE_STRATEGIES.has(strategy)) {
+    return {
+      hedgeInstrument: "SELF-HEDGE",
+      hedgeRatioPct: 100,
+      hedgeOverlay: "This position is a direct hedge sleeve. Keep size controlled and rebalance weekly.",
+    };
+  }
+
+  if (params.regimeType === "crisis" || params.sentimentScore <= -30 || params.volatility >= 45) {
+    return {
+      hedgeInstrument: "VIXY",
+      hedgeRatioPct: 14,
+      hedgeOverlay: "Event-volatility overlay: allocate ~14% notional to VIXY during earnings/event shock windows.",
+    };
+  }
+
+  if (sector.includes("technology") || sector.includes("communication")) {
+    return {
+      hedgeInstrument: "PSQ",
+      hedgeRatioPct: 18,
+      hedgeOverlay: "Nasdaq beta hedge: pair with PSQ to cushion tech-led drawdowns around earnings cycles.",
+    };
+  }
+
+  if (sector.includes("energy")) {
+    return {
+      hedgeInstrument: "XLE",
+      hedgeRatioPct: 16,
+      hedgeOverlay: "Sector hedge: pair with XLE options/futures overlay to mitigate crude-linked downside.",
+    };
+  }
+
+  return {
+    hedgeInstrument: "SH",
+    hedgeRatioPct: 12,
+    hedgeOverlay: "Broad-market hedge: hold SH overlay to reduce S&P beta if risk-off conditions accelerate.",
+  };
+}
+
 // ── Yahoo Finance helpers ──────────────────────────────────────────
 async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
   try {
@@ -561,7 +837,12 @@ Return via the tool call only.`,
       momentum5d: number;
       trendStrength: number;
       winRate: number;
-      filterTier: "strict" | "balanced" | "rescue";
+      filterTier: FilterTier;
+      sentimentScore: number;
+      sentimentLabel: string;
+      earningsSignal: "bullish" | "neutral" | "bearish";
+      sentimentHeadline: string;
+      sentimentArticleCount: number;
     }
 
     const scored: ScoredRec[] = [];
@@ -612,7 +893,7 @@ Return via the tool call only.`,
         portCorr = pearsonCorrelation(returns, portReturns);
       }
 
-      const isHedge = rec.strategy === "correlation_hedge" || rec.strategy === "sector_hedge";
+      const isHedge = HEDGE_STRATEGIES.has(String(rec.strategy || ""));
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
 
       // F1: Skip portfolio holdings
@@ -742,7 +1023,52 @@ Return via the tool call only.`,
         trendStrength: Math.round(trendStrength),
         winRate: Math.round(winRate * 10) / 10,
         filterTier,
+        sentimentScore: 0,
+        sentimentLabel: "Neutral",
+        earningsSignal: "neutral",
+        sentimentHeadline: "",
+        sentimentArticleCount: 0,
       });
+    }
+
+    // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
+    const sentimentCandidates = [...scored]
+      .sort((a, b) => b.quantScore - a.quantScore)
+      .slice(0, Math.min(18, scored.length));
+
+    const sentimentByTicker: Record<string, RealtimeSentiment> = {};
+    const SENTIMENT_BATCH = 5;
+    for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
+      const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
+      const sentimentResults = await Promise.allSettled(
+        batch.map((s) => fetchTickerRealtimeSentiment(s.rec.ticker, s.rec.name)),
+      );
+      for (let j = 0; j < batch.length; j++) {
+        const result = sentimentResults[j];
+        if (result.status === "fulfilled" && result.value) {
+          sentimentByTicker[batch[j].rec.ticker] = result.value;
+        }
+      }
+    }
+
+    for (const s of scored) {
+      const sentiment = sentimentByTicker[s.rec.ticker];
+      if (!sentiment) continue;
+
+      s.sentimentScore = sentiment.sentimentScore;
+      s.sentimentLabel = sentiment.sentimentLabel;
+      s.earningsSignal = sentiment.earningsSignal;
+      s.sentimentHeadline = sentiment.headline;
+      s.sentimentArticleCount = sentiment.articleCount;
+
+      const isHedge = HEDGE_STRATEGIES.has(String(s.rec.strategy || ""));
+      const sentimentImpact = Math.round(sentiment.sentimentScore * 0.14);
+      const earningsImpact = sentiment.earningsSignal === "bullish" ? 5 : sentiment.earningsSignal === "bearish" ? -8 : 0;
+      const severeEarningsPenalty = !isHedge && sentiment.sentimentScore <= -45 && sentiment.earningsSignal === "bearish"
+        ? s.filterTier === "rescue" ? 14 : 8
+        : 0;
+
+      s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
     }
 
     // ── STAGE 4: Select top candidates by score ─────────────────
@@ -831,8 +1157,46 @@ Return via the tool call only.`,
           trendStrength: 50,
           winRate: 50,
           filterTier: "rescue" as const,
+            sentimentScore: 0,
+            sentimentLabel: "Neutral",
+            earningsSignal: "neutral",
+            sentimentHeadline: "",
+            sentimentArticleCount: 0,
         });
         selectedTickers.add(fallbackRec.ticker);
+      }
+    }
+
+    // Ensure hedge coverage exists in final set.
+    const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
+    let hedgeCount = selected.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""))).length;
+    if (hedgeCount < minHedgeCount) {
+      const hedgePool = scored
+        .filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && !selectedTickers.has(s.rec.ticker))
+        .sort((a, b) => b.quantScore - a.quantScore);
+
+      for (const hedgeCandidate of hedgePool) {
+        if (hedgeCount >= minHedgeCount) break;
+
+        if (selected.length >= 25) {
+          let replaceIdx = -1;
+          for (let i = selected.length - 1; i >= 0; i--) {
+            if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
+              replaceIdx = i;
+              break;
+            }
+          }
+          if (replaceIdx >= 0) {
+            selectedTickers.delete(selected[replaceIdx].rec.ticker);
+            selected.splice(replaceIdx, 1);
+          } else {
+            break;
+          }
+        }
+
+        selected.push(hedgeCandidate);
+        selectedTickers.add(hedgeCandidate.rec.ticker);
+        hedgeCount += 1;
       }
     }
 
@@ -862,6 +1226,7 @@ Return via the tool call only.`,
       let targetPrice = s.rec.targetPrice;
       let stopLoss = s.rec.stopLoss;
       let entryZone = s.rec.entryZone;
+      const isHedge = HEDGE_STRATEGIES.has(String(s.rec.strategy || ""));
 
       // Server-side validation: target must be above current price
       if (!targetPrice || targetPrice < realPrice) {
@@ -883,6 +1248,13 @@ Return via the tool call only.`,
 
       // Fix hedging strategy — NEVER return empty or "no hedge"
       let hedgingStrategy = sanitizeText(s.rec.hedgingStrategy || "");
+      const hedgePlan = deriveHedgePlan({
+        strategy: s.rec.strategy || "equity",
+        sector: s.rec.sector || "",
+        regimeType: parsed.regimeType || "transition",
+        sentimentScore: s.sentimentScore || 0,
+        volatility: s.volatility || 25,
+      });
 
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
         const sector = s.rec.sector || "broad market";
@@ -905,6 +1277,24 @@ Return via the tool call only.`,
         }
       }
 
+      if (!isHedge && hedgePlan.hedgeInstrument !== "SELF-HEDGE") {
+        const upperHedge = hedgePlan.hedgeInstrument.toUpperCase();
+        if (!hedgingStrategy.toUpperCase().includes(upperHedge)) {
+          hedgingStrategy = `${hedgingStrategy} Primary hedge overlay: ${hedgePlan.hedgeInstrument} at ~${hedgePlan.hedgeRatioPct}% notional. ${hedgePlan.hedgeOverlay}`;
+        }
+      }
+
+      const positionSizing = computeOptimalPositionSize({
+        portfolioValue,
+        price: realPrice,
+        stopLoss,
+        confidence: Number(s.rec.confidence) || 60,
+        volatility: s.volatility || 25,
+        filterTier: s.filterTier,
+        isHedge,
+        sentimentScore: s.sentimentScore || 0,
+      });
+
       // Compute risk-reward string from validated numbers
       const riskReward = realPrice && targetPrice && stopLoss && (realPrice - stopLoss) > 0
         ? `1:${((targetPrice - realPrice) / (realPrice - stopLoss)).toFixed(1)}`
@@ -914,6 +1304,7 @@ Return via the tool call only.`,
         ...s.rec,
         thesis: sanitizeText(s.rec.thesis || ""),
         catalyst: sanitizeText(s.rec.catalyst || ""),
+        suggestedQty: positionSizing.suggestedQty,
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
         entryZone,
@@ -940,6 +1331,16 @@ Return via the tool call only.`,
         momentum20d: s.momentum20d,
         momentum5d: s.momentum5d,
         trendStrength: s.trendStrength,
+        allocationPct: positionSizing.allocationPct,
+        positionValue: positionSizing.positionValue,
+        riskBudgetPct: positionSizing.riskBudgetPct,
+        hedgeInstrument: hedgePlan.hedgeInstrument,
+        hedgeRatioPct: hedgePlan.hedgeRatioPct,
+        sentimentScore: s.sentimentScore,
+        sentimentLabel: s.sentimentLabel,
+        earningsSignal: s.earningsSignal,
+        sentimentHeadline: s.sentimentHeadline,
+        sentimentArticleCount: s.sentimentArticleCount,
       };
     });
 
