@@ -756,7 +756,7 @@ Return JSON:
       };
     });
 
-    console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed strict quant filters`);
+    console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed tiered quant filters`);
 
     return new Response(JSON.stringify({
       marketCondition: sanitizeText(parsed.marketCondition || ""),
@@ -771,6 +771,7 @@ Return JSON:
     });
   } catch (error: any) {
     console.error("Desirable assets error:", error);
+    if (error instanceof Response) return error;
     if (error.status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (error.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please top up your OpenRouter account." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
