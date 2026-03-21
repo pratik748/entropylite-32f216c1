@@ -232,6 +232,11 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       } catch (err: any) {
         lastError = err;
         console.error(`callAI → Cloudflare attempt ${attempt + 1} failed:`, err.message || err);
+        const quotaExhausted = err.status === 429 && /daily free allocation|neurons/i.test(String(err.message || ""));
+        if (quotaExhausted) {
+          console.log("callAI → Cloudflare quota exhausted, skipping retries and falling back immediately");
+          break;
+        }
         if (err.status === 401 || err.status === 403) break;
         if (err.status === 429 || (err.status >= 500 && err.status < 600)) continue;
         break;
