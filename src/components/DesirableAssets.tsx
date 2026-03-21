@@ -8,16 +8,6 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 
-declare global {
-  interface Window {
-    puter?: {
-      ai: {
-        chat: (prompt: string, options?: { model?: string }) => Promise<{ message?: { content?: string }; toString?: () => string }>;
-      };
-    };
-  }
-}
-
 interface Recommendation {
   ticker: string;
   name: string;
@@ -133,92 +123,6 @@ const REGION_LABELS: Record<string, string> = {
   BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
 };
 
-// ── Puter.js Perplexity Sentiment Gate ──
-const SENTIMENT_CACHE_KEY = "da_sentiment_cache_v1";
-const SENTIMENT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
-
-function getSentimentCache(): Record<string, { score: number; label: string; ts: number }> {
-  try {
-    const raw = localStorage.getItem(SENTIMENT_CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-function setSentimentCache(cache: Record<string, { score: number; label: string; ts: number }>) {
-  try { localStorage.setItem(SENTIMENT_CACHE_KEY, JSON.stringify(cache)); } catch {}
-}
-
-async function checkSentimentViaPuter(ticker: string, name: string): Promise<{ score: number; label: string }> {
-  const cache = getSentimentCache();
-  const cached = cache[ticker];
-  if (cached && Date.now() - cached.ts < SENTIMENT_CACHE_TTL) {
-    return { score: cached.score, label: cached.label };
-  }
-
-  try {
-    if (!window.puter?.ai?.chat) {
-      return { score: 70, label: "unknown" }; // Puter not loaded, pass through
-    }
-
-    const resp = await window.puter.ai.chat(
-      `What is the current market sentiment for ${ticker} (${name}) stock? Is there any recent negative news, earnings miss, regulatory issues, or analyst downgrades? Reply with ONLY a JSON object: {"sentiment": "bullish" or "bearish" or "neutral", "score": 0-100 where 100 is extremely bullish, "reason": "one sentence"}`,
-      { model: "claude-3-5-sonnet" }
-    );
-
-    const text = typeof resp === "string" ? resp : resp?.message?.content || resp?.toString?.() || "";
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const score = typeof parsed.score === "number" ? parsed.score : 50;
-      const label = parsed.sentiment || "neutral";
-      cache[ticker] = { score, label, ts: Date.now() };
-      setSentimentCache(cache);
-      return { score, label };
-    }
-  } catch (e) {
-    console.warn(`Sentiment check failed for ${ticker}:`, e);
-  }
-  return { score: 60, label: "neutral" };
-}
-
-async function validateSentimentBatch(recs: Recommendation[]): Promise<Recommendation[]> {
-  // Check sentiment for each rec in parallel (max 5 concurrent)
-  const BATCH = 5;
-  const results = [...recs];
-  
-  for (let i = 0; i < results.length; i += BATCH) {
-    const batch = results.slice(i, i + BATCH);
-    const sentiments = await Promise.all(
-      batch.map(r => checkSentimentViaPuter(r.ticker, r.name))
-    );
-    for (let j = 0; j < batch.length; j++) {
-      const idx = i + j;
-      results[idx] = {
-        ...results[idx],
-        sentimentScore: sentiments[j].score,
-        sentimentLabel: sentiments[j].label,
-        sentimentChecked: true,
-      };
-    }
-  }
-
-  // Filter out bearish sentiment stocks (score < 30) — they are likely to lose money
-  const filtered = results.filter(r => {
-    if (r.strategy === "correlation_hedge" || r.strategy === "sector_hedge") return true; // hedges can be bearish
-    return (r.sentimentScore || 60) >= 30;
-  });
-
-  // Sort: bullish first, then by quant score
-  filtered.sort((a, b) => {
-    const sentDiff = (b.sentimentScore || 50) - (a.sentimentScore || 50);
-    if (Math.abs(sentDiff) > 20) return sentDiff;
-    return (b.quantScore || 0) - (a.quantScore || 0);
-  });
-
-  return filtered;
-}
-
 // Mini sparkline component
 const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
   if (!data || data.length < 2) return null;
@@ -299,7 +203,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
         { at: 78, label: "Computing portfolio correlation..." },
         { at: 85, label: "Scoring & ranking assets..." },
-        { at: 90, label: "Perplexity sentiment validation..." },
+        { at: 90, label: "Final quality checks..." },
       ];
       let idx = 0;
       progressTimer.current = setInterval(() => {
@@ -365,25 +269,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       setRegimeType(data.regimeType || "");
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       
-      // ── SENTIMENT GATE via Puter.js + Perplexity ──
-      setLoadingStage("Running real-time sentiment validation via Perplexity...");
-      setLoadingProgress(92);
-      
-      let validated: Recommendation[];
-      try {
-        validated = await validateSentimentBatch(data.recommendations);
-        const removed = data.recommendations.length - validated.length;
-        if (removed > 0) {
-          console.log(`Sentiment gate removed ${removed} bearish stocks`);
-          toast({ title: "Sentiment Filter", description: `${removed} stocks removed due to bearish real-time sentiment` });
-        }
-      } catch (e) {
-        console.warn("Sentiment validation failed, using unfiltered:", e);
-        validated = data.recommendations;
-      }
-      
-      setCachedDA({ ...payload, recommendations: validated });
-      setRecommendations(validated);
+      setCachedDA(payload);
+      setRecommendations(data.recommendations);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
@@ -438,7 +325,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground/60 font-mono text-center mt-2">
-          4-stage funnel: AI generation → Momentum + Trend → Monte Carlo sim → Perplexity sentiment
+          4-stage funnel: AI generation → Price verify → Quant filter → Monte Carlo stress test
         </p>
       </div>
     );
@@ -526,15 +413,6 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   {rec.simulationTested && (
                     <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
                       <CheckCircle2 className="h-2.5 w-2.5" /> MC SIM
-                    </span>
-                  )}
-                  {rec.sentimentChecked && (
-                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
-                      rec.sentimentLabel === "bullish" ? "bg-gain/10 text-gain" : 
-                      rec.sentimentLabel === "bearish" ? "bg-loss/10 text-loss" : 
-                      "bg-warning/10 text-warning"
-                    }`}>
-                      {rec.sentimentLabel === "bullish" ? "🟢" : rec.sentimentLabel === "bearish" ? "🔴" : "🟡"} {(rec.sentimentScore || 0)}
                     </span>
                   )}
                   {(rec.momentum20d || 0) > 0 && (
