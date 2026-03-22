@@ -17,6 +17,7 @@ import CausalEffectsEngine from "./CausalEffectsEngine";
 import StatArbEngine from "./StatArbEngine";
 import StrategyFactory from "./StrategyFactory";
 import DerivativesEngine from "./DerivativesEngine";
+import OutcomeGradientDashboard from "./OutcomeGradientDashboard";
 
 interface Props {
   stocks: PortfolioStock[];
