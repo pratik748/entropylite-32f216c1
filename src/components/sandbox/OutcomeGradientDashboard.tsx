@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   Flame, TrendingUp, TrendingDown, Shield, AlertTriangle, Zap,
   BarChart3, Activity, RefreshCw, Trash2, Target, Layers,
+  ArrowUpRight, ArrowDownRight, Repeat, Eye, Scale, RotateCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -9,12 +10,28 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useOutcomeGradient, type IntelligenceSignal } from "@/hooks/useOutcomeGradient";
+
+const signalConfig: Record<IntelligenceSignal["type"], { icon: typeof Flame; color: string; label: string }> = {
+  invest: { icon: ArrowUpRight, color: "text-gain", label: "INVEST" },
+  hedge: { icon: Shield, color: "text-warning", label: "HEDGE" },
+  pair: { icon: Repeat, color: "text-primary", label: "PAIR TRADE" },
+  avoid: { icon: ArrowDownRight, color: "text-loss", label: "AVOID" },
+  scale_up: { icon: Scale, color: "text-gain", label: "SCALE UP" },
+  rotate: { icon: RotateCcw, color: "text-primary", label: "ROTATE" },
+};
+
+const urgencyBorder: Record<string, string> = {
+  high: "border-gain/40",
+  medium: "border-primary/30",
+  low: "border-border/50",
+};
 
 const OutcomeGradientDashboard = () => {
   const {
     entries, profitField, desirableZones, combinationScores,
     gradient, safetyStatus, shadowComparison, allocationHistory,
+    intelligenceSignals,
     computeAndApplyGradient, clearAll, totalTrades, generation,
   } = useOutcomeGradient();
 
@@ -123,6 +140,62 @@ const OutcomeGradientDashboard = () => {
                 {safetyStatus.blacklistedAssets.map(a => (
                   <Badge key={a} variant="outline" className="text-[9px] font-mono text-loss border-loss/30">{a}</Badge>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─── INTELLIGENCE SIGNALS ─── */}
+          {intelligenceSignals.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">
+                  Live Intelligence — {intelligenceSignals.length} Actionable Signals
+                </span>
+              </div>
+              <div className="space-y-2">
+                {intelligenceSignals.map(sig => {
+                  const cfg = signalConfig[sig.type];
+                  const Icon = cfg.icon;
+                  return (
+                    <div
+                      key={sig.id}
+                      className={`rounded-lg border ${urgencyBorder[sig.urgency]} bg-muted/10 p-3 transition-colors hover:bg-muted/20`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-md bg-muted/30 flex-shrink-0 mt-0.5`}>
+                          <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <Badge variant="outline" className={`text-[8px] px-1.5 py-0 font-mono ${cfg.color} border-current/30`}>
+                              {cfg.label}
+                            </Badge>
+                            <Badge variant="outline" className={`text-[8px] px-1.5 py-0 font-mono ${
+                              sig.urgency === "high" ? "text-gain border-gain/30" :
+                              sig.urgency === "medium" ? "text-primary border-primary/30" :
+                              "text-muted-foreground border-border"
+                            }`}>
+                              {sig.urgency.toUpperCase()}
+                            </Badge>
+                            <span className="text-[9px] font-mono text-muted-foreground ml-auto">
+                              {sig.confidence}% conf
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-foreground mb-1">{sig.title}</p>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">{sig.reasoning}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {sig.assets.map(a => (
+                              <span key={a} className="text-[9px] font-mono font-bold text-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                {a}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

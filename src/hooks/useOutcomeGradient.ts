@@ -62,6 +62,16 @@ export interface GradientVector {
   generation: number;
 }
 
+export interface IntelligenceSignal {
+  id: string;
+  type: "invest" | "hedge" | "pair" | "avoid" | "scale_up" | "rotate";
+  urgency: "high" | "medium" | "low";
+  title: string;
+  reasoning: string;
+  assets: string[];
+  confidence: number; // 0-100
+}
+
 export interface ShadowState {
   activeParams: GradientVector;
   evolvedParams: GradientVector;
@@ -450,7 +460,6 @@ export function useOutcomeGradient() {
   // ─── Allocation Shift History ──────────────────────
 
   const allocationHistory = useMemo(() => {
-    // Build a synthetic history from gradient generations
     const generations = Math.min(gradient.generation, 20);
     const history: { gen: number; momentum: number; vol: number; sentiment: number }[] = [];
     for (let i = 0; i <= generations; i++) {
@@ -464,6 +473,122 @@ export function useOutcomeGradient() {
     }
     return history;
   }, [gradient]);
+
+  // ─── Intelligence Signals ─────────────────────────
+
+  const intelligenceSignals = useMemo((): IntelligenceSignal[] => {
+    if (entries.length < 3) return [];
+    const signals: IntelligenceSignal[] = [];
+
+    // 1. INVEST signals: hot-zone assets with rising trend
+    for (const asset of profitField.filter(a => a.isHotZone && !a.isBlacklisted && a.recentTrend === "rising")) {
+      const allocScale = gradient.allocationScales[asset.asset] || 1.0;
+      const zone = desirableZones.find(z => z.assets.includes(asset.asset));
+      signals.push({
+        id: `invest-${asset.asset}`,
+        type: "invest",
+        urgency: asset.avgPnlPct > 5 ? "high" : "medium",
+        title: `Increase ${asset.asset} — hot zone, rising momentum`,
+        reasoning: `${asset.asset} is in a desirable zone with ${asset.winRate.toFixed(0)}% win rate and avg +${asset.avgPnlPct.toFixed(1)}% PnL across ${asset.tradeCount} trades. ` +
+          `Gradient suggests scaling allocation to ${allocScale.toFixed(2)}×.` +
+          (zone ? ` Best in ${zone.regime} regime with momentum=${zone.featureSignature.momentum.toFixed(0)}, sentiment=${zone.featureSignature.sentiment.toFixed(0)}.` : ""),
+        assets: [asset.asset],
+        confidence: Math.min(95, Math.round(asset.winRate * 0.7 + asset.tradeCount * 2)),
+      });
+    }
+
+    // 2. PAIR signals: high-synergy combinations
+    for (const pair of combinationScores.filter(p => p.synergyScore > 0.5 && p.jointWinRate > 55)) {
+      const [a, b] = pair.pair.split("+");
+      signals.push({
+        id: `pair-${pair.pair}`,
+        type: "pair",
+        urgency: pair.jointAvgPnl > 3 ? "high" : "medium",
+        title: `Pair ${a} + ${b} — ${pair.jointWinRate.toFixed(0)}% joint win rate`,
+        reasoning: `When traded together, ${a} and ${b} produce +${pair.jointAvgPnl.toFixed(1)}% avg PnL with synergy score ${pair.synergyScore.toFixed(2)} across ${pair.tradeCount} co-occurrences. ` +
+          `Joint performance exceeds individual — consider correlated entries.`,
+        assets: [a, b],
+        confidence: Math.min(90, Math.round(pair.jointWinRate * 0.8 + pair.tradeCount * 3)),
+      });
+    }
+
+    // 3. HEDGE signals: assets with high vol feature weight + falling zones
+    const volWeight = gradient.featureWeights.find(f => f.feature === "vol")?.weight || 1;
+    if (volWeight > 1.3) {
+      const highVolAssets = profitField.filter(a => !a.isBlacklisted && a.recentTrend === "falling" && a.tradeCount >= 2);
+      for (const asset of highVolAssets.slice(0, 2)) {
+        const hotPair = combinationScores.find(p => p.pair.includes(asset.asset) && p.synergyScore > 0);
+        const hedgeTarget = hotPair ? hotPair.pair.split("+").find(x => x !== asset.asset) : null;
+        signals.push({
+          id: `hedge-${asset.asset}`,
+          type: "hedge",
+          urgency: "medium",
+          title: `Hedge ${asset.asset}${hedgeTarget ? ` with ${hedgeTarget}` : ""} — vol regime elevated`,
+          reasoning: `Gradient vol weight is ${volWeight.toFixed(2)}× (elevated). ${asset.asset} is in a falling trend with avg ${asset.avgPnlPct.toFixed(1)}% PnL. ` +
+            (hedgeTarget
+              ? `Historical pair data shows ${hedgeTarget} offsets ${asset.asset} drawdowns — consider a paired hedge.`
+              : `Consider protective puts or reducing position size to cap downside.`),
+          assets: hedgeTarget ? [asset.asset, hedgeTarget] : [asset.asset],
+          confidence: Math.min(80, Math.round(50 + (volWeight - 1) * 30)),
+        });
+      }
+    }
+
+    // 4. AVOID signals: blacklisted or consistently losing
+    for (const asset of profitField.filter(a => a.isBlacklisted || (a.winRate < 30 && a.tradeCount >= 3))) {
+      signals.push({
+        id: `avoid-${asset.asset}`,
+        type: "avoid",
+        urgency: asset.isBlacklisted ? "high" : "low",
+        title: `Avoid ${asset.asset} — ${asset.isBlacklisted ? "blacklisted (DD > 15%)" : `${asset.winRate.toFixed(0)}% win rate`}`,
+        reasoning: `${asset.asset} has underperformed with ${asset.winRate.toFixed(0)}% win rate and avg ${asset.avgPnlPct.toFixed(1)}% PnL over ${asset.tradeCount} trades. ` +
+          (asset.isBlacklisted ? "Drawdown exceeded 15% — automatically blocked. Will re-enable after 30 days." : "Gradient is reducing selection probability."),
+        assets: [asset.asset],
+        confidence: Math.min(90, Math.round(70 + (50 - asset.winRate) * 0.5)),
+      });
+    }
+
+    // 5. SCALE_UP: promoted shadow evolution
+    if (shadowComparison.promoted && profitField.filter(a => a.isHotZone).length >= 3) {
+      const topHot = profitField.filter(a => a.isHotZone).slice(0, 3).map(a => a.asset);
+      signals.push({
+        id: "scale-up-promoted",
+        type: "scale_up",
+        urgency: "high",
+        title: `Scale up hot-zone portfolio — evolved system outperforms by ${((shadowComparison.evolvedPnlRolling / Math.max(0.01, shadowComparison.activePnlRolling) - 1) * 100).toFixed(0)}%`,
+        reasoning: `The ODGS-biased portfolio produces ${shadowComparison.evolvedPnlRolling.toFixed(2)}% vs ${shadowComparison.activePnlRolling.toFixed(2)}% neutral rolling PnL. ` +
+          `Profit gradient is converging — consider increasing overall exposure to ${topHot.join(", ")}.`,
+        assets: topHot,
+        confidence: 75,
+      });
+    }
+
+    // 6. ROTATE: regime-based zone shifts
+    for (const zone of desirableZones.filter(z => z.avgPnlPct > 3 && z.tradeCount >= 3)) {
+      const currentExposure = zone.assets.filter(a => {
+        const bias = gradient.assetBiases[a] || 1.0;
+        return bias < 1.1; // under-biased relative to zone performance
+      });
+      if (currentExposure.length > 0) {
+        signals.push({
+          id: `rotate-${zone.id}`,
+          type: "rotate",
+          urgency: zone.avgPnlPct > 5 ? "high" : "low",
+          title: `Rotate into ${zone.regime} zone — ${currentExposure.slice(0, 3).join(", ")} underweighted`,
+          reasoning: `${zone.regime} regime zone averaging +${zone.avgPnlPct.toFixed(1)}% PnL with momentum=${zone.featureSignature.momentum.toFixed(0)} and sentiment=${zone.featureSignature.sentiment.toFixed(0)}. ` +
+            `${currentExposure.join(", ")} are in this zone but currently underweighted by the gradient — consider increasing exposure.`,
+          assets: currentExposure.slice(0, 5),
+          confidence: Math.min(85, Math.round(zone.avgPnlPct * 8 + zone.tradeCount * 3)),
+        });
+      }
+    }
+
+    // Sort: high urgency first, then by confidence
+    const urgencyOrder = { high: 0, medium: 1, low: 2 };
+    return signals
+      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence)
+      .slice(0, 12);
+  }, [entries, profitField, desirableZones, combinationScores, gradient, shadowComparison]);
 
   // ─── Clear ─────────────────────────────────────────
 
@@ -494,6 +619,7 @@ export function useOutcomeGradient() {
     safetyStatus,
     shadowComparison,
     allocationHistory,
+    intelligenceSignals,
     // Actions
     ingestTrade,
     computeAndApplyGradient,
