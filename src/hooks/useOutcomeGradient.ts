@@ -177,7 +177,7 @@ export function useOutcomeGradient() {
         winRate: wr,
         avgPnlPct: data.count > 0 ? data.scores.reduce((s, v) => s + v, 0) / data.count : 0,
         recentTrend: trend,
-        isHotZone: wps > 0 && data.winRate > 50 && data.count >= 3,
+        isHotZone: wps > 0 && wr > 50 && data.count >= 3,
         isBlacklisted: blacklist.includes(asset),
       };
     }).sort((a, b) => b.weightedProfitScore - a.weightedProfitScore);
