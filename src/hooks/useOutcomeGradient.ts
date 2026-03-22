@@ -477,113 +477,127 @@ export function useOutcomeGradient() {
   // ─── Intelligence Signals ─────────────────────────
 
   const intelligenceSignals = useMemo((): IntelligenceSignal[] => {
-    if (entries.length < 3) return [];
+    if (entries.length === 0) return [];
     const signals: IntelligenceSignal[] = [];
 
-    // 1. INVEST signals: hot-zone assets with rising trend
-    for (const asset of profitField.filter(a => a.isHotZone && !a.isBlacklisted && a.recentTrend === "rising")) {
+    const topAssets = profitField.filter(a => !a.isBlacklisted).slice(0, 5);
+    const lastTrade = entries[0];
+
+    // 0. Immediate signal from latest crossed trade (works from first trade)
+    if (lastTrade) {
+      signals.push({
+        id: `last-${lastTrade.id}`,
+        type: lastTrade.pnlPct >= 0 ? "invest" : "hedge",
+        urgency: Math.abs(lastTrade.pnlPct) >= 5 ? "high" : "medium",
+        title: lastTrade.pnlPct >= 0
+          ? `Invest bias toward ${lastTrade.asset} after +${lastTrade.pnlPct.toFixed(2)}% outcome`
+          : `Hedge ${lastTrade.asset} after ${lastTrade.pnlPct.toFixed(2)}% adverse outcome`,
+        reasoning: lastTrade.pnlPct >= 0
+          ? `${lastTrade.asset} just closed positive; ODGS is pulling exposure toward this zone. Re-entry can use lighter threshold with capped allocation.`
+          : `${lastTrade.asset} closed negative; ODGS suggests tighter entry and protective hedge until recovery evidence appears.`,
+        assets: [lastTrade.asset],
+        confidence: Math.min(85, Math.max(55, Math.round(55 + Math.abs(lastTrade.pnlPct) * 4))),
+      });
+    }
+
+    // 1. INVEST signals from profitable assets (relaxed threshold)
+    for (const asset of topAssets.filter(a => a.weightedProfitScore > 0 && a.tradeCount >= 1)) {
       const allocScale = gradient.allocationScales[asset.asset] || 1.0;
       const zone = desirableZones.find(z => z.assets.includes(asset.asset));
       signals.push({
         id: `invest-${asset.asset}`,
         type: "invest",
-        urgency: asset.avgPnlPct > 5 ? "high" : "medium",
-        title: `Increase ${asset.asset} — hot zone, rising momentum`,
-        reasoning: `${asset.asset} is in a desirable zone with ${asset.winRate.toFixed(0)}% win rate and avg +${asset.avgPnlPct.toFixed(1)}% PnL across ${asset.tradeCount} trades. ` +
-          `Gradient suggests scaling allocation to ${allocScale.toFixed(2)}×.` +
-          (zone ? ` Best in ${zone.regime} regime with momentum=${zone.featureSignature.momentum.toFixed(0)}, sentiment=${zone.featureSignature.sentiment.toFixed(0)}.` : ""),
+        urgency: asset.avgPnlPct > 4 ? "high" : "medium",
+        title: `Invest more in ${asset.asset} (${asset.winRate.toFixed(0)}% win rate)`,
+        reasoning: `${asset.asset} shows positive profit density with avg ${asset.avgPnlPct >= 0 ? "+" : ""}${asset.avgPnlPct.toFixed(1)}% across ${asset.tradeCount} trades. ` +
+          `Allocation bias is ${allocScale.toFixed(2)}×.` +
+          (zone ? ` Correlated success appears in ${zone.regime} regime.` : ""),
         assets: [asset.asset],
-        confidence: Math.min(95, Math.round(asset.winRate * 0.7 + asset.tradeCount * 2)),
+        confidence: Math.min(92, Math.round(asset.winRate * 0.75 + asset.tradeCount * 4)),
       });
     }
 
-    // 2. PAIR signals: high-synergy combinations
-    for (const pair of combinationScores.filter(p => p.synergyScore > 0.5 && p.jointWinRate > 55)) {
+    // 2. PAIR/CORRELATION signals (relaxed threshold)
+    for (const pair of combinationScores.filter(p => p.synergyScore > 0 && p.tradeCount >= 1).slice(0, 3)) {
       const [a, b] = pair.pair.split("+");
       signals.push({
         id: `pair-${pair.pair}`,
         type: "pair",
-        urgency: pair.jointAvgPnl > 3 ? "high" : "medium",
-        title: `Pair ${a} + ${b} — ${pair.jointWinRate.toFixed(0)}% joint win rate`,
-        reasoning: `When traded together, ${a} and ${b} produce +${pair.jointAvgPnl.toFixed(1)}% avg PnL with synergy score ${pair.synergyScore.toFixed(2)} across ${pair.tradeCount} co-occurrences. ` +
-          `Joint performance exceeds individual — consider correlated entries.`,
+        urgency: pair.jointAvgPnl > 2 ? "high" : "medium",
+        title: `Correlation opportunity: ${a} + ${b}`,
+        reasoning: `${a}/${b} shows positive joint edge (synergy ${pair.synergyScore.toFixed(2)}, win ${pair.jointWinRate.toFixed(0)}%). ` +
+          `Use paired entries to reinforce outcomes vs single-name trades.`,
         assets: [a, b],
-        confidence: Math.min(90, Math.round(pair.jointWinRate * 0.8 + pair.tradeCount * 3)),
+        confidence: Math.min(88, Math.round(pair.jointWinRate * 0.8 + pair.tradeCount * 5)),
       });
     }
 
-    // 3. HEDGE signals: assets with high vol feature weight + falling zones
+    // 3. HEDGE signals from weak/falling assets
     const volWeight = gradient.featureWeights.find(f => f.feature === "vol")?.weight || 1;
-    if (volWeight > 1.3) {
-      const highVolAssets = profitField.filter(a => !a.isBlacklisted && a.recentTrend === "falling" && a.tradeCount >= 2);
-      for (const asset of highVolAssets.slice(0, 2)) {
-        const hotPair = combinationScores.find(p => p.pair.includes(asset.asset) && p.synergyScore > 0);
-        const hedgeTarget = hotPair ? hotPair.pair.split("+").find(x => x !== asset.asset) : null;
-        signals.push({
-          id: `hedge-${asset.asset}`,
-          type: "hedge",
-          urgency: "medium",
-          title: `Hedge ${asset.asset}${hedgeTarget ? ` with ${hedgeTarget}` : ""} — vol regime elevated`,
-          reasoning: `Gradient vol weight is ${volWeight.toFixed(2)}× (elevated). ${asset.asset} is in a falling trend with avg ${asset.avgPnlPct.toFixed(1)}% PnL. ` +
-            (hedgeTarget
-              ? `Historical pair data shows ${hedgeTarget} offsets ${asset.asset} drawdowns — consider a paired hedge.`
-              : `Consider protective puts or reducing position size to cap downside.`),
-          assets: hedgeTarget ? [asset.asset, hedgeTarget] : [asset.asset],
-          confidence: Math.min(80, Math.round(50 + (volWeight - 1) * 30)),
-        });
-      }
+    const weakAssets = profitField.filter(a => !a.isBlacklisted && (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
+    for (const asset of weakAssets) {
+      const hedgePair = combinationScores.find(p => p.pair.includes(asset.asset) && p.synergyScore > 0);
+      const hedgeTarget = hedgePair ? hedgePair.pair.split("+").find(x => x !== asset.asset) : null;
+      signals.push({
+        id: `hedge-${asset.asset}`,
+        type: "hedge",
+        urgency: asset.avgPnlPct < -3 || volWeight > 1.2 ? "high" : "medium",
+        title: `Hedge ${asset.asset}${hedgeTarget ? ` with ${hedgeTarget}` : ""}`,
+        reasoning: `${asset.asset} shows weaker edge (${asset.avgPnlPct.toFixed(1)}% avg). ` +
+          (hedgeTarget
+            ? `Use correlation hedge via ${hedgeTarget} where joint behavior is more stable.`
+            : `Use protective structure (smaller size / options hedge) until trend improves.`),
+        assets: hedgeTarget ? [asset.asset, hedgeTarget] : [asset.asset],
+        confidence: Math.min(84, Math.round(58 + Math.max(0, -asset.avgPnlPct) * 4 + (volWeight - 1) * 20)),
+      });
     }
 
-    // 4. AVOID signals: blacklisted or consistently losing
-    for (const asset of profitField.filter(a => a.isBlacklisted || (a.winRate < 30 && a.tradeCount >= 3))) {
+    // 4. AVOID signals
+    for (const asset of profitField.filter(a => a.isBlacklisted || (a.winRate < 35 && a.tradeCount >= 2)).slice(0, 3)) {
       signals.push({
         id: `avoid-${asset.asset}`,
         type: "avoid",
-        urgency: asset.isBlacklisted ? "high" : "low",
-        title: `Avoid ${asset.asset} — ${asset.isBlacklisted ? "blacklisted (DD > 15%)" : `${asset.winRate.toFixed(0)}% win rate`}`,
-        reasoning: `${asset.asset} has underperformed with ${asset.winRate.toFixed(0)}% win rate and avg ${asset.avgPnlPct.toFixed(1)}% PnL over ${asset.tradeCount} trades. ` +
-          (asset.isBlacklisted ? "Drawdown exceeded 15% — automatically blocked. Will re-enable after 30 days." : "Gradient is reducing selection probability."),
+        urgency: asset.isBlacklisted ? "high" : "medium",
+        title: `Avoid ${asset.asset}${asset.isBlacklisted ? " (risk blocked)" : ""}`,
+        reasoning: `${asset.asset} underperforms with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL.` +
+          (asset.isBlacklisted ? " Drawdown guard triggered." : " ODGS is reducing selection probability."),
         assets: [asset.asset],
-        confidence: Math.min(90, Math.round(70 + (50 - asset.winRate) * 0.5)),
+        confidence: Math.min(90, Math.round(65 + Math.max(0, 50 - asset.winRate) * 0.6)),
       });
     }
 
-    // 5. SCALE_UP: promoted shadow evolution
-    if (shadowComparison.promoted && profitField.filter(a => a.isHotZone).length >= 3) {
-      const topHot = profitField.filter(a => a.isHotZone).slice(0, 3).map(a => a.asset);
+    // 5. SCALE_UP / ROTATE signals from regime zones
+    for (const zone of desirableZones.filter(z => z.avgPnlPct > 0 && z.tradeCount >= 1).slice(0, 2)) {
       signals.push({
-        id: "scale-up-promoted",
-        type: "scale_up",
-        urgency: "high",
-        title: `Scale up hot-zone portfolio — evolved system outperforms by ${((shadowComparison.evolvedPnlRolling / Math.max(0.01, shadowComparison.activePnlRolling) - 1) * 100).toFixed(0)}%`,
-        reasoning: `The ODGS-biased portfolio produces ${shadowComparison.evolvedPnlRolling.toFixed(2)}% vs ${shadowComparison.activePnlRolling.toFixed(2)}% neutral rolling PnL. ` +
-          `Profit gradient is converging — consider increasing overall exposure to ${topHot.join(", ")}.`,
-        assets: topHot,
-        confidence: 75,
+        id: `rotate-${zone.id}`,
+        type: shadowComparison.promoted ? "scale_up" : "rotate",
+        urgency: zone.avgPnlPct > 4 ? "high" : "low",
+        title: shadowComparison.promoted
+          ? `Scale up ${zone.regime} zone`
+          : `Rotate into ${zone.regime} zone`,
+        reasoning: `${zone.regime} zone is producing +${zone.avgPnlPct.toFixed(1)}% avg outcomes across ${zone.tradeCount} trades. ` +
+          `Focus on ${zone.assets.slice(0, 3).join(", ")} while maintaining diversification floor.`,
+        assets: zone.assets.slice(0, 5),
+        confidence: Math.min(86, Math.round(zone.avgPnlPct * 7 + zone.tradeCount * 4)),
       });
     }
 
-    // 6. ROTATE: regime-based zone shifts
-    for (const zone of desirableZones.filter(z => z.avgPnlPct > 3 && z.tradeCount >= 3)) {
-      const currentExposure = zone.assets.filter(a => {
-        const bias = gradient.assetBiases[a] || 1.0;
-        return bias < 1.1; // under-biased relative to zone performance
+    // Safety fallback: always provide at least one actionable recommendation
+    if (signals.length === 0 && topAssets.length > 0) {
+      const fallback = topAssets[0];
+      signals.push({
+        id: `fallback-${fallback.asset}`,
+        type: fallback.weightedProfitScore >= 0 ? "invest" : "hedge",
+        urgency: "medium",
+        title: fallback.weightedProfitScore >= 0
+          ? `Starter signal: build exposure in ${fallback.asset}`
+          : `Starter signal: hedge ${fallback.asset}`,
+        reasoning: `ODGS has limited history but ${fallback.asset} is currently the strongest observed node in the Profit Field. This updates automatically as more crosses are recorded.`,
+        assets: [fallback.asset],
+        confidence: 58,
       });
-      if (currentExposure.length > 0) {
-        signals.push({
-          id: `rotate-${zone.id}`,
-          type: "rotate",
-          urgency: zone.avgPnlPct > 5 ? "high" : "low",
-          title: `Rotate into ${zone.regime} zone — ${currentExposure.slice(0, 3).join(", ")} underweighted`,
-          reasoning: `${zone.regime} regime zone averaging +${zone.avgPnlPct.toFixed(1)}% PnL with momentum=${zone.featureSignature.momentum.toFixed(0)} and sentiment=${zone.featureSignature.sentiment.toFixed(0)}. ` +
-            `${currentExposure.join(", ")} are in this zone but currently underweighted by the gradient — consider increasing exposure.`,
-          assets: currentExposure.slice(0, 5),
-          confidence: Math.min(85, Math.round(zone.avgPnlPct * 8 + zone.tradeCount * 3)),
-        });
-      }
     }
 
-    // Sort: high urgency first, then by confidence
     const urgencyOrder = { high: 0, medium: 1, low: 2 };
     return signals
       .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence)
