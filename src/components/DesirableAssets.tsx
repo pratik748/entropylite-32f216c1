@@ -7,6 +7,7 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
 interface Recommendation {
   ticker: string;
