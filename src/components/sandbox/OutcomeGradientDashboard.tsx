@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   Flame, TrendingUp, TrendingDown, Shield, AlertTriangle, Zap,
   BarChart3, Activity, RefreshCw, Trash2, Target, Layers,
+  ArrowUpRight, ArrowDownRight, Repeat, Eye, Scale, RotateCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -9,12 +10,28 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useOutcomeGradient, type IntelligenceSignal } from "@/hooks/useOutcomeGradient";
+
+const signalConfig: Record<IntelligenceSignal["type"], { icon: typeof Flame; color: string; label: string }> = {
+  invest: { icon: ArrowUpRight, color: "text-gain", label: "INVEST" },
+  hedge: { icon: Shield, color: "text-warning", label: "HEDGE" },
+  pair: { icon: Repeat, color: "text-primary", label: "PAIR TRADE" },
+  avoid: { icon: ArrowDownRight, color: "text-loss", label: "AVOID" },
+  scale_up: { icon: Scale, color: "text-gain", label: "SCALE UP" },
+  rotate: { icon: RotateCcw, color: "text-primary", label: "ROTATE" },
+};
+
+const urgencyBorder: Record<string, string> = {
+  high: "border-gain/40",
+  medium: "border-primary/30",
+  low: "border-border/50",
+};
 
 const OutcomeGradientDashboard = () => {
   const {
     entries, profitField, desirableZones, combinationScores,
     gradient, safetyStatus, shadowComparison, allocationHistory,
+    intelligenceSignals,
     computeAndApplyGradient, clearAll, totalTrades, generation,
   } = useOutcomeGradient();
 
