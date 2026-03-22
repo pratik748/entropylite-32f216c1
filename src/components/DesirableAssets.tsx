@@ -7,6 +7,7 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
 interface Recommendation {
   ticker: string;
@@ -188,7 +189,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-
+  const { getAssetBoost } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
@@ -416,7 +417,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const priceChange24h = rec.priceChange24h || 0;
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
-          const qs = rec.quantScore || 0;
+          const odgs = getAssetBoost(rec.ticker);
+          const qs = Math.round((rec.quantScore || 0) * odgs.scoreMult);
 
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
@@ -450,6 +452,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     </span>
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
+                  {odgs.isHot && <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">ODGS ↑</span>}
+                  {odgs.isBlacklisted && <span className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss">ODGS ✕</span>}
                 </div>
                 <div className="flex items-center gap-1.5">
                   {/* Quant Score badge */}

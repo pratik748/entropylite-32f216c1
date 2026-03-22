@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useLocalStorage } from "./useLocalStorage";
+import { useOutcomeGradient } from "./useOutcomeGradient";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 export interface EvolvedStrategy {
@@ -39,6 +40,7 @@ export function useStrategyEvolution(stocks: PortfolioStock[], refreshKey: numbe
   const [generation, setGeneration] = useLocalStorage<number>("entropy-evolution-gen", 0);
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { desirableZones, combinationScores, gradient } = useOutcomeGradient();
 
   const analyzed = stocks.filter(s => s.analysis);
   const portfolio = analyzed.map(s => ({
@@ -59,6 +61,9 @@ export function useStrategyEvolution(stocks: PortfolioStock[], refreshKey: numbe
           vix: 18,
           memory: allStrategies.slice(0, 10),
           generation: nextGen,
+          odgsHotAssets: desirableZones.flatMap(z => z.assets).slice(0, 10),
+          odgsSynergyPairs: combinationScores.slice(0, 5).map(c => c.pair),
+          odgsFeatureWeights: gradient.featureWeights.reduce((acc, f) => ({ ...acc, [f.feature]: f.weight }), {}),
         },
       });
       if (result && result.evolved_strategies?.length > 0) {
