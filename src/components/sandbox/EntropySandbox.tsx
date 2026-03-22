@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Zap, Brain, Target, Crosshair, Shield, BarChart3, Skull,
-  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna, LineChart,
+  Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna, LineChart, Flame,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useAIProvider } from "@/hooks/useAIProvider";
