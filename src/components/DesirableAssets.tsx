@@ -452,6 +452,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     </span>
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
+                  {odgs.isHot && <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">ODGS ↑</span>}
+                  {odgs.isBlacklisted && <span className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss">ODGS ✕</span>}
                 </div>
                 <div className="flex items-center gap-1.5">
                   {/* Quant Score badge */}

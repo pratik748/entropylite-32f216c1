@@ -61,6 +61,9 @@ export function useStrategyEvolution(stocks: PortfolioStock[], refreshKey: numbe
           vix: 18,
           memory: allStrategies.slice(0, 10),
           generation: nextGen,
+          odgsHotAssets: desirableZones.flatMap(z => z.assets).slice(0, 10),
+          odgsSynergyPairs: combinationScores.slice(0, 5).map(c => c.pair),
+          odgsFeatureWeights: gradient.featureWeights.reduce((acc, f) => ({ ...acc, [f.feature]: f.weight }), {}),
         },
       });
       if (result && result.evolved_strategies?.length > 0) {
