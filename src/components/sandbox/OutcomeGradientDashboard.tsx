@@ -144,6 +144,62 @@ const OutcomeGradientDashboard = () => {
             </div>
           )}
 
+          {/* ─── INTELLIGENCE SIGNALS ─── */}
+          {intelligenceSignals.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">
+                  Live Intelligence — {intelligenceSignals.length} Actionable Signals
+                </span>
+              </div>
+              <div className="space-y-2">
+                {intelligenceSignals.map(sig => {
+                  const cfg = signalConfig[sig.type];
+                  const Icon = cfg.icon;
+                  return (
+                    <div
+                      key={sig.id}
+                      className={`rounded-lg border ${urgencyBorder[sig.urgency]} bg-muted/10 p-3 transition-colors hover:bg-muted/20`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-md bg-muted/30 flex-shrink-0 mt-0.5`}>
+                          <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <Badge variant="outline" className={`text-[8px] px-1.5 py-0 font-mono ${cfg.color} border-current/30`}>
+                              {cfg.label}
+                            </Badge>
+                            <Badge variant="outline" className={`text-[8px] px-1.5 py-0 font-mono ${
+                              sig.urgency === "high" ? "text-gain border-gain/30" :
+                              sig.urgency === "medium" ? "text-primary border-primary/30" :
+                              "text-muted-foreground border-border"
+                            }`}>
+                              {sig.urgency.toUpperCase()}
+                            </Badge>
+                            <span className="text-[9px] font-mono text-muted-foreground ml-auto">
+                              {sig.confidence}% conf
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-foreground mb-1">{sig.title}</p>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">{sig.reasoning}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {sig.assets.map(a => (
+                              <span key={a} className="text-[9px] font-mono font-bold text-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                {a}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Profit Field Heatmap */}
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-1.5 mb-3">
