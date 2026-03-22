@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useLocalStorage } from "./useLocalStorage";
+import { useOutcomeGradient } from "./useOutcomeGradient";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 export interface EvolvedStrategy {
