@@ -42,6 +42,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk";
 
