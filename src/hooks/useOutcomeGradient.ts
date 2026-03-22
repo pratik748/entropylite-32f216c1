@@ -62,6 +62,16 @@ export interface GradientVector {
   generation: number;
 }
 
+export interface IntelligenceSignal {
+  id: string;
+  type: "invest" | "hedge" | "pair" | "avoid" | "scale_up" | "rotate";
+  urgency: "high" | "medium" | "low";
+  title: string;
+  reasoning: string;
+  assets: string[];
+  confidence: number; // 0-100
+}
+
 export interface ShadowState {
   activeParams: GradientVector;
   evolvedParams: GradientVector;
