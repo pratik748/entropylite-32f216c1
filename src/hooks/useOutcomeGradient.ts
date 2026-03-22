@@ -619,6 +619,7 @@ export function useOutcomeGradient() {
     safetyStatus,
     shadowComparison,
     allocationHistory,
+    intelligenceSignals,
     // Actions
     ingestTrade,
     computeAndApplyGradient,
