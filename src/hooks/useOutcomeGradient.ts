@@ -169,11 +169,12 @@ export function useOutcomeGradient() {
         recentAvg > overallAvg * 1.1 ? "rising" as const :
         recentAvg < overallAvg * 0.9 ? "falling" as const : "stable" as const;
 
+      const wr = data.count > 0 ? (data.wins / data.count) * 100 : 0;
       return {
         asset,
         weightedProfitScore: wps,
         tradeCount: data.count,
-        winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+        winRate: wr,
         avgPnlPct: data.count > 0 ? data.scores.reduce((s, v) => s + v, 0) / data.count : 0,
         recentTrend: trend,
         isHotZone: wps > 0 && data.winRate > 50 && data.count >= 3,
