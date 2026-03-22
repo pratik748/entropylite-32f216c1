@@ -40,6 +40,7 @@ export function useStrategyEvolution(stocks: PortfolioStock[], refreshKey: numbe
   const [generation, setGeneration] = useLocalStorage<number>("entropy-evolution-gen", 0);
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { desirableZones, combinationScores, gradient } = useOutcomeGradient();
 
   const analyzed = stocks.filter(s => s.analysis);
   const portfolio = analyzed.map(s => ({
