@@ -69,6 +69,7 @@ const IndexContent = () => {
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
+  const { ingestTrade } = useOutcomeGradient();
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback((tab: Tab) => {
