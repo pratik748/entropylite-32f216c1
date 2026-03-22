@@ -181,6 +181,27 @@ const IndexContent = () => {
   };
 
   const handleRemoveStock = (id: string) => {
+    const stock = stocks.find(s => s.id === id);
+    // Ingest closed position into ODGS Profit Gradient
+    if (stock?.analysis) {
+      const currentPrice = stock.analysis.currentPrice ?? stock.buyPrice;
+      const pnlPct = ((currentPrice - stock.buyPrice) / stock.buyPrice) * 100;
+      ingestTrade({
+        asset: stock.ticker,
+        assetClass: "equity",
+        features: {
+          momentum: stock.analysis.momentum ?? 0,
+          vol: stock.analysis.volatility ?? 0,
+          sentiment: stock.analysis.sentiment ?? 0,
+          regime: stock.analysis.regime ?? "unknown",
+        },
+        pnlPct,
+        returnAbs: (currentPrice - stock.buyPrice) * stock.quantity,
+        duration: Math.max(1, (Date.now() - new Date(stock.analysis.analyzedAt || Date.now()).getTime()) / 3_600_000),
+        timestamp: Date.now(),
+      });
+      toast({ title: "Trade crossed → Profit Gradient", description: `${stock.ticker} ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}% ingested into ODGS` });
+    }
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
   };
