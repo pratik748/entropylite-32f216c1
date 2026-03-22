@@ -59,7 +59,7 @@ const OutcomeGradientDashboard = () => {
     fill: f.delta > 0 ? "hsl(var(--gain))" : f.delta < 0 ? "hsl(var(--loss))" : "hsl(var(--primary))",
   }));
 
-  const isEmpty = totalTrades < 3;
+  const isEmpty = totalTrades === 0;
 
   return (
     <div className="space-y-4">
@@ -78,7 +78,7 @@ const OutcomeGradientDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={computeAndApplyGradient} className="h-7 gap-1 text-[10px]" disabled={isEmpty}>
+            <Button size="sm" variant="outline" onClick={computeAndApplyGradient} className="h-7 gap-1 text-[10px]" disabled={totalTrades < 5}>
               <RefreshCw className="h-3 w-3" /> Update Gradient
             </Button>
             <Button size="sm" variant="ghost" onClick={clearAll} className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-loss">
@@ -93,11 +93,11 @@ const OutcomeGradientDashboard = () => {
           <Flame className="h-12 w-12 mx-auto text-muted-foreground/20 mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Trade Data Yet</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Log trades in the Trade Journal, run paper trades, or record strategy outcomes.
-            ODGS learns automatically from your real outcomes.
+            Cross a trade from Dashboard or log a trade in Trade Journal.
+            ODGS will immediately emit invest/hedge/correlation signals.
           </p>
           <p className="text-xs text-muted-foreground/60 mt-3 font-mono">
-            Minimum 5 trades to activate · Updates every 25 trades
+            First signal appears after 1 trade · Full gradient after 5+ trades
           </p>
         </div>
       ) : (
