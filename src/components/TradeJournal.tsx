@@ -25,6 +25,33 @@ const TradeJournal = () => {
   const { baseCurrency } = useFX();
   const sym = getCurrencySymbol(baseCurrency);
   const fmt = (n: number) => formatCurrency(n, baseCurrency);
+  const { ingestTrade } = useOutcomeGradient();
+
+  // Auto-ingest SELL trades as completed round-trips into ODGS
+  const [lastIngestedCount, setLastIngestedCount] = useLocalStorage<number>("odgs-journal-ingested", 0);
+  useEffect(() => {
+    if (trades.length <= lastIngestedCount) return;
+    const newTrades = trades.slice(0, trades.length - lastIngestedCount);
+    for (const t of newTrades) {
+      if (t.type === "SELL") {
+        const buyTrade = trades.find(b => b.ticker === t.ticker && b.type === "BUY" && b.date <= t.date);
+        if (buyTrade) {
+          const pnlPct = ((t.price - buyTrade.price) / buyTrade.price) * 100;
+          const durationHours = (new Date(t.date).getTime() - new Date(buyTrade.date).getTime()) / 3_600_000;
+          ingestTrade({
+            asset: t.ticker,
+            assetClass: "equity",
+            features: { momentum: 0, vol: 0, sentiment: 0, regime: "unknown" },
+            pnlPct,
+            returnAbs: (t.price - buyTrade.price) * t.quantity,
+            duration: Math.max(1, durationHours),
+            timestamp: Date.now(),
+          });
+        }
+      }
+    }
+    setLastIngestedCount(trades.length);
+  }, [trades.length]);
 
   const [form, setForm] = useState({
     ticker: "", type: "BUY" as "BUY" | "SELL", price: "", quantity: "",
