@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, Plus, Trash2, TrendingUp, TrendingDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
 export interface TradeEntry {
   id: string;
