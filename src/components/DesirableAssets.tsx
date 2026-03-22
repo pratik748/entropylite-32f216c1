@@ -189,7 +189,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-
+  const { getAssetBoost } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
