@@ -417,7 +417,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const priceChange24h = rec.priceChange24h || 0;
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
-          const qs = rec.quantScore || 0;
+          const odgs = getAssetBoost(rec.ticker);
+          const qs = Math.round((rec.quantScore || 0) * odgs.scoreMult);
 
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
