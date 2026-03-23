@@ -196,7 +196,12 @@ const OutcomeGradientDashboard = () => {
                 3D Profit Field — Momentum × Volatility × PnL
               </span>
             </div>
-            <ProfitHeatmap3D data={advancedMetrics.heatmapGrid} />
+            <ProfitHeatmap3D
+              data={advancedMetrics.heatmapGrid}
+              featureImportance={advancedMetrics.featureImportance}
+              regimeAlpha={advancedMetrics.regimeAlpha}
+              gradient={gradient}
+            />
           </div>
 
           {/* ─── INTELLIGENCE SIGNALS ─── */}
