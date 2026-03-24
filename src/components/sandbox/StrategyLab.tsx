@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Brain, Zap, AlertTriangle, Clock, Target, XCircle, CheckCircle, RefreshCw,
   Trash2, History, TrendingUp, TrendingDown, Shield, Activity, ArrowUpRight,
-  ArrowDownRight, DollarSign, ShieldAlert, Layers, BarChart3, Flame,
+  ArrowDownRight, DollarSign, ShieldAlert, Layers, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -10,7 +10,6 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { getCurrencySymbol } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
@@ -95,7 +94,6 @@ const MUTED_COLOR = "hsl(0 0% 42%)";
 const StrategyLab = ({ stocks }: Props) => {
   const { holdings, fmt } = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(30000);
-  const { intelligenceSignals, profitField, desirableZones, getAssetBoost } = useOutcomeGradient();
 
   const [instructions, setInstructions] = useState<TradeInstruction[]>([]);
   const [assessment, setAssessment] = useState("");
@@ -104,15 +102,6 @@ const StrategyLab = ({ stocks }: Props) => {
   const [showMemory, setShowMemory] = useState(false);
   const generatingRef = useRef(false);
   const { memory, logStrategy, getRelevantMemories, getWinRate, clearMemory } = useStrategyMemory();
-
-  // ODGS enrichment for strategy generation
-  const odgsContext = useMemo(() => {
-    const hotAssets = profitField.filter(a => a.isHotZone && !a.isBlacklisted).slice(0, 8);
-    const avoidAssets = profitField.filter(a => a.isBlacklisted || (a.winRate < 30 && a.tradeCount >= 2)).slice(0, 5);
-    const investSignals = intelligenceSignals.filter(s => s.type === "invest" || s.type === "scale_up").slice(0, 4);
-    const hedgeSignals = intelligenceSignals.filter(s => s.type === "hedge" || s.type === "avoid").slice(0, 3);
-    return { hotAssets, avoidAssets, investSignals, hedgeSignals };
-  }, [profitField, intelligenceSignals]);
 
   const generateInstructions = useCallback(async () => {
     if (!regime || generatingRef.current) return;
@@ -144,10 +133,6 @@ const StrategyLab = ({ stocks }: Props) => {
           portfolio,
           keyEvents: regime.keyEvents,
           outlook: regime.outlook,
-          odgsHotAssets: odgsContext.hotAssets.map(a => `${a.asset} (${a.winRate.toFixed(0)}% win, avg +${a.avgPnlPct.toFixed(1)}%)`),
-          odgsAvoidAssets: odgsContext.avoidAssets.map(a => `${a.asset} (${a.winRate.toFixed(0)}% win, AVOID)`),
-          odgsInvestSignals: odgsContext.investSignals.map(s => s.title),
-          odgsHedgeSignals: odgsContext.hedgeSignals.map(s => s.title),
         },
         force: true,
       });
@@ -260,33 +245,6 @@ const StrategyLab = ({ stocks }: Props) => {
                   }`}>{c.label}</span>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ODGS Gradient Intelligence */}
-        {(odgsContext.investSignals.length > 0 || odgsContext.hedgeSignals.length > 0) && (
-          <div className="mt-3 rounded-lg bg-primary/5 border border-primary/20 p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Flame className="h-3 w-3 text-primary" />
-              <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Profit Gradient Bias</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {odgsContext.investSignals.map(s => (
-                <span key={s.id} className="rounded bg-gain/10 border border-gain/20 px-2 py-1 text-[9px] font-mono text-gain">
-                  ↑ {s.assets.join(", ")} · {s.confidence}%
-                </span>
-              ))}
-              {odgsContext.hedgeSignals.map(s => (
-                <span key={s.id} className="rounded bg-loss/10 border border-loss/20 px-2 py-1 text-[9px] font-mono text-loss">
-                  ↓ {s.assets.join(", ")} · {s.confidence}%
-                </span>
-              ))}
-              {odgsContext.hotAssets.length > 0 && (
-                <span className="text-[8px] font-mono text-muted-foreground self-center ml-1">
-                  {odgsContext.hotAssets.length} hot zones active
-                </span>
-              )}
             </div>
           </div>
         )}

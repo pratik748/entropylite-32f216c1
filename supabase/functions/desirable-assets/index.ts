@@ -623,8 +623,6 @@ serve(async (req) => {
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
-    const odgsHotZones: string[] = body.odgsHotZones || [];
-    const odgsBlacklist: string[] = body.odgsBlacklist || [];
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
@@ -643,12 +641,7 @@ serve(async (req) => {
 
     // Anti-repeat instruction
     const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended or already sold): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
-      : "";
-
-    // ODGS intelligence block
-    const odgsBlock = (odgsHotZones.length > 0 || odgsBlacklist.length > 0)
-      ? `\n## PROFIT GRADIENT INTELLIGENCE:\n${odgsHotZones.length > 0 ? `Assets with PROVEN profitability (prioritize similar sectors/themes): ${odgsHotZones.join(", ")}. Look for NEW opportunities in same sectors, correlated names, or upstream/downstream plays.` : ""}\n${odgsBlacklist.length > 0 ? `AVOID these assets (historically poor outcomes, drawdown-blocked): ${odgsBlacklist.join(", ")}. Do NOT recommend them.` : ""}\n`
+      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
@@ -738,7 +731,6 @@ Do not output markdown.`,
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
-${odgsBlock}
 Home-market rule: ${homeMarketRule}
 
 Create 14-16 recommendations that prioritize:
@@ -770,12 +762,8 @@ Return via the tool call only.`,
     }
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates([...previousTickers, ...odgsBlacklist]);
-    // Remove ODGS blacklisted assets from all candidates
-    const odgsBlackSet = new Set(odgsBlacklist.map(t => t.toUpperCase()));
-    candidates = dedupeCandidates([...candidates, ...deterministicCandidates])
-      .filter((c: any) => !odgsBlackSet.has(String(c.ticker).toUpperCase()))
-      .slice(0, 25);
+    const deterministicCandidates = buildDeterministicCandidates(previousTickers);
+    candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
 
     if (candidates.length === 0) {
       throw new Error("No candidates available after deterministic fallback");

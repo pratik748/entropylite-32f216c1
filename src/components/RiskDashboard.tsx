@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { Shield, AlertTriangle, Zap, Brain, Flame } from "lucide-react";
+import { Shield, AlertTriangle, Zap, Brain } from "lucide-react";
 import ClankEngine from "@/components/risk/ClankEngine";
 import { useAIProvider } from "@/hooks/useAIProvider";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
@@ -33,7 +32,6 @@ function computeVaRCVaR(stocks: PortfolioStock[]) {
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
   const staticVars = computeVaRCVaR(stocks);
-  const { intelligenceSignals, profitField, safetyStatus } = useOutcomeGradient();
 
   const [aiData, setAiData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -205,49 +203,6 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <Brain className="h-4 w-4 text-gain" />
           <span className="text-xs text-gain">AI-Driven Risk Analysis</span>
           {volatilityRegime && <span className="ml-auto text-xs font-mono text-foreground">Regime: {volatilityRegime}</span>}
-        </div>
-      )}
-
-      {/* ODGS Risk Intelligence */}
-      {intelligenceSignals.length > 0 && (
-        <div className="rounded-lg border border-primary/20 bg-card p-3">
-          <div className="flex items-center gap-1.5 mb-2">
-            <Flame className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Profit Gradient Risk Signals</span>
-            <span className="text-[8px] font-mono text-muted-foreground ml-auto">
-              {safetyStatus.blacklistedAssets.length > 0 && `${safetyStatus.blacklistedAssets.length} blocked · `}
-              α={safetyStatus.learningRate.toFixed(3)} · PnL₅={safetyStatus.rollingPnl5 >= 0 ? "+" : ""}{safetyStatus.rollingPnl5.toFixed(1)}%
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-            {intelligenceSignals.filter(s => s.type === "hedge" || s.type === "avoid").slice(0, 6).map(sig => (
-              <div key={sig.id} className={`rounded-lg px-3 py-2 text-[10px] border ${
-                sig.urgency === "high" ? "bg-loss/5 border-loss/20" : "bg-warning/5 border-warning/20"
-              }`}>
-                <div className="flex items-center gap-1 mb-0.5">
-                  <AlertTriangle className={`h-2.5 w-2.5 ${sig.urgency === "high" ? "text-loss" : "text-warning"}`} />
-                  <span className="font-bold text-foreground">{sig.assets.join(", ")}</span>
-                  <span className={`ml-auto font-mono ${sig.urgency === "high" ? "text-loss" : "text-warning"}`}>{sig.confidence}%</span>
-                </div>
-                <p className="text-muted-foreground leading-tight">{sig.reasoning.slice(0, 120)}</p>
-              </div>
-            ))}
-            {intelligenceSignals.filter(s => s.type === "invest" || s.type === "scale_up").slice(0, 3).map(sig => (
-              <div key={sig.id} className="rounded-lg px-3 py-2 text-[10px] border bg-gain/5 border-gain/20">
-                <div className="flex items-center gap-1 mb-0.5">
-                  <Shield className="h-2.5 w-2.5 text-gain" />
-                  <span className="font-bold text-foreground">{sig.assets.join(", ")}</span>
-                  <span className="ml-auto font-mono text-gain">{sig.confidence}%</span>
-                </div>
-                <p className="text-muted-foreground leading-tight">{sig.reasoning.slice(0, 120)}</p>
-              </div>
-            ))}
-          </div>
-          {safetyStatus.rollbackTriggered && (
-            <div className="mt-2 rounded bg-loss/10 border border-loss/30 px-3 py-1.5 text-[9px] font-mono text-loss">
-              ⚠ ROLLBACK TRIGGERED — 5-trade rolling PnL below threshold. All biases decaying toward neutral.
-            </div>
-          )}
         </div>
       )}
 

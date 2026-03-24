@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
-    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider, odgsHotAssets, odgsAvoidAssets, odgsInvestSignals, odgsHedgeSignals } = await req.json();
+    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider } = await req.json();
 
     const sectorSummary = (sectors || [])
       .slice(0, 10)
@@ -41,15 +41,6 @@ CRITICAL RULES:
 9. All prices must be realistic based on current market data provided
 10. Generate 4-6 trade instructions covering: position management, hedging, new opportunities`;
 
-    const odgsBlock = (odgsHotAssets?.length || odgsAvoidAssets?.length || odgsInvestSignals?.length || odgsHedgeSignals?.length) ? `
-PROFIT GRADIENT INTELLIGENCE (ODGS):
-${odgsHotAssets?.length ? `Hot zone assets (proven winners): ${odgsHotAssets.join("; ")}` : ""}
-${odgsAvoidAssets?.length ? `AVOID these assets (poor historical outcomes): ${odgsAvoidAssets.join("; ")}` : ""}
-${odgsInvestSignals?.length ? `Invest signals: ${odgsInvestSignals.join("; ")}` : ""}
-${odgsHedgeSignals?.length ? `Hedge signals: ${odgsHedgeSignals.join("; ")}` : ""}
-IMPORTANT: Prioritize trades that ALIGN with ODGS hot zones. Do NOT recommend trades in AVOID assets unless hedging against them. Factor ODGS intelligence into your rationale.
-` : "";
-
     const userPrompt = `LIVE MARKET STATE:
 Regime: ${regime}
 VIX: ${vix}
@@ -57,7 +48,7 @@ Mood Score: ${moodScore}/100
 Key Events: ${(keyEvents || []).join("; ")}
 Outlook: ${outlook || "N/A"}
 Sector Performance: ${sectorSummary || "N/A"}
-${odgsBlock}
+
 CURRENT PORTFOLIO (Total Value: $${totalValue.toFixed(0)}):
 ${portfolioLines || "EMPTY — No positions. Recommend initial portfolio construction."}
 
