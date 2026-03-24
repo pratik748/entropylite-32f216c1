@@ -33,6 +33,7 @@ function computeVaRCVaR(stocks: PortfolioStock[]) {
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
   const staticVars = computeVaRCVaR(stocks);
+  const { intelligenceSignals, profitField, safetyStatus } = useOutcomeGradient();
 
   const [aiData, setAiData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
