@@ -144,6 +144,10 @@ const StrategyLab = ({ stocks }: Props) => {
           portfolio,
           keyEvents: regime.keyEvents,
           outlook: regime.outlook,
+          odgsHotAssets: odgsContext.hotAssets.map(a => `${a.asset} (${a.winRate.toFixed(0)}% win, avg +${a.avgPnlPct.toFixed(1)}%)`),
+          odgsAvoidAssets: odgsContext.avoidAssets.map(a => `${a.asset} (${a.winRate.toFixed(0)}% win, AVOID)`),
+          odgsInvestSignals: odgsContext.investSignals.map(s => s.title),
+          odgsHedgeSignals: odgsContext.hedgeSignals.map(s => s.title),
         },
         force: true,
       });
