@@ -81,8 +81,52 @@ const IndexContent = () => {
   }, [triggerRefresh]);
   const { data: geoData, loading: geoLoading, tickerThreats, exposedTickers, refresh: geoRefresh } = useGeoIntelligence(stocks, refreshKey);
 
-  // Sell notification system — monitors positions for profit drawdowns and sell signals
-  useSellNotifications(stocks);
+  // Auto-sell handler: books profit and removes stock
+  const handleAutoSell = useCallback((event: AutoSellEvent) => {
+    const stock = stocksRef.current.find(s => s.id === event.stockId);
+    if (!stock) return;
+    const ccy = stock.analysis?.currency || "USD";
+    const pnlPct = ((event.sellPrice - event.buyPrice) / event.buyPrice) * 100;
+    const pnlAbs = (event.sellPrice - event.buyPrice) * event.quantity;
+
+    // Book the profit
+    addBookedProfit({
+      ticker: event.ticker,
+      buyPrice: event.buyPrice,
+      sellPrice: event.sellPrice,
+      quantity: event.quantity,
+      pnlPct,
+      pnlAbs,
+      currency: ccy,
+      bookedAt: Date.now(),
+      reason: event.reason,
+    });
+
+    // Ingest into ODGS
+    ingestTrade({
+      asset: event.ticker,
+      assetClass: "equity",
+      features: {
+        momentum: stock.analysis?.momentum ?? 0,
+        vol: stock.analysis?.volatility ?? 0,
+        sentiment: stock.analysis?.sentiment ?? 0,
+        regime: stock.analysis?.regime ?? "unknown",
+      },
+      pnlPct,
+      returnAbs: pnlAbs,
+      duration: 1,
+      timestamp: Date.now(),
+    });
+
+    // Remove from portfolio
+    setStocks(prev => prev.filter(s => s.id !== event.stockId));
+    if (activeStockId === event.stockId) {
+      setActiveStockId(stocksRef.current.find(s => s.id !== event.stockId)?.id ?? null);
+    }
+  }, [ingestTrade, setStocks, activeStockId]);
+
+  // Sell notification system — monitors positions and auto-sells at max profit
+  useSellNotifications(stocks, handleAutoSell);
 
 
   const stocksRef = useRef(stocks);
