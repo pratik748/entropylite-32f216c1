@@ -277,7 +277,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioSectors,
           portfolioValue: totalValue || 100000,
           baseCurrency,
-          previousTickers: getPreviousTickers(),
+          previousTickers: [...getPreviousTickers(), ...soldTickers],
+          odgsHotZones: hotZoneAssets.slice(0, 10),
+          odgsBlacklist: blacklistedAssets.slice(0, 10),
         },
       });
 
