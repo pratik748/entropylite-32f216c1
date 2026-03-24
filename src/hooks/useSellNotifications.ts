@@ -177,17 +177,28 @@ export function useSellNotifications(
           });
         }
 
-        // Alert 2: Reached or exceeded max profit target
+        // Alert 2: Reached or exceeded max profit target → AUTO-SELL
         if (progressToMax >= 1.0 && !tracker.maxProfitAlerted) {
           tracker.maxProfitAlerted = true;
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `🏆 ${ticker} — MAX PROFIT ZONE`,
-            description: `Price $${currentPrice.toFixed(2)} reached computed ceiling $${maxTarget.toFixed(2)} (+${maxProfitPct.toFixed(1)}%). TAKE PROFIT NOW. Beyond this, risk/reward deteriorates.`,
+            title: `🏆 ${ticker} — AUTO-SOLD AT MAX PROFIT`,
+            description: `Price $${currentPrice.toFixed(2)} hit ceiling $${maxTarget.toFixed(2)} (+${maxProfitPct.toFixed(1)}%). Profit booked automatically.`,
             variant: "destructive",
             duration: 30000,
           });
+          // Trigger auto-sell callback
+          if (onAutoSell) {
+            onAutoSell({
+              stockId: trackerId,
+              ticker,
+              buyPrice,
+              sellPrice: currentPrice,
+              quantity: stock.quantity,
+              reason: "Max Profit Target",
+            });
+          }
         }
 
         // Alert 3: Was above max target, now falling back
