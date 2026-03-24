@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, Flame } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,8 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
-
+import { useOutcomeGradient, type IntelligenceSignal, type AssetScore } from "@/hooks/useOutcomeGradient";
+import { loadBookedProfits } from "@/components/BookedProfits";
 interface Recommendation {
   ticker: string;
   name: string;
