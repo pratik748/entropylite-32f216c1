@@ -263,6 +263,33 @@ const StrategyLab = ({ stocks }: Props) => {
             </div>
           </div>
         )}
+
+        {/* ODGS Gradient Intelligence */}
+        {(odgsContext.investSignals.length > 0 || odgsContext.hedgeSignals.length > 0) && (
+          <div className="mt-3 rounded-lg bg-primary/5 border border-primary/20 p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Flame className="h-3 w-3 text-primary" />
+              <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Profit Gradient Bias</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {odgsContext.investSignals.map(s => (
+                <span key={s.id} className="rounded bg-gain/10 border border-gain/20 px-2 py-1 text-[9px] font-mono text-gain">
+                  ↑ {s.assets.join(", ")} · {s.confidence}%
+                </span>
+              ))}
+              {odgsContext.hedgeSignals.map(s => (
+                <span key={s.id} className="rounded bg-loss/10 border border-loss/20 px-2 py-1 text-[9px] font-mono text-loss">
+                  ↓ {s.assets.join(", ")} · {s.confidence}%
+                </span>
+              ))}
+              {odgsContext.hotAssets.length > 0 && (
+                <span className="text-[8px] font-mono text-muted-foreground self-center ml-1">
+                  {odgsContext.hotAssets.length} hot zones active
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Portfolio Assessment */}
