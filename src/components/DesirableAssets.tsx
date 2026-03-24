@@ -299,8 +299,13 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         throw new Error("No recommendations survived quant filters. Try refreshing.");
       }
 
+      // Filter out sold/booked tickers from recommendations
+      const filteredRecs = (data.recommendations || []).filter(
+        (r: any) => !soldTickers.includes(r.ticker)
+      );
+
       const payload = {
-        recommendations: data.recommendations,
+        recommendations: filteredRecs,
         marketCondition: data.marketCondition || "",
         regimeType: data.regimeType || "",
         candidatesGenerated: data.candidatesGenerated || 0,
@@ -308,15 +313,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       };
       
       // Save tickers for anti-repeat on next refresh
-      const newTickers = data.recommendations.map((r: any) => r.ticker);
+      const newTickers = filteredRecs.map((r: any) => r.ticker);
       savePreviousTickers([...getPreviousTickers(), ...newTickers]);
       
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
-      setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+      setStats({ generated: data.candidatesGenerated || 0, passed: filteredRecs.length });
       
       setCachedDA(payload);
-      setRecommendations(data.recommendations);
+      setRecommendations(filteredRecs);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
