@@ -312,6 +312,7 @@ const IndexContent = () => {
           isMobile ? (
             /* Mobile: stacked layout */
             <div className="p-1.5 space-y-1.5 pb-10">
+              <BookedProfits />
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
