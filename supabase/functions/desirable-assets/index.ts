@@ -623,6 +623,8 @@ serve(async (req) => {
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
+    const odgsHotZones: string[] = body.odgsHotZones || [];
+    const odgsBlacklist: string[] = body.odgsBlacklist || [];
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
