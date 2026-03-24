@@ -95,6 +95,7 @@ const MUTED_COLOR = "hsl(0 0% 42%)";
 const StrategyLab = ({ stocks }: Props) => {
   const { holdings, fmt } = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(30000);
+  const { intelligenceSignals, profitField, desirableZones, getAssetBoost } = useOutcomeGradient();
 
   const [instructions, setInstructions] = useState<TradeInstruction[]>([]);
   const [assessment, setAssessment] = useState("");
@@ -103,6 +104,15 @@ const StrategyLab = ({ stocks }: Props) => {
   const [showMemory, setShowMemory] = useState(false);
   const generatingRef = useRef(false);
   const { memory, logStrategy, getRelevantMemories, getWinRate, clearMemory } = useStrategyMemory();
+
+  // ODGS enrichment for strategy generation
+  const odgsContext = useMemo(() => {
+    const hotAssets = profitField.filter(a => a.isHotZone && !a.isBlacklisted).slice(0, 8);
+    const avoidAssets = profitField.filter(a => a.isBlacklisted || (a.winRate < 30 && a.tradeCount >= 2)).slice(0, 5);
+    const investSignals = intelligenceSignals.filter(s => s.type === "invest" || s.type === "scale_up").slice(0, 4);
+    const hedgeSignals = intelligenceSignals.filter(s => s.type === "hedge" || s.type === "avoid").slice(0, 3);
+    return { hotAssets, avoidAssets, investSignals, hedgeSignals };
+  }, [profitField, intelligenceSignals]);
 
   const generateInstructions = useCallback(async () => {
     if (!regime || generatingRef.current) return;
