@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Brain, Zap, AlertTriangle, Clock, Target, XCircle, CheckCircle, RefreshCw,
   Trash2, History, TrendingUp, TrendingDown, Shield, Activity, ArrowUpRight,
-  ArrowDownRight, DollarSign, ShieldAlert, Layers, BarChart3,
+  ArrowDownRight, DollarSign, ShieldAlert, Layers, BarChart3, Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -10,6 +10,7 @@ import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime, type RegimeType } from "@/hooks/useMarketRegime";
 import { usePaperTrading, type PaperTrade } from "@/hooks/usePaperTrading";
 import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } from "@/hooks/useStrategyMemory";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { getCurrencySymbol } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
