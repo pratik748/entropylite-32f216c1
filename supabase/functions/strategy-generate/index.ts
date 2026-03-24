@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
-    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider } = await req.json();
+    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider, odgsHotAssets, odgsAvoidAssets, odgsInvestSignals, odgsHedgeSignals } = await req.json();
 
     const sectorSummary = (sectors || [])
       .slice(0, 10)
