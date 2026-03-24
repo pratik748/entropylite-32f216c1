@@ -360,6 +360,7 @@ const IndexContent = () => {
                   {/* Top center: Main analysis */}
                   <ResizablePanel defaultSize={65} minSize={30}>
                     <div className="h-full overflow-auto p-3 space-y-3">
+                      <BookedProfits />
                       {!isLoading && !analysis && (
                         <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
                           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
