@@ -738,6 +738,7 @@ Do not output markdown.`,
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
+${odgsBlock}
 Home-market rule: ${homeMarketRule}
 
 Create 14-16 recommendations that prioritize:
