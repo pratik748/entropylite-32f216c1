@@ -643,7 +643,12 @@ serve(async (req) => {
 
     // Anti-repeat instruction
     const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended or already sold): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+      : "";
+
+    // ODGS intelligence block
+    const odgsBlock = (odgsHotZones.length > 0 || odgsBlacklist.length > 0)
+      ? `\n## PROFIT GRADIENT INTELLIGENCE:\n${odgsHotZones.length > 0 ? `Assets with PROVEN profitability (prioritize similar sectors/themes): ${odgsHotZones.join(", ")}. Look for NEW opportunities in same sectors, correlated names, or upstream/downstream plays.` : ""}\n${odgsBlacklist.length > 0 ? `AVOID these assets (historically poor outcomes, drawdown-blocked): ${odgsBlacklist.join(", ")}. Do NOT recommend them.` : ""}\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
