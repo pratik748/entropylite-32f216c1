@@ -434,6 +434,49 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
+      {/* ODGS Intelligence Signals */}
+      {(odgsInvestSignals.length > 0 || odgsAvoidSignals.length > 0) && (
+        <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Flame className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Profit Gradient Intelligence</span>
+            <span className="text-[8px] font-mono text-muted-foreground ml-auto">ODGS learned from {profitField.length} assets</span>
+          </div>
+          {odgsInvestSignals.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-mono text-gain uppercase tracking-wider">↑ Seek Exposure</span>
+              {odgsInvestSignals.map(sig => (
+                <div key={sig.id} className="flex items-center gap-2 rounded-lg bg-gain/5 border border-gain/20 px-3 py-1.5">
+                  <TrendingUp className="h-3 w-3 text-gain shrink-0" />
+                  <span className="text-[10px] text-foreground flex-1">{sig.title}</span>
+                  <span className="text-[9px] font-mono text-gain">{sig.confidence}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {odgsAvoidSignals.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-mono text-loss uppercase tracking-wider">↓ Reduce / Avoid</span>
+              {odgsAvoidSignals.map(sig => (
+                <div key={sig.id} className="flex items-center gap-2 rounded-lg bg-loss/5 border border-loss/20 px-3 py-1.5">
+                  <Ban className="h-3 w-3 text-loss shrink-0" />
+                  <span className="text-[10px] text-foreground flex-1">{sig.title}</span>
+                  <span className="text-[9px] font-mono text-loss">{sig.confidence}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hotZoneAssets.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1 border-t border-border/30">
+              <span className="text-[8px] font-mono text-muted-foreground mr-1">HOT ZONES:</span>
+              {hotZoneAssets.slice(0, 8).map(a => (
+                <span key={a} className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">{a}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Cards */}
       <div className="grid gap-4 md:grid-cols-2">
         {recommendations.map((rec, i) => {
