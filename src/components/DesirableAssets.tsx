@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, Flame } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,8 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
-
+import { useOutcomeGradient, type IntelligenceSignal, type AssetScore } from "@/hooks/useOutcomeGradient";
+import { loadBookedProfits } from "@/components/BookedProfits";
 interface Recommendation {
   ticker: string;
   name: string;
@@ -189,8 +189,32 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { getAssetBoost } = useOutcomeGradient();
+  const { getAssetBoost, profitField, intelligenceSignals, desirableZones } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
+
+  // Get sold/booked tickers to exclude from recommendations
+  const soldTickers = useMemo(() => {
+    const booked = loadBookedProfits().map(p => p.ticker);
+    return [...new Set(booked)];
+  }, []);
+
+  // ODGS-driven intelligence signals for the top bar
+  const odgsInvestSignals = useMemo(() => 
+    intelligenceSignals.filter(s => s.type === "invest" || s.type === "scale_up" || s.type === "pair").slice(0, 4),
+  [intelligenceSignals]);
+
+  const odgsAvoidSignals = useMemo(() =>
+    intelligenceSignals.filter(s => s.type === "avoid" || s.type === "hedge").slice(0, 3),
+  [intelligenceSignals]);
+
+  // Hot zone tickers from ODGS for AI prompt enrichment
+  const hotZoneAssets = useMemo(() => 
+    profitField.filter(a => a.isHotZone && !a.isBlacklisted).map(a => a.asset),
+  [profitField]);
+
+  const blacklistedAssets = useMemo(() =>
+    profitField.filter(a => a.isBlacklisted).map(a => a.asset),
+  [profitField]);
 
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
     if (!forceRefresh) {
@@ -253,7 +277,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioSectors,
           portfolioValue: totalValue || 100000,
           baseCurrency,
-          previousTickers: getPreviousTickers(),
+          previousTickers: [...getPreviousTickers(), ...soldTickers],
+          odgsHotZones: hotZoneAssets.slice(0, 10),
+          odgsBlacklist: blacklistedAssets.slice(0, 10),
         },
       });
 
@@ -273,8 +299,13 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         throw new Error("No recommendations survived quant filters. Try refreshing.");
       }
 
+      // Filter out sold/booked tickers from recommendations
+      const filteredRecs = (data.recommendations || []).filter(
+        (r: any) => !soldTickers.includes(r.ticker)
+      );
+
       const payload = {
-        recommendations: data.recommendations,
+        recommendations: filteredRecs,
         marketCondition: data.marketCondition || "",
         regimeType: data.regimeType || "",
         candidatesGenerated: data.candidatesGenerated || 0,
@@ -282,15 +313,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       };
       
       // Save tickers for anti-repeat on next refresh
-      const newTickers = data.recommendations.map((r: any) => r.ticker);
+      const newTickers = filteredRecs.map((r: any) => r.ticker);
       savePreviousTickers([...getPreviousTickers(), ...newTickers]);
       
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
-      setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+      setStats({ generated: data.candidatesGenerated || 0, passed: filteredRecs.length });
       
       setCachedDA(payload);
-      setRecommendations(data.recommendations);
+      setRecommendations(filteredRecs);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
@@ -400,6 +431,49 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Market Assessment</span>
           </div>
           <p className="text-sm text-foreground">{marketCondition}</p>
+        </div>
+      )}
+
+      {/* ODGS Intelligence Signals */}
+      {(odgsInvestSignals.length > 0 || odgsAvoidSignals.length > 0) && (
+        <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Flame className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Profit Gradient Intelligence</span>
+            <span className="text-[8px] font-mono text-muted-foreground ml-auto">ODGS learned from {profitField.length} assets</span>
+          </div>
+          {odgsInvestSignals.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-mono text-gain uppercase tracking-wider">↑ Seek Exposure</span>
+              {odgsInvestSignals.map(sig => (
+                <div key={sig.id} className="flex items-center gap-2 rounded-lg bg-gain/5 border border-gain/20 px-3 py-1.5">
+                  <TrendingUp className="h-3 w-3 text-gain shrink-0" />
+                  <span className="text-[10px] text-foreground flex-1">{sig.title}</span>
+                  <span className="text-[9px] font-mono text-gain">{sig.confidence}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {odgsAvoidSignals.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-mono text-loss uppercase tracking-wider">↓ Reduce / Avoid</span>
+              {odgsAvoidSignals.map(sig => (
+                <div key={sig.id} className="flex items-center gap-2 rounded-lg bg-loss/5 border border-loss/20 px-3 py-1.5">
+                  <Ban className="h-3 w-3 text-loss shrink-0" />
+                  <span className="text-[10px] text-foreground flex-1">{sig.title}</span>
+                  <span className="text-[9px] font-mono text-loss">{sig.confidence}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {hotZoneAssets.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1 border-t border-border/30">
+              <span className="text-[8px] font-mono text-muted-foreground mr-1">HOT ZONES:</span>
+              {hotZoneAssets.slice(0, 8).map(a => (
+                <span key={a} className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">{a}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
