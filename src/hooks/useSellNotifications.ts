@@ -84,7 +84,19 @@ function computeMaxProfitFromAnalysis(
  * 4. AI says sell/exit
  * 5. High risk + loss combination
  */
-export function useSellNotifications(stocks: PortfolioStock[]) {
+export interface AutoSellEvent {
+  stockId: string;
+  ticker: string;
+  buyPrice: number;
+  sellPrice: number;
+  quantity: number;
+  reason: string;
+}
+
+export function useSellNotifications(
+  stocks: PortfolioStock[],
+  onAutoSell?: (event: AutoSellEvent) => void,
+) {
   const trackers = useRef<Record<string, PeakTracker>>(loadTrackers());
   const initialized = useRef(false);
 
