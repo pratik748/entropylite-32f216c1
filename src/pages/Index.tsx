@@ -265,69 +265,9 @@ const IndexContent = () => {
       <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
         {activeTab === "dashboard" && (
           isMobile ? (
-            /* Mobile: stacked layout with portfolio management */
-            <div className="p-1.5 space-y-1.5 pb-14">
+            /* Mobile: stacked layout */
+            <div className="p-1.5 space-y-1.5 pb-10">
               <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-
-              {/* Mobile Portfolio List */}
-              {stocks.filter(s => s.analysis).length > 0 && (
-                <div className="rounded-sm border border-border bg-card">
-                  <div className="px-2 py-1.5 border-b border-border/50 flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-semibold text-foreground uppercase tracking-wider">Portfolio</span>
-                    <span className="text-[9px] font-mono text-muted-foreground">{stocks.filter(s => s.analysis).length} positions</span>
-                  </div>
-                  <div className="divide-y divide-border/30">
-                    {stocks.filter(s => s.analysis).map(s => {
-                      const a = s.analysis!;
-                      const pnlPct = s.buyPrice > 0 ? ((a.currentPrice - s.buyPrice) / s.buyPrice) * 100 : 0;
-                      const pnl = (a.currentPrice - s.buyPrice) * s.quantity;
-                      const isActive = s.id === activeStockId;
-                      return (
-                        <div
-                          key={s.id}
-                          className={`flex items-center gap-2 px-2 py-2 cursor-pointer transition-colors ${isActive ? "bg-primary/10" : "active:bg-surface-2"}`}
-                          onClick={() => setActiveStockId(s.id)}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs font-bold text-foreground">{s.ticker}</span>
-                              <span className={`font-mono text-[10px] font-semibold ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
-                                {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px] font-mono text-muted-foreground">
-                              <span>${a.currentPrice.toFixed(2)}</span>
-                              <span>×{s.quantity}</span>
-                              <span className={pnl >= 0 ? "text-gain" : "text-loss"}>
-                                {pnl >= 0 ? "+" : ""}${Math.abs(pnl).toFixed(0)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {a.suggestion && (
-                              <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                a.suggestion.toLowerCase().includes("buy") ? "bg-gain/15 text-gain" :
-                                a.suggestion.toLowerCase().includes("sell") ? "bg-loss/15 text-loss" :
-                                "bg-muted/30 text-muted-foreground"
-                              }`}>
-                                {a.suggestion.toLowerCase().includes("buy") ? "BUY" :
-                                 a.suggestion.toLowerCase().includes("sell") ? "SELL" : "HOLD"}
-                              </span>
-                            )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleRemoveStock(s.id); }}
-                              className="p-1 rounded hover:bg-loss/10 text-muted-foreground hover:text-loss transition-colors"
-                            >
-                              <Activity className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {isLoading && <LoadingState />}
               {analysis && !isLoading && (
                 <>
@@ -339,7 +279,6 @@ const IndexContent = () => {
                   <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                   <CompanyIntelligence ticker={analysis.ticker} />
                   <LiveNewsFeed ticker={analysis.ticker} compact />
-                  <ProfitTaskbar ticker={analysis.ticker} currentPrice={analysis.currentPrice} buyPrice={analysis.buyPrice} quantity={analysis.quantity} suggestion={analysis.suggestion} confidence={analysis.confidence} bullRange={analysis.bullRange} bearRange={analysis.bearRange} riskLevel={analysis.riskLevel} />
                 </>
               )}
               {stocks.filter((s) => s.analysis).length > 1 && (
