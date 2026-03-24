@@ -770,8 +770,12 @@ Return via the tool call only.`,
     }
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers);
-    candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
+    const deterministicCandidates = buildDeterministicCandidates([...previousTickers, ...odgsBlacklist]);
+    // Remove ODGS blacklisted assets from all candidates
+    const odgsBlackSet = new Set(odgsBlacklist.map(t => t.toUpperCase()));
+    candidates = dedupeCandidates([...candidates, ...deterministicCandidates])
+      .filter((c: any) => !odgsBlackSet.has(String(c.ticker).toUpperCase()))
+      .slice(0, 25);
 
     if (candidates.length === 0) {
       throw new Error("No candidates available after deterministic fallback");
