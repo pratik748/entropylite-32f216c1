@@ -189,8 +189,32 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { getAssetBoost } = useOutcomeGradient();
+  const { getAssetBoost, profitField, intelligenceSignals, desirableZones } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
+
+  // Get sold/booked tickers to exclude from recommendations
+  const soldTickers = useMemo(() => {
+    const booked = loadBookedProfits().map(p => p.ticker);
+    return [...new Set(booked)];
+  }, []);
+
+  // ODGS-driven intelligence signals for the top bar
+  const odgsInvestSignals = useMemo(() => 
+    intelligenceSignals.filter(s => s.type === "invest" || s.type === "scale_up" || s.type === "pair").slice(0, 4),
+  [intelligenceSignals]);
+
+  const odgsAvoidSignals = useMemo(() =>
+    intelligenceSignals.filter(s => s.type === "avoid" || s.type === "hedge").slice(0, 3),
+  [intelligenceSignals]);
+
+  // Hot zone tickers from ODGS for AI prompt enrichment
+  const hotZoneAssets = useMemo(() => 
+    profitField.filter(a => a.isHotZone && !a.isBlacklisted).map(a => a.asset),
+  [profitField]);
+
+  const blacklistedAssets = useMemo(() =>
+    profitField.filter(a => a.isBlacklisted).map(a => a.asset),
+  [profitField]);
 
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
     if (!forceRefresh) {
