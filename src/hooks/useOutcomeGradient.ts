@@ -513,7 +513,7 @@ export function useOutcomeGradient() {
 
     // 3. HEDGE signals from weak/falling assets
     const volWeight = gradient.featureWeights.find(f => f.feature === "vol")?.weight || 1;
-    const weakAssets = profitField.filter(a => !a.isBlacklisted && (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
+    const weakAssets = profitField.filter(a => (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
     for (const asset of weakAssets) {
       const hedgePair = combinationScores.find(p => p.pair.includes(asset.asset) && p.synergyScore > 0);
       const hedgeTarget = hedgePair ? hedgePair.pair.split("+").find(x => x !== asset.asset) : null;
