@@ -406,13 +406,12 @@ const OutcomeGradientDashboard = () => {
                         {a.recentTrend === "stable" && <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-2 py-2 text-center">
-                        {a.isBlacklisted ? (
-                          <Badge variant="destructive" className="text-[8px] px-1.5 py-0">BLOCKED</Badge>
-                        ) : a.isHotZone ? (
+                        {a.isHotZone ? (
                           <Badge className="text-[8px] px-1.5 py-0 bg-gain/20 text-gain border-gain/30">HOT</Badge>
                         ) : (
                           <span className="text-muted-foreground text-[9px]">—</span>
                         )}
+                      </td>
                       </td>
                     </tr>
                   ))}

@@ -231,7 +231,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── PROFIT ERASED ─────────────────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         tracker.lastPnlPct > 0.3 &&
         pnlPct < 0
       ) {
