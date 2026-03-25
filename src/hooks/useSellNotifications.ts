@@ -131,6 +131,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       }
 
       const tracker = trackers.current[trackerId];
+      const graceOk = now - (tracker.createdAt || 0) > 60_000; // 60s grace period
       const cooldownOk = now - tracker.notifiedAt > NOTIFY_COOLDOWN;
 
       // Update max profit target if we have new analysis
