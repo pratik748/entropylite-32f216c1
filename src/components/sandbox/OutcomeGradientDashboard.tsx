@@ -127,20 +127,6 @@ const OutcomeGradientDashboard = () => {
             </div>
           )}
 
-          {/* Blacklisted Assets */}
-          {safetyStatus.blacklistedAssets.length > 0 && (
-            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Shield className="h-3.5 w-3.5 text-warning" />
-                <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Blacklisted (DD &gt; 15%)</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {safetyStatus.blacklistedAssets.map(a => (
-                  <Badge key={a} variant="outline" className="text-[9px] font-mono text-loss border-loss/30">{a}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ─── INTELLIGENCE SIGNALS ─── */}
           {intelligenceSignals.length > 0 && (
