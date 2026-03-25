@@ -145,6 +145,7 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
+    const indiaMode = body.indiaMode === true;
 
     // 1. Fetch real forex volatility + market context + headlines in parallel
     const [forexResults, marketContext, headlines] = await Promise.all([
