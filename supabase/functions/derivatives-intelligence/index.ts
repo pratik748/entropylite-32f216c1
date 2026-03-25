@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const { user } = await requireAuth(req, corsHeaders);
-    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context, sentiment_context } = await req.json();
+    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context, sentiment_context, indiaMode } = await req.json();
 
     if (!tickers?.length) {
       return new Response(JSON.stringify({ error: "No tickers provided" }), {
