@@ -49,6 +49,7 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
     const provider = rawBody.provider;
+    const indiaMode = rawBody.indiaMode === true;
     const requestedTicker = (rawBody.ticker || "").toString();
     const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = rawBody.buyPrice;
