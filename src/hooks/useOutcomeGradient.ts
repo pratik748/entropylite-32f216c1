@@ -303,7 +303,7 @@ export function useOutcomeGradient() {
     setRollbackTriggered(false);
 
     // Compute asset biases from profit field
-    const hotAssets = profitField.filter(a => a.isHotZone && !a.isBlacklisted);
+    const hotAssets = profitField.filter(a => a.isHotZone);
     const coldAssets = profitField.filter(a => !a.isHotZone && a.weightedProfitScore < 0);
 
     const newAssetBiases: Record<string, number> = { ...gradient.assetBiases };
