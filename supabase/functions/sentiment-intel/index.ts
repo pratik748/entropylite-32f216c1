@@ -279,10 +279,10 @@ serve(async (req) => {
     // Fetch ALL sources in parallel
     const [cnnFearGreed, gdeltTone, sourceBreakdown, redditSentiment, wikiAttention, macroSignals] = await Promise.all([
       fetchCNNFearGreed(),
-      fetchGDELTTone(ticker),
-      fetchSourceBreakdown(ticker),
-      fetchRedditSentiment(ticker),
-      fetchWikipediaAttention(ticker),
+      fetchGDELTTone(effectiveTicker),
+      fetchSourceBreakdown(effectiveTicker),
+      fetchRedditSentiment(effectiveTicker),
+      fetchWikipediaAttention(effectiveTicker),
       fetchMacroSignals(),
     ]);
 
