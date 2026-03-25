@@ -636,17 +636,18 @@ function dedupeCandidates(candidates: any[]): any[] {
   return out;
 }
 
-function buildDeterministicCandidates(previousTickers: string[]): any[] {
+function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
+  const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
   const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
-  return ELITE_FALLBACK_UNIVERSE
+  return universe
     .filter((c) => !blocked.has(c.ticker))
     .slice(0, 16)
     .map((c, i) => ({
       ticker: c.ticker,
       name: c.name,
-      assetClass: c.assetClass || "Equity",
-      exchange: "NASDAQ",
-      currency: "USD",
+      assetClass: (c as any).assetClass || "Equity",
+      exchange: indiaMode ? "NSE" : "NASDAQ",
+      currency: indiaMode ? "INR" : "USD",
       currentEstPrice: 0,
       entryZone: [0, 0],
       targetPrice: 0,
@@ -655,8 +656,12 @@ function buildDeterministicCandidates(previousTickers: string[]): any[] {
       suggestedQty: 1,
       confidence: 68,
       thesis: `${c.name} is a liquid institutional-grade name with strong trend persistence and robust balance sheet quality.`,
-      catalyst: "Upcoming earnings and continued institutional flow momentum.",
-      hedgingStrategy: "Use protective puts and hard stop-loss discipline.",
+      catalyst: indiaMode
+        ? "Domestic earnings momentum and FII/DII flow support over next quarter."
+        : "Upcoming earnings and continued institutional flow momentum.",
+      hedgingStrategy: indiaMode
+        ? "Use Nifty PUT options and strict stop-loss discipline."
+        : "Use protective puts and hard stop-loss discipline.",
       riskReward: "1:2.2",
       sector: c.sector,
       tags: ["liquid", "institutional", "momentum"],
