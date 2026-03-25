@@ -597,9 +597,8 @@ export function useOutcomeGradient() {
       timestamp: Date.now(),
       generation: 0,
     });
-    setBlacklist([]);
     setUpdateCounter(0);
-  }, [setEntries, setGradient, setBlacklist, setUpdateCounter]);
+  }, [setEntries, setGradient, setUpdateCounter]);
 
   return {
     // Data
