@@ -8,9 +8,10 @@ interface PeakTracker {
   notifiedAt: number;
   lastPnlPct: number;
   peakTimestamp: number;
-  maxProfitTarget: number | null;    // quant-computed max target
-  maxProfitAlerted: boolean;         // already alerted for max profit
-  maxProfitConfidence: number;       // confidence in target
+  createdAt: number;                  // grace period start
+  maxProfitTarget: number | null;
+  maxProfitAlerted: boolean;
+  maxProfitConfidence: number;
 }
 
 const STORAGE_KEY = "entropy_sell_trackers";
