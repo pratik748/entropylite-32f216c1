@@ -357,21 +357,6 @@ export function useOutcomeGradient() {
       newAllocScales[cold.asset] = clamp(current - alpha * 0.1, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
     }
 
-    // Check blacklist: zones with drawdown beyond limit
-    const newBlacklist: string[] = [...blacklist];
-    for (const asset of profitField) {
-      const recentTrades = entries.filter(e => e.asset === asset.asset).slice(0, 10);
-      const worstPnl = Math.min(...recentTrades.map(e => e.pnlPct), 0);
-      if (worstPnl < DRAWDOWN_LIMIT && !newBlacklist.includes(asset.asset)) {
-        newBlacklist.push(asset.asset);
-      }
-    }
-    // Auto-remove from blacklist after 30 days
-    setBlacklist(newBlacklist.filter(a => {
-      const lastTrade = entries.find(e => e.asset === a);
-      return lastTrade ? daysSince(lastTrade.timestamp) < 30 : false;
-    }));
-
     setGradient({
       assetBiases: newAssetBiases,
       featureWeights: newFeatureWeights,
