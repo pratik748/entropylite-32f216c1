@@ -412,7 +412,6 @@ const OutcomeGradientDashboard = () => {
                           <span className="text-muted-foreground text-[9px]">—</span>
                         )}
                       </td>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
