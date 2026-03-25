@@ -152,7 +152,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       const maxTarget = tracker.maxProfitTarget;
 
       // ── MAX PROFIT ALERTS ──────────────────────────────────
-      if (maxTarget && maxTarget > buyPrice && cooldownOk) {
+      if (maxTarget && maxTarget > buyPrice && cooldownOk && graceOk) {
         const progressToMax = (currentPrice - buyPrice) / (maxTarget - buyPrice);
         const maxProfitPct = ((maxTarget - buyPrice) / buyPrice) * 100;
 
