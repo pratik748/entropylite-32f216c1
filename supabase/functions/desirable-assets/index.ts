@@ -258,6 +258,7 @@ function deriveHedgePlan(params: {
   regimeType: string;
   sentimentScore: number;
   volatility: number;
+  indiaMode?: boolean;
 }): { hedgeInstrument: string; hedgeRatioPct: number; hedgeOverlay: string } {
   const strategy = (params.strategy || "equity").toLowerCase();
   const sector = (params.sector || "").toLowerCase();
@@ -267,6 +268,42 @@ function deriveHedgePlan(params: {
       hedgeInstrument: "SELF-HEDGE",
       hedgeRatioPct: 100,
       hedgeOverlay: "This position is a direct hedge sleeve. Keep size controlled and rebalance weekly.",
+    };
+  }
+
+  if (params.indiaMode) {
+    if (params.regimeType === "crisis" || params.sentimentScore <= -30 || params.volatility >= 45) {
+      return {
+        hedgeInstrument: "INDIAVIX.NS",
+        hedgeRatioPct: 14,
+        hedgeOverlay: "Event-volatility overlay: buy Nifty PUT options or India VIX futures during earnings/event shock windows (~14% notional).",
+      };
+    }
+    if (sector.includes("technology") || sector.includes("it")) {
+      return {
+        hedgeInstrument: "NIFTYBEES.NS",
+        hedgeRatioPct: 18,
+        hedgeOverlay: "Nifty beta hedge: buy Nifty PUT options to cushion tech-led drawdowns. Alternative: short Nifty IT index futures.",
+      };
+    }
+    if (sector.includes("financ") || sector.includes("bank")) {
+      return {
+        hedgeInstrument: "BANKBEES.NS",
+        hedgeRatioPct: 16,
+        hedgeOverlay: "Bank Nifty hedge: buy Bank Nifty PUT options at 95% strike to protect against banking sector drawdowns.",
+      };
+    }
+    if (sector.includes("energy") || sector.includes("oil")) {
+      return {
+        hedgeInstrument: "GOLDBEES.NS",
+        hedgeRatioPct: 15,
+        hedgeOverlay: "Commodity hedge: pair with Gold Bees ETF to offset energy/commodity-linked downside. Gold is a natural safe haven in INR terms.",
+      };
+    }
+    return {
+      hedgeInstrument: "NIFTYBEES.NS",
+      hedgeRatioPct: 12,
+      hedgeOverlay: "Broad-market hedge: buy Nifty PUT options or hold inverse Nifty position to reduce market beta if risk-off conditions accelerate.",
     };
   }
 
@@ -518,6 +555,30 @@ const ELITE_FALLBACK_UNIVERSE = [
   { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
 ];
 
+const INDIA_FALLBACK_UNIVERSE = [
+  { ticker: "RELIANCE.NS", name: "Reliance Industries", sector: "Energy", marketCap: "mega", strategy: "equity" },
+  { ticker: "TCS.NS", name: "Tata Consultancy Services", sector: "Technology", marketCap: "mega", strategy: "equity" },
+  { ticker: "HDFCBANK.NS", name: "HDFC Bank", sector: "Financials", marketCap: "mega", strategy: "equity" },
+  { ticker: "INFY.NS", name: "Infosys", sector: "Technology", marketCap: "mega", strategy: "momentum" },
+  { ticker: "ICICIBANK.NS", name: "ICICI Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", sector: "Communication", marketCap: "large", strategy: "momentum" },
+  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "SBIN.NS", name: "State Bank of India", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "LT.NS", name: "Larsen & Toubro", sector: "Industrials", marketCap: "large", strategy: "equity" },
+  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
+  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
+  { ticker: "BAJFINANCE.NS", name: "Bajaj Finance", sector: "Financials", marketCap: "large", strategy: "momentum" },
+  { ticker: "MARUTI.NS", name: "Maruti Suzuki", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "TATAMOTORS.NS", name: "Tata Motors", sector: "Consumer Discretionary", marketCap: "large", strategy: "momentum" },
+  { ticker: "AXISBANK.NS", name: "Axis Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "SUNPHARMA.NS", name: "Sun Pharma", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "TITAN.NS", name: "Titan Company", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
+  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
+];
+
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
   if (!ticker || ticker.length > 16) return null;
@@ -575,17 +636,18 @@ function dedupeCandidates(candidates: any[]): any[] {
   return out;
 }
 
-function buildDeterministicCandidates(previousTickers: string[]): any[] {
+function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
+  const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
   const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
-  return ELITE_FALLBACK_UNIVERSE
+  return universe
     .filter((c) => !blocked.has(c.ticker))
     .slice(0, 16)
     .map((c, i) => ({
       ticker: c.ticker,
       name: c.name,
-      assetClass: c.assetClass || "Equity",
-      exchange: "NASDAQ",
-      currency: "USD",
+      assetClass: (c as any).assetClass || "Equity",
+      exchange: indiaMode ? "NSE" : "NASDAQ",
+      currency: indiaMode ? "INR" : "USD",
       currentEstPrice: 0,
       entryZone: [0, 0],
       targetPrice: 0,
@@ -594,8 +656,12 @@ function buildDeterministicCandidates(previousTickers: string[]): any[] {
       suggestedQty: 1,
       confidence: 68,
       thesis: `${c.name} is a liquid institutional-grade name with strong trend persistence and robust balance sheet quality.`,
-      catalyst: "Upcoming earnings and continued institutional flow momentum.",
-      hedgingStrategy: "Use protective puts and hard stop-loss discipline.",
+      catalyst: indiaMode
+        ? "Domestic earnings momentum and FII/DII flow support over next quarter."
+        : "Upcoming earnings and continued institutional flow momentum.",
+      hedgingStrategy: indiaMode
+        ? "Use Nifty PUT options and strict stop-loss discipline."
+        : "Use protective puts and hard stop-loss discipline.",
       riskReward: "1:2.2",
       sector: c.sector,
       tags: ["liquid", "institutional", "momentum"],
@@ -636,9 +702,11 @@ serve(async (req) => {
       ? `Existing portfolio: ${portfolioTickers.map(t => `${t} (${portfolioSectors[t] || "unknown"}, weight: ${((portfolioWeights[t] || 0) * 100).toFixed(1)}%)`).join(", ")}. Sectors already held: ${existingSectors.join(", ") || "none"}.`
       : "Empty portfolio — recommend foundational positions.";
 
-    const homeMarketRule = isUSUser
-      ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
-      : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
+    const homeMarketRule = indiaMode
+      ? "ALL recommendations must be Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs (e.g. NIFTYBEES.NS, GOLDBEES.NS), or Indian F&O instruments. No foreign stocks whatsoever."
+      : isUSUser
+        ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
+        : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
     // Anti-repeat instruction
     const antiRepeatBlock = previousTickers.length > 0
@@ -763,7 +831,7 @@ Return via the tool call only.`,
     }
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers);
+    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
     candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
 
     if (candidates.length === 0) {
@@ -1255,6 +1323,7 @@ Return via the tool call only.`,
         regimeType: parsed.regimeType || "transition",
         sentimentScore: s.sentimentScore || 0,
         volatility: s.volatility || 25,
+        indiaMode,
       });
 
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
