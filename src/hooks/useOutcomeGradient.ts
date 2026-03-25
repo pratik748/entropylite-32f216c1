@@ -364,7 +364,7 @@ export function useOutcomeGradient() {
       timestamp: Date.now(),
       generation: gradient.generation + 1,
     });
-  }, [entries, profitField, gradient, blacklist, setGradient, setBlacklist]);
+  }, [entries, profitField, gradient, setGradient]);
 
   // ─── Auto-trigger on N trades ──────────────────────
 
