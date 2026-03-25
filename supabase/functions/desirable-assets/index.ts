@@ -555,6 +555,30 @@ const ELITE_FALLBACK_UNIVERSE = [
   { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
 ];
 
+const INDIA_FALLBACK_UNIVERSE = [
+  { ticker: "RELIANCE.NS", name: "Reliance Industries", sector: "Energy", marketCap: "mega", strategy: "equity" },
+  { ticker: "TCS.NS", name: "Tata Consultancy Services", sector: "Technology", marketCap: "mega", strategy: "equity" },
+  { ticker: "HDFCBANK.NS", name: "HDFC Bank", sector: "Financials", marketCap: "mega", strategy: "equity" },
+  { ticker: "INFY.NS", name: "Infosys", sector: "Technology", marketCap: "mega", strategy: "momentum" },
+  { ticker: "ICICIBANK.NS", name: "ICICI Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", sector: "Communication", marketCap: "large", strategy: "momentum" },
+  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "SBIN.NS", name: "State Bank of India", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "LT.NS", name: "Larsen & Toubro", sector: "Industrials", marketCap: "large", strategy: "equity" },
+  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
+  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
+  { ticker: "BAJFINANCE.NS", name: "Bajaj Finance", sector: "Financials", marketCap: "large", strategy: "momentum" },
+  { ticker: "MARUTI.NS", name: "Maruti Suzuki", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "TATAMOTORS.NS", name: "Tata Motors", sector: "Consumer Discretionary", marketCap: "large", strategy: "momentum" },
+  { ticker: "AXISBANK.NS", name: "Axis Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "SUNPHARMA.NS", name: "Sun Pharma", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "TITAN.NS", name: "Titan Company", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
+  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
+];
+
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
   if (!ticker || ticker.length > 16) return null;
