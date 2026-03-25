@@ -227,7 +227,7 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
     let jsonStr: string;
     try {
       const result = await callAI({
-        systemPrompt: `You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.`,
+        systemPrompt: `You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
         userPrompt: prompt,
         maxTokens: 8192,
         provider,
