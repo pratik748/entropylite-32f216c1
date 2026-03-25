@@ -831,7 +831,7 @@ Return via the tool call only.`,
     }
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers);
+    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
     candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
 
     if (candidates.length === 0) {
