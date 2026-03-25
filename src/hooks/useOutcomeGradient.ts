@@ -372,7 +372,7 @@ export function useOutcomeGradient() {
 
   // ─── Get Boost for Asset ───────────────────────────
 
-  const getAssetBoost = useCallback((ticker: string): { scoreMult: number; allocMult: number; isHot: boolean; isBlacklisted: boolean } => {
+  const getAssetBoost = useCallback((ticker: string): { scoreMult: number; allocMult: number; isHot: boolean } => {
     const bias = gradient.assetBiases[ticker] || 1.0;
     const allocScale = gradient.allocationScales[ticker] || 1.0;
     const field = profitField.find(a => a.asset === ticker);
@@ -380,9 +380,8 @@ export function useOutcomeGradient() {
       scoreMult: clamp(bias, 0.7, 1.5),
       allocMult: clamp(allocScale, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE),
       isHot: field?.isHotZone ?? false,
-      isBlacklisted: blacklist.includes(ticker),
     };
-  }, [gradient, profitField, blacklist]);
+  }, [gradient, profitField]);
 
   // ─── Safety Status ─────────────────────────────────
 
