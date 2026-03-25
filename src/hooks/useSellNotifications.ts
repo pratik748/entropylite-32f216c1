@@ -214,7 +214,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── RISK CRITICAL ─────────────────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         analysis.riskScore &&
         analysis.riskScore >= 75 &&
         pnlPct < 0
