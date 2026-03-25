@@ -47,6 +47,17 @@ const Header = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          {/* India Mode Toggle */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px]">🇮🇳</span>
+            <Switch
+              checked={indiaMode}
+              onCheckedChange={setIndiaMode}
+              className="h-4 w-8 data-[state=checked]:bg-primary"
+            />
+            <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">India</span>
+          </div>
+
           {/* Base Currency Selector */}
           <div className="flex items-center gap-1">
             <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">BASE</span>
