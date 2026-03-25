@@ -270,13 +270,14 @@ serve(async (req) => {
       Europe: "Europe OR ECB OR FTSE OR DAX OR eurozone OR EU economy",
       Asia: "Asia OR Nikkei OR Hang Seng OR China OR Japan OR Korea",
     };
-    const regionContext = region && region !== "All" ? regionKeywords[region] || "" : "";
+    const effectiveRegion = indiaMode ? "India" : region;
+    const regionContext = effectiveRegion && effectiveRegion !== "All" ? (regionKeywords[effectiveRegion] || "") : "";
 
     let query: string;
     if (cleanTicker) {
-      query = regionContext ? `${cleanTicker} stock ${regionContext}` : `${cleanTicker} stock market`;
+      query = regionContext ? `${cleanTicker} stock ${regionContext}` : indiaMode ? `${cleanTicker} stock India NSE BSE` : `${cleanTicker} stock market`;
     } else {
-      query = regionContext || "stock market OR earnings OR inflation";
+      query = indiaMode ? "India NSE BSE Nifty Sensex RBI SEBI stock market economy" : (regionContext || "stock market OR earnings OR inflation");
     }
 
     console.log("Multi-source news fetch for:", query);

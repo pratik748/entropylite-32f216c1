@@ -622,6 +622,7 @@ serve(async (req) => {
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
+    const indiaMode = body.indiaMode === true;
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];

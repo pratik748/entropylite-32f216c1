@@ -170,7 +170,7 @@ serve(async (req) => {
 
       const result = await callAI({
         provider,
-        systemPrompt: "You are a real-time geopolitical intelligence analyst. Return ONLY a single valid JSON object — no markdown, no commentary, no code fences.",
+        systemPrompt: `You are a real-time geopolitical intelligence analyst. Return ONLY a single valid JSON object — no markdown, no commentary, no code fences.${indiaMode ? " Focus on geopolitical events that directly impact India and Indian markets (NSE/BSE). Prioritize India-Pakistan, India-China, RBI/SEBI policy, Indian Ocean shipping, and South Asian conflicts." : ""}`,
         userPrompt: `TIMESTAMP: ${timeStr}
 LIVE MARKET: ${marketContext}
 FX STRESS: ${stressedCurrencies || "None >2%"}
