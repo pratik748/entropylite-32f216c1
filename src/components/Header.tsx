@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
-  const { baseCurrency, setBaseCurrency } = useFX();
+  const { baseCurrency, setBaseCurrency, indiaMode, setIndiaMode } = useFX();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
