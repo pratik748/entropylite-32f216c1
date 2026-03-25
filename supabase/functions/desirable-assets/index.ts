@@ -258,6 +258,7 @@ function deriveHedgePlan(params: {
   regimeType: string;
   sentimentScore: number;
   volatility: number;
+  indiaMode?: boolean;
 }): { hedgeInstrument: string; hedgeRatioPct: number; hedgeOverlay: string } {
   const strategy = (params.strategy || "equity").toLowerCase();
   const sector = (params.sector || "").toLowerCase();
@@ -267,6 +268,42 @@ function deriveHedgePlan(params: {
       hedgeInstrument: "SELF-HEDGE",
       hedgeRatioPct: 100,
       hedgeOverlay: "This position is a direct hedge sleeve. Keep size controlled and rebalance weekly.",
+    };
+  }
+
+  if (params.indiaMode) {
+    if (params.regimeType === "crisis" || params.sentimentScore <= -30 || params.volatility >= 45) {
+      return {
+        hedgeInstrument: "INDIAVIX.NS",
+        hedgeRatioPct: 14,
+        hedgeOverlay: "Event-volatility overlay: buy Nifty PUT options or India VIX futures during earnings/event shock windows (~14% notional).",
+      };
+    }
+    if (sector.includes("technology") || sector.includes("it")) {
+      return {
+        hedgeInstrument: "NIFTYBEES.NS",
+        hedgeRatioPct: 18,
+        hedgeOverlay: "Nifty beta hedge: buy Nifty PUT options to cushion tech-led drawdowns. Alternative: short Nifty IT index futures.",
+      };
+    }
+    if (sector.includes("financ") || sector.includes("bank")) {
+      return {
+        hedgeInstrument: "BANKBEES.NS",
+        hedgeRatioPct: 16,
+        hedgeOverlay: "Bank Nifty hedge: buy Bank Nifty PUT options at 95% strike to protect against banking sector drawdowns.",
+      };
+    }
+    if (sector.includes("energy") || sector.includes("oil")) {
+      return {
+        hedgeInstrument: "GOLDBEES.NS",
+        hedgeRatioPct: 15,
+        hedgeOverlay: "Commodity hedge: pair with Gold Bees ETF to offset energy/commodity-linked downside. Gold is a natural safe haven in INR terms.",
+      };
+    }
+    return {
+      hedgeInstrument: "NIFTYBEES.NS",
+      hedgeRatioPct: 12,
+      hedgeOverlay: "Broad-market hedge: buy Nifty PUT options or hold inverse Nifty position to reduce market beta if risk-off conditions accelerate.",
     };
   }
 
