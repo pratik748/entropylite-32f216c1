@@ -131,7 +131,6 @@ export function useOutcomeGradient() {
     timestamp: Date.now(),
     generation: 0,
   });
-  const [blacklist, setBlacklist] = useLocalStorage<string[]>("odgs-blacklist", []);
   const [rollbackTriggered, setRollbackTriggered] = useState(false);
   const [updateCounter, setUpdateCounter] = useLocalStorage<number>("odgs-update-counter", 0);
 
