@@ -121,6 +121,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           notifiedAt: 0,
           lastPnlPct: pnlPct,
           peakTimestamp: now,
+          createdAt: now,
           maxProfitTarget: mpt?.maxTarget || null,
           maxProfitAlerted: false,
           maxProfitConfidence: mpt?.confidence || 0,
