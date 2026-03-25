@@ -83,7 +83,6 @@ export interface SafetyStatus {
   maxAllocCap: number;       // 25%
   learningRate: number;      // current α
   decayFactor: number;       // 0.97
-  blacklistedAssets: string[];
   rollbackTriggered: boolean;
   diversificationCount: number; // distinct assets in hot zones
   rollingPnl5: number;       // 5-trade rolling PnL
