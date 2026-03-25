@@ -459,7 +459,7 @@ export function useOutcomeGradient() {
     if (entries.length === 0) return [];
     const signals: IntelligenceSignal[] = [];
 
-    const topAssets = profitField.filter(a => !a.isBlacklisted).slice(0, 5);
+    const topAssets = profitField.slice(0, 5);
     const lastTrade = entries[0];
 
     // 0. Immediate signal from latest crossed trade (works from first trade)
