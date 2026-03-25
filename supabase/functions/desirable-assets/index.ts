@@ -1323,6 +1323,7 @@ Return via the tool call only.`,
         regimeType: parsed.regimeType || "transition",
         sentimentScore: s.sentimentScore || 0,
         volatility: s.volatility || 25,
+        indiaMode,
       });
 
       if (!hedgingStrategy || hedgingStrategy.toLowerCase().includes("no hedge") || hedgingStrategy.toLowerCase() === "none" || hedgingStrategy.toLowerCase() === "n/a" || hedgingStrategy.trim().length < 10) {
