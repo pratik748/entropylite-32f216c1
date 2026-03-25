@@ -41,9 +41,7 @@ const OutcomeGradientDashboard = () => {
       asset: a.asset,
       score: parseFloat(a.weightedProfitScore.toFixed(2)),
       winRate: parseFloat(a.winRate.toFixed(0)),
-      fill: a.isBlacklisted
-        ? "hsl(var(--muted-foreground))"
-        : a.isHotZone
+      fill: a.isHotZone
           ? "hsl(var(--gain))"
           : a.weightedProfitScore > 0
             ? "hsl(var(--primary))"
