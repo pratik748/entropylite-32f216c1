@@ -396,12 +396,11 @@ export function useOutcomeGradient() {
       maxAllocCap: MAX_ALLOC_PER_ASSET * 100,
       learningRate: alpha,
       decayFactor: DAILY_DECAY,
-      blacklistedAssets: blacklist,
       rollbackTriggered,
       diversificationCount: hotCount,
       rollingPnl5: rolling5,
     };
-  }, [entries, profitField, blacklist, rollbackTriggered]);
+  }, [entries, profitField, rollbackTriggered]);
 
   // ─── Shadow Evolution ──────────────────────────────
 
