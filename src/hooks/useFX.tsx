@@ -10,6 +10,8 @@ interface FXContextType {
   rates: Record<string, number>;
   baseCurrency: string;
   setBaseCurrency: (c: string) => void;
+  indiaMode: boolean;
+  setIndiaMode: (v: boolean) => void;
   convert: (amount: number, fromCurrency: string, toCurrency?: string) => number;
   convertToBase: (amount: number, fromCurrency: string) => number;
   getRate: (from: string, to: string) => number;
@@ -38,6 +40,7 @@ export const getCurrencyLabel = (c: string) => CURRENCY_LABELS[c] || c;
 export function FXProvider({ children }: { children: React.ReactNode }) {
   const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
   const [baseCurrency, setBaseCurrency] = useState(() => localStorage.getItem("entropy-base-ccy") || "USD");
+  const [indiaMode, setIndiaModeState] = useState(() => localStorage.getItem("entropy-india-mode") === "true");
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
 
@@ -67,6 +70,16 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("entropy-base-ccy", baseCurrency);
   }, [baseCurrency]);
+
+  const setIndiaMode = useCallback((v: boolean) => {
+    setIndiaModeState(v);
+    localStorage.setItem("entropy-india-mode", String(v));
+    if (v) setBaseCurrency("INR");
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("entropy-india-mode", String(indiaMode));
+  }, [indiaMode]);
 
   const getRate = useCallback((from: string, to: string): number => {
     if (from === to) return 1;
@@ -102,6 +115,7 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
   return (
     <FXContext.Provider value={{
       rates, baseCurrency, setBaseCurrency,
+      indiaMode, setIndiaMode,
       convert, convertToBase, getRate, fxImpact, stressTest,
       isLoading, lastUpdate,
     }}>

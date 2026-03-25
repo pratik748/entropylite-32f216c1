@@ -8,9 +8,10 @@ interface PeakTracker {
   notifiedAt: number;
   lastPnlPct: number;
   peakTimestamp: number;
-  maxProfitTarget: number | null;    // quant-computed max target
-  maxProfitAlerted: boolean;         // already alerted for max profit
-  maxProfitConfidence: number;       // confidence in target
+  createdAt: number;                  // grace period start
+  maxProfitTarget: number | null;
+  maxProfitAlerted: boolean;
+  maxProfitConfidence: number;
 }
 
 const STORAGE_KEY = "entropy_sell_trackers";
@@ -120,6 +121,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           notifiedAt: 0,
           lastPnlPct: pnlPct,
           peakTimestamp: now,
+          createdAt: now,
           maxProfitTarget: mpt?.maxTarget || null,
           maxProfitAlerted: false,
           maxProfitConfidence: mpt?.confidence || 0,
@@ -129,6 +131,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       }
 
       const tracker = trackers.current[trackerId];
+      const graceOk = now - (tracker.createdAt || 0) > 60_000; // 60s grace period
       const cooldownOk = now - tracker.notifiedAt > NOTIFY_COOLDOWN;
 
       // Update max profit target if we have new analysis
@@ -149,7 +152,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
       const maxTarget = tracker.maxProfitTarget;
 
       // ── MAX PROFIT ALERTS ──────────────────────────────────
-      if (maxTarget && maxTarget > buyPrice && cooldownOk) {
+      if (maxTarget && maxTarget > buyPrice && cooldownOk && graceOk) {
         const progressToMax = (currentPrice - buyPrice) / (maxTarget - buyPrice);
         const maxProfitPct = ((maxTarget - buyPrice) / buyPrice) * 100;
 
@@ -195,7 +198,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── INTELLIGENCE SELL SIGNAL ───────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         analysis.suggestion &&
         (analysis.suggestion.toLowerCase().includes("sell") || analysis.suggestion.toLowerCase().includes("exit"))
       ) {
@@ -211,7 +214,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── RISK CRITICAL ─────────────────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         analysis.riskScore &&
         analysis.riskScore >= 75 &&
         pnlPct < 0
@@ -228,7 +231,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── PROFIT ERASED ─────────────────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         tracker.lastPnlPct > 0.3 &&
         pnlPct < 0
       ) {

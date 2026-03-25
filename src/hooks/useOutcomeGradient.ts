@@ -27,7 +27,6 @@ export interface AssetScore {
   avgPnlPct: number;
   recentTrend: "rising" | "falling" | "stable";
   isHotZone: boolean;
-  isBlacklisted: boolean;
 }
 
 export interface PairScore {
@@ -84,7 +83,6 @@ export interface SafetyStatus {
   maxAllocCap: number;       // 25%
   learningRate: number;      // current α
   decayFactor: number;       // 0.97
-  blacklistedAssets: string[];
   rollbackTriggered: boolean;
   diversificationCount: number; // distinct assets in hot zones
   rollingPnl5: number;       // 5-trade rolling PnL
@@ -133,7 +131,6 @@ export function useOutcomeGradient() {
     timestamp: Date.now(),
     generation: 0,
   });
-  const [blacklist, setBlacklist] = useLocalStorage<string[]>("odgs-blacklist", []);
   const [rollbackTriggered, setRollbackTriggered] = useState(false);
   const [updateCounter, setUpdateCounter] = useLocalStorage<number>("odgs-update-counter", 0);
 
@@ -188,10 +185,9 @@ export function useOutcomeGradient() {
         avgPnlPct: data.count > 0 ? data.scores.reduce((s, v) => s + v, 0) / data.count : 0,
         recentTrend: trend,
         isHotZone: wps > 0 && wr > 50 && data.count >= 3,
-        isBlacklisted: blacklist.includes(asset),
       };
     }).sort((a, b) => b.weightedProfitScore - a.weightedProfitScore);
-  }, [entries, blacklist]);
+  }, [entries]);
 
   // ─── Detect Desirable Zones ────────────────────────
 
@@ -307,7 +303,7 @@ export function useOutcomeGradient() {
     setRollbackTriggered(false);
 
     // Compute asset biases from profit field
-    const hotAssets = profitField.filter(a => a.isHotZone && !a.isBlacklisted);
+    const hotAssets = profitField.filter(a => a.isHotZone);
     const coldAssets = profitField.filter(a => !a.isHotZone && a.weightedProfitScore < 0);
 
     const newAssetBiases: Record<string, number> = { ...gradient.assetBiases };
@@ -361,21 +357,6 @@ export function useOutcomeGradient() {
       newAllocScales[cold.asset] = clamp(current - alpha * 0.1, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
     }
 
-    // Check blacklist: zones with drawdown beyond limit
-    const newBlacklist: string[] = [...blacklist];
-    for (const asset of profitField) {
-      const recentTrades = entries.filter(e => e.asset === asset.asset).slice(0, 10);
-      const worstPnl = Math.min(...recentTrades.map(e => e.pnlPct), 0);
-      if (worstPnl < DRAWDOWN_LIMIT && !newBlacklist.includes(asset.asset)) {
-        newBlacklist.push(asset.asset);
-      }
-    }
-    // Auto-remove from blacklist after 30 days
-    setBlacklist(newBlacklist.filter(a => {
-      const lastTrade = entries.find(e => e.asset === a);
-      return lastTrade ? daysSince(lastTrade.timestamp) < 30 : false;
-    }));
-
     setGradient({
       assetBiases: newAssetBiases,
       featureWeights: newFeatureWeights,
@@ -383,7 +364,7 @@ export function useOutcomeGradient() {
       timestamp: Date.now(),
       generation: gradient.generation + 1,
     });
-  }, [entries, profitField, gradient, blacklist, setGradient, setBlacklist]);
+  }, [entries, profitField, gradient, setGradient]);
 
   // ─── Auto-trigger on N trades ──────────────────────
 
@@ -391,7 +372,7 @@ export function useOutcomeGradient() {
 
   // ─── Get Boost for Asset ───────────────────────────
 
-  const getAssetBoost = useCallback((ticker: string): { scoreMult: number; allocMult: number; isHot: boolean; isBlacklisted: boolean } => {
+  const getAssetBoost = useCallback((ticker: string): { scoreMult: number; allocMult: number; isHot: boolean } => {
     const bias = gradient.assetBiases[ticker] || 1.0;
     const allocScale = gradient.allocationScales[ticker] || 1.0;
     const field = profitField.find(a => a.asset === ticker);
@@ -399,9 +380,8 @@ export function useOutcomeGradient() {
       scoreMult: clamp(bias, 0.7, 1.5),
       allocMult: clamp(allocScale, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE),
       isHot: field?.isHotZone ?? false,
-      isBlacklisted: blacklist.includes(ticker),
     };
-  }, [gradient, profitField, blacklist]);
+  }, [gradient, profitField]);
 
   // ─── Safety Status ─────────────────────────────────
 
@@ -416,12 +396,11 @@ export function useOutcomeGradient() {
       maxAllocCap: MAX_ALLOC_PER_ASSET * 100,
       learningRate: alpha,
       decayFactor: DAILY_DECAY,
-      blacklistedAssets: blacklist,
       rollbackTriggered,
       diversificationCount: hotCount,
       rollingPnl5: rolling5,
     };
-  }, [entries, profitField, blacklist, rollbackTriggered]);
+  }, [entries, profitField, rollbackTriggered]);
 
   // ─── Shadow Evolution ──────────────────────────────
 
@@ -480,7 +459,7 @@ export function useOutcomeGradient() {
     if (entries.length === 0) return [];
     const signals: IntelligenceSignal[] = [];
 
-    const topAssets = profitField.filter(a => !a.isBlacklisted).slice(0, 5);
+    const topAssets = profitField.slice(0, 5);
     const lastTrade = entries[0];
 
     // 0. Immediate signal from latest crossed trade (works from first trade)
@@ -534,7 +513,7 @@ export function useOutcomeGradient() {
 
     // 3. HEDGE signals from weak/falling assets
     const volWeight = gradient.featureWeights.find(f => f.feature === "vol")?.weight || 1;
-    const weakAssets = profitField.filter(a => !a.isBlacklisted && (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
+    const weakAssets = profitField.filter(a => (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
     for (const asset of weakAssets) {
       const hedgePair = combinationScores.find(p => p.pair.includes(asset.asset) && p.synergyScore > 0);
       const hedgeTarget = hedgePair ? hedgePair.pair.split("+").find(x => x !== asset.asset) : null;
@@ -553,14 +532,13 @@ export function useOutcomeGradient() {
     }
 
     // 4. AVOID signals
-    for (const asset of profitField.filter(a => a.isBlacklisted || (a.winRate < 35 && a.tradeCount >= 2)).slice(0, 3)) {
+    for (const asset of profitField.filter(a => a.winRate < 35 && a.tradeCount >= 2).slice(0, 3)) {
       signals.push({
         id: `avoid-${asset.asset}`,
         type: "avoid",
-        urgency: asset.isBlacklisted ? "high" : "medium",
-        title: `Avoid ${asset.asset}${asset.isBlacklisted ? " (risk blocked)" : ""}`,
-        reasoning: `${asset.asset} underperforms with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL.` +
-          (asset.isBlacklisted ? " Drawdown guard triggered." : " ODGS is reducing selection probability."),
+        urgency: "medium",
+        title: `Caution: ${asset.asset} underperforming`,
+        reasoning: `${asset.asset} shows weak edge with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL. ODGS is reducing selection probability — but monitoring for recovery.`,
         assets: [asset.asset],
         confidence: Math.min(90, Math.round(65 + Math.max(0, 50 - asset.winRate) * 0.6)),
       });
@@ -619,9 +597,8 @@ export function useOutcomeGradient() {
       timestamp: Date.now(),
       generation: 0,
     });
-    setBlacklist([]);
     setUpdateCounter(0);
-  }, [setEntries, setGradient, setBlacklist, setUpdateCounter]);
+  }, [setEntries, setGradient, setUpdateCounter]);
 
   return {
     // Data

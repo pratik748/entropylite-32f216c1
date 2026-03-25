@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
-    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider } = await req.json();
+    const { regime, vix, moodScore, sectors, portfolio, keyEvents, outlook, provider, indiaMode } = await req.json();
 
     const sectorSummary = (sectors || [])
       .slice(0, 10)
@@ -26,6 +26,8 @@ serve(async (req) => {
     ).join("\n");
 
     const totalValue = (portfolio || []).reduce((s: number, p: any) => s + p.currentPrice * p.quantity, 0);
+
+    const indiaBlock = indiaMode ? "\n11. INDIA-ONLY MODE: Only recommend Indian equities (NSE/BSE), F&O instruments, Indian ETFs/bonds. Use INR denomination. Consider SEBI/RBI rules, Indian tax structure, Indian market hours. No foreign-centric recommendations." : "";
 
     const systemPrompt = `You are an elite portfolio strategist managing a live portfolio. You produce EXACT, EXECUTABLE trade instructions — not generic advice.
 
@@ -39,7 +41,7 @@ CRITICAL RULES:
 7. Explain the EXACT market condition driving each recommendation
 8. If portfolio is empty, recommend 4-6 specific new positions to build a balanced portfolio
 9. All prices must be realistic based on current market data provided
-10. Generate 4-6 trade instructions covering: position management, hedging, new opportunities`;
+10. Generate 4-6 trade instructions covering: position management, hedging, new opportunities${indiaBlock}`;
 
     const userPrompt = `LIVE MARKET STATE:
 Regime: ${regime}

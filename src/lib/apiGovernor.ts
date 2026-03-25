@@ -197,11 +197,12 @@ export async function governedInvoke<T = any>(
   // 4. Execute request — inject AI provider for AI-tier calls
   const promise = (async () => {
     let body = opts.body;
-    // Inject provider for all calls — non-AI functions ignore it harmlessly
+    // Inject provider and indiaMode for all calls
     {
       try {
         const provider = localStorage.getItem("entropy-ai-provider") || "mistral";
-        body = { ...body, provider };
+        const indiaMode = localStorage.getItem("entropy-india-mode") === "true";
+        body = { ...body, provider, ...(indiaMode ? { indiaMode: true } : {}) };
       } catch {}
     }
     const { data, error } = await supabase.functions.invoke(functionName, {

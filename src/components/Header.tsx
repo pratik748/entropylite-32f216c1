@@ -3,10 +3,11 @@ import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
-  const { baseCurrency, setBaseCurrency } = useFX();
+  const { baseCurrency, setBaseCurrency, indiaMode, setIndiaMode } = useFX();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -46,6 +47,17 @@ const Header = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          {/* India Mode Toggle */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px]">🇮🇳</span>
+            <Switch
+              checked={indiaMode}
+              onCheckedChange={setIndiaMode}
+              className="h-4 w-8 data-[state=checked]:bg-primary"
+            />
+            <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">India</span>
+          </div>
+
           {/* Base Currency Selector */}
           <div className="flex items-center gap-1">
             <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">BASE</span>

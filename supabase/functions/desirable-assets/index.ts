@@ -622,6 +622,7 @@ serve(async (req) => {
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
+    const indiaMode = body.indiaMode === true;
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
 
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
@@ -726,7 +727,7 @@ Reject low-quality names, random microcaps, and weak momentum setups.
 Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
 Prefer large/mid-cap leaders, strong earnings trends, and positive sentiment dislocations with recovery setups.
 Use exact tickers supported by Yahoo Finance.
-Do not output markdown.`,
+Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}

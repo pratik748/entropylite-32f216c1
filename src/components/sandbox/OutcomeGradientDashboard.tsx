@@ -41,9 +41,7 @@ const OutcomeGradientDashboard = () => {
       asset: a.asset,
       score: parseFloat(a.weightedProfitScore.toFixed(2)),
       winRate: parseFloat(a.winRate.toFixed(0)),
-      fill: a.isBlacklisted
-        ? "hsl(var(--muted-foreground))"
-        : a.isHotZone
+      fill: a.isHotZone
           ? "hsl(var(--gain))"
           : a.weightedProfitScore > 0
             ? "hsl(var(--primary))"
@@ -129,20 +127,6 @@ const OutcomeGradientDashboard = () => {
             </div>
           )}
 
-          {/* Blacklisted Assets */}
-          {safetyStatus.blacklistedAssets.length > 0 && (
-            <div className="rounded-lg border border-border/50 bg-muted/10 p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Shield className="h-3.5 w-3.5 text-warning" />
-                <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Blacklisted (DD &gt; 15%)</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {safetyStatus.blacklistedAssets.map(a => (
-                  <Badge key={a} variant="outline" className="text-[9px] font-mono text-loss border-loss/30">{a}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ─── INTELLIGENCE SIGNALS ─── */}
           {intelligenceSignals.length > 0 && (
@@ -422,9 +406,7 @@ const OutcomeGradientDashboard = () => {
                         {a.recentTrend === "stable" && <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-2 py-2 text-center">
-                        {a.isBlacklisted ? (
-                          <Badge variant="destructive" className="text-[8px] px-1.5 py-0">BLOCKED</Badge>
-                        ) : a.isHotZone ? (
+                        {a.isHotZone ? (
                           <Badge className="text-[8px] px-1.5 py-0 bg-gain/20 text-gain border-gain/30">HOT</Badge>
                         ) : (
                           <span className="text-muted-foreground text-[9px]">—</span>

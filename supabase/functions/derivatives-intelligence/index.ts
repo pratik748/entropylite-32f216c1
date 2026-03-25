@@ -14,7 +14,7 @@ serve(async (req) => {
 
   try {
     const { user } = await requireAuth(req, corsHeaders);
-    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context, sentiment_context } = await req.json();
+    const { tickers, weights, prices, volatilities, sectors, baseCurrency, provider, discovery_mode, news_context, macro_context, sentiment_context, indiaMode } = await req.json();
 
     if (!tickers?.length) {
       return new Response(JSON.stringify({ error: "No tickers provided" }), {
@@ -94,7 +94,8 @@ MANDATORY DIVERSITY: You MUST include at least:
     const discoveryMinimum = discovery_mode ? `
 - ${discoveryCount} discovery opportunities BEYOND portfolio tickers (MANDATORY MIX: at least 2 each of futures_etf_leverage, sector_pair, macro_hedge, relative_value, cross_asset). These must involve at least one asset NOT in the portfolio. Be specific about instruments (futures contracts, ETF tickers, etc). Each discovery MUST reference the current market sentiment and news context in its reasoning.` : "";
 
-    const systemPrompt = `You are a GOD'S EYE derivatives intelligence engine for institutional portfolio management. You see the ENTIRE market, not just what's in the portfolio. Return ONLY valid JSON. No commentary, no markdown.
+    const indiaBlock = indiaMode ? "\n- INDIA-ONLY MODE: Only use Indian equities (NSE/BSE), Nifty/Bank Nifty F&O, Indian commodity futures (MCX), and INR-denominated instruments. No foreign instruments." : "";
+    const systemPrompt = `You are a GOD'S EYE derivatives intelligence engine for institutional portfolio management. You see the ENTIRE market, not just what's in the portfolio. Return ONLY valid JSON. No commentary, no markdown.${indiaBlock}
 
 CRITICAL RULES:
 - All numeric values must be plain numbers (no +, ~, ≈, "approximately")

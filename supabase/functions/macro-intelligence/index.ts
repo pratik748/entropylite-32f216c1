@@ -154,8 +154,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const body = await req.json().catch(() => ({}));
+    const indiaMode = body.indiaMode === true;
     const [fredData, wbData] = await Promise.all([fetchFRED(), fetchWorldBank()]);
-    const allIndicators = [...fredData, ...wbData];
+    let allIndicators = [...fredData, ...wbData];
+    
+    // In India mode, add India-specific context labels
+    if (indiaMode) {
+      allIndicators = allIndicators.map(i => ({
+        ...i,
+        name: `${i.name} (Impact on India)`,
+      }));
+    }
     const regime = classifyRegime(allIndicators);
 
     return new Response(JSON.stringify({

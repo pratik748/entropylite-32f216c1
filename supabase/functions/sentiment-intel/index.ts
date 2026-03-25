@@ -273,15 +273,16 @@ serve(async (req) => {
 
   try {
     await requireAuth(req, corsHeaders);
-    const { ticker } = await req.json().catch(() => ({}));
+    const { ticker, indiaMode } = await req.json().catch(() => ({} as any));
+    const effectiveTicker = indiaMode && ticker ? `${ticker} India NSE` : ticker;
 
     // Fetch ALL sources in parallel
     const [cnnFearGreed, gdeltTone, sourceBreakdown, redditSentiment, wikiAttention, macroSignals] = await Promise.all([
       fetchCNNFearGreed(),
-      fetchGDELTTone(ticker),
-      fetchSourceBreakdown(ticker),
-      fetchRedditSentiment(ticker),
-      fetchWikipediaAttention(ticker),
+      fetchGDELTTone(effectiveTicker),
+      fetchSourceBreakdown(effectiveTicker),
+      fetchRedditSentiment(effectiveTicker),
+      fetchWikipediaAttention(effectiveTicker),
       fetchMacroSignals(),
     ]);
 
