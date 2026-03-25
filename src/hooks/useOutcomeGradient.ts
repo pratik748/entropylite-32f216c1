@@ -27,7 +27,6 @@ export interface AssetScore {
   avgPnlPct: number;
   recentTrend: "rising" | "falling" | "stable";
   isHotZone: boolean;
-  isBlacklisted: boolean;
 }
 
 export interface PairScore {
