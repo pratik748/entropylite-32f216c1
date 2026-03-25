@@ -532,14 +532,13 @@ export function useOutcomeGradient() {
     }
 
     // 4. AVOID signals
-    for (const asset of profitField.filter(a => a.isBlacklisted || (a.winRate < 35 && a.tradeCount >= 2)).slice(0, 3)) {
+    for (const asset of profitField.filter(a => a.winRate < 35 && a.tradeCount >= 2).slice(0, 3)) {
       signals.push({
         id: `avoid-${asset.asset}`,
         type: "avoid",
-        urgency: asset.isBlacklisted ? "high" : "medium",
-        title: `Avoid ${asset.asset}${asset.isBlacklisted ? " (risk blocked)" : ""}`,
-        reasoning: `${asset.asset} underperforms with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL.` +
-          (asset.isBlacklisted ? " Drawdown guard triggered." : " ODGS is reducing selection probability."),
+        urgency: "medium",
+        title: `Caution: ${asset.asset} underperforming`,
+        reasoning: `${asset.asset} shows weak edge with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL. ODGS is reducing selection probability — but monitoring for recovery.`,
         assets: [asset.asset],
         confidence: Math.min(90, Math.round(65 + Math.max(0, 50 - asset.winRate) * 0.6)),
       });
