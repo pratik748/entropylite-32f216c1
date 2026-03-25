@@ -702,9 +702,11 @@ serve(async (req) => {
       ? `Existing portfolio: ${portfolioTickers.map(t => `${t} (${portfolioSectors[t] || "unknown"}, weight: ${((portfolioWeights[t] || 0) * 100).toFixed(1)}%)`).join(", ")}. Sectors already held: ${existingSectors.join(", ") || "none"}.`
       : "Empty portfolio — recommend foundational positions.";
 
-    const homeMarketRule = isUSUser
-      ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
-      : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
+    const homeMarketRule = indiaMode
+      ? "ALL recommendations must be Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs (e.g. NIFTYBEES.NS, GOLDBEES.NS), or Indian F&O instruments. No foreign stocks whatsoever."
+      : isUSUser
+        ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
+        : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
     // Anti-repeat instruction
     const antiRepeatBlock = previousTickers.length > 0
