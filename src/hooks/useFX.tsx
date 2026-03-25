@@ -40,6 +40,7 @@ export const getCurrencyLabel = (c: string) => CURRENCY_LABELS[c] || c;
 export function FXProvider({ children }: { children: React.ReactNode }) {
   const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
   const [baseCurrency, setBaseCurrency] = useState(() => localStorage.getItem("entropy-base-ccy") || "USD");
+  const [indiaMode, setIndiaModeState] = useState(() => localStorage.getItem("entropy-india-mode") === "true");
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
 
