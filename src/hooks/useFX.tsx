@@ -71,6 +71,16 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("entropy-base-ccy", baseCurrency);
   }, [baseCurrency]);
 
+  const setIndiaMode = useCallback((v: boolean) => {
+    setIndiaModeState(v);
+    localStorage.setItem("entropy-india-mode", String(v));
+    if (v) setBaseCurrency("INR");
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("entropy-india-mode", String(indiaMode));
+  }, [indiaMode]);
+
   const getRate = useCallback((from: string, to: string): number => {
     if (from === to) return 1;
     const fromUsd = rates[from] || 1;
