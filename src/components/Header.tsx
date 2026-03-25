@@ -3,6 +3,7 @@ import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const Header = () => {
   const [time, setTime] = useState(new Date());
