@@ -10,6 +10,8 @@ interface FXContextType {
   rates: Record<string, number>;
   baseCurrency: string;
   setBaseCurrency: (c: string) => void;
+  indiaMode: boolean;
+  setIndiaMode: (v: boolean) => void;
   convert: (amount: number, fromCurrency: string, toCurrency?: string) => number;
   convertToBase: (amount: number, fromCurrency: string) => number;
   getRate: (from: string, to: string) => number;
