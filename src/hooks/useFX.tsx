@@ -115,6 +115,7 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
   return (
     <FXContext.Provider value={{
       rates, baseCurrency, setBaseCurrency,
+      indiaMode, setIndiaMode,
       convert, convertToBase, getRate, fxImpact, stressTest,
       isLoading, lastUpdate,
     }}>
