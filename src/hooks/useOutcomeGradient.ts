@@ -185,10 +185,9 @@ export function useOutcomeGradient() {
         avgPnlPct: data.count > 0 ? data.scores.reduce((s, v) => s + v, 0) / data.count : 0,
         recentTrend: trend,
         isHotZone: wps > 0 && wr > 50 && data.count >= 3,
-        isBlacklisted: blacklist.includes(asset),
       };
     }).sort((a, b) => b.weightedProfitScore - a.weightedProfitScore);
-  }, [entries, blacklist]);
+  }, [entries]);
 
   // ─── Detect Desirable Zones ────────────────────────
 
