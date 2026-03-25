@@ -198,7 +198,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
 
       // ── INTELLIGENCE SELL SIGNAL ───────────────────────────
       if (
-        cooldownOk &&
+        cooldownOk && graceOk &&
         analysis.suggestion &&
         (analysis.suggestion.toLowerCase().includes("sell") || analysis.suggestion.toLowerCase().includes("exit"))
       ) {
