@@ -127,7 +127,7 @@ const TickerStrip = () => {
   const baseSym = getCurrencySymbol(baseCurrency);
 
   // Some tickers are ratios/indices — don't convert those
-  const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX"].includes(sym);
+  const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX", "USDINR=X"].includes(sym);
 
   return (
     <div
