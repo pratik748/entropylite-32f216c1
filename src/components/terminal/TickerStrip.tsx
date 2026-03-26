@@ -30,6 +30,24 @@ const GLOBAL_TICKERS = [
   { symbol: "^FTSE", name: "FTSE", currency: "GBP" },
 ];
 
+const INDIA_TICKERS = [
+  { symbol: "^NSEI", name: "NIFTY 50", currency: "INR" },
+  { symbol: "^BSESN", name: "SENSEX", currency: "INR" },
+  { symbol: "^NSEBANK", name: "BANK NIFTY", currency: "INR" },
+  { symbol: "RELIANCE.NS", name: "RELIANCE", currency: "INR" },
+  { symbol: "TCS.NS", name: "TCS", currency: "INR" },
+  { symbol: "HDFCBANK.NS", name: "HDFC BANK", currency: "INR" },
+  { symbol: "INFY.NS", name: "INFOSYS", currency: "INR" },
+  { symbol: "ICICIBANK.NS", name: "ICICI BANK", currency: "INR" },
+  { symbol: "GC=F", name: "GOLD", currency: "USD" },
+  { symbol: "CL=F", name: "OIL", currency: "USD" },
+  { symbol: "BTC-USD", name: "BTC", currency: "USD" },
+  { symbol: "USDINR=X", name: "USD/INR", currency: "INR" },
+  { symbol: "BHARTIARTL.NS", name: "AIRTEL", currency: "INR" },
+  { symbol: "ITC.NS", name: "ITC", currency: "INR" },
+  { symbol: "SBIN.NS", name: "SBI", currency: "INR" },
+];
+
 const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }) => {
   if (data.length < 2) return null;
   const min = Math.min(...data);
