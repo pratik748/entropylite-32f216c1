@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import VixGauge from "@/components/charts/VixGauge";
 import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
+import { useFX } from "@/hooks/useFX";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -51,11 +52,17 @@ type Region = typeof regions[number];
 
 const MarketOverview = () => {
   const { data: macroIntel } = useMacroIntelligence();
+  const { indiaMode } = useFX();
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [region, setRegion] = useState<Region>("All");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-switch to India region when indiaMode is on
+  useEffect(() => {
+    if (indiaMode) setRegion("India");
+  }, [indiaMode]);
 
   const fetchMarketData = async (showLoading = true, force = false) => {
     if (showLoading) setLoading(true);

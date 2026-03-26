@@ -48,13 +48,24 @@ ${sentiment_context}
 You MUST incorporate this sentiment into every discovery. If sentiment is risk-off/bearish, emphasize hedges, defensive plays, and inverse ETFs. If risk-on/bullish, emphasize leveraged upside, momentum plays, and growth sector futures.
 ` : "";
 
-    const discoveryContext = discovery_mode ? `
+    const indiaDiscoveryBlock = indiaMode ? `
+DISCOVERY MODE ACTIVE — INDIA-ONLY. Scan Indian markets only:
+- Find correlated Indian ETFs, Nifty/Bank Nifty F&O, sectoral indices (e.g., RELIANCE.NS + NIFTYBEES.NS for sector exposure)
+- Identify macro trades from RBI policy, monsoon, FII/DII flows (e.g., rate cut → long BANKBEES.NS / long real estate stocks)
+- Spot relative value: if portfolio holds TCS.NS, suggest ITBEES.NS pair trades or Nifty IT futures
+- Consider MCX commodity futures (gold, crude, silver) that hedge portfolio exposures
+- Scan for Nifty/Bank Nifty options strategies: straddles, strangles, iron condors
+- Look for calendar spreads on Nifty monthly/weekly options
 
-MARKET CONTEXT FOR GOD'S EYE DISCOVERY:
-${news_context ? `Recent news headlines: ${news_context.slice(0, 800)}` : "Use your knowledge of current market themes, geopolitical events, and sector trends."}
-${macro_context ? `Macro regime: ${macro_context.slice(0, 500)}` : "Consider current interest rate environment, inflation, and macro conditions."}
-${sentimentBlock}
+MANDATORY DIVERSITY (all Indian instruments):
+  - 2× nifty_fo (Nifty/Bank Nifty F&O strategies)
+  - 2× sector_pair (sectoral ETF/index pairs on NSE)
+  - 2× macro_hedge (hedging via gold, Nifty puts, or defensive sectors)
+  - 2× relative_value (mispricing between related Indian instruments)
+  - 2× cross_asset (equity vs commodity plays within Indian markets)
+` : "";
 
+    const globalDiscoveryBlock = !indiaMode ? `
 DISCOVERY MODE ACTIVE — You MUST find opportunities BEYOND the portfolio tickers. Think like a hedge fund CIO scanning the entire market:
 - Find correlated ETFs, sector futures, cross-asset plays (e.g., LMT futures + ITA defense ETF for leveraged sector exposure)
 - Identify macro trades triggered by news (e.g., oil shock → long XLE futures / short airline ETF)
@@ -71,6 +82,15 @@ MANDATORY DIVERSITY: You MUST include at least:
   - 2× macro_hedge (hedging macro risk via derivatives)
   - 2× relative_value (mispricing between related instruments)
   - 2× cross_asset (cross-market plays: equities vs commodities, bonds vs stocks, etc.)
+` : "";
+
+    const discoveryContext = discovery_mode ? `
+
+MARKET CONTEXT FOR GOD'S EYE DISCOVERY:
+${news_context ? `Recent news headlines: ${news_context.slice(0, 800)}` : "Use your knowledge of current market themes, geopolitical events, and sector trends."}
+${macro_context ? `Macro regime: ${macro_context.slice(0, 500)}` : "Consider current interest rate environment, inflation, and macro conditions."}
+${sentimentBlock}
+${indiaMode ? indiaDiscoveryBlock : globalDiscoveryBlock}
 ` : "";
 
     const discoverySchema = discovery_mode ? `,

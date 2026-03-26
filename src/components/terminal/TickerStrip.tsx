@@ -30,6 +30,24 @@ const GLOBAL_TICKERS = [
   { symbol: "^FTSE", name: "FTSE", currency: "GBP" },
 ];
 
+const INDIA_TICKERS = [
+  { symbol: "^NSEI", name: "NIFTY 50", currency: "INR" },
+  { symbol: "^BSESN", name: "SENSEX", currency: "INR" },
+  { symbol: "^NSEBANK", name: "BANK NIFTY", currency: "INR" },
+  { symbol: "RELIANCE.NS", name: "RELIANCE", currency: "INR" },
+  { symbol: "TCS.NS", name: "TCS", currency: "INR" },
+  { symbol: "HDFCBANK.NS", name: "HDFC BANK", currency: "INR" },
+  { symbol: "INFY.NS", name: "INFOSYS", currency: "INR" },
+  { symbol: "ICICIBANK.NS", name: "ICICI BANK", currency: "INR" },
+  { symbol: "GC=F", name: "GOLD", currency: "USD" },
+  { symbol: "CL=F", name: "OIL", currency: "USD" },
+  { symbol: "BTC-USD", name: "BTC", currency: "USD" },
+  { symbol: "USDINR=X", name: "USD/INR", currency: "INR" },
+  { symbol: "BHARTIARTL.NS", name: "AIRTEL", currency: "INR" },
+  { symbol: "ITC.NS", name: "ITC", currency: "INR" },
+  { symbol: "SBIN.NS", name: "SBI", currency: "INR" },
+];
+
 const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }) => {
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -53,19 +71,25 @@ const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }
 };
 
 const TickerStrip = () => {
-  const { baseCurrency, convertToBase } = useFX();
+  const { baseCurrency, convertToBase, indiaMode } = useFX();
+  const activeTickers = indiaMode ? INDIA_TICKERS : GLOBAL_TICKERS;
   const [tickers, setTickers] = useState<TickerData[]>(() =>
-    GLOBAL_TICKERS.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] }))
+    activeTickers.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] }))
   );
   const [paused, setPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset tickers when mode changes
+  useEffect(() => {
+    setTickers(activeTickers.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] })));
+  }, [indiaMode]);
 
   useEffect(() => {
     let alive = true;
     const fetchPrices = async () => {
       try {
         const { data, error } = await governedInvoke("market-data", {
-          body: { tickers: GLOBAL_TICKERS.map(t => t.symbol) },
+          body: { tickers: activeTickers.map(t => t.symbol) },
         });
         if (!alive || error) return;
 
@@ -97,13 +121,13 @@ const TickerStrip = () => {
     fetchPrices();
     const iv = setInterval(fetchPrices, 15000);
     return () => { alive = false; clearInterval(iv); };
-  }, []);
+  }, [indiaMode]);
 
   const items = [...tickers, ...tickers];
   const baseSym = getCurrencySymbol(baseCurrency);
 
   // Some tickers are ratios/indices — don't convert those
-  const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX"].includes(sym);
+  const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX", "USDINR=X"].includes(sym);
 
   return (
     <div

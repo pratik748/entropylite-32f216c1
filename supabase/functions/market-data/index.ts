@@ -88,7 +88,8 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
-    const region = body.region || "All";
+    const indiaMode = body.indiaMode === true;
+    const region = indiaMode ? "India" : (body.region || "All");
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
@@ -126,15 +127,29 @@ serve(async (req) => {
       fetchYahooQuote("SI=F").catch(() => null),
     ]);
 
-    const indexData = indexResults.filter(Boolean);
+    let indexData = indexResults.filter(Boolean);
 
-    const sectorSymbols = [
+    // When indiaMode, filter indices to India only
+    if (indiaMode) {
+      indexData = indexData.filter((i: any) => i?.region === "India");
+    }
+
+    const indiaSectorSymbols = [
+      { symbol: "NIFTYBEES.NS", name: "Nifty 50" }, { symbol: "BANKBEES.NS", name: "Bank Nifty" },
+      { symbol: "ITBEES.NS", name: "IT" }, { symbol: "PSUBNKBEES.NS", name: "PSU Banks" },
+      { symbol: "PHARMABEES.NS", name: "Pharma" }, { symbol: "CPSEETF.NS", name: "CPSE/PSU" },
+      { symbol: "GOLDBEES.NS", name: "Gold" }, { symbol: "JUNIORBEES.NS", name: "Nifty Next 50" },
+    ];
+
+    const globalSectorSymbols = [
       { symbol: "XLK", name: "Technology" }, { symbol: "XLF", name: "Financials" },
       { symbol: "XLE", name: "Energy" }, { symbol: "XLV", name: "Healthcare" },
       { symbol: "XLI", name: "Industrials" }, { symbol: "XLC", name: "Communication" },
       { symbol: "XLRE", name: "Real Estate" }, { symbol: "XLU", name: "Utilities" },
       { symbol: "XLY", name: "Consumer Disc." }, { symbol: "XLP", name: "Consumer Staples" },
     ];
+
+    const sectorSymbols = indiaMode ? indiaSectorSymbols : globalSectorSymbols;
 
     const sectorResults = await Promise.all(sectorSymbols.map(async (sec) => {
       try {
