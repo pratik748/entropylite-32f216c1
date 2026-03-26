@@ -71,19 +71,25 @@ const MiniSparkline = ({ data, positive }: { data: number[]; positive: boolean }
 };
 
 const TickerStrip = () => {
-  const { baseCurrency, convertToBase } = useFX();
+  const { baseCurrency, convertToBase, indiaMode } = useFX();
+  const activeTickers = indiaMode ? INDIA_TICKERS : GLOBAL_TICKERS;
   const [tickers, setTickers] = useState<TickerData[]>(() =>
-    GLOBAL_TICKERS.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] }))
+    activeTickers.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] }))
   );
   const [paused, setPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset tickers when mode changes
+  useEffect(() => {
+    setTickers(activeTickers.map(t => ({ ...t, price: 0, nativeCurrency: t.currency, change: 0, history: [] })));
+  }, [indiaMode]);
 
   useEffect(() => {
     let alive = true;
     const fetchPrices = async () => {
       try {
         const { data, error } = await governedInvoke("market-data", {
-          body: { tickers: GLOBAL_TICKERS.map(t => t.symbol) },
+          body: { tickers: activeTickers.map(t => t.symbol) },
         });
         if (!alive || error) return;
 
