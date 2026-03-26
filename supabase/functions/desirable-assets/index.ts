@@ -832,6 +832,16 @@ Return via the tool call only.`,
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
     const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
+
+    // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
+    if (indiaMode) {
+      candidates = candidates.filter((c: any) => {
+        const t = String(c?.ticker || "").toUpperCase();
+        return t.endsWith(".NS") || t.endsWith(".BO");
+      });
+      console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
+    }
+
     candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
 
     if (candidates.length === 0) {
