@@ -88,7 +88,8 @@ serve(async (req) => {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
-    const region = body.region || "All";
+    const indiaMode = body.indiaMode === true;
+    const region = indiaMode ? "India" : (body.region || "All");
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
