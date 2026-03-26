@@ -121,7 +121,7 @@ const TickerStrip = () => {
     fetchPrices();
     const iv = setInterval(fetchPrices, 15000);
     return () => { alive = false; clearInterval(iv); };
-  }, []);
+  }, [indiaMode]);
 
   const items = [...tickers, ...tickers];
   const baseSym = getCurrencySymbol(baseCurrency);
