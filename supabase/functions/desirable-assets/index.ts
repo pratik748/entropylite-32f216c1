@@ -922,6 +922,7 @@ Return via the tool call only.`,
       zScore: number;
       quantScore: number;
       priceVerified: boolean;
+      stalePrice: boolean;
       realPrice: number;
       realCurrency: string;
       priceChange24h: number;
