@@ -1,8 +1,21 @@
 import { useState, useEffect } from "react";
-import { Sun, Moon, Shield } from "lucide-react";
+import { Sun, Moon, Hexagon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const THEMES = ["dark", "palantir", "light"] as const;
 type Theme = (typeof THEMES)[number];
+
+const icons: Record<Theme, React.ReactNode> = {
+  dark: <Moon className="h-3 w-3" />,
+  palantir: <Hexagon className="h-3 w-3" />,
+  light: <Sun className="h-3 w-3" />,
+};
+
+const labels: Record<Theme, string> = {
+  dark: "Dark",
+  palantir: "Palantir",
+  light: "Light",
+};
 
 const ThemeToggle = () => {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -23,26 +36,28 @@ const ThemeToggle = () => {
   const cycle = () =>
     setTheme((t) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length]);
 
-  const icon =
-    theme === "light" ? (
-      <Moon className="h-3 w-3" />
-    ) : theme === "palantir" ? (
-      <Shield className="h-3 w-3" />
-    ) : (
-      <Sun className="h-3 w-3" />
-    );
-
-  const label = theme === "dark" ? "Dark" : theme === "palantir" ? "Palantir" : "Light";
-
   return (
-    <button
+    <motion.button
       onClick={cycle}
-      className="fixed bottom-4 right-3 z-50 flex items-center gap-1.5 px-2 py-1 rounded bg-surface-2 border border-border hover:border-primary/40 transition-colors text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
-      title={`Theme: ${label}`}
+      whileTap={{ scale: 0.92 }}
+      whileHover={{ scale: 1.05 }}
+      className="fixed bottom-4 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-2 border border-border hover:border-foreground/20 transition-colors text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      title={`Theme: ${labels[theme]}`}
     >
-      {icon}
-      <span>{label}</span>
-    </button>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={theme}
+          initial={{ rotateY: 90, opacity: 0 }}
+          animate={{ rotateY: 0, opacity: 1 }}
+          exit={{ rotateY: -90, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex items-center gap-1.5"
+        >
+          {icons[theme]}
+          <span>{labels[theme]}</span>
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
   );
 };
 

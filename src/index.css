@@ -135,67 +135,67 @@
   }
 
   .palantir {
-    --background: 220 20% 7%;
-    --foreground: 210 15% 88%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 8%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 15% 88%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 15% 88%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
 
-    --primary: 210 100% 56%;
+    --primary: 0 0% 5%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 210 12% 58%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 35%;
 
-    --muted: 220 14% 12%;
-    --muted-foreground: 210 10% 48%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 210 80% 52%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 8%;
 
-    --destructive: 0 72% 52%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 18%;
-    --input: 220 16% 14%;
-    --ring: 210 100% 56%;
+    --border: 0 0% 88%;
+    --input: 0 0% 92%;
+    --ring: 0 0% 20%;
 
-    --radius: 0.25rem;
+    --radius: 0rem;
 
-    --gain: 152 72% 42%;
-    --loss: 0 72% 52%;
-    --warning: 38 80% 52%;
-    --info: 210 80% 56%;
+    --gain: 152 55% 32%;
+    --loss: 0 65% 45%;
+    --warning: 38 75% 45%;
+    --info: 210 50% 45%;
 
-    --sentiment-positive: 152 72% 42%;
-    --sentiment-negative: 0 72% 52%;
-    --sentiment-neutral: 38 80% 52%;
+    --sentiment-positive: 152 55% 32%;
+    --sentiment-negative: 0 65% 45%;
+    --sentiment-neutral: 38 75% 45%;
 
-    --surface-1: 220 18% 10%;
-    --surface-2: 220 16% 13%;
-    --surface-3: 220 14% 17%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 0 0% 97%;
+    --surface-3: 0 0% 93%;
 
-    --glass-bg: 220 20% 8% / 0.82;
-    --glass-border: 210 40% 40% / 0.12;
-    --glass-highlight: 210 60% 70% / 0.06;
-    --glass-refraction: 210 40% 50% / 0.03;
+    --glass-bg: 0 0% 100% / 0.95;
+    --glass-border: 0 0% 0% / 0.06;
+    --glass-highlight: 0 0% 0% / 0.02;
+    --glass-refraction: 0 0% 0% / 0.01;
 
-    --glow-primary: 0 0 24px hsl(210 100% 56% / 0.15);
-    --glow-gain: 0 0 20px hsl(152 72% 42% / 0.18);
-    --glow-loss: 0 0 20px hsl(0 72% 52% / 0.18);
-    --glow-glass: 0 0 30px hsl(210 60% 50% / 0.08), inset 0 1px 0 hsl(210 60% 70% / 0.08);
+    --glow-primary: none;
+    --glow-gain: none;
+    --glow-loss: none;
+    --glow-glass: 0 1px 3px hsl(0 0% 0% / 0.04);
 
-    --sidebar-background: 220 20% 7%;
-    --sidebar-foreground: 210 10% 48%;
-    --sidebar-primary: 210 100% 56%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 45%;
+    --sidebar-primary: 0 0% 5%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 15%;
-    --sidebar-accent-foreground: 210 15% 88%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 0% 20%;
   }
 }
 
@@ -237,10 +237,19 @@
     background: hsl(0 0% 25%);
   }
 
+  /* Palantir scrollbar */
+  .palantir ::-webkit-scrollbar-track { background: hsl(0 0% 95%); }
+  .palantir ::-webkit-scrollbar-thumb { background: hsl(0 0% 78%); }
+  .palantir ::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 60%); }
+
   /* Selection */
   ::selection {
     background: hsl(0 0% 30%);
     color: hsl(0 0% 98%);
+  }
+  .palantir ::selection {
+    background: hsl(0 0% 85%);
+    color: hsl(0 0% 5%);
   }
 
   /* Prevent iOS bounce on fixed panels */
