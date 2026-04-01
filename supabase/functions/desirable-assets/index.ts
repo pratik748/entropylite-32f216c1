@@ -877,7 +877,7 @@ Return via the tool call only.`,
     const uniqueTickers = [...new Set(allTickers)];
 
     // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
-    const BATCH_SIZE = 6;
+    const BATCH_SIZE = 10;
     const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
     for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
       const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
