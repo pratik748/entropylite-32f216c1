@@ -341,8 +341,15 @@ function deriveHedgePlan(params: {
 // ── Yahoo Finance helpers ──────────────────────────────────────────
 async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000); // 8s per-fetch timeout
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&_t=${Date.now()}`;
-    const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" }, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) { await res.text(); return null; }
     const data = await res.json();
     const result = data?.chart?.result?.[0];
@@ -364,6 +371,11 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
     }
 
     const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+    // Price freshness check
+    const marketTime = meta.regularMarketTime || 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const stalePrice = marketTime > 0 && (nowSec - marketTime) > 8 * 3600;
+
     return {
       price: meta.regularMarketPrice || 0,
       currency: meta.currency || "USD",
@@ -375,6 +387,7 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
       volumes,
       highs: highs.filter(h => h != null && h > 0),
       lows: lows.filter(l => l != null && l > 0),
+      stalePrice,
     };
   } catch { return null; }
 }
