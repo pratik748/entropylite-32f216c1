@@ -265,6 +265,7 @@ const IndexContent = () => {
 
       {/* Main Content — fills all remaining space, above the status bar */}
       <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
+        <PageTransition tabKey={activeTab}>
         {activeTab === "dashboard" && (
           isMobile ? (
             /* Mobile: stacked layout */
@@ -389,6 +390,7 @@ const IndexContent = () => {
         {activeTab === "geopolitical" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><GeopoliticalGlobe key={refreshKey} stocks={stocks} geoData={geoData} geoLoading={geoLoading} exposedTickers={exposedTickers} tickerThreats={tickerThreats} onRefresh={geoRefresh} /></div>}
         {activeTab === "desirable" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} /></div>}
         {activeTab === "risk" && <div className="px-2 sm:container py-2 sm:py-4 pb-12"><RiskDashboard key={refreshKey} stocks={stocks} /></div>}
+        </PageTransition>
       </main>
 
       {/* System Status Bar */}
