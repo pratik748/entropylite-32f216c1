@@ -831,7 +831,7 @@ Hard constraints:
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 5200,
+        maxTokens: 3800,
         temperature: 0.35,
         provider: effectiveProvider,
       });
