@@ -392,6 +392,7 @@ const IndexContent = () => {
 
       {/* System Status Bar */}
       <SystemStatusBar stockCount={stocks.filter(s => s.analysis).length} />
+      <ThemeToggle />
     </div>
   );
 };
