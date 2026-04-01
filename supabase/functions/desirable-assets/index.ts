@@ -855,7 +855,15 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
+    // Only use fallback when AI returns fewer than 8 candidates
+    if (candidates.length < 8) {
+      const needed = 8 - candidates.length;
+      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
+      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
+    } else {
+      candidates = dedupeCandidates(candidates).slice(0, 18);
+      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
+    }
 
     if (candidates.length === 0) {
       throw new Error("No candidates available after deterministic fallback");
