@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI + Mistral, with retry + exponential backoff.
+ * AI caller — Cloudflare Workers AI + Mistral, with optimized retry + fast fallback.
  */
 
 interface CallAIOptions {
@@ -78,6 +78,17 @@ function stripThinkingBlocks(text: string): string {
   return cleaned;
 }
 
+/** Fetch with AbortController timeout */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
@@ -102,14 +113,14 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiToken}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  }, 15000); // 15s timeout
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -132,7 +143,6 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
     };
   }
 
-  // result.response can be a string, array, or object depending on model
   let raw: string;
   if (typeof result.response === "string") {
     raw = result.response.trim();
@@ -175,14 +185,14 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     body.response_format = { type: "json_object" };
   }
 
-  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  }, 20000); // 20s timeout
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -211,10 +221,10 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "mistral" };
 }
 
-const RETRY_DELAYS = [0, 1000, 3000];
+// Optimized: 2 attempts max, instant 429 fallback
+const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  // Default to Cloudflare — fallback to Mistral on failure
   const provider = opts.provider || "cloudflare";
 
   if (provider === "cloudflare") {
@@ -232,13 +242,18 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       } catch (err: any) {
         lastError = err;
         console.error(`callAI → Cloudflare attempt ${attempt + 1} failed:`, err.message || err);
-        const quotaExhausted = err.status === 429 && /daily free allocation|neurons/i.test(String(err.message || ""));
-        if (quotaExhausted) {
-          console.log("callAI → Cloudflare quota exhausted, skipping retries and falling back immediately");
+        // ANY 429 → immediate Mistral fallback (no retry)
+        if (err.status === 429) {
+          console.log("callAI → Cloudflare 429, falling back to Mistral immediately");
           break;
         }
         if (err.status === 401 || err.status === 403) break;
-        if (err.status === 429 || (err.status >= 500 && err.status < 600)) continue;
+        if (err.status >= 500 && err.status < 600) continue;
+        // Abort/timeout errors
+        if (err.name === "AbortError") {
+          console.log("callAI → Cloudflare timed out, falling back to Mistral");
+          break;
+        }
         break;
       }
     }
@@ -253,7 +268,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
     }
   }
 
-  // Mistral (default path)
+  // Mistral (forced)
   console.log("callAI → Mistral (forced by provider preference)");
   return await callMistral(opts);
 }
