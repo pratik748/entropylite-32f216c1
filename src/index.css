@@ -237,10 +237,19 @@
     background: hsl(0 0% 25%);
   }
 
+  /* Palantir scrollbar */
+  .palantir ::-webkit-scrollbar-track { background: hsl(0 0% 95%); }
+  .palantir ::-webkit-scrollbar-thumb { background: hsl(0 0% 78%); }
+  .palantir ::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 60%); }
+
   /* Selection */
   ::selection {
     background: hsl(0 0% 30%);
     color: hsl(0 0% 98%);
+  }
+  .palantir ::selection {
+    background: hsl(0 0% 85%);
+    color: hsl(0 0% 5%);
   }
 
   /* Prevent iOS bounce on fixed panels */
