@@ -341,8 +341,15 @@ function deriveHedgePlan(params: {
 // ── Yahoo Finance helpers ──────────────────────────────────────────
 async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000); // 8s per-fetch timeout
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&_t=${Date.now()}`;
-    const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" }, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) { await res.text(); return null; }
     const data = await res.json();
     const result = data?.chart?.result?.[0];
@@ -364,6 +371,11 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
     }
 
     const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+    // Price freshness check
+    const marketTime = meta.regularMarketTime || 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const stalePrice = marketTime > 0 && (nowSec - marketTime) > 8 * 3600;
+
     return {
       price: meta.regularMarketPrice || 0,
       currency: meta.currency || "USD",
@@ -375,6 +387,7 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
       volumes,
       highs: highs.filter(h => h != null && h > 0),
       lows: lows.filter(l => l != null && l > 0),
+      stalePrice,
     };
   } catch { return null; }
 }
@@ -818,7 +831,7 @@ Hard constraints:
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 5200,
+        maxTokens: 3800,
         temperature: 0.35,
         provider: effectiveProvider,
       });
@@ -842,7 +855,15 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    candidates = dedupeCandidates([...candidates, ...deterministicCandidates]).slice(0, 25);
+    // Only use fallback when AI returns fewer than 8 candidates
+    if (candidates.length < 8) {
+      const needed = 8 - candidates.length;
+      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
+      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
+    } else {
+      candidates = dedupeCandidates(candidates).slice(0, 18);
+      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
+    }
 
     if (candidates.length === 0) {
       throw new Error("No candidates available after deterministic fallback");
@@ -856,7 +877,7 @@ Return via the tool call only.`,
     const uniqueTickers = [...new Set(allTickers)];
 
     // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
-    const BATCH_SIZE = 6;
+    const BATCH_SIZE = 10;
     const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
     for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
       const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
@@ -901,6 +922,7 @@ Return via the tool call only.`,
       zScore: number;
       quantScore: number;
       priceVerified: boolean;
+      stalePrice: boolean;
       realPrice: number;
       realCurrency: string;
       priceChange24h: number;
@@ -1086,6 +1108,7 @@ Return via the tool call only.`,
         zScore: Math.round(zs * 100) / 100,
         quantScore: Math.min(quantScore, 99),
         priceVerified: true,
+        stalePrice: td.stalePrice || false,
         realPrice: td.price,
         realCurrency: td.currency,
         priceChange24h: Math.round(td.change * 100) / 100,
@@ -1113,7 +1136,7 @@ Return via the tool call only.`,
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
     const sentimentCandidates = [...scored]
       .sort((a, b) => b.quantScore - a.quantScore)
-      .slice(0, Math.min(18, scored.length));
+      .slice(0, Math.min(12, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
     const SENTIMENT_BATCH = 5;
@@ -1220,6 +1243,7 @@ Return via the tool call only.`,
           zScore: Math.round(zs * 100) / 100,
           quantScore: 42,
           priceVerified: true,
+          stalePrice: td.stalePrice || false,
           realPrice: td.price,
           realCurrency: td.currency,
           priceChange24h: Math.round(td.change * 100) / 100,
@@ -1394,6 +1418,7 @@ Return via the tool call only.`,
         realCurrency: s.realCurrency,
         priceChange24h: s.priceChange24h,
         priceVerified: s.priceVerified,
+        stalePrice: s.stalePrice || false,
         realVolume: s.volume,
         fiftyTwoHigh: s.fiftyTwoHigh,
         fiftyTwoLow: s.fiftyTwoLow,
