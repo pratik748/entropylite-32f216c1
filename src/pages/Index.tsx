@@ -29,6 +29,7 @@ import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import TickerStrip from "@/components/terminal/TickerStrip";
 import SystemStatusBar from "@/components/terminal/SystemStatusBar";
 import ThemeToggle from "@/components/ThemeToggle";
+import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
