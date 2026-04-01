@@ -1134,7 +1134,7 @@ Return via the tool call only.`,
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
     const sentimentCandidates = [...scored]
       .sort((a, b) => b.quantScore - a.quantScore)
-      .slice(0, Math.min(18, scored.length));
+      .slice(0, Math.min(12, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
     const SENTIMENT_BATCH = 5;
