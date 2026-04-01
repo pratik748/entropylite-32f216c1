@@ -133,6 +133,70 @@
     --sidebar-border: 0 0% 85%;
     --sidebar-ring: 0 0% 30%;
   }
+
+  .palantir {
+    --background: 220 20% 7%;
+    --foreground: 210 15% 88%;
+
+    --card: 220 18% 10%;
+    --card-foreground: 210 15% 88%;
+
+    --popover: 220 18% 10%;
+    --popover-foreground: 210 15% 88%;
+
+    --primary: 210 100% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 210 12% 58%;
+
+    --muted: 220 14% 12%;
+    --muted-foreground: 210 10% 48%;
+
+    --accent: 210 80% 52%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 15% 18%;
+    --input: 220 16% 14%;
+    --ring: 210 100% 56%;
+
+    --radius: 0.25rem;
+
+    --gain: 152 72% 42%;
+    --loss: 0 72% 52%;
+    --warning: 38 80% 52%;
+    --info: 210 80% 56%;
+
+    --sentiment-positive: 152 72% 42%;
+    --sentiment-negative: 0 72% 52%;
+    --sentiment-neutral: 38 80% 52%;
+
+    --surface-1: 220 18% 10%;
+    --surface-2: 220 16% 13%;
+    --surface-3: 220 14% 17%;
+
+    --glass-bg: 220 20% 8% / 0.82;
+    --glass-border: 210 40% 40% / 0.12;
+    --glass-highlight: 210 60% 70% / 0.06;
+    --glass-refraction: 210 40% 50% / 0.03;
+
+    --glow-primary: 0 0 24px hsl(210 100% 56% / 0.15);
+    --glow-gain: 0 0 20px hsl(152 72% 42% / 0.18);
+    --glow-loss: 0 0 20px hsl(0 72% 52% / 0.18);
+    --glow-glass: 0 0 30px hsl(210 60% 50% / 0.08), inset 0 1px 0 hsl(210 60% 70% / 0.08);
+
+    --sidebar-background: 220 20% 7%;
+    --sidebar-foreground: 210 10% 48%;
+    --sidebar-primary: 210 100% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 210 15% 88%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 210 100% 56%;
+  }
 }
 
 @layer base {

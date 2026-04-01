@@ -1,36 +1,47 @@
 import { useState, useEffect } from "react";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Shield } from "lucide-react";
+
+const THEMES = ["dark", "palantir", "light"] as const;
+type Theme = (typeof THEMES)[number];
 
 const ThemeToggle = () => {
-  const [light, setLight] = useState(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("entropy-theme") === "light";
+      const stored = localStorage.getItem("entropy-theme");
+      if (stored === "light" || stored === "palantir") return stored;
     }
-    return false;
+    return "dark";
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    if (light) {
-      root.classList.add("light");
-      localStorage.setItem("entropy-theme", "light");
-    } else {
-      root.classList.remove("light");
-      localStorage.setItem("entropy-theme", "dark");
-    }
-  }, [light]);
+    root.classList.remove("light", "palantir");
+    if (theme !== "dark") root.classList.add(theme);
+    localStorage.setItem("entropy-theme", theme);
+  }, [theme]);
+
+  const cycle = () =>
+    setTheme((t) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length]);
+
+  const icon =
+    theme === "light" ? (
+      <Moon className="h-3 w-3" />
+    ) : theme === "palantir" ? (
+      <Shield className="h-3 w-3" />
+    ) : (
+      <Sun className="h-3 w-3" />
+    );
+
+  const label = theme === "dark" ? "Dark" : theme === "palantir" ? "Palantir" : "Light";
 
   return (
     <button
-      onClick={() => setLight((v) => !v)}
-      className="fixed bottom-8 left-3 z-50 p-1.5 rounded bg-surface-2 border border-border hover:border-primary/40 transition-colors"
-      title={light ? "Switch to dark" : "Switch to light"}
+      onClick={cycle}
+      className="fixed bottom-4 right-3 z-50 flex items-center gap-1.5 px-2 py-1 rounded bg-surface-2 border border-border hover:border-primary/40 transition-colors text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      title={`Theme: ${label}`}
     >
-      {light ? (
-        <Moon className="h-3.5 w-3.5 text-foreground" />
-      ) : (
-        <Sun className="h-3.5 w-3.5 text-muted-foreground" />
-      )}
+      {icon}
+      <span>{label}</span>
     </button>
   );
 };
