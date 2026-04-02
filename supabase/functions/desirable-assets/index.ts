@@ -755,8 +755,8 @@ serve(async (req) => {
               regimeType: { type: "string", enum: ["risk-on", "risk-off", "transition", "crisis"] },
               recommendations: {
                 type: "array",
-                minItems: 12,
-                maxItems: 18,
+                minItems: 6,
+                maxItems: 12,
                 items: {
                   type: "object",
                   properties: {
