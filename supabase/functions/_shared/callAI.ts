@@ -280,18 +280,15 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
  * Use different seeds/temperatures per provider for diversity.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  const cfOpts = { ...opts, provider: "cloudflare" as const };
-  const miOpts = { ...opts, provider: "mistral" as const, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) };
-
   console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
 
   const results = await Promise.allSettled([
-    callCloudflare(cfOpts).catch(async (err) => {
-      console.warn("callAIParallel → Cloudflare failed:", err.message || err);
+    callAI({ ...opts, provider: "cloudflare" }).catch((err) => {
+      console.warn("callAIParallel → Cloudflare path failed:", err.message || err);
       throw err;
     }),
-    callMistral(miOpts).catch(async (err) => {
-      console.warn("callAIParallel → Mistral failed:", err.message || err);
+    callAI({ ...opts, provider: "mistral", temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).catch((err) => {
+      console.warn("callAIParallel → Mistral path failed:", err.message || err);
       throw err;
     }),
   ]);
