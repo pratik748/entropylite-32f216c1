@@ -113,6 +113,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
+  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 30000 : 15000;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
@@ -120,7 +121,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  }, 15000); // 15s timeout
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -185,6 +186,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     body.response_format = { type: "json_object" };
   }
 
+  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -192,7 +194,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  }, 20000); // 20s timeout
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -278,29 +280,42 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
  * Use different seeds/temperatures per provider for diversity.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  const cfOpts = { ...opts, provider: "cloudflare" as const };
-  const miOpts = { ...opts, provider: "mistral" as const, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) };
-
   console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
 
-  const results = await Promise.allSettled([
-    callCloudflare(cfOpts).catch(async (err) => {
+  // Race: collect results as they come, return after 25s max or when both done
+  const promises = [
+    callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
       console.warn("callAIParallel → Cloudflare failed:", err.message || err);
-      throw err;
+      return null;
     }),
-    callMistral(miOpts).catch(async (err) => {
+    callMistral({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).then(r => ({ ...r, provider: "mistral" as const })).catch((err) => {
       console.warn("callAIParallel → Mistral failed:", err.message || err);
-      throw err;
+      return null;
     }),
+  ];
+
+  // Wait for all but with a 25s ceiling
+  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 25000));
+  
+  const results = await Promise.allSettled([
+    Promise.race([promises[0], timeoutPromise]),
+    Promise.race([promises[1], timeoutPromise]),
   ]);
 
   const successes: AIResult[] = [];
   for (const r of results) {
-    if (r.status === "fulfilled") successes.push(r.value);
+    if (r.status === "fulfilled" && r.value) successes.push(r.value);
   }
 
   if (successes.length === 0) {
-    throw new Error("callAIParallel: both providers failed");
+    // Last resort: try just Mistral with generous timeout
+    console.log("callAIParallel → both failed, last-resort Mistral call");
+    try {
+      const lastResort = await callMistral(opts);
+      return [lastResort];
+    } catch {
+      throw new Error("callAIParallel: all providers failed");
+    }
   }
 
   console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
