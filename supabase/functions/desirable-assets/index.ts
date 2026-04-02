@@ -888,7 +888,7 @@ Return via the tool call only.`,
       candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
       console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
     } else {
-      candidates = dedupeCandidates(candidates).slice(0, 18);
+      candidates = dedupeCandidates(candidates).slice(0, 28);
       console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
     }
 
