@@ -649,43 +649,58 @@ function dedupeCandidates(candidates: any[]): any[] {
   return out;
 }
 
+const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
+  Technology: { thesis: "Secular AI/cloud tailwinds with expanding margins and strong R&D moat. Enterprise adoption acceleration creates durable revenue visibility.", catalyst: "AI capex cycle and enterprise digital transformation driving order book growth." },
+  Financials: { thesis: "Rising net interest margins and credit quality improvement in current rate environment. Strong capital return program with buybacks and dividends.", catalyst: "Credit cycle normalization and loan growth reacceleration as rate uncertainty clears." },
+  Energy: { thesis: "Supply discipline from OPEC+ and underinvestment cycle supports pricing power. Free cash flow yield among highest in market.", catalyst: "Global energy security spending and dividend growth attracting institutional reallocation." },
+  Healthcare: { thesis: "Pipeline optionality with multiple late-stage catalysts. Defensive cash flows with pricing power in specialty segments.", catalyst: "FDA approval cycle and aging demographics driving structural demand growth." },
+  "Consumer Discretionary": { thesis: "Consumer spending resilience with market share gains from weaker competitors. Margin expansion through operational efficiency.", catalyst: "Seasonal demand uptick and inventory normalization supporting earnings beat potential." },
+  "Consumer Staples": { thesis: "Defensive positioning with consistent dividend growth and pricing power in inflationary environments.", catalyst: "Volume recovery and premiumization trends supporting organic revenue acceleration." },
+  Communication: { thesis: "Digital advertising recovery and subscriber monetization improvements. Platform network effects create widening competitive moat.", catalyst: "Ad spend rebound and new product monetization driving revenue re-rating." },
+  Industrials: { thesis: "Infrastructure spending cycle and reshoring trends creating multi-year order backlog visibility.", catalyst: "Government infrastructure bills and defense spending uplift driving order growth." },
+  Utilities: { thesis: "Regulated returns with data center power demand creating secular growth overlay on traditional defensive profile.", catalyst: "AI-driven electricity demand surge and rate base expansion supporting earnings growth." },
+  Commodities: { thesis: "Supply constraints and geopolitical risk premium supporting commodity prices. Portfolio diversification benefits in risk-off environments.", catalyst: "Central bank gold buying and inflation hedge demand from institutional allocators." },
+  Index: { thesis: "Broad market exposure with low tracking error. Efficient vehicle for tactical allocation and hedging strategies.", catalyst: "Market breadth improvement and sectoral rotation supporting index-level returns." },
+  Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
+};
+
 function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
   const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
   const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
   return universe
     .filter((c) => !blocked.has(c.ticker))
     .slice(0, 16)
-    .map((c, i) => ({
-      ticker: c.ticker,
-      name: c.name,
-      assetClass: (c as any).assetClass || "Equity",
-      exchange: indiaMode ? "NSE" : "NASDAQ",
-      currency: indiaMode ? "INR" : "USD",
-      currentEstPrice: 0,
-      entryZone: [0, 0],
-      targetPrice: 0,
-      stopLoss: 0,
-      timeHorizon: i % 3 === 0 ? "1M" : "3M",
-      suggestedQty: 1,
-      confidence: 68,
-      thesis: `${c.name} is a liquid institutional-grade name with strong trend persistence and robust balance sheet quality.`,
-      catalyst: indiaMode
-        ? "Domestic earnings momentum and FII/DII flow support over next quarter."
-        : "Upcoming earnings and continued institutional flow momentum.",
-      hedgingStrategy: indiaMode
-        ? "Use Nifty PUT options and strict stop-loss discipline."
-        : "Use protective puts and hard stop-loss discipline.",
-      riskReward: "1:2.2",
-      sector: c.sector,
-      tags: ["liquid", "institutional", "momentum"],
-      riskProfile: ["medium_term", "high_conviction"],
-      strategy: c.strategy,
-      pairedInstrument: null,
-      pairedStructure: null,
-      capitalEfficiency: 1,
-      correlationToPortfolio: "low",
-      marketCap: c.marketCap,
-    }));
+    .map((c, i) => {
+      const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
+      return {
+        ticker: c.ticker,
+        name: c.name,
+        assetClass: (c as any).assetClass || "Equity",
+        exchange: indiaMode ? "NSE" : "NASDAQ",
+        currency: indiaMode ? "INR" : "USD",
+        currentEstPrice: 0,
+        entryZone: [0, 0],
+        targetPrice: 0,
+        stopLoss: 0,
+        timeHorizon: i % 3 === 0 ? "1M" : "3M",
+        suggestedQty: 1,
+        confidence: 68,
+        thesis: "", // left empty — will be generated dynamically in enrichment
+        catalyst: "", // left empty — will be generated dynamically in enrichment
+        hedgingStrategy: "", // left empty — deriveHedgePlan will fill this
+        riskReward: "1:2.2",
+        sector: c.sector,
+        tags: ["liquid", "institutional", "momentum"],
+        riskProfile: ["medium_term", "high_conviction"],
+        strategy: c.strategy,
+        pairedInstrument: null,
+        pairedStructure: null,
+        capitalEfficiency: 1,
+        correlationToPortfolio: "low",
+        marketCap: c.marketCap,
+        _isFallback: true,
+      };
+    });
 }
 
 // ── Main serve ─────────────────────────────────────────────────────
