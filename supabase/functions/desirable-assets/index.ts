@@ -1419,10 +1419,28 @@ Return via the tool call only.`,
         ? `1:${((targetPrice - realPrice) / (realPrice - stopLoss)).toFixed(1)}`
         : s.rec.riskReward || "—";
 
+      // Generate dynamic thesis/catalyst for fallback candidates with empty text
+      let thesis = sanitizeText(s.rec.thesis || "");
+      let catalyst = sanitizeText(s.rec.catalyst || "");
+
+      if (!thesis || thesis.length < 15) {
+        const sectorInfo = SECTOR_THESIS[s.rec.sector] || SECTOR_THESIS["Technology"];
+        const momLabel = s.momentum20d > 3 ? "strong upward momentum" : s.momentum20d > 0 ? "positive trend" : "mean-reversion setup";
+        const volLabel = s.volatility < 20 ? "low volatility" : s.volatility < 35 ? "moderate volatility" : "elevated volatility";
+        const srLabel = s.sharpeRatio > 0.5 ? "excellent risk-adjusted returns" : s.sharpeRatio > 0 ? "positive risk-adjusted returns" : "recovery potential";
+        thesis = `${s.rec.name}: ${sectorInfo.thesis} Currently showing ${momLabel} with ${volLabel} (${srLabel}, Sharpe ${s.sharpeRatio}). MaxDD ${s.maxDrawdown}% over 3 months.`;
+      }
+
+      if (!catalyst || catalyst.length < 15) {
+        const sectorInfo = SECTOR_THESIS[s.rec.sector] || SECTOR_THESIS["Technology"];
+        const sentLabel = s.sentimentScore > 15 ? "Positive news sentiment supports near-term upside." : s.sentimentScore < -15 ? "Contrarian opportunity as negative sentiment may be overextended." : "Neutral sentiment with catalysts pending.";
+        catalyst = `${sectorInfo.catalyst} ${sentLabel}`;
+      }
+
       return {
         ...s.rec,
-        thesis: sanitizeText(s.rec.thesis || ""),
-        catalyst: sanitizeText(s.rec.catalyst || ""),
+        thesis,
+        catalyst,
         suggestedQty: positionSizing.suggestedQty,
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
