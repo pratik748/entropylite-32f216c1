@@ -113,6 +113,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
+  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 30000 : 15000;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
@@ -120,7 +121,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  }, 15000); // 15s timeout
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
