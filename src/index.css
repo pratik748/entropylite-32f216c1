@@ -60,7 +60,10 @@
     --glow-primary: 0 0 20px hsl(0 0% 90% / 0.1);
     --glow-gain: 0 0 20px hsl(152 90% 45% / 0.18);
     --glow-loss: 0 0 20px hsl(0 90% 55% / 0.18);
-    --glow-glass: 0 0 30px hsl(0 0% 60% / 0.06), inset 0 1px 0 hsl(0 0% 80% / 0.06);
+    --glow-glass: 0 1px 3px hsl(0 0% 0% / 0.5);
+    --glow-glass-primary: 0 0 30px hsl(0 0% 90% / 0.08), 0 0 60px hsl(0 0% 90% / 0.03), inset 0 1px 0 hsl(0 0% 80% / 0.08);
+    --glow-glass-loss: 0 0 30px hsl(0 90% 55% / 0.15), 0 0 60px hsl(0 90% 55% / 0.06), inset 0 1px 0 hsl(0 100% 80% / 0.08);
+    --glow-glass-gain: 0 0 30px hsl(152 90% 45% / 0.15), 0 0 60px hsl(152 90% 45% / 0.06), inset 0 1px 0 hsl(152 100% 80% / 0.08);
 
     --sidebar-background: 0 0% 2%;
     --sidebar-foreground: 0 0% 42%;
@@ -122,7 +125,10 @@
     --glow-primary: 0 0 20px hsl(0 0% 10% / 0.06);
     --glow-gain: 0 0 20px hsl(152 70% 35% / 0.12);
     --glow-loss: 0 0 20px hsl(0 75% 48% / 0.12);
-    --glow-glass: 0 0 30px hsl(0 0% 0% / 0.04), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+    --glow-glass: 0 1px 4px hsl(0 0% 0% / 0.08), 0 0 1px hsl(0 0% 0% / 0.05);
+    --glow-glass-primary: 0 0 15px hsl(0 0% 10% / 0.06), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+    --glow-glass-loss: 0 0 15px hsl(0 75% 48% / 0.1), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+    --glow-glass-gain: 0 0 15px hsl(152 70% 35% / 0.1), inset 0 1px 0 hsl(0 0% 100% / 0.5);
 
     --sidebar-background: 0 0% 97%;
     --sidebar-foreground: 0 0% 45%;
@@ -187,6 +193,9 @@
     --glow-gain: none;
     --glow-loss: none;
     --glow-glass: 0 1px 3px hsl(0 0% 0% / 0.04);
+    --glow-glass-primary: 0 1px 3px hsl(0 0% 0% / 0.06);
+    --glow-glass-loss: 0 1px 3px hsl(0 0% 0% / 0.06);
+    --glow-glass-gain: 0 1px 3px hsl(0 0% 0% / 0.06);
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 0 0% 45%;
@@ -227,29 +236,20 @@
     height: 3px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(0 0% 4%);
+    background: hsl(var(--surface-1));
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 15%);
+    background: hsl(var(--border));
     border-radius: 0;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(0 0% 25%);
+    background: hsl(var(--muted-foreground));
   }
-
-  /* Palantir scrollbar */
-  .palantir ::-webkit-scrollbar-track { background: hsl(0 0% 95%); }
-  .palantir ::-webkit-scrollbar-thumb { background: hsl(0 0% 78%); }
-  .palantir ::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 60%); }
 
   /* Selection */
   ::selection {
-    background: hsl(0 0% 30%);
-    color: hsl(0 0% 98%);
-  }
-  .palantir ::selection {
-    background: hsl(0 0% 85%);
-    color: hsl(0 0% 5%);
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
   }
 
   /* Prevent iOS bounce on fixed panels */
@@ -298,7 +298,7 @@
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
     border: 1px solid hsl(var(--glass-border));
-    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.5);
+    box-shadow: var(--glow-glass);
     position: relative;
     overflow: hidden;
   }
@@ -309,7 +309,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 30%, hsl(0 0% 80% / 0.1) 50%, hsl(var(--glass-highlight)) 70%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 30%, hsl(var(--glass-highlight)) 70%, transparent 100%);
     pointer-events: none;
   }
   .glass-panel::after {
@@ -324,28 +324,28 @@
   }
 
   .glass-card {
-    background: hsl(0 0% 5% / 0.8);
+    background: hsl(var(--glass-bg));
     backdrop-filter: blur(16px) saturate(1.2);
     -webkit-backdrop-filter: blur(16px) saturate(1.2);
     border: 1px solid hsl(var(--glass-border));
-    box-shadow: 0 4px 16px hsl(0 0% 0% / 0.4);
+    box-shadow: var(--glow-glass);
   }
 
   .glass-subtle {
-    background: hsl(0 0% 7% / 0.6);
+    background: hsl(var(--surface-2));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(0 0% 25% / 0.1);
+    border: 1px solid hsl(var(--glass-border));
   }
 
   .glass-glow-primary {
-    box-shadow: 0 0 30px hsl(0 0% 90% / 0.08), 0 0 60px hsl(0 0% 90% / 0.03), inset 0 1px 0 hsl(0 0% 80% / 0.08);
+    box-shadow: var(--glow-glass-primary);
   }
   .glass-glow-loss {
-    box-shadow: 0 0 30px hsl(0 90% 55% / 0.15), 0 0 60px hsl(0 90% 55% / 0.06), inset 0 1px 0 hsl(0 100% 80% / 0.08);
+    box-shadow: var(--glow-glass-loss);
   }
   .glass-glow-gain {
-    box-shadow: 0 0 30px hsl(152 90% 45% / 0.15), 0 0 60px hsl(152 90% 45% / 0.06), inset 0 1px 0 hsl(152 100% 80% / 0.08);
+    box-shadow: var(--glow-glass-gain);
   }
 
   .gradient-border {
