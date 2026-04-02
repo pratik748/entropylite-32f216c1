@@ -193,6 +193,9 @@
     --glow-gain: none;
     --glow-loss: none;
     --glow-glass: 0 1px 3px hsl(0 0% 0% / 0.04);
+    --glow-glass-primary: 0 1px 3px hsl(0 0% 0% / 0.06);
+    --glow-glass-loss: 0 1px 3px hsl(0 0% 0% / 0.06);
+    --glow-glass-gain: 0 1px 3px hsl(0 0% 0% / 0.06);
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 0 0% 45%;
