@@ -226,14 +226,36 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
 
     let jsonStr: string;
     try {
-      const result = await callAI({
+      const aiOpts = {
         systemPrompt: `You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
         userPrompt: prompt,
         maxTokens: 8192,
-        provider,
-      });
-      jsonStr = result.text;
-      console.log(`analyze-stock used provider: ${result.provider}`);
+      };
+
+      // Fire both providers in parallel, pick the best result
+      const parallelResults = await callAIParallel(aiOpts);
+      console.log(`analyze-stock: ${parallelResults.length} parallel AI responses received`);
+
+      // Pick the response with the most complete JSON (longest valid parse)
+      let bestText = "";
+      let bestScore = -1;
+      for (const result of parallelResults) {
+        const parsed = safeParseJSON(result.text);
+        if (!parsed) continue;
+        // Score by completeness: count non-null keys
+        const keys = Object.keys(parsed);
+        const score = keys.filter(k => parsed[k] != null).length;
+        if (score > bestScore) {
+          bestScore = score;
+          bestText = result.text;
+          console.log(`analyze-stock: picked ${result.provider} response (${score} fields)`);
+        }
+      }
+
+      if (!bestText && parallelResults.length > 0) {
+        bestText = parallelResults[0].text;
+      }
+      jsonStr = bestText;
     } catch (e: any) {
       if (e.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
