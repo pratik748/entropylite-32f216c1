@@ -830,7 +830,7 @@ ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Create 14-16 recommendations that prioritize:
+Create 8-10 recommendations that prioritize:
 1) Positive earnings momentum + institutional participation
 2) Price trend confirmation (above key averages)
 3) Catalyst-driven upside in 1-6 months
@@ -838,15 +838,15 @@ Create 14-16 recommendations that prioritize:
 5) Liquidity and execution quality
 
 Hard constraints:
-- Maximum 3 ETFs
+- Maximum 2 ETFs
 - No penny stocks / meme stocks / niche illiquid names
 - No deteriorating fundamentals
-- Provide strategy diversity across at least 5 strategy types
+- Provide strategy diversity across at least 4 strategy types
 
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 3800,
+        maxTokens: 2800,
         temperature: 0.35,
       };
 
