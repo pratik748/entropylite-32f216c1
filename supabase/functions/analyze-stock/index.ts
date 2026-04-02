@@ -278,8 +278,9 @@ Include 6-8 news items with REAL recent headlines. Every data point must reflect
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in analyze-stock:", error);
+    if (error instanceof Response) return error;
     return new Response(JSON.stringify({ error: "Analysis failed", details: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
