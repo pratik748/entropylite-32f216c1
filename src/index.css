@@ -339,13 +339,13 @@
   }
 
   .glass-glow-primary {
-    box-shadow: var(--glow-primary);
+    box-shadow: var(--glow-glass-primary);
   }
   .glass-glow-loss {
-    box-shadow: var(--glow-loss);
+    box-shadow: var(--glow-glass-loss);
   }
   .glass-glow-gain {
-    box-shadow: var(--glow-gain);
+    box-shadow: var(--glow-glass-gain);
   }
 
   .gradient-border {
