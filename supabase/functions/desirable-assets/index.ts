@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI } from "../_shared/callAI.ts";
+import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
@@ -817,7 +817,7 @@ serve(async (req) => {
     let candidates: any[] = [];
 
     try {
-      const result = await callAI({
+      const aiOpts = {
         systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
 Reject low-quality names, random microcaps, and weak momentum setups.
 Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
@@ -848,12 +848,24 @@ Return via the tool call only.`,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
         maxTokens: 3800,
         temperature: 0.35,
-        provider: effectiveProvider,
-      });
+      };
 
-      parsed = safeParseJSON(result.text);
-      candidates = dedupeCandidates(Array.isArray(parsed?.recommendations) ? parsed.recommendations : []);
-      console.log(`desirable-assets Stage 1 done, provider: ${result.provider}, seed: ${seed}, aiCandidates: ${candidates.length}`);
+      // Fire BOTH providers in parallel for 2x candidate power
+      const parallelResults = await callAIParallel(aiOpts);
+      console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
+
+      for (const result of parallelResults) {
+        const p = safeParseJSON(result.text);
+        const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+        console.log(`desirable-assets: ${result.provider} returned ${recs.length} candidates`);
+        if (!parsed.marketCondition && p?.marketCondition) {
+          parsed.marketCondition = p.marketCondition;
+          parsed.regimeType = p.regimeType || "transition";
+        }
+        candidates.push(...recs);
+      }
+      candidates = dedupeCandidates(candidates);
+      console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
     } catch (aiError) {
       console.error("desirable-assets Stage 1 AI generation failed:", aiError);
     }
@@ -876,7 +888,7 @@ Return via the tool call only.`,
       candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
       console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
     } else {
-      candidates = dedupeCandidates(candidates).slice(0, 18);
+      candidates = dedupeCandidates(candidates).slice(0, 28);
       console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
     }
 

@@ -272,3 +272,37 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   console.log("callAI → Mistral (forced by provider preference)");
   return await callMistral(opts);
 }
+
+/**
+ * Fire both Cloudflare AND Mistral in parallel, return all successful results.
+ * Use different seeds/temperatures per provider for diversity.
+ */
+export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
+  const cfOpts = { ...opts, provider: "cloudflare" as const };
+  const miOpts = { ...opts, provider: "mistral" as const, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) };
+
+  console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
+
+  const results = await Promise.allSettled([
+    callCloudflare(cfOpts).catch(async (err) => {
+      console.warn("callAIParallel → Cloudflare failed:", err.message || err);
+      throw err;
+    }),
+    callMistral(miOpts).catch(async (err) => {
+      console.warn("callAIParallel → Mistral failed:", err.message || err);
+      throw err;
+    }),
+  ]);
+
+  const successes: AIResult[] = [];
+  for (const r of results) {
+    if (r.status === "fulfilled") successes.push(r.value);
+  }
+
+  if (successes.length === 0) {
+    throw new Error("callAIParallel: both providers failed");
+  }
+
+  console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
+  return successes;
+}
