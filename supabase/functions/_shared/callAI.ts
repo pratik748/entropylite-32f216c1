@@ -282,24 +282,40 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
 
+  // Race: collect results as they come, return after 25s max or when both done
+  const promises = [
+    callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
+      console.warn("callAIParallel → Cloudflare failed:", err.message || err);
+      return null;
+    }),
+    callMistral({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).then(r => ({ ...r, provider: "mistral" as const })).catch((err) => {
+      console.warn("callAIParallel → Mistral failed:", err.message || err);
+      return null;
+    }),
+  ];
+
+  // Wait for all but with a 25s ceiling
+  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 25000));
+  
   const results = await Promise.allSettled([
-    callAI({ ...opts, provider: "cloudflare" }).catch((err) => {
-      console.warn("callAIParallel → Cloudflare path failed:", err.message || err);
-      throw err;
-    }),
-    callAI({ ...opts, provider: "mistral", temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).catch((err) => {
-      console.warn("callAIParallel → Mistral path failed:", err.message || err);
-      throw err;
-    }),
+    Promise.race([promises[0], timeoutPromise]),
+    Promise.race([promises[1], timeoutPromise]),
   ]);
 
   const successes: AIResult[] = [];
   for (const r of results) {
-    if (r.status === "fulfilled") successes.push(r.value);
+    if (r.status === "fulfilled" && r.value) successes.push(r.value);
   }
 
   if (successes.length === 0) {
-    throw new Error("callAIParallel: both providers failed");
+    // Last resort: try just Mistral with generous timeout
+    console.log("callAIParallel → both failed, last-resort Mistral call");
+    try {
+      const lastResort = await callMistral(opts);
+      return [lastResort];
+    } catch {
+      throw new Error("callAIParallel: all providers failed");
+    }
   }
 
   console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
