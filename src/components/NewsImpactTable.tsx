@@ -1,4 +1,5 @@
 import { Newspaper, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { cleanAIText } from "@/lib/utils";
 
 export interface NewsItem {
   headline: string;
