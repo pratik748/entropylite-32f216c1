@@ -83,6 +83,7 @@ const COST_WEIGHT: Record<Tier, number> = {
   ai:         5,
   continuous: 3,
   evolution:  4,
+  heavy:      8,
 };
 
 // --------------- Singleton State ---------------
