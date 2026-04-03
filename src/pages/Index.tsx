@@ -337,7 +337,7 @@ const IndexContent = () => {
                           <NewsImpactTable news={analysis.news || []} overallSentiment={analysis.overallSentiment} totalPressure={analysis.totalPressure} />
                           <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
                             <SimulationTable currentPrice={analysis.currentPrice} bullRange={analysis.bullRange} neutralRange={analysis.neutralRange} bearRange={analysis.bearRange} currency={analysis.currency} />
-                            <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} />
+                            <Recommendation summary={analysis.summary} suggestion={analysis.suggestion} confidence={analysis.confidence} confidenceReasoning={analysis.confidenceReasoning} macroFactors={analysis.macroFactors} verdict={analysis.verdict} hedgeStrategy={analysis.hedgeStrategy} />
                           </div>
                         </>
                       )}

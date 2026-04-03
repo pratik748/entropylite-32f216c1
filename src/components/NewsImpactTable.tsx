@@ -65,7 +65,10 @@ const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTa
               <tr key={i} className="group border-b border-border/50 transition-colors hover:bg-surface-2">
                 <td className="py-3 pr-4">
                   <p className="font-medium text-foreground leading-snug">{item.headline}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.explanation}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {item.date && <span className="text-[10px] font-mono text-muted-foreground/60">{item.date}</span>}
+                    <p className="text-xs text-muted-foreground">{item.explanation}</p>
+                  </div>
                 </td>
                 <td className="py-3 pr-4">
                   <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${categoryColors[item.category]}`}>
