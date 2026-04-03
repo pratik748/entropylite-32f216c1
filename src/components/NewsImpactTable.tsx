@@ -2,6 +2,7 @@ import { Newspaper, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 export interface NewsItem {
   headline: string;
+  date?: string;
   category: "Company" | "Sector" | "Macro" | "Competitor";
   sentiment: number;
   shortTermImpact: number;
