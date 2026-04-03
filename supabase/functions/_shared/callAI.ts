@@ -113,7 +113,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
-  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 30000 : 15000;
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 3000 ? 30000 : 15000;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
@@ -186,7 +186,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     body.response_format = { type: "json_object" };
   }
 
-  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
