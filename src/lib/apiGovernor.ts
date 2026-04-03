@@ -30,16 +30,17 @@ interface GovernorMetrics {
   requestsInWindow: number;
 }
 
-type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution";
+type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy";
 
 const TTL: Record<Tier, number> = {
-  realtime:   8_000,    // 8s — prices
-  frequent:   15_000,   // 15s — market overview, ticker strip
-  slow:       60_000,   // 1 min — news, geopolitical, desirable assets
-  static:     Infinity, // permanent — historical data
-  ai:         30_000,   // 30s cooldown for AI calls
-  continuous: 60_000,   // 60s — background simulation loops
-  evolution:  120_000,  // 120s — strategy discovery
+  realtime:   8_000,       // 8s — prices
+  frequent:   15_000,      // 15s — market overview, ticker strip
+  slow:       60_000,      // 1 min — news, geopolitical, desirable assets
+  static:     Infinity,    // permanent — historical data
+  ai:         30_000,      // 30s cooldown for AI calls
+  continuous: 60_000,      // 60s — background simulation loops
+  evolution:  120_000,     // 120s — strategy discovery
+  heavy:      1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
 };
 
 const ENDPOINT_TIER: Record<string, Tier> = {
