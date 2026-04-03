@@ -186,7 +186,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     body.response_format = { type: "json_object" };
   }
 
-  const timeout = opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
