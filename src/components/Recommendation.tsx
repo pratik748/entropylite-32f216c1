@@ -82,7 +82,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
 
       <div className="mb-5">
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Analysis Summary</p>
-        <p className="text-sm leading-relaxed text-secondary-foreground">{summary}</p>
+        <p className="text-sm leading-relaxed text-secondary-foreground">{cleanAIText(summary)}</p>
       </div>
 
       <div>
