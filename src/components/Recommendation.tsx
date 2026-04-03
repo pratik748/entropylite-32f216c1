@@ -76,7 +76,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
       {confidenceReasoning && (
         <div className="mb-5">
           <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Confidence Reasoning</p>
-          <p className="text-sm leading-relaxed text-secondary-foreground italic">{confidenceReasoning}</p>
+          <p className="text-sm leading-relaxed text-secondary-foreground italic">{cleanAIText(confidenceReasoning)}</p>
         </div>
       )}
 
