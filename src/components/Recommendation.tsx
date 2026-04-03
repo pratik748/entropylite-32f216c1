@@ -34,7 +34,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
             <Target className={`h-5 w-5 mt-0.5 shrink-0 ${config.color}`} />
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Verdict</p>
-              <p className={`text-sm sm:text-base font-semibold leading-snug ${config.color}`}>{verdict}</p>
+              <p className={`text-sm sm:text-base font-semibold leading-snug ${config.color}`}>{cleanAIText(verdict)}</p>
             </div>
             <div className="text-right shrink-0">
               <p className={`font-mono text-2xl font-bold ${config.color}`}>{config.label}</p>
