@@ -230,6 +230,7 @@ CRITICAL NEWS RULES:
 - Include the date each headline was published.
 - DO NOT fabricate or hallucinate headlines. If you cannot recall a real headline, describe the real event factually (e.g. "Fed holds rates steady at June FOMC meeting").
 - News must be MARKET-MOVING — no generic filler like "Company continues operations".
+FORMATTING: Do NOT use markdown. No asterisks, no bold (**), no italic (*), no headers (#), no bullet points. Use plain text only. Numbers and percentages are fine.
 Every data point must reflect current market reality.`;
 
     let jsonStr: string;
