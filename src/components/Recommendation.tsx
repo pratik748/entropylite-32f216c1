@@ -1,4 +1,5 @@
 import { Brain, ArrowRight, Shield, Target } from "lucide-react";
+import { cleanAIText } from "@/lib/utils";
 
 interface RecommendationProps {
   summary: string;
@@ -33,7 +34,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
             <Target className={`h-5 w-5 mt-0.5 shrink-0 ${config.color}`} />
             <div className="flex-1">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Verdict</p>
-              <p className={`text-sm sm:text-base font-semibold leading-snug ${config.color}`}>{verdict}</p>
+              <p className={`text-sm sm:text-base font-semibold leading-snug ${config.color}`}>{cleanAIText(verdict)}</p>
             </div>
             <div className="text-right shrink-0">
               <p className={`font-mono text-2xl font-bold ${config.color}`}>{config.label}</p>
@@ -66,7 +67,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
             <Shield className="h-4 w-4 mt-0.5 shrink-0 text-info" />
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Hedge if Wrong</p>
-              <p className="text-sm leading-relaxed text-foreground">{hedgeStrategy}</p>
+              <p className="text-sm leading-relaxed text-foreground">{cleanAIText(hedgeStrategy)}</p>
             </div>
           </div>
         </div>
@@ -75,13 +76,13 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
       {confidenceReasoning && (
         <div className="mb-5">
           <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Confidence Reasoning</p>
-          <p className="text-sm leading-relaxed text-secondary-foreground italic">{confidenceReasoning}</p>
+          <p className="text-sm leading-relaxed text-secondary-foreground italic">{cleanAIText(confidenceReasoning)}</p>
         </div>
       )}
 
       <div className="mb-5">
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Analysis Summary</p>
-        <p className="text-sm leading-relaxed text-secondary-foreground">{summary}</p>
+        <p className="text-sm leading-relaxed text-secondary-foreground">{cleanAIText(summary)}</p>
       </div>
 
       <div>
@@ -89,7 +90,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
         <div className="flex flex-wrap gap-2">
           {macroFactors.map((f, i) => (
             <span key={i} className="rounded-md bg-surface-3 px-2.5 py-1 text-xs text-muted-foreground">
-              {f}
+              {cleanAIText(f)}
             </span>
           ))}
         </div>
