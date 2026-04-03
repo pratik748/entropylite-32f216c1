@@ -327,7 +327,7 @@ export function flushAnalyticalCaches() {
  * Flush AI-tier caches only — called when provider is switched.
  */
 export function flushAICaches() {
-  const aiTiers: Tier[] = ["ai", "continuous", "evolution"];
+  const aiTiers: Tier[] = ["ai", "continuous", "evolution", "heavy"];
   for (const key of Array.from(cache.keys())) {
     // Check if the endpoint is AI-tier
     const fn = key.split("::")[0];
