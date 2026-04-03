@@ -90,7 +90,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
         <div className="flex flex-wrap gap-2">
           {macroFactors.map((f, i) => (
             <span key={i} className="rounded-md bg-surface-3 px-2.5 py-1 text-xs text-muted-foreground">
-              {f}
+              {cleanAIText(f)}
             </span>
           ))}
         </div>
