@@ -65,10 +65,10 @@ const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTa
             {news.map((item, i) => (
               <tr key={i} className="group border-b border-border/50 transition-colors hover:bg-surface-2">
                 <td className="py-3 pr-4">
-                  <p className="font-medium text-foreground leading-snug">{item.headline}</p>
+                  <p className="font-medium text-foreground leading-snug">{cleanAIText(item.headline)}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {item.date && <span className="text-[10px] font-mono text-muted-foreground/60">{item.date}</span>}
-                    <p className="text-xs text-muted-foreground">{item.explanation}</p>
+                    <p className="text-xs text-muted-foreground">{cleanAIText(item.explanation)}</p>
                   </div>
                 </td>
                 <td className="py-3 pr-4">
