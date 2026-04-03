@@ -57,7 +57,7 @@ const EntropySandbox = ({ stocks }: Props) => {
       case "crown": return <CrownLayer stocks={stocks} />;
       case "execution": return <ExecutionEngine stocks={stocks} />;
       case "command": return <PortfolioCommandCenter stocks={stocks} />;
-      case "scar": return <ScarMemory />;
+      case "scar": return <ScarMemory stocks={stocks} />;
       case "factory": return <StrategyFactory stocks={stocks} />;
       case "derivatives": return <DerivativesEngine stocks={stocks} />;
       case "odgs": return <OutcomeGradientDashboard />;
