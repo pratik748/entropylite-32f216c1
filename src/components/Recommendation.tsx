@@ -67,7 +67,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
             <Shield className="h-4 w-4 mt-0.5 shrink-0 text-info" />
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Hedge if Wrong</p>
-              <p className="text-sm leading-relaxed text-foreground">{hedgeStrategy}</p>
+              <p className="text-sm leading-relaxed text-foreground">{cleanAIText(hedgeStrategy)}</p>
             </div>
           </div>
         </div>
