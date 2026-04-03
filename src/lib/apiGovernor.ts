@@ -30,16 +30,17 @@ interface GovernorMetrics {
   requestsInWindow: number;
 }
 
-type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution";
+type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy";
 
 const TTL: Record<Tier, number> = {
-  realtime:   8_000,    // 8s — prices
-  frequent:   15_000,   // 15s — market overview, ticker strip
-  slow:       60_000,   // 1 min — news, geopolitical, desirable assets
-  static:     Infinity, // permanent — historical data
-  ai:         30_000,   // 30s cooldown for AI calls
-  continuous: 60_000,   // 60s — background simulation loops
-  evolution:  120_000,  // 120s — strategy discovery
+  realtime:   8_000,       // 8s — prices
+  frequent:   15_000,      // 15s — market overview, ticker strip
+  slow:       60_000,      // 1 min — news, geopolitical, desirable assets
+  static:     Infinity,    // permanent — historical data
+  ai:         30_000,      // 30s cooldown for AI calls
+  continuous: 60_000,      // 60s — background simulation loops
+  evolution:  120_000,     // 120s — strategy discovery
+  heavy:      1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
 };
 
 const ENDPOINT_TIER: Record<string, Tier> = {
@@ -53,13 +54,13 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "strategy-generate":       "ai",
   "causal-effects":          "ai",
   "sentiment-intel":         "slow",
-  "risk-intelligence":       "ai",
-  "flow-intelligence":       "ai",
-  "portfolio-intelligence":  "ai",
+  "risk-intelligence":       "heavy",
+  "flow-intelligence":       "heavy",
+  "portfolio-intelligence":  "heavy",
   "monte-carlo-intelligence":"ai",
   "crown-intelligence":      "ai",
-  "deep-intelligence":       "ai",
-  "parallel-intelligence":   "ai",
+  "deep-intelligence":       "heavy",
+  "parallel-intelligence":   "heavy",
   "continuous-simulation":   "continuous",
   "clank-detection":         "ai",
   "strategy-evolution":      "evolution",
@@ -68,7 +69,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "alternative-signals":     "slow",
   "institutional-flows":     "slow",
   "data-pipeline-status":    "frequent",
-  "derivatives-intelligence":"ai",
+  "derivatives-intelligence":"heavy",
   "historical-prices":        "slow",
   // company-intelligence removed — uses its own 24h localStorage cache
 };
@@ -82,6 +83,7 @@ const COST_WEIGHT: Record<Tier, number> = {
   ai:         5,
   continuous: 3,
   evolution:  4,
+  heavy:      8,
 };
 
 // --------------- Singleton State ---------------
@@ -325,7 +327,7 @@ export function flushAnalyticalCaches() {
  * Flush AI-tier caches only — called when provider is switched.
  */
 export function flushAICaches() {
-  const aiTiers: Tier[] = ["ai", "continuous", "evolution"];
+  const aiTiers: Tier[] = ["ai", "continuous", "evolution", "heavy"];
   for (const key of Array.from(cache.keys())) {
     // Check if the endpoint is AI-tier
     const fn = key.split("::")[0];

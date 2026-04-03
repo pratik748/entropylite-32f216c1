@@ -72,7 +72,6 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
 
     try {
       const { data: result, error: err } = await governedInvoke<DerivativesData>("derivatives-intelligence", {
-        tier: "slow",
         force,
         body: {
           tickers: analyzed.map(s => s.ticker),
