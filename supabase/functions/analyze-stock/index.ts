@@ -203,6 +203,8 @@ Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
   "suggestion": "<Hold | Add | Exit>",
   "confidence": <0-100>,
   "confidenceReasoning": "<2-3 sentence explanation>",
+  "verdict": "<1 sentence clear actionable verdict e.g. 'Buy aggressively on dips below 1500 with a 12-month target of 1850' or 'Exit immediately — downtrend confirmed with no catalyst in sight'>",
+  "hedgeStrategy": "<Specific hedge if the primary suggestion fails, e.g. 'Buy 1-month ATM put at strike 1450 (~2% premium) to cap downside at -5%' or 'Short Nifty IT index futures 1:0.5 ratio to hedge sector beta' — NEVER say 'no hedge needed', always provide a concrete defensive play>",
   "summary": "<4-5 sentence deep analysis>",
   "macroFactors": ["<factor1>", "<factor2>"],
   "overallSentiment": <-100 to 100>,
@@ -219,10 +221,16 @@ Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
   "debtToEquity": <number or null>,
   "esgScore": <0-100 or null>,
   "technicals": { "rsi": <number>, "support": <number>, "resistance": <number>, "trend": "<bullish|bearish|sideways>", "maSignal": "<above_200dma|below_200dma|crossing>" },
-  "news": [{ "headline": "<real headline>", "category": "<Company|Sector|Macro>", "sentiment": <-100 to 100>, "shortTermImpact": <% number>, "longTermImpact": <% number>, "confidence": <0-100>, "explanation": "<2 sentence>" }]
+  "news": [{ "headline": "<REAL recent headline from the last 7 days — must be a genuine news event, not fabricated>", "date": "<YYYY-MM-DD>", "category": "<Company|Sector|Macro>", "sentiment": <-100 to 100>, "shortTermImpact": <% number>, "longTermImpact": <% number>, "confidence": <0-100>, "explanation": "<2 sentence>" }]
 }
 ALL price values (currentPrice, support, resistance, bullRange, bearRange, neutralRange) MUST be in ${currency}.
-Include 6-8 news items with REAL recent headlines. Every data point must reflect current market reality.`;
+CRITICAL NEWS RULES:
+- Include 6-8 news items with REAL headlines from the LAST 7 DAYS only. Today is ${new Date().toISOString().split('T')[0]}.
+- Each headline must reference a real event (earnings release, analyst upgrade/downgrade, regulatory action, macro data release, sector development).
+- Include the date each headline was published.
+- DO NOT fabricate or hallucinate headlines. If you cannot recall a real headline, describe the real event factually (e.g. "Fed holds rates steady at June FOMC meeting").
+- News must be MARKET-MOVING — no generic filler like "Company continues operations".
+Every data point must reflect current market reality.`;
 
     let jsonStr: string;
     try {
