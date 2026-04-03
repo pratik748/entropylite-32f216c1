@@ -1,4 +1,5 @@
 import { Brain, ArrowRight, Shield, Target } from "lucide-react";
+import { cleanAIText } from "@/lib/utils";
 
 interface RecommendationProps {
   summary: string;
