@@ -72,19 +72,23 @@ const DerivativesEngine = ({ stocks }: Props) => {
   const { data, loading, error, analyze } = useDerivativesIntelligence(stocks);
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const analyzed = stocks.filter(s => s.analysis);
+  const analyzedSignature = useMemo(
+    () => analyzed.map((s) => `${s.ticker}:${s.quantity}:${s.buyPrice}`).sort().join("|"),
+    [analyzed],
+  );
 
   useEffect(() => {
     if (analyzed.length > 0 && !data && !loading) {
       analyze(false, newsHeadlines, "", sentimentMood);
     }
-  }, [analyzed.length]);
+  }, [analyzedSignature]);
 
   // Fetch historical prices for real correlation matrix
   useEffect(() => {
     if (analyzed.length > 0) {
       fetchHistorical(analyzed.map(s => s.ticker));
     }
-  }, [analyzed.length]);
+  }, [analyzedSignature]);
 
   const assetCount = analyzed.length;
   const optionsCount = data?.options_intel?.length ?? 0;
@@ -727,6 +731,22 @@ const DerivativesEngine = ({ stocks }: Props) => {
       );
     }
 
+    if (error && !data) {
+      return (
+        <div className="glass-panel rounded-xl p-6 border border-red-500/20 text-center space-y-3">
+          <p className="text-sm font-semibold text-foreground">Derivatives engine failed to complete.</p>
+          <p className="text-xs text-muted-foreground">{error}</p>
+          <button
+            onClick={() => analyze(true, newsHeadlines, "", sentimentMood)}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-mono text-primary hover:bg-primary/10 transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" />
+            RETRY ANALYSIS
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "discoveries": return renderDiscoveries();
       case "correlations": return renderCorrelations();
@@ -761,8 +781,9 @@ const DerivativesEngine = ({ stocks }: Props) => {
           })}
           <div className="flex-1" />
           {data && (
-            <span className="text-[9px] font-mono text-muted-foreground mr-2">
-              {optionsCount}/{assetCount} assets · {pairsCount} pairs · {discoveryCount} discoveries
+            <span className="text-[9px] font-mono text-muted-foreground mr-2 text-right">
+              <span className="block">{optionsCount}/{assetCount} assets · {pairsCount} pairs · {discoveryCount} discoveries</span>
+              <span className="block uppercase">{data.engine || data.provider || "live"}{data.generated_at ? ` · ${new Date(data.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
             </span>
           )}
           <button
@@ -775,6 +796,12 @@ const DerivativesEngine = ({ stocks }: Props) => {
           </button>
         </div>
       </div>
+
+      {error && data && (
+        <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400">
+          Latest refresh failed, showing the most recent completed derivatives snapshot.
+        </div>
+      )}
 
       {data && optionsCount < assetCount && (
         <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400 flex items-center gap-2">
