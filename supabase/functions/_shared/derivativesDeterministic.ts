@@ -114,6 +114,7 @@ function hedgeInstrument(indiaMode: boolean, bias: Bias, themes: string[]) {
     if (themes.includes("gold") || bias === "risk_off") return "GOLDBEES.NS / MCX gold";
     return "NIFTY protective puts";
   }
+  if (bias === "risk_off") return "GLD / GC futures";
   if (themes.includes("rates")) return "TLT calls";
   if (themes.includes("gold") || bias === "risk_off") return "GLD / GC futures";
   return "SPY protective puts";
@@ -353,7 +354,7 @@ export function generateDerivativesIntelligence(body: DerivativesRequestBody) {
         instrument: hedgeInstrument(!!body.indiaMode, context.bias, context.themes),
         action: context.bias === "risk_on" ? "Trim" : "Buy",
         size: neutralitySize(weights, context.bias),
-        reasoning: `${context.headline}. Hedge size is intentionally moderate so the engine reverses bias without becoming too punitive.`,
+        reasoning: `${context.headline}. Hedge size is intentionally measured and moderate so the engine reverses bias without becoming too punitive.`,
         confidence: round(clamp(0.6 + context.intensity * 0.18, 0.6, 0.9)),
       },
     ],
