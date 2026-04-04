@@ -231,7 +231,7 @@ Use real market knowledge for these tickers. Be specific and actionable. Each ti
       userPrompt,
       maxTokens,
       temperature: 0.5,
-      provider: provider || "mistral",
+      provider: provider || "cloudflare",
       jsonMode: true,
     });
 
