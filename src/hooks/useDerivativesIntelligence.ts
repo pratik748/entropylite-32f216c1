@@ -76,6 +76,7 @@ export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
     try {
       const { data: result, error: err } = await governedInvoke<DerivativesData>("derivatives-intelligence", {
         force,
+        tier: "frequent",
         body: {
           tickers: analyzed.map(s => s.ticker),
           weights: analyzed.map(s => ((s.analysis?.currentPrice ?? s.buyPrice) * s.quantity) / (totalValue || 1)),
