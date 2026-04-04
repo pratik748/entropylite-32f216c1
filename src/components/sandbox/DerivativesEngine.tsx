@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, Cell, PieChart, Pie, RadarChart, PolarGrid, PolarAngleAxis,
@@ -15,6 +15,8 @@ import {
   covarianceMatrix, returns, mean, stddev, zScore,
 } from "@/lib/statarb-math";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
+import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
+import { useMarketRegime } from "@/hooks/useMarketRegime";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -67,21 +69,78 @@ function pctFmt(v: number) { return `${(v * 100).toFixed(1)}%`; }
 
 const DerivativesEngine = ({ stocks }: Props) => {
   const [activeTab, setActiveTab] = useState<SubTab>("discoveries");
-  const [newsHeadlines, setNewsHeadlines] = useState<string>("");
-  const [sentimentMood, setSentimentMood] = useState<string>("");
   const { data, loading, error, analyze } = useDerivativesIntelligence(stocks);
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
+  const { data: macroIntelligence } = useMacroIntelligence();
+  const marketRegime = useMarketRegime(15000);
   const analyzed = stocks.filter(s => s.analysis);
+  const lastAnalysisSignature = useRef<string>("");
   const analyzedSignature = useMemo(
     () => analyzed.map((s) => `${s.ticker}:${s.quantity}:${s.buyPrice}`).sort().join("|"),
     [analyzed],
   );
 
+  const newsHeadlines = useMemo(
+    () => (marketRegime?.keyEvents || []).slice(0, 6).join(" | "),
+    [marketRegime],
+  );
+
+  const macroContext = useMemo(() => {
+    const regimeSummary = marketRegime
+      ? `Regime ${marketRegime.regime}; VIX ${marketRegime.vix}; mood ${marketRegime.moodScore}; movers ${marketRegime.topMovers?.slice(0, 3).map((m) => `${m.name} ${m.change > 0 ? "+" : ""}${m.change.toFixed(1)}%`).join(", ") || "none"}`
+      : "";
+
+    const indicatorSummary = macroIntelligence?.indicators
+      ?.slice(0, 5)
+      .map((indicator) => `${indicator.name}: ${indicator.value} (${indicator.trend})`)
+      .join(" | ") || "";
+
+    return [regimeSummary, indicatorSummary].filter(Boolean).join(" | ");
+  }, [macroIntelligence, marketRegime]);
+
+  const sentimentMood = useMemo(() => {
+    if (!marketRegime) return "";
+    const conditions = marketRegime.conditions?.slice(0, 3).map((condition) => condition.label).join(", ");
+    return `${marketRegime.regime} · mood ${marketRegime.moodScore} · ${conditions || "stable cross-asset tone"}`;
+  }, [marketRegime]);
+
+  const liveContextSignature = useMemo(
+    () => `${newsHeadlines}::${macroContext}::${sentimentMood}`,
+    [newsHeadlines, macroContext, sentimentMood],
+  );
+
+  const runLiveAnalysis = useCallback((force = false) => {
+    if (analyzed.length === 0) return;
+    analyze(force, newsHeadlines, macroContext, sentimentMood);
+  }, [analyzed.length, analyze, newsHeadlines, macroContext, sentimentMood]);
+
   useEffect(() => {
-    if (analyzed.length > 0 && !data && !loading) {
-      analyze(false, newsHeadlines, "", sentimentMood);
-    }
-  }, [analyzedSignature]);
+    if (analyzed.length === 0 || loading) return;
+    const signature = `${analyzedSignature}::${liveContextSignature}`;
+    if (!signature || lastAnalysisSignature.current === signature) return;
+    lastAnalysisSignature.current = signature;
+    runLiveAnalysis(!!data);
+  }, [analyzed.length, analyzedSignature, liveContextSignature, loading, data, runLiveAnalysis]);
+
+  useEffect(() => {
+    if (analyzed.length === 0) return;
+
+    const handleVisibleRefresh = () => {
+      if (document.visibilityState === "visible") {
+        runLiveAnalysis(true);
+      }
+    };
+
+    const handleFocusRefresh = () => runLiveAnalysis(true);
+
+    document.addEventListener("visibilitychange", handleVisibleRefresh);
+    window.addEventListener("focus", handleFocusRefresh);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibleRefresh);
+      window.removeEventListener("focus", handleFocusRefresh);
+    };
+  }, [analyzed.length, analyzedSignature, runLiveAnalysis]);
 
   // Fetch historical prices for real correlation matrix
   useEffect(() => {
@@ -737,7 +796,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
           <p className="text-sm font-semibold text-foreground">Derivatives engine failed to complete.</p>
           <p className="text-xs text-muted-foreground">{error}</p>
           <button
-            onClick={() => analyze(true, newsHeadlines, "", sentimentMood)}
+            onClick={() => runLiveAnalysis(true)}
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-mono text-primary hover:bg-primary/10 transition-colors"
           >
             <RefreshCw className="h-3 w-3" />
@@ -787,7 +846,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             </span>
           )}
           <button
-            onClick={() => analyze(true, newsHeadlines, "", sentimentMood)}
+            onClick={() => runLiveAnalysis(true)}
             disabled={loading}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
           >
