@@ -40,7 +40,7 @@ serve(async (req) => {
     const discoveryCount = discovery_mode ? Math.max(10, Math.min(n * 3, 20)) : 0;
     const seed = Math.floor(Math.random() * 99999);
 
-    const maxTokens = Math.min(12000, 4000 + n * 400 + (discovery_mode ? 3000 : 0));
+    const maxTokens = Math.min(8000, 3500 + n * 300 + (discovery_mode ? 2000 : 0));
 
     const sentimentBlock = sentiment_context ? `
 REAL-TIME SENTIMENT CONTEXT:
