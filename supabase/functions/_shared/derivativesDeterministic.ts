@@ -116,7 +116,7 @@ function hedgeInstrument(indiaMode: boolean, bias: Bias, themes: string[]) {
   }
   if (bias === "risk_off") return "GLD / GC futures";
   if (themes.includes("rates")) return "TLT calls";
-  if (themes.includes("gold") || bias === "risk_off") return "GLD / GC futures";
+  if (themes.includes("gold")) return "GLD / GC futures";
   return "SPY protective puts";
 }
 
