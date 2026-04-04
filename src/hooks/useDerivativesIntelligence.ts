@@ -54,6 +54,9 @@ export interface DerivativesData {
   }[];
   discoveries?: DiscoveryOpportunity[];
   provider?: string;
+  engine?: string;
+  generated_at?: string;
+  market_bias?: string;
 }
 
 export function useDerivativesIntelligence(stocks: PortfolioStock[]) {
