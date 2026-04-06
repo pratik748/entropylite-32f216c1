@@ -33,30 +33,32 @@ export default function AuthPage() {
         className="absolute inset-0 w-full h-full object-cover object-center"
       />
 
-      {/* Top section: Logo + Tagline — positioned above the horses */}
-      <div className="relative z-10 flex flex-col items-center pt-10 sm:pt-14 gap-3">
-        <img
-          src={entropyLogo}
-          alt="Entropy"
-          className="h-20 object-contain"
-        />
-        <h1
-          className="text-center leading-tight"
-          style={{
-            fontFamily: "'Pinyon Script', cursive",
-            fontSize: "clamp(1.8rem, 5vw, 3rem)",
-            color: "#000000",
-            fontWeight: 400,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          Operating System of Finance
-        </h1>
+      {/* Top section: Logo + Tagline in a glass card, clear of the horses */}
+      <div className="relative z-10 flex flex-col items-center pt-8 sm:pt-12 px-4">
+        <div className="flex flex-col items-center gap-4 px-8 py-5 rounded-sm border border-white/30 bg-white/40 backdrop-blur-xl">
+          <img
+            src={entropyLogo}
+            alt="Entropy"
+            className="h-16 object-contain"
+          />
+          <h1
+            className="text-center leading-tight"
+            style={{
+              fontFamily: "'Pinyon Script', cursive",
+              fontSize: "clamp(1.6rem, 4.5vw, 2.6rem)",
+              color: "#000000",
+              fontWeight: 400,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Operating System of Finance
+          </h1>
+        </div>
       </div>
 
       {/* Bottom section: Auth buttons — positioned below the horses */}
       <div className="relative z-10 mt-auto pb-10 sm:pb-14 flex flex-col items-center px-6">
-        <div className="w-full max-w-xs space-y-3 border border-black/10 rounded-sm p-5 bg-white/90">
+        <div className="w-full max-w-xs space-y-3 border border-white/30 rounded-sm p-5 bg-white/40 backdrop-blur-xl">
           <Button
             variant="outline"
             className="w-full h-11 font-mono text-xs tracking-wide border-black/20 hover:bg-black/5 bg-white text-black"
