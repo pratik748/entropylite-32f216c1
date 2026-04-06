@@ -19,49 +19,47 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col overflow-hidden bg-white">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
       {/* Load signature font */}
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap"
         rel="stylesheet"
       />
 
-      {/* Background image - no overlay, no blur */}
+      {/* Background image with subtle blur for glass aesthetic */}
       <img
         src={authBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover object-center"
+        className="absolute inset-0 w-full h-full object-cover object-center blur-[2px]"
       />
+      {/* Light frosted overlay */}
+      <div className="absolute inset-0 bg-white/20" />
 
-      {/* Top section: Logo + Tagline in a glass card, clear of the horses */}
-      <div className="relative z-10 flex flex-col items-center pt-8 sm:pt-12 px-4">
-        <div className="flex flex-col items-center gap-4 px-8 py-5 rounded-sm border border-white/30 bg-white/40 backdrop-blur-xl">
-          <img
-            src={entropyLogo}
-            alt="Entropy"
-            className="h-16 object-contain"
-          />
-          <h1
-            className="text-center leading-tight"
-            style={{
-              fontFamily: "'Pinyon Script', cursive",
-              fontSize: "clamp(1.6rem, 4.5vw, 2.6rem)",
-              color: "#000000",
-              fontWeight: 400,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Operating System of Finance
-          </h1>
-        </div>
-      </div>
+      {/* Single centered card — everything in one block, no overlaps */}
+      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-sm border border-white/40 bg-white/30 backdrop-blur-2xl shadow-lg">
+        <img
+          src={entropyLogo}
+          alt="Entropy"
+          className="h-16 object-contain"
+        />
 
-      {/* Bottom section: Auth buttons — positioned below the horses */}
-      <div className="relative z-10 mt-auto pb-10 sm:pb-14 flex flex-col items-center px-6">
-        <div className="w-full max-w-xs space-y-3 border border-white/30 rounded-sm p-5 bg-white/40 backdrop-blur-xl">
+        <h1
+          className="text-center leading-tight"
+          style={{
+            fontFamily: "'Pinyon Script', cursive",
+            fontSize: "clamp(1.6rem, 4.5vw, 2.6rem)",
+            color: "#000000",
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Operating System of Finance
+        </h1>
+
+        <div className="w-full space-y-3">
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-black/20 hover:bg-black/5 bg-white text-black"
+            className="w-full h-11 font-mono text-xs tracking-wide border-black/15 hover:bg-white/60 bg-white/50 text-black"
             onClick={() => handleOAuth("google")}
             disabled={!!loading}
           >
@@ -80,7 +78,7 @@ export default function AuthPage() {
 
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-black/20 hover:bg-black/5 bg-white text-black"
+            className="w-full h-11 font-mono text-xs tracking-wide border-black/15 hover:bg-white/60 bg-white/50 text-black"
             onClick={() => handleOAuth("apple")}
             disabled={!!loading}
           >
@@ -95,7 +93,7 @@ export default function AuthPage() {
           </Button>
         </div>
 
-        <p className="mt-4 text-center font-mono text-[9px] text-black/30 uppercase tracking-[0.2em]">
+        <p className="text-center font-mono text-[9px] text-black/30 uppercase tracking-[0.2em]">
           Secure authentication required
         </p>
       </div>
