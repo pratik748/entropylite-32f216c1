@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import entropyLogo from "@/assets/entropy-logo-auth.jpeg";
-import authBg from "@/assets/auth-bg.gif";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -19,53 +18,30 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden">
-      {/* Load signature font */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap"
-        rel="stylesheet"
-      />
-
-      {/* GIF Background */}
-      <img
-        src={authBg}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/60" />
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle radial glow behind logo */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[600px] h-[600px] rounded-full bg-foreground/[0.02] blur-3xl" />
+      </div>
 
       <div className="w-full max-w-sm space-y-8 relative z-10">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-5">
+        <div className="flex flex-col items-center gap-4">
           <img
             src={entropyLogo}
             alt="Entropy"
             className="h-24 object-contain invert"
           />
-
-          {/* Tagline in signature font */}
-          <h1
-            className="text-center leading-tight"
-            style={{
-              fontFamily: "'Dancing Script', cursive",
-              fontSize: "clamp(2rem, 5.5vw, 3.2rem)",
-              color: "#1B5E20",
-              fontWeight: 700,
-              fontStyle: "italic",
-              textShadow: "0 0 20px rgba(27,94,32,0.35), 0 2px 6px rgba(0,0,0,0.5)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Operating System of Finance
-          </h1>
+          <p className="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-[0.3em]">
+            Financial Intelligence Terminal
+          </p>
         </div>
 
         {/* Auth buttons */}
-        <div className="space-y-3 border border-border/40 rounded-sm p-6 bg-black/50 backdrop-blur-md">
+        <div className="space-y-3 border border-border rounded-sm p-6 bg-card/50 backdrop-blur-sm">
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-black/40 text-white"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border hover:bg-accent"
             onClick={() => handleOAuth("google")}
             disabled={!!loading}
           >
@@ -84,7 +60,7 @@ export default function AuthPage() {
 
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-black/40 text-white"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border hover:bg-accent"
             onClick={() => handleOAuth("apple")}
             disabled={!!loading}
           >
@@ -99,7 +75,7 @@ export default function AuthPage() {
           </Button>
         </div>
 
-        <p className="text-center font-mono text-[9px] text-white/30 uppercase tracking-[0.2em]">
+        <p className="text-center font-mono text-[9px] text-muted-foreground/30 uppercase tracking-[0.2em]">
           Secure authentication required
         </p>
       </div>
