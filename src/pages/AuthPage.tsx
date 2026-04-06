@@ -19,53 +19,47 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-screen relative flex flex-col overflow-hidden bg-white">
       {/* Load signature font */}
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap"
         rel="stylesheet"
       />
 
-      {/* GIF Background */}
+      {/* Background image - no overlay, no blur */}
       <img
         src={authBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover object-center"
       />
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-white/30" />
 
-      <div className="w-full max-w-sm space-y-8 relative z-10">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-5">
-          <img
-            src={entropyLogo}
-            alt="Entropy"
-            className="h-24 object-contain"
-          />
+      {/* Top section: Logo + Tagline — positioned above the horses */}
+      <div className="relative z-10 flex flex-col items-center pt-10 sm:pt-14 gap-3">
+        <img
+          src={entropyLogo}
+          alt="Entropy"
+          className="h-20 object-contain"
+        />
+        <h1
+          className="text-center leading-tight"
+          style={{
+            fontFamily: "'Pinyon Script', cursive",
+            fontSize: "clamp(1.8rem, 5vw, 3rem)",
+            color: "#000000",
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Operating System of Finance
+        </h1>
+      </div>
 
-          {/* Tagline in signature font */}
-          <h1
-            className="text-center leading-tight"
-            style={{
-              fontFamily: "'Pinyon Script', cursive",
-              fontSize: "clamp(2rem, 5.5vw, 3.2rem)",
-              color: "#000000",
-              fontWeight: 400,
-              fontStyle: "normal",
-              textShadow: "0 2px 6px rgba(0,0,0,0.3)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Operating System of Finance
-          </h1>
-        </div>
-
-        {/* Auth buttons */}
-        <div className="space-y-3 border border-border/40 rounded-sm p-6 bg-white/60 backdrop-blur-md">
+      {/* Bottom section: Auth buttons — positioned below the horses */}
+      <div className="relative z-10 mt-auto pb-10 sm:pb-14 flex flex-col items-center px-6">
+        <div className="w-full max-w-xs space-y-3 border border-black/10 rounded-sm p-5 bg-white/90">
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-white/40 text-black"
+            className="w-full h-11 font-mono text-xs tracking-wide border-black/20 hover:bg-black/5 bg-white text-black"
             onClick={() => handleOAuth("google")}
             disabled={!!loading}
           >
@@ -84,7 +78,7 @@ export default function AuthPage() {
 
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-white/40 text-black"
+            className="w-full h-11 font-mono text-xs tracking-wide border-black/20 hover:bg-black/5 bg-white text-black"
             onClick={() => handleOAuth("apple")}
             disabled={!!loading}
           >
@@ -99,7 +93,7 @@ export default function AuthPage() {
           </Button>
         </div>
 
-        <p className="text-center font-mono text-[9px] text-black/30 uppercase tracking-[0.2em]">
+        <p className="mt-4 text-center font-mono text-[9px] text-black/30 uppercase tracking-[0.2em]">
           Secure authentication required
         </p>
       </div>
