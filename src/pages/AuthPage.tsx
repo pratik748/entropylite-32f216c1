@@ -41,7 +41,7 @@ export default function AuthPage() {
           <img
             src={entropyLogo}
             alt="Entropy"
-            className="h-24 object-contain invert"
+            className="h-24 object-contain"
           />
 
           {/* Tagline in signature font */}
@@ -62,10 +62,10 @@ export default function AuthPage() {
         </div>
 
         {/* Auth buttons */}
-        <div className="space-y-3 border border-border/40 rounded-sm p-6 bg-black/50 backdrop-blur-md">
+        <div className="space-y-3 border border-border/40 rounded-sm p-6 bg-white/60 backdrop-blur-md">
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-black/40 text-white"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-white/40 text-black"
             onClick={() => handleOAuth("google")}
             disabled={!!loading}
           >
@@ -84,7 +84,7 @@ export default function AuthPage() {
 
           <Button
             variant="outline"
-            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-black/40 text-white"
+            className="w-full h-11 font-mono text-xs tracking-wide border-border/50 hover:bg-accent bg-white/40 text-black"
             onClick={() => handleOAuth("apple")}
             disabled={!!loading}
           >
@@ -99,7 +99,7 @@ export default function AuthPage() {
           </Button>
         </div>
 
-        <p className="text-center font-mono text-[9px] text-white/30 uppercase tracking-[0.2em]">
+        <p className="text-center font-mono text-[9px] text-black/30 uppercase tracking-[0.2em]">
           Secure authentication required
         </p>
       </div>
