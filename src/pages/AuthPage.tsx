@@ -30,7 +30,7 @@ export default function AuthPage() {
       <img
         src={authBg}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover object-center blur-[2px]"
+        className="absolute inset-0 w-full h-full object-cover object-center"
       />
       {/* Light frosted overlay */}
       <div className="absolute inset-0 bg-white/20" />
