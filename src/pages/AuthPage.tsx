@@ -103,9 +103,11 @@ export default function AuthPage() {
         className="absolute bottom-8 left-0 right-0 text-center z-10"
         style={{
           fontFamily: "'Great Vibes', cursive",
-          fontSize: "clamp(1.1rem, 3vw, 1.6rem)",
-          color: "#000000",
+          fontSize: "clamp(1.4rem, 4vw, 2.2rem)",
           fontWeight: 400,
+          color: "#C5942A",
+          textShadow: "1px 1px 0px #8B6914, 2px 2px 1px #6B4F10, 0px 0px 8px rgba(197,148,42,0.4)",
+          letterSpacing: "0.02em",
         }}
       >
         Stop following the crowd when they're all lost.
