@@ -545,57 +545,79 @@ const ALLOWED_STRATEGIES = new Set([
   "momentum",
 ]);
 
-const ELITE_FALLBACK_UNIVERSE = [
-  // Tier 1: Under-covered mid-caps with real edge
-  { ticker: "AXON", name: "Axon Enterprise", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "DECK", name: "Deckers Outdoor", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  { ticker: "TOST", name: "Toast Inc", sector: "Technology", marketCap: "mid", strategy: "equity" },
-  { ticker: "DUOL", name: "Duolingo", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "CELH", name: "Celsius Holdings", sector: "Consumer Staples", marketCap: "mid", strategy: "mean_reversion" },
-  { ticker: "ANET", name: "Arista Networks", sector: "Technology", marketCap: "large", strategy: "equity" },
-  { ticker: "WFRD", name: "Weatherford Intl", sector: "Energy", marketCap: "mid", strategy: "equity" },
-  { ticker: "HOOD", name: "Robinhood Markets", sector: "Financials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "MNDY", name: "Monday.com", sector: "Technology", marketCap: "mid", strategy: "equity" },
-  { ticker: "APP", name: "AppLovin", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  // Tier 2: Structural/catalyst plays
-  { ticker: "VST", name: "Vistra Corp", sector: "Utilities", marketCap: "large", strategy: "equity" },
-  { ticker: "TRGP", name: "Targa Resources", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "EME", name: "EMCOR Group", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "FIX", name: "Comfort Systems", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "CAVA", name: "CAVA Group", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  // Tier 3: Hedges & pairs
-  { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-  { ticker: "TLT", name: "iShares 20+ Year Treasury", sector: "Fixed Income", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
-  { ticker: "URA", name: "Global X Uranium ETF", sector: "Energy", marketCap: "mid", strategy: "momentum", assetClass: "ETF" },
-];
+function normalizeCandidate(rec: any): any | null {
+  const ticker = String(rec?.ticker || "").trim().toUpperCase();
+  if (!ticker || ticker.length > 16) return null;
 
-const INDIA_FALLBACK_UNIVERSE = [
-  // Tier 1: Under-covered mid-caps with real edge
-  { ticker: "TRENT.NS", name: "Trent Limited", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  { ticker: "PERSISTENT.NS", name: "Persistent Systems", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "POLYCAB.NS", name: "Polycab India", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "ZOMATO.NS", name: "Zomato", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  { ticker: "JIOFIN.NS", name: "Jio Financial Services", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "KAYNES.NS", name: "Kaynes Technology", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "BEL.NS", name: "Bharat Electronics", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "HAL.NS", name: "Hindustan Aeronautics", sector: "Industrials", marketCap: "large", strategy: "momentum" },
-  { ticker: "CAMS.NS", name: "Computer Age Management", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "CDSL.NS", name: "Central Depository Services", sector: "Financials", marketCap: "mid", strategy: "momentum" },
-  // Tier 2: Structural plays
-  { ticker: "IRFC.NS", name: "Indian Railway Finance", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "RECLTD.NS", name: "REC Limited", sector: "Financials", marketCap: "mid", strategy: "mean_reversion" },
-  { ticker: "NHPC.NS", name: "NHPC", sector: "Utilities", marketCap: "mid", strategy: "equity" },
-  { ticker: "COALINDIA.NS", name: "Coal India", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "DIXON.NS", name: "Dixon Technologies", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  // Tier 3: Hedges & pairs
-  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
-  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
-  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
-];
+  const strategy = String(rec?.strategy || "equity").toLowerCase();
+  const normalizedStrategy = ALLOWED_STRATEGIES.has(strategy) ? strategy : "equity";
+  const marketCap = String(rec?.marketCap || "large").toLowerCase();
+  const normalizedMarketCap = ["mega", "large", "mid", "small", "micro"].includes(marketCap)
+    ? marketCap
+    : "large";
+
+  const entryZone = Array.isArray(rec?.entryZone) && rec.entryZone.length >= 2
+    ? [Number(rec.entryZone[0]) || 0, Number(rec.entryZone[1]) || 0]
+    : [0, 0];
+
+  return {
+    ticker,
+    name: String(rec?.name || ticker),
+    assetClass: String(rec?.assetClass || "Equity"),
+    exchange: String(rec?.exchange || "NASDAQ"),
+    currency: String(rec?.currency || "USD"),
+    currentEstPrice: Number(rec?.currentEstPrice) || 0,
+    entryZone,
+    targetPrice: Number(rec?.targetPrice) || 0,
+    stopLoss: Number(rec?.stopLoss) || 0,
+    timeHorizon: String(rec?.timeHorizon || "3M"),
+    suggestedQty: Math.max(1, Math.round(Number(rec?.suggestedQty) || 1)),
+    confidence: Math.max(1, Math.min(99, Math.round(Number(rec?.confidence) || 60))),
+    thesis: String(rec?.thesis || ""),
+    catalyst: String(rec?.catalyst || ""),
+    hedgingStrategy: String(rec?.hedgingStrategy || ""),
+    riskReward: String(rec?.riskReward || "1:2.0"),
+    sector: String(rec?.sector || "Diversified"),
+    tags: Array.isArray(rec?.tags) ? rec.tags.slice(0, 6) : [],
+    riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.slice(0, 6) : [],
+    strategy: normalizedStrategy,
+    pairedInstrument: rec?.pairedInstrument || null,
+    pairedStructure: rec?.pairedStructure || null,
+    capitalEfficiency: Number(rec?.capitalEfficiency) > 0 ? Number(rec.capitalEfficiency) : 1,
+    correlationToPortfolio: String(rec?.correlationToPortfolio || "low"),
+    marketCap: normalizedMarketCap,
+  };
+}
+
+function dedupeCandidates(candidates: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const rec of candidates) {
+    const normalized = normalizeCandidate(rec);
+    if (!normalized) continue;
+    if (seen.has(normalized.ticker)) continue;
+    seen.add(normalized.ticker);
+    out.push(normalized);
+  }
+  return out;
+}
+
+const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
+  Technology: { thesis: "Secular AI/cloud tailwinds with expanding margins and strong R&D moat. Enterprise adoption acceleration creates durable revenue visibility.", catalyst: "AI capex cycle and enterprise digital transformation driving order book growth." },
+  Financials: { thesis: "Rising net interest margins and credit quality improvement in current rate environment. Strong capital return program with buybacks and dividends.", catalyst: "Credit cycle normalization and loan growth reacceleration as rate uncertainty clears." },
+  Energy: { thesis: "Supply discipline from OPEC+ and underinvestment cycle supports pricing power. Free cash flow yield among highest in market.", catalyst: "Global energy security spending and dividend growth attracting institutional reallocation." },
+  Healthcare: { thesis: "Pipeline optionality with multiple late-stage catalysts. Defensive cash flows with pricing power in specialty segments.", catalyst: "FDA approval cycle and aging demographics driving structural demand growth." },
+  "Consumer Discretionary": { thesis: "Consumer spending resilience with market share gains from weaker competitors. Margin expansion through operational efficiency.", catalyst: "Seasonal demand uptick and inventory normalization supporting earnings beat potential." },
+  "Consumer Staples": { thesis: "Defensive positioning with consistent dividend growth and pricing power in inflationary environments.", catalyst: "Volume recovery and premiumization trends supporting organic revenue acceleration." },
+  Communication: { thesis: "Digital advertising recovery and subscriber monetization improvements. Platform network effects create widening competitive moat.", catalyst: "Ad spend rebound and new product monetization driving revenue re-rating." },
+  Industrials: { thesis: "Infrastructure spending cycle and reshoring trends creating multi-year order backlog visibility.", catalyst: "Government infrastructure bills and defense spending uplift driving order growth." },
+  Utilities: { thesis: "Regulated returns with data center power demand creating secular growth overlay on traditional defensive profile.", catalyst: "AI-driven electricity demand surge and rate base expansion supporting earnings growth." },
+  Commodities: { thesis: "Supply constraints and geopolitical risk premium supporting commodity prices. Portfolio diversification benefits in risk-off environments.", catalyst: "Central bank gold buying and inflation hedge demand from institutional allocators." },
+  Index: { thesis: "Broad market exposure with low tracking error. Efficient vehicle for tactical allocation and hedging strategies.", catalyst: "Market breadth improvement and sectoral rotation supporting index-level returns." },
+  Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
+  "Fixed Income": { thesis: "Duration exposure provides portfolio ballast during equity drawdowns. Yield curve positioning for rate cycle shifts.", catalyst: "Fed policy pivot expectations and flight-to-quality flows during risk-off episodes." },
+};
+
 
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
@@ -668,45 +690,6 @@ const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
   Index: { thesis: "Broad market exposure with low tracking error. Efficient vehicle for tactical allocation and hedging strategies.", catalyst: "Market breadth improvement and sectoral rotation supporting index-level returns." },
   Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
 };
-
-function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
-  const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
-  const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
-  return universe
-    .filter((c) => !blocked.has(c.ticker))
-    .slice(0, 16)
-    .map((c, i) => {
-      const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
-      return {
-        ticker: c.ticker,
-        name: c.name,
-        assetClass: (c as any).assetClass || "Equity",
-        exchange: indiaMode ? "NSE" : "NASDAQ",
-        currency: indiaMode ? "INR" : "USD",
-        currentEstPrice: 0,
-        entryZone: [0, 0],
-        targetPrice: 0,
-        stopLoss: 0,
-        timeHorizon: i % 3 === 0 ? "1M" : "3M",
-        suggestedQty: 1,
-        confidence: 68,
-        thesis: "", // left empty — will be generated dynamically in enrichment
-        catalyst: "", // left empty — will be generated dynamically in enrichment
-        hedgingStrategy: "", // left empty — deriveHedgePlan will fill this
-        riskReward: "1:2.2",
-        sector: c.sector,
-        tags: ["liquid", "institutional", "momentum"],
-        riskProfile: ["medium_term", "high_conviction"],
-        strategy: c.strategy,
-        pairedInstrument: null,
-        pairedStructure: null,
-        capitalEfficiency: 1,
-        correlationToPortfolio: "low",
-        marketCap: c.marketCap,
-        _isFallback: true,
-      };
-    });
-}
 
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
@@ -823,44 +806,44 @@ serve(async (req) => {
 
     try {
       const aiOpts = {
-        systemPrompt: `You are a hedge fund alpha-seeking PM who finds EDGE — not consensus. Your job is to surface asymmetric, non-obvious opportunities that most analysts miss.
+        systemPrompt: `You are a hedge fund alpha-seeking PM who balances conviction blue-chips with non-obvious edge plays. Your job is to surface a MIX of quality large-caps AND asymmetric mid/small-cap opportunities most analysts miss.
 
-CRITICAL RULES:
-1. NEVER recommend obvious mega-cap blue chips (AAPL, MSFT, AMZN, GOOGL, META, NVDA, TSLA, JPM, V, MA) — these are consensus, not alpha
-2. Focus on: mid-caps ($2B-$30B), under-covered small-caps ($500M-$2B), sector dislocations, event-driven setups, and structural catalysts
-3. Find names with: insider buying, earnings acceleration, sector rotation tailwinds, M&A optionality, or contrarian recovery setups
+PORTFOLIO CONSTRUCTION RULES:
+1. 30-40% large/mega-cap quality names (strong fundamentals, institutional ownership) — but VARY which ones, don't always pick the same 10
+2. 40-50% mid-caps ($2B-$30B) with earnings inflection, margin expansion, or structural catalysts — this is where alpha lives
+3. 10-20% high-conviction small-caps ($500M-$2B) or thematic plays with asymmetric upside
 4. Every pick must have a SPECIFIC, TIME-BOUND catalyst (not generic "AI tailwinds" or "strong fundamentals")
-5. Include at least 2 names most retail investors have never heard of
-6. Prefer stocks with <10 sell-side analysts covering them
-7. Asymmetric risk/reward minimum 1:2.5
-8. Mix time horizons: 2-3 swing trades (1-4 weeks) + 3-4 position trades (1-6 months) + 1-2 structural themes (6-12 months)
-Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Focus on SME/mid-cap India, not just NIFTY 50 blue chips. No foreign stocks." : ""}`,
+5. Include at least 2 names with <15 sell-side analysts covering them
+6. Asymmetric risk/reward minimum 1:2
+7. Mix time horizons: swing trades (1-4 weeks) + position trades (1-6 months) + structural themes (6-12 months)
+8. VARY your picks on every call — use the SEED to randomize sector emphasis and market cap tilt
+9. Look for: insider buying clusters, earnings acceleration, sector rotation tailwinds, M&A optionality, contrarian recovery setups, post-selloff quality names
+Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips with under-covered mid/small-cap India names. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Find 8-10 HIGH-ALPHA opportunities that are NOT in the S&P 500 top 20 / NIFTY 50 top 15:
-1) Under-covered mid/small-caps with earnings inflection points or margin expansion stories
-2) Sector dislocations: names beaten down >20% from highs but with improving fundamentals
-3) Event-driven: upcoming catalysts (FDA approvals, contract wins, spinoffs, activist involvement, insider clusters)
-4) Structural themes: infrastructure, reshoring, energy transition, defense, AI picks-and-shovels (not the obvious names)
-5) Mean-reversion plays on quality names trading 2+ standard deviations below fair value
-6) At least 1 international ADR or cross-listed name for diversification
+Find 8-10 opportunities with REAL VARIETY — mix blue-chips with hidden gems:
+1) 2-3 quality large-caps with strong momentum or upcoming catalysts (rotate which ones — don't always pick the same names)
+2) 3-4 under-covered mid-caps ($2B-$30B) with earnings inflection points, margin expansion, or structural tailwinds
+3) 1-2 high-conviction small-caps or thematic plays with asymmetric payoff
+4) 1-2 hedges or pair trades for portfolio protection
+5) At least 3 different sectors represented
 
 Hard constraints:
-- Maximum 2 ETFs (and make them thematic/niche, not SPY/QQQ)
-- No penny stocks under $5 / no meme stocks
-- Minimum $500M market cap, prefer $2B-$30B sweet spot
+- Maximum 2 ETFs (prefer thematic/niche over broad index)
+- No penny stocks under $5
+- Minimum $500M market cap
 - At least 4 different strategy types
-- ZERO overlap with typical "top 10 stocks to buy" lists
+- Use SEED ${seed} to vary sector emphasis and avoid repeating the same names
 
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
         maxTokens: 3200,
-        temperature: 0.65,
+        temperature: 0.6,
       };
 
       // Fire BOTH providers in parallel for 2x candidate power
@@ -881,10 +864,10 @@ Return via the tool call only.`,
       console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
     } catch (aiError) {
       console.error("desirable-assets Stage 1 AI generation failed:", aiError);
+      return new Response(JSON.stringify({ error: "AI analysis failed. Please retry in a moment." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
@@ -895,18 +878,13 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    // Only use fallback when AI returns fewer than 8 candidates
-    if (candidates.length < 8) {
-      const needed = 8 - candidates.length;
-      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
-      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
-    } else {
-      candidates = dedupeCandidates(candidates).slice(0, 28);
-      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
-    }
+    candidates = dedupeCandidates(candidates).slice(0, 28);
+    console.log(`desirable-assets: AI returned ${candidates.length} picks`);
 
     if (candidates.length === 0) {
-      throw new Error("No candidates available after deterministic fallback");
+      return new Response(JSON.stringify({ error: "AI returned no valid candidates. Please retry." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
@@ -1257,58 +1235,7 @@ Return via the tool call only.`,
       }
     }
 
-    // Reliability backstop: ensure at least 8 output candidates when market filters are too harsh.
-    if (selected.length < 8) {
-      for (const fallbackRec of deterministicCandidates) {
-        if (selected.length >= 8) break;
-        if (selectedTickers.has(fallbackRec.ticker) || portfolioTickers.includes(fallbackRec.ticker)) continue;
-
-        const td = tickerData[fallbackRec.ticker];
-        if (!td || td.closes.length < 20 || td.price <= 0) continue;
-
-        const returns = logReturns(td.closes);
-        const sr = sharpeRatio(returns);
-        const mdd = maxDrawdown(td.closes);
-        const vol = annualizedVol(returns);
-        const zs = zScore(td.closes);
-        const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
-        const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
-
-        selected.push({
-          rec: fallbackRec,
-          sharpeRatio: Math.round(sr * 100) / 100,
-          maxDrawdown: Math.round(mdd * 10) / 10,
-          portfolioCorrelation: Math.round(portCorr * 100) / 100,
-          volatility: Math.round(vol * 10) / 10,
-          zScore: Math.round(zs * 100) / 100,
-          quantScore: 42,
-          priceVerified: true,
-          stalePrice: td.stalePrice || false,
-          realPrice: td.price,
-          realCurrency: td.currency,
-          priceChange24h: Math.round(td.change * 100) / 100,
-          volume: td.volume,
-          fiftyTwoHigh: td.fiftyTwoHigh,
-          fiftyTwoLow: td.fiftyTwoLow,
-          closes: td.closes.slice(-60),
-          highs: (td.highs || []).slice(-60),
-          maxProfitTarget: mpt.maxTarget,
-          maxProfitConfidence: mpt.confidence,
-          maxProfitMethod: mpt.method,
-          momentum20d: Math.round((((td.price - mean(td.closes.slice(-20))) / mean(td.closes.slice(-20))) * 100) * 100) / 100,
-          momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
-          trendStrength: 50,
-          winRate: 50,
-          filterTier: "rescue" as const,
-            sentimentScore: 0,
-            sentimentLabel: "Neutral",
-            earningsSignal: "neutral",
-            sentimentHeadline: "",
-            sentimentArticleCount: 0,
-        });
-        selectedTickers.add(fallbackRec.ticker);
-      }
-    }
+    // No fallback injection — only show AI-analyzed, quant-validated picks
 
     // Ensure hedge coverage exists in final set.
     const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
@@ -1345,6 +1272,12 @@ Return via the tool call only.`,
 
     if (selected.length === 0 && scored.length > 0) {
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
+    }
+
+    if (selected.length === 0) {
+      return new Response(JSON.stringify({ error: "No candidates passed quant validation. Market conditions may be unfavorable. Please retry." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify strategy diversity
