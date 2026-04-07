@@ -546,50 +546,55 @@ const ALLOWED_STRATEGIES = new Set([
 ]);
 
 const ELITE_FALLBACK_UNIVERSE = [
-  { ticker: "MSFT", name: "Microsoft", sector: "Technology", marketCap: "mega", strategy: "equity" },
-  { ticker: "NVDA", name: "NVIDIA", sector: "Technology", marketCap: "mega", strategy: "momentum" },
-  { ticker: "AMZN", name: "Amazon", sector: "Consumer Discretionary", marketCap: "mega", strategy: "equity" },
-  { ticker: "META", name: "Meta Platforms", sector: "Communication", marketCap: "mega", strategy: "equity" },
-  { ticker: "GOOGL", name: "Alphabet", sector: "Communication", marketCap: "mega", strategy: "equity" },
-  { ticker: "AVGO", name: "Broadcom", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  { ticker: "LLY", name: "Eli Lilly", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "COST", name: "Costco", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
-  { ticker: "ORCL", name: "Oracle", sector: "Technology", marketCap: "large", strategy: "equity" },
+  // Tier 1: Under-covered mid-caps with real edge
+  { ticker: "AXON", name: "Axon Enterprise", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
+  { ticker: "DECK", name: "Deckers Outdoor", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
+  { ticker: "TOST", name: "Toast Inc", sector: "Technology", marketCap: "mid", strategy: "equity" },
+  { ticker: "DUOL", name: "Duolingo", sector: "Technology", marketCap: "mid", strategy: "momentum" },
+  { ticker: "CELH", name: "Celsius Holdings", sector: "Consumer Staples", marketCap: "mid", strategy: "mean_reversion" },
+  { ticker: "ANET", name: "Arista Networks", sector: "Technology", marketCap: "large", strategy: "equity" },
+  { ticker: "WFRD", name: "Weatherford Intl", sector: "Energy", marketCap: "mid", strategy: "equity" },
+  { ticker: "HOOD", name: "Robinhood Markets", sector: "Financials", marketCap: "mid", strategy: "momentum" },
+  { ticker: "MNDY", name: "Monday.com", sector: "Technology", marketCap: "mid", strategy: "equity" },
+  { ticker: "APP", name: "AppLovin", sector: "Technology", marketCap: "large", strategy: "momentum" },
+  // Tier 2: Structural/catalyst plays
+  { ticker: "VST", name: "Vistra Corp", sector: "Utilities", marketCap: "large", strategy: "equity" },
+  { ticker: "TRGP", name: "Targa Resources", sector: "Energy", marketCap: "large", strategy: "equity" },
+  { ticker: "EME", name: "EMCOR Group", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
+  { ticker: "FIX", name: "Comfort Systems", sector: "Industrials", marketCap: "mid", strategy: "equity" },
+  { ticker: "CAVA", name: "CAVA Group", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
+  // Tier 3: Hedges & pairs
   { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "ASML", name: "ASML", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "V", name: "Visa", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "MA", name: "Mastercard", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "QQQ", name: "Invesco QQQ ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "XLE", name: "Energy Select Sector SPDR", sector: "Energy", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
   { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
   { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+  { ticker: "TLT", name: "iShares 20+ Year Treasury", sector: "Fixed Income", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
+  { ticker: "URA", name: "Global X Uranium ETF", sector: "Energy", marketCap: "mid", strategy: "momentum", assetClass: "ETF" },
 ];
 
 const INDIA_FALLBACK_UNIVERSE = [
-  { ticker: "RELIANCE.NS", name: "Reliance Industries", sector: "Energy", marketCap: "mega", strategy: "equity" },
-  { ticker: "TCS.NS", name: "Tata Consultancy Services", sector: "Technology", marketCap: "mega", strategy: "equity" },
-  { ticker: "HDFCBANK.NS", name: "HDFC Bank", sector: "Financials", marketCap: "mega", strategy: "equity" },
-  { ticker: "INFY.NS", name: "Infosys", sector: "Technology", marketCap: "mega", strategy: "momentum" },
-  { ticker: "ICICIBANK.NS", name: "ICICI Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", sector: "Communication", marketCap: "large", strategy: "momentum" },
-  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "SBIN.NS", name: "State Bank of India", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "LT.NS", name: "Larsen & Toubro", sector: "Industrials", marketCap: "large", strategy: "equity" },
+  // Tier 1: Under-covered mid-caps with real edge
+  { ticker: "TRENT.NS", name: "Trent Limited", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
+  { ticker: "PERSISTENT.NS", name: "Persistent Systems", sector: "Technology", marketCap: "mid", strategy: "momentum" },
+  { ticker: "POLYCAB.NS", name: "Polycab India", sector: "Industrials", marketCap: "mid", strategy: "equity" },
+  { ticker: "ZOMATO.NS", name: "Zomato", sector: "Technology", marketCap: "large", strategy: "momentum" },
+  { ticker: "JIOFIN.NS", name: "Jio Financial Services", sector: "Financials", marketCap: "mid", strategy: "equity" },
+  { ticker: "KAYNES.NS", name: "Kaynes Technology", sector: "Technology", marketCap: "mid", strategy: "momentum" },
+  { ticker: "BEL.NS", name: "Bharat Electronics", sector: "Industrials", marketCap: "mid", strategy: "equity" },
+  { ticker: "HAL.NS", name: "Hindustan Aeronautics", sector: "Industrials", marketCap: "large", strategy: "momentum" },
+  { ticker: "CAMS.NS", name: "Computer Age Management", sector: "Financials", marketCap: "mid", strategy: "equity" },
+  { ticker: "CDSL.NS", name: "Central Depository Services", sector: "Financials", marketCap: "mid", strategy: "momentum" },
+  // Tier 2: Structural plays
+  { ticker: "IRFC.NS", name: "Indian Railway Finance", sector: "Financials", marketCap: "mid", strategy: "equity" },
+  { ticker: "RECLTD.NS", name: "REC Limited", sector: "Financials", marketCap: "mid", strategy: "mean_reversion" },
+  { ticker: "NHPC.NS", name: "NHPC", sector: "Utilities", marketCap: "mid", strategy: "equity" },
+  { ticker: "COALINDIA.NS", name: "Coal India", sector: "Energy", marketCap: "large", strategy: "equity" },
+  { ticker: "DIXON.NS", name: "Dixon Technologies", sector: "Technology", marketCap: "mid", strategy: "momentum" },
+  // Tier 3: Hedges & pairs
   { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
-  { ticker: "BAJFINANCE.NS", name: "Bajaj Finance", sector: "Financials", marketCap: "large", strategy: "momentum" },
-  { ticker: "MARUTI.NS", name: "Maruti Suzuki", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
-  { ticker: "TATAMOTORS.NS", name: "Tata Motors", sector: "Consumer Discretionary", marketCap: "large", strategy: "momentum" },
-  { ticker: "AXISBANK.NS", name: "Axis Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "SUNPHARMA.NS", name: "Sun Pharma", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "TITAN.NS", name: "Titan Company", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
-  { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
   { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
   { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
+  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
+  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
 ];
 
 function normalizeCandidate(rec: any): any | null {
@@ -818,36 +823,44 @@ serve(async (req) => {
 
     try {
       const aiOpts = {
-        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
-Reject low-quality names, random microcaps, and weak momentum setups.
-Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
-Prefer large/mid-cap leaders, strong earnings trends, and positive sentiment dislocations with recovery setups.
-Use exact tickers supported by Yahoo Finance.
-Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : ""}`,
+        systemPrompt: `You are a hedge fund alpha-seeking PM who finds EDGE — not consensus. Your job is to surface asymmetric, non-obvious opportunities that most analysts miss.
+
+CRITICAL RULES:
+1. NEVER recommend obvious mega-cap blue chips (AAPL, MSFT, AMZN, GOOGL, META, NVDA, TSLA, JPM, V, MA) — these are consensus, not alpha
+2. Focus on: mid-caps ($2B-$30B), under-covered small-caps ($500M-$2B), sector dislocations, event-driven setups, and structural catalysts
+3. Find names with: insider buying, earnings acceleration, sector rotation tailwinds, M&A optionality, or contrarian recovery setups
+4. Every pick must have a SPECIFIC, TIME-BOUND catalyst (not generic "AI tailwinds" or "strong fundamentals")
+5. Include at least 2 names most retail investors have never heard of
+6. Prefer stocks with <10 sell-side analysts covering them
+7. Asymmetric risk/reward minimum 1:2.5
+8. Mix time horizons: 2-3 swing trades (1-4 weeks) + 3-4 position trades (1-6 months) + 1-2 structural themes (6-12 months)
+Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Focus on SME/mid-cap India, not just NIFTY 50 blue chips. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Create 8-10 recommendations that prioritize:
-1) Positive earnings momentum + institutional participation
-2) Price trend confirmation (above key averages)
-3) Catalyst-driven upside in 1-6 months
-4) Sentiment-aware setups (avoid structural breakdowns)
-5) Liquidity and execution quality
+Find 8-10 HIGH-ALPHA opportunities that are NOT in the S&P 500 top 20 / NIFTY 50 top 15:
+1) Under-covered mid/small-caps with earnings inflection points or margin expansion stories
+2) Sector dislocations: names beaten down >20% from highs but with improving fundamentals
+3) Event-driven: upcoming catalysts (FDA approvals, contract wins, spinoffs, activist involvement, insider clusters)
+4) Structural themes: infrastructure, reshoring, energy transition, defense, AI picks-and-shovels (not the obvious names)
+5) Mean-reversion plays on quality names trading 2+ standard deviations below fair value
+6) At least 1 international ADR or cross-listed name for diversification
 
 Hard constraints:
-- Maximum 2 ETFs
-- No penny stocks / meme stocks / niche illiquid names
-- No deteriorating fundamentals
-- Provide strategy diversity across at least 4 strategy types
+- Maximum 2 ETFs (and make them thematic/niche, not SPY/QQQ)
+- No penny stocks under $5 / no meme stocks
+- Minimum $500M market cap, prefer $2B-$30B sweet spot
+- At least 4 different strategy types
+- ZERO overlap with typical "top 10 stocks to buy" lists
 
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 2800,
-        temperature: 0.35,
+        maxTokens: 3200,
+        temperature: 0.65,
       };
 
       // Fire BOTH providers in parallel for 2x candidate power
