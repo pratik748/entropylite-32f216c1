@@ -99,19 +99,20 @@ export default function AuthPage() {
       </div>
 
       {/* Bottom tagline */}
-      <p
-        className="absolute bottom-8 left-0 right-0 text-center z-10"
-        style={{
-          fontFamily: "'Great Vibes', cursive",
-          fontSize: "clamp(1.4rem, 4vw, 2.2rem)",
-          fontWeight: 400,
-          color: "#C5942A",
-          textShadow: "1px 1px 0px #8B6914, 2px 2px 1px #6B4F10, 0px 0px 8px rgba(197,148,42,0.4)",
-          letterSpacing: "0.02em",
-        }}
-      >
-        Stop following the crowd when they're all lost.
-      </p>
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 px-8 py-3 rounded-sm border border-white/40 bg-white/30 backdrop-blur-2xl">
+        <p
+          className="text-center"
+          style={{
+            fontFamily: "'Great Vibes', cursive",
+            fontSize: "clamp(1.8rem, 5vw, 2.8rem)",
+            fontWeight: 400,
+            color: "#000000",
+            letterSpacing: "0.01em",
+          }}
+        >
+          Stop following the crowd when they're all lost.
+        </p>
+      </div>
     </div>
   );
 }
