@@ -691,40 +691,6 @@ const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
   Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
 };
 
-
-
-      const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
-      return {
-        ticker: c.ticker,
-        name: c.name,
-        assetClass: (c as any).assetClass || "Equity",
-        exchange: indiaMode ? "NSE" : "NASDAQ",
-        currency: indiaMode ? "INR" : "USD",
-        currentEstPrice: 0,
-        entryZone: [0, 0],
-        targetPrice: 0,
-        stopLoss: 0,
-        timeHorizon: i % 3 === 0 ? "1M" : "3M",
-        suggestedQty: 1,
-        confidence: 68,
-        thesis: "", // left empty — will be generated dynamically in enrichment
-        catalyst: "", // left empty — will be generated dynamically in enrichment
-        hedgingStrategy: "", // left empty — deriveHedgePlan will fill this
-        riskReward: "1:2.2",
-        sector: c.sector,
-        tags: ["liquid", "institutional", "momentum"],
-        riskProfile: ["medium_term", "high_conviction"],
-        strategy: c.strategy,
-        pairedInstrument: null,
-        pairedStructure: null,
-        capitalEfficiency: 1,
-        correlationToPortfolio: "low",
-        marketCap: c.marketCap,
-        _isFallback: true,
-      };
-    });
-}
-
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
