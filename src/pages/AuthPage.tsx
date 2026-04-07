@@ -22,7 +22,7 @@ export default function AuthPage() {
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
       {/* Load signature font */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Great+Vibes&display=swap"
         rel="stylesheet"
       />
 
@@ -97,6 +97,19 @@ export default function AuthPage() {
           Secure authentication required
         </p>
       </div>
+
+      {/* Bottom tagline */}
+      <p
+        className="absolute bottom-8 left-0 right-0 text-center z-10"
+        style={{
+          fontFamily: "'Great Vibes', cursive",
+          fontSize: "clamp(1.1rem, 3vw, 1.6rem)",
+          color: "#000000",
+          fontWeight: 400,
+        }}
+      >
+        Stop following the crowd when they're all lost.
+      </p>
     </div>
   );
 }
