@@ -691,13 +691,8 @@ const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
   Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
 };
 
-function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
-  const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
-  const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
-  return universe
-    .filter((c) => !blocked.has(c.ticker))
-    .slice(0, 16)
-    .map((c, i) => {
+
+
       const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
       return {
         ticker: c.ticker,
