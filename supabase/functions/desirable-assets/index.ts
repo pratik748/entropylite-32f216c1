@@ -823,44 +823,44 @@ serve(async (req) => {
 
     try {
       const aiOpts = {
-        systemPrompt: `You are a hedge fund alpha-seeking PM who finds EDGE — not consensus. Your job is to surface asymmetric, non-obvious opportunities that most analysts miss.
+        systemPrompt: `You are a hedge fund alpha-seeking PM who balances conviction blue-chips with non-obvious edge plays. Your job is to surface a MIX of quality large-caps AND asymmetric mid/small-cap opportunities most analysts miss.
 
-CRITICAL RULES:
-1. NEVER recommend obvious mega-cap blue chips (AAPL, MSFT, AMZN, GOOGL, META, NVDA, TSLA, JPM, V, MA) — these are consensus, not alpha
-2. Focus on: mid-caps ($2B-$30B), under-covered small-caps ($500M-$2B), sector dislocations, event-driven setups, and structural catalysts
-3. Find names with: insider buying, earnings acceleration, sector rotation tailwinds, M&A optionality, or contrarian recovery setups
+PORTFOLIO CONSTRUCTION RULES:
+1. 30-40% large/mega-cap quality names (strong fundamentals, institutional ownership) — but VARY which ones, don't always pick the same 10
+2. 40-50% mid-caps ($2B-$30B) with earnings inflection, margin expansion, or structural catalysts — this is where alpha lives
+3. 10-20% high-conviction small-caps ($500M-$2B) or thematic plays with asymmetric upside
 4. Every pick must have a SPECIFIC, TIME-BOUND catalyst (not generic "AI tailwinds" or "strong fundamentals")
-5. Include at least 2 names most retail investors have never heard of
-6. Prefer stocks with <10 sell-side analysts covering them
-7. Asymmetric risk/reward minimum 1:2.5
-8. Mix time horizons: 2-3 swing trades (1-4 weeks) + 3-4 position trades (1-6 months) + 1-2 structural themes (6-12 months)
-Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Focus on SME/mid-cap India, not just NIFTY 50 blue chips. No foreign stocks." : ""}`,
+5. Include at least 2 names with <15 sell-side analysts covering them
+6. Asymmetric risk/reward minimum 1:2
+7. Mix time horizons: swing trades (1-4 weeks) + position trades (1-6 months) + structural themes (6-12 months)
+8. VARY your picks on every call — use the SEED to randomize sector emphasis and market cap tilt
+9. Look for: insider buying clusters, earnings acceleration, sector rotation tailwinds, M&A optionality, contrarian recovery setups, post-selloff quality names
+Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips with under-covered mid/small-cap India names. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Find 8-10 HIGH-ALPHA opportunities that are NOT in the S&P 500 top 20 / NIFTY 50 top 15:
-1) Under-covered mid/small-caps with earnings inflection points or margin expansion stories
-2) Sector dislocations: names beaten down >20% from highs but with improving fundamentals
-3) Event-driven: upcoming catalysts (FDA approvals, contract wins, spinoffs, activist involvement, insider clusters)
-4) Structural themes: infrastructure, reshoring, energy transition, defense, AI picks-and-shovels (not the obvious names)
-5) Mean-reversion plays on quality names trading 2+ standard deviations below fair value
-6) At least 1 international ADR or cross-listed name for diversification
+Find 8-10 opportunities with REAL VARIETY — mix blue-chips with hidden gems:
+1) 2-3 quality large-caps with strong momentum or upcoming catalysts (rotate which ones — don't always pick the same names)
+2) 3-4 under-covered mid-caps ($2B-$30B) with earnings inflection points, margin expansion, or structural tailwinds
+3) 1-2 high-conviction small-caps or thematic plays with asymmetric payoff
+4) 1-2 hedges or pair trades for portfolio protection
+5) At least 3 different sectors represented
 
 Hard constraints:
-- Maximum 2 ETFs (and make them thematic/niche, not SPY/QQQ)
-- No penny stocks under $5 / no meme stocks
-- Minimum $500M market cap, prefer $2B-$30B sweet spot
+- Maximum 2 ETFs (prefer thematic/niche over broad index)
+- No penny stocks under $5
+- Minimum $500M market cap
 - At least 4 different strategy types
-- ZERO overlap with typical "top 10 stocks to buy" lists
+- Use SEED ${seed} to vary sector emphasis and avoid repeating the same names
 
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
         maxTokens: 3200,
-        temperature: 0.65,
+        temperature: 0.6,
       };
 
       // Fire BOTH providers in parallel for 2x candidate power
