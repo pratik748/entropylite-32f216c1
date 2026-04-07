@@ -1043,10 +1043,10 @@ Return via the tool call only.`,
       // F2: Target must be above current price
       if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
 
-      // F3: Liquidity + investability guards (avoid tiny/random names)
+      // F3: Liquidity + investability guards (allow mid/small caps but reject truly illiquid)
       const dollarVolume = (td.volume || 0) * price;
-      if (!isHedge && dollarVolume < 20_000_000) { filtered++; continue; }
-      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
+      if (!isHedge && dollarVolume < 5_000_000) { filtered++; continue; } // lowered from $20M to $5M for mid/small-cap alpha
+      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro" && dollarVolume < 10_000_000) { filtered++; continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
