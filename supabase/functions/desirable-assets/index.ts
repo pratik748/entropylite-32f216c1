@@ -1291,6 +1291,12 @@ Return via the tool call only.`,
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
     }
 
+    if (selected.length === 0) {
+      return new Response(JSON.stringify({ error: "No candidates passed quant validation. Market conditions may be unfavorable. Please retry." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Verify strategy diversity
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
 
