@@ -545,57 +545,79 @@ const ALLOWED_STRATEGIES = new Set([
   "momentum",
 ]);
 
-const ELITE_FALLBACK_UNIVERSE = [
-  // Tier 1: Under-covered mid-caps with real edge
-  { ticker: "AXON", name: "Axon Enterprise", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "DECK", name: "Deckers Outdoor", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  { ticker: "TOST", name: "Toast Inc", sector: "Technology", marketCap: "mid", strategy: "equity" },
-  { ticker: "DUOL", name: "Duolingo", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "CELH", name: "Celsius Holdings", sector: "Consumer Staples", marketCap: "mid", strategy: "mean_reversion" },
-  { ticker: "ANET", name: "Arista Networks", sector: "Technology", marketCap: "large", strategy: "equity" },
-  { ticker: "WFRD", name: "Weatherford Intl", sector: "Energy", marketCap: "mid", strategy: "equity" },
-  { ticker: "HOOD", name: "Robinhood Markets", sector: "Financials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "MNDY", name: "Monday.com", sector: "Technology", marketCap: "mid", strategy: "equity" },
-  { ticker: "APP", name: "AppLovin", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  // Tier 2: Structural/catalyst plays
-  { ticker: "VST", name: "Vistra Corp", sector: "Utilities", marketCap: "large", strategy: "equity" },
-  { ticker: "TRGP", name: "Targa Resources", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "EME", name: "EMCOR Group", sector: "Industrials", marketCap: "mid", strategy: "momentum" },
-  { ticker: "FIX", name: "Comfort Systems", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "CAVA", name: "CAVA Group", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  // Tier 3: Hedges & pairs
-  { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-  { ticker: "TLT", name: "iShares 20+ Year Treasury", sector: "Fixed Income", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
-  { ticker: "URA", name: "Global X Uranium ETF", sector: "Energy", marketCap: "mid", strategy: "momentum", assetClass: "ETF" },
-];
+function normalizeCandidate(rec: any): any | null {
+  const ticker = String(rec?.ticker || "").trim().toUpperCase();
+  if (!ticker || ticker.length > 16) return null;
 
-const INDIA_FALLBACK_UNIVERSE = [
-  // Tier 1: Under-covered mid-caps with real edge
-  { ticker: "TRENT.NS", name: "Trent Limited", sector: "Consumer Discretionary", marketCap: "mid", strategy: "momentum" },
-  { ticker: "PERSISTENT.NS", name: "Persistent Systems", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "POLYCAB.NS", name: "Polycab India", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "ZOMATO.NS", name: "Zomato", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  { ticker: "JIOFIN.NS", name: "Jio Financial Services", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "KAYNES.NS", name: "Kaynes Technology", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  { ticker: "BEL.NS", name: "Bharat Electronics", sector: "Industrials", marketCap: "mid", strategy: "equity" },
-  { ticker: "HAL.NS", name: "Hindustan Aeronautics", sector: "Industrials", marketCap: "large", strategy: "momentum" },
-  { ticker: "CAMS.NS", name: "Computer Age Management", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "CDSL.NS", name: "Central Depository Services", sector: "Financials", marketCap: "mid", strategy: "momentum" },
-  // Tier 2: Structural plays
-  { ticker: "IRFC.NS", name: "Indian Railway Finance", sector: "Financials", marketCap: "mid", strategy: "equity" },
-  { ticker: "RECLTD.NS", name: "REC Limited", sector: "Financials", marketCap: "mid", strategy: "mean_reversion" },
-  { ticker: "NHPC.NS", name: "NHPC", sector: "Utilities", marketCap: "mid", strategy: "equity" },
-  { ticker: "COALINDIA.NS", name: "Coal India", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "DIXON.NS", name: "Dixon Technologies", sector: "Technology", marketCap: "mid", strategy: "momentum" },
-  // Tier 3: Hedges & pairs
-  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
-  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
-  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
-];
+  const strategy = String(rec?.strategy || "equity").toLowerCase();
+  const normalizedStrategy = ALLOWED_STRATEGIES.has(strategy) ? strategy : "equity";
+  const marketCap = String(rec?.marketCap || "large").toLowerCase();
+  const normalizedMarketCap = ["mega", "large", "mid", "small", "micro"].includes(marketCap)
+    ? marketCap
+    : "large";
+
+  const entryZone = Array.isArray(rec?.entryZone) && rec.entryZone.length >= 2
+    ? [Number(rec.entryZone[0]) || 0, Number(rec.entryZone[1]) || 0]
+    : [0, 0];
+
+  return {
+    ticker,
+    name: String(rec?.name || ticker),
+    assetClass: String(rec?.assetClass || "Equity"),
+    exchange: String(rec?.exchange || "NASDAQ"),
+    currency: String(rec?.currency || "USD"),
+    currentEstPrice: Number(rec?.currentEstPrice) || 0,
+    entryZone,
+    targetPrice: Number(rec?.targetPrice) || 0,
+    stopLoss: Number(rec?.stopLoss) || 0,
+    timeHorizon: String(rec?.timeHorizon || "3M"),
+    suggestedQty: Math.max(1, Math.round(Number(rec?.suggestedQty) || 1)),
+    confidence: Math.max(1, Math.min(99, Math.round(Number(rec?.confidence) || 60))),
+    thesis: String(rec?.thesis || ""),
+    catalyst: String(rec?.catalyst || ""),
+    hedgingStrategy: String(rec?.hedgingStrategy || ""),
+    riskReward: String(rec?.riskReward || "1:2.0"),
+    sector: String(rec?.sector || "Diversified"),
+    tags: Array.isArray(rec?.tags) ? rec.tags.slice(0, 6) : [],
+    riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.slice(0, 6) : [],
+    strategy: normalizedStrategy,
+    pairedInstrument: rec?.pairedInstrument || null,
+    pairedStructure: rec?.pairedStructure || null,
+    capitalEfficiency: Number(rec?.capitalEfficiency) > 0 ? Number(rec.capitalEfficiency) : 1,
+    correlationToPortfolio: String(rec?.correlationToPortfolio || "low"),
+    marketCap: normalizedMarketCap,
+  };
+}
+
+function dedupeCandidates(candidates: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const rec of candidates) {
+    const normalized = normalizeCandidate(rec);
+    if (!normalized) continue;
+    if (seen.has(normalized.ticker)) continue;
+    seen.add(normalized.ticker);
+    out.push(normalized);
+  }
+  return out;
+}
+
+const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
+  Technology: { thesis: "Secular AI/cloud tailwinds with expanding margins and strong R&D moat. Enterprise adoption acceleration creates durable revenue visibility.", catalyst: "AI capex cycle and enterprise digital transformation driving order book growth." },
+  Financials: { thesis: "Rising net interest margins and credit quality improvement in current rate environment. Strong capital return program with buybacks and dividends.", catalyst: "Credit cycle normalization and loan growth reacceleration as rate uncertainty clears." },
+  Energy: { thesis: "Supply discipline from OPEC+ and underinvestment cycle supports pricing power. Free cash flow yield among highest in market.", catalyst: "Global energy security spending and dividend growth attracting institutional reallocation." },
+  Healthcare: { thesis: "Pipeline optionality with multiple late-stage catalysts. Defensive cash flows with pricing power in specialty segments.", catalyst: "FDA approval cycle and aging demographics driving structural demand growth." },
+  "Consumer Discretionary": { thesis: "Consumer spending resilience with market share gains from weaker competitors. Margin expansion through operational efficiency.", catalyst: "Seasonal demand uptick and inventory normalization supporting earnings beat potential." },
+  "Consumer Staples": { thesis: "Defensive positioning with consistent dividend growth and pricing power in inflationary environments.", catalyst: "Volume recovery and premiumization trends supporting organic revenue acceleration." },
+  Communication: { thesis: "Digital advertising recovery and subscriber monetization improvements. Platform network effects create widening competitive moat.", catalyst: "Ad spend rebound and new product monetization driving revenue re-rating." },
+  Industrials: { thesis: "Infrastructure spending cycle and reshoring trends creating multi-year order backlog visibility.", catalyst: "Government infrastructure bills and defense spending uplift driving order growth." },
+  Utilities: { thesis: "Regulated returns with data center power demand creating secular growth overlay on traditional defensive profile.", catalyst: "AI-driven electricity demand surge and rate base expansion supporting earnings growth." },
+  Commodities: { thesis: "Supply constraints and geopolitical risk premium supporting commodity prices. Portfolio diversification benefits in risk-off environments.", catalyst: "Central bank gold buying and inflation hedge demand from institutional allocators." },
+  Index: { thesis: "Broad market exposure with low tracking error. Efficient vehicle for tactical allocation and hedging strategies.", catalyst: "Market breadth improvement and sectoral rotation supporting index-level returns." },
+  Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
+  "Fixed Income": { thesis: "Duration exposure provides portfolio ballast during equity drawdowns. Yield curve positioning for rate cycle shifts.", catalyst: "Fed policy pivot expectations and flight-to-quality flows during risk-off episodes." },
+};
+
 
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
