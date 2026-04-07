@@ -881,10 +881,10 @@ Return via the tool call only.`,
       console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
     } catch (aiError) {
       console.error("desirable-assets Stage 1 AI generation failed:", aiError);
+      return new Response(JSON.stringify({ error: "AI analysis failed. Please retry in a moment." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
@@ -895,18 +895,13 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    // Only use fallback when AI returns fewer than 8 candidates
-    if (candidates.length < 8) {
-      const needed = 8 - candidates.length;
-      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
-      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
-    } else {
-      candidates = dedupeCandidates(candidates).slice(0, 28);
-      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
-    }
+    candidates = dedupeCandidates(candidates).slice(0, 28);
+    console.log(`desirable-assets: AI returned ${candidates.length} picks`);
 
     if (candidates.length === 0) {
-      throw new Error("No candidates available after deterministic fallback");
+      return new Response(JSON.stringify({ error: "AI returned no valid candidates. Please retry." }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
