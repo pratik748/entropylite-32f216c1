@@ -733,7 +733,6 @@ serve(async (req) => {
     let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
     let candidates: any[] = [];
 
-    {
       const aiOpts = {
         systemPrompt: `You are a hedge fund alpha-seeking PM who balances conviction blue-chips with non-obvious edge plays. Your job is to surface a MIX of quality large-caps AND asymmetric mid/small-cap opportunities most analysts miss.
 
