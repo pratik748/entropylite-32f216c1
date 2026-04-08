@@ -182,7 +182,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
     if (opts.toolChoice) body.tool_choice = opts.toolChoice;
   }
 
-  if (opts.jsonMode) {
+  if (opts.jsonMode && !opts.tools) {
     body.response_format = { type: "json_object" };
   }
 
