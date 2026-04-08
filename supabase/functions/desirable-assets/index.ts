@@ -950,10 +950,11 @@ Return via the tool call only.`,
       // F2: Target must be above current price
       if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
 
-      // F3: Liquidity + investability guards (allow mid/small caps but reject truly illiquid)
+      // F3: Liquidity + investability guards — penalize weak names instead of hard-killing almost the entire set
       const dollarVolume = (td.volume || 0) * price;
-      if (!isHedge && dollarVolume < 5_000_000) { filtered++; continue; } // lowered from $20M to $5M for mid/small-cap alpha
-      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro" && dollarVolume < 10_000_000) { filtered++; continue; }
+      const marketCapBucket = String(rec.marketCap || "").toLowerCase();
+      const lowLiquidity = !isHedge && dollarVolume < 3_000_000;
+      const microLiquidityFail = !isHedge && marketCapBucket === "micro" && dollarVolume < 5_000_000;
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
@@ -964,55 +965,58 @@ Return via the tool call only.`,
       for (let p = 0; p < simPaths; p++) {
         let simPrice = price;
         for (let d = 0; d < simDays; d++) {
-          // Box-Muller for normal random
           const u1 = Math.random();
           const u2 = Math.random();
           const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
           simPrice *= Math.exp((mu60 - 0.5 * sig60 * sig60) + sig60 * z);
         }
-        if (simPrice > price * 1.02) profitablePaths++; // >2% gain
+        if (simPrice > price * 1.02) profitablePaths++;
       }
       const winRate = (profitablePaths / simPaths) * 100;
 
-      // Compute max profit target
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
+      const targetBelowMarket = Boolean(rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95);
+      const weakUpside = !isHedge && expectedUpsidePct < 2;
+      const veryWeakUpside = !isHedge && expectedUpsidePct < -4;
 
-      // F4: Avoid weak upside profiles
-      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
-
-      // Tiered pass logic to avoid empty result sets while preserving quality.
+      // Tiered pass logic — relaxed enough to consistently return a full 8-name set when live data exists,
+      // while still demoting weaker ideas into balanced/rescue tiers rather than presenting them as top quality.
       const strictPass = isHedge || (
-        sr >= 0.15 &&
-        mdd <= 35 &&
-        (!isPair ? price >= sma20 * 0.99 : true) &&
-        (!isPair ? trendStrength >= 55 : true) &&
-        cumReturn20d >= -8 &&
-        fiftyTwoPos >= 30 &&
-        (!isPair ? portCorr <= 0.75 : true) &&
-        (vol <= 85 || sr >= 0.3) &&
-        winRate >= 48 &&
-        momentum20d > -2
+        sr >= 0 &&
+        mdd <= 45 &&
+        (!isPair ? price >= sma20 * 0.97 : true) &&
+        (!isPair ? trendStrength >= 45 : true) &&
+        cumReturn20d >= -10 &&
+        fiftyTwoPos >= 20 &&
+        (!isPair ? portCorr <= 0.82 : true) &&
+        (vol <= 95 || sr >= 0.15) &&
+        winRate >= 42 &&
+        momentum20d > -4 &&
+        !veryWeakUpside &&
+        !microLiquidityFail
       );
 
       const balancedPass = isHedge || (
-        sr >= -0.1 &&
-        mdd <= 50 &&
-        (!isPair ? price >= sma20 * 0.95 : true) &&
-        (!isPair ? trendStrength >= 35 : true) &&
-        cumReturn20d >= -15 &&
-        fiftyTwoPos >= 15 &&
-        (!isPair ? portCorr <= 0.88 : true) &&
-        winRate >= 40 &&
-        momentum20d > -6
+        sr >= -0.25 &&
+        mdd <= 62 &&
+        (!isPair ? price >= sma20 * 0.92 : true) &&
+        (!isPair ? trendStrength >= 25 : true) &&
+        cumReturn20d >= -18 &&
+        fiftyTwoPos >= 8 &&
+        (!isPair ? portCorr <= 0.93 : true) &&
+        winRate >= 34 &&
+        momentum20d > -10 &&
+        !microLiquidityFail
       );
 
       const rescuePass = isHedge || (
-        sr >= -0.35 &&
-        mdd <= 65 &&
-        (!isPair ? price >= sma20 * 0.9 : true) &&
-        winRate >= 34 &&
-        momentum20d > -12
+        sr >= -0.55 &&
+        mdd <= 82 &&
+        price >= 5 &&
+        winRate >= 26 &&
+        momentum20d > -18 &&
+        !microLiquidityFail
       );
 
       if (!strictPass && !balancedPass && !rescuePass) { filtered++; continue; }
@@ -1022,29 +1026,41 @@ Return via the tool call only.`,
           ? "balanced"
           : "rescue";
 
-      // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
       const conf = (rec.confidence || 50) / 100;
-      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1); // normalize momentum
+      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1);
       const trendScore = trendStrength / 100;
       const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
-      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.06;
+      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.04;
+      const capBalanceBonus = marketCapBucket === "mid"
+        ? 0.06
+        : marketCapBucket === "small"
+          ? 0.04
+          : ["mega", "large"].includes(marketCapBucket)
+            ? 0.05
+            : 0;
+      const penaltyPoints =
+        (targetBelowMarket ? 12 : 0) +
+        (lowLiquidity ? 8 : 0) +
+        (weakUpside ? 8 : 0) +
+        (veryWeakUpside ? 10 : 0);
 
       const quantScore = Math.round(
-        (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
-         0.15 * diversification +            // Portfolio diversification
-         0.10 * conf +                       // AI confidence
-         0.05 * Math.min(capEff / 5, 1) +   // Capital efficiency
-         0.10 * Math.max(0, 1 - mdd / 35) + // Low drawdown reward
-         0.15 * (momScore + 1) / 2 +         // Momentum (NEW)
-         0.10 * trendScore +                 // Trend strength (NEW)
-         0.15 * winRateScore +               // Monte Carlo win rate (NEW)
+        (0.20 * (normSharpe + 1) / 2 +
+         0.15 * diversification +
+         0.10 * conf +
+         0.05 * Math.min(capEff / 5, 1) +
+         0.10 * Math.max(0, 1 - mdd / 45) +
+         0.15 * (momScore + 1) / 2 +
+         0.10 * trendScore +
+         0.15 * winRateScore +
          hedgeBonus +
-         tierBonus) * 100
-      );
+         tierBonus +
+         capBalanceBonus) * 100
+      ) - penaltyPoints;
 
       scored.push({
         rec,
@@ -1053,7 +1069,7 @@ Return via the tool call only.`,
         portfolioCorrelation: Math.round(portCorr * 100) / 100,
         volatility: Math.round(vol * 10) / 10,
         zScore: Math.round(zs * 100) / 100,
-        quantScore: Math.min(quantScore, 99),
+        quantScore: clamp(quantScore, 1, 99),
         priceVerified: true,
         stalePrice: td.stalePrice || false,
         realPrice: td.price,
@@ -1120,7 +1136,7 @@ Return via the tool call only.`,
       s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
     }
 
-    // ── STAGE 4: Select top candidates by score ─────────────────
+    // ── STAGE 4: Select top candidates by score with guaranteed balanced coverage ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
     const strictPool = scored.filter((s) => s.filterTier === "strict");
@@ -1133,71 +1149,49 @@ Return via the tool call only.`,
     } else if (balancedPool.length >= 8) {
       selectionPool = balancedPool;
     } else {
-      selectionPool = scored.filter((s) => s.quantScore >= 32);
-      if (selectionPool.length === 0) selectionPool = scored;
+      selectionPool = scored.filter((s) => s.quantScore >= 24);
+      if (selectionPool.length < Math.min(8, scored.length)) selectionPool = scored;
     }
 
+    const targetCount = Math.min(8, selectionPool.length);
     const selected: ScoredRec[] = [];
     const selectedTickers = new Set<string>();
+    const selectedSectors = new Set<string>();
+    const sortedPool = [...selectionPool].sort((a, b) => b.quantScore - a.quantScore);
 
-    // First: try to pick one from each available strategy bucket for diversity
-    const strategyBuckets: Record<string, ScoredRec[]> = {};
-    for (const s of selectionPool) {
-      const strat = s.rec.strategy || "equity";
-      if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
-      strategyBuckets[strat].push(s);
-    }
-    for (const strat of Object.keys(strategyBuckets)) {
-      const bucket = strategyBuckets[strat];
-      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
-        selected.push(bucket[0]);
-        selectedTickers.add(bucket[0].rec.ticker);
+    const addCandidate = (candidate: ScoredRec) => {
+      selected.push(candidate);
+      selectedTickers.add(candidate.rec.ticker);
+      selectedSectors.add(String(candidate.rec.sector || "Diversified"));
+    };
+
+    const takeFromPool = (pool: ScoredRec[], limit: number, preferFreshSector: boolean = false) => {
+      let remaining = limit;
+      for (const candidate of pool) {
+        if (remaining <= 0 || selected.length >= targetCount) break;
+        if (selectedTickers.has(candidate.rec.ticker)) continue;
+        const sector = String(candidate.rec.sector || "Diversified");
+        if (preferFreshSector && selectedSectors.has(sector)) continue;
+        addCandidate(candidate);
+        remaining -= 1;
       }
-    }
-
-    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
-    for (const s of selectionPool) {
-      if (selected.length >= 25) break;
-      if (!selectedTickers.has(s.rec.ticker)) {
-        selected.push(s);
-        selectedTickers.add(s.rec.ticker);
+      if (preferFreshSector && remaining > 0) {
+        takeFromPool(pool, remaining, false);
       }
-    }
+    };
 
-    // No fallback injection — only show AI-analyzed, quant-validated picks
+    const hedgePool = sortedPool.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || "")));
+    const mainstreamPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && ["mega", "large"].includes(String(s.rec.marketCap || "").toLowerCase()));
+    const midCapPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && String(s.rec.marketCap || "").toLowerCase() === "mid");
+    const smallCapPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && ["small", "micro"].includes(String(s.rec.marketCap || "").toLowerCase()));
+    const nonHedgePool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")));
 
-    // Ensure hedge coverage exists in final set.
-    const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
-    let hedgeCount = selected.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""))).length;
-    if (hedgeCount < minHedgeCount) {
-      const hedgePool = scored
-        .filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && !selectedTickers.has(s.rec.ticker))
-        .sort((a, b) => b.quantScore - a.quantScore);
-
-      for (const hedgeCandidate of hedgePool) {
-        if (hedgeCount >= minHedgeCount) break;
-
-        if (selected.length >= 25) {
-          let replaceIdx = -1;
-          for (let i = selected.length - 1; i >= 0; i--) {
-            if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
-              replaceIdx = i;
-              break;
-            }
-          }
-          if (replaceIdx >= 0) {
-            selectedTickers.delete(selected[replaceIdx].rec.ticker);
-            selected.splice(replaceIdx, 1);
-          } else {
-            break;
-          }
-        }
-
-        selected.push(hedgeCandidate);
-        selectedTickers.add(hedgeCandidate.rec.ticker);
-        hedgeCount += 1;
-      }
-    }
+    takeFromPool(mainstreamPool, Math.min(3, targetCount), true);
+    takeFromPool(midCapPool, Math.min(3, Math.max(0, targetCount - selected.length)), true);
+    takeFromPool(smallCapPool, Math.min(1, Math.max(0, targetCount - selected.length)), true);
+    takeFromPool(hedgePool, hedgePool.length > 0 ? 1 : 0, false);
+    takeFromPool(nonHedgePool, Math.max(0, targetCount - selected.length), true);
+    takeFromPool(sortedPool, Math.max(0, targetCount - selected.length), false);
 
     if (selected.length === 0 && scored.length > 0) {
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
