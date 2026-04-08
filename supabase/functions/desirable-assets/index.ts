@@ -653,9 +653,9 @@ serve(async (req) => {
         ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
         : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
-    // Anti-repeat instruction
+    // Anti-repeat instruction — rotate away from recent names, but do not hard-ban fair mainstream picks.
     const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+      ? `\n## ROTATION RULE:\nPrefer fresh names over these recently recommended tickers when equally attractive: ${previousTickers.join(", ")}. You MAY reuse a recent ticker only if it is one of the strongest mainstream blue-chip allocations needed for balance.\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
