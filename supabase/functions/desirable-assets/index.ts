@@ -948,8 +948,8 @@ Return via the tool call only.`,
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
-      // F2: Target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+      // F2: Target validation — penalize stale/poor AI targets instead of rejecting the candidate outright
+      const targetBelowMarket = Boolean(rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95);
 
       // F3: Liquidity + investability guards — penalize weak names instead of hard-killing almost the entire set
       const dollarVolume = (td.volume || 0) * price;
