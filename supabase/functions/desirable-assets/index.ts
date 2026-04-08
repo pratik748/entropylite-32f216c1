@@ -754,19 +754,20 @@ ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Find 8-10 opportunities with REAL VARIETY — mix blue-chips with hidden gems:
-1) 2-3 quality large-caps with strong momentum or upcoming catalysts (rotate which ones — don't always pick the same names)
-2) 3-4 under-covered mid-caps ($2B-$30B) with earnings inflection points, margin expansion, or structural tailwinds
-3) 1-2 high-conviction small-caps or thematic plays with asymmetric payoff
+Find 14-16 opportunities with REAL VARIETY — mix blue-chips with hidden gems:
+1) 3-4 quality large-caps with strong momentum or upcoming catalysts (rotate which ones, but allow best-in-class mainstream names when justified)
+2) 5-6 under-covered mid-caps ($2B-$30B) with earnings inflection points, margin expansion, or structural tailwinds
+3) 2-3 high-conviction small-caps or thematic plays with asymmetric payoff
 4) 1-2 hedges or pair trades for portfolio protection
-5) At least 3 different sectors represented
+5) At least 4 different sectors represented
+6) Aim to provide enough viable candidates so the final quant-ranked basket can contain 8 balanced names
 
 Hard constraints:
 - Maximum 2 ETFs (prefer thematic/niche over broad index)
 - No penny stocks under $5
 - Minimum $500M market cap
-- At least 4 different strategy types
-- Use SEED ${seed} to vary sector emphasis and avoid repeating the same names
+- At least 4 different strategy types when possible
+- Use SEED ${seed} to vary sector emphasis and avoid stale recommendations
 
 Return via the tool call only.`,
         tools: candidateTools,
