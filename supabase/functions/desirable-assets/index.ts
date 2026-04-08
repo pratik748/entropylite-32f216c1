@@ -747,7 +747,7 @@ PORTFOLIO CONSTRUCTION RULES:
 7. Mix time horizons: swing trades (1-4 weeks) + position trades (1-6 months) + structural themes (6-12 months)
 8. VARY your picks on every call — use the SEED to randomize sector emphasis and market cap tilt
 9. Look for: insider buying clusters, earnings acceleration, sector rotation tailwinds, M&A optionality, contrarian recovery setups, post-selloff quality names
-Use exact tickers supported by Yahoo Finance. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips with under-covered mid/small-cap India names. No foreign stocks." : ""}`,
+Use exact tickers supported by Yahoo Finance. Return valid JSON only. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips with under-covered mid/small-cap India names. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -772,32 +772,48 @@ Hard constraints:
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 3200,
-        temperature: 0.6,
+        maxTokens: 4200,
+        temperature: 0.45,
+        jsonMode: true,
       };
 
-      // Fire BOTH providers in parallel for 2x candidate power
-      const parallelResults = await callAIParallel(aiOpts);
-      console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
-
-      for (const result of parallelResults) {
-        const p = safeParseJSON(result.text);
-        const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
-        console.log(`desirable-assets: ${result.provider} returned ${recs.length} candidates`);
-        if (!parsed.marketCondition && p?.marketCondition) {
-          parsed.marketCondition = p.marketCondition;
-          parsed.regimeType = p.regimeType || "transition";
+      const mergeParsedRecommendations = (rawText: string, source: string) => {
+        try {
+          const parsedChunk = safeParseJSON(rawText);
+          const recs = Array.isArray(parsedChunk?.recommendations) ? parsedChunk.recommendations : [];
+          console.log(`desirable-assets: ${source} yielded ${recs.length} parsed candidates`);
+          if (!parsed.marketCondition && parsedChunk?.marketCondition) {
+            parsed.marketCondition = parsedChunk.marketCondition;
+            parsed.regimeType = parsedChunk.regimeType || "transition";
+          }
+          candidates.push(...recs);
+          return recs.length;
+        } catch (parseError) {
+          console.error(`desirable-assets: failed to parse ${source} response:`, parseError);
+          return 0;
         }
-        candidates.push(...recs);
+      };
+
+      try {
+        const parallelResults = await callAIParallel(aiOpts);
+        console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
+        for (const result of parallelResults) {
+          mergeParsedRecommendations(result.text, result.provider);
+        }
+
+        if (candidates.length < 10) {
+          const fallbackResult = await callAI({ ...aiOpts, provider: effectiveProvider === "cloudflare" ? "cloudflare" : "mistral" });
+          mergeParsedRecommendations(fallbackResult.text, `${fallbackResult.provider}-fallback`);
+        }
+
+        candidates = dedupeCandidates(candidates);
+        console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
+      } catch (aiError) {
+        console.error("desirable-assets Stage 1 AI generation failed:", aiError);
+        return new Response(JSON.stringify({ error: "AI analysis failed. Please retry in a moment." }), {
+          status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      candidates = dedupeCandidates(candidates);
-      console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
-    } catch (aiError) {
-      console.error("desirable-assets Stage 1 AI generation failed:", aiError);
-      return new Response(JSON.stringify({ error: "AI analysis failed. Please retry in a moment." }), {
-        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
@@ -961,7 +977,7 @@ Return via the tool call only.`,
       const mu60 = mean(returns);
       const sig60 = stddev(returns);
       let profitablePaths = 0;
-      const simPaths = 5000;
+      const simPaths = 1200;
       const simDays = 60;
       for (let p = 0; p < simPaths; p++) {
         let simPrice = price;
@@ -1011,11 +1027,11 @@ Return via the tool call only.`,
       );
 
       const rescuePass = isHedge || (
-        sr >= -0.55 &&
-        mdd <= 82 &&
+        sr >= -0.8 &&
+        mdd <= 95 &&
         price >= 5 &&
-        winRate >= 26 &&
-        momentum20d > -18 &&
+        winRate >= 18 &&
+        momentum20d > -25 &&
         !microLiquidityFail
       );
 
@@ -1099,10 +1115,10 @@ Return via the tool call only.`,
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
     const sentimentCandidates = [...scored]
       .sort((a, b) => b.quantScore - a.quantScore)
-      .slice(0, Math.min(12, scored.length));
+      .slice(0, Math.min(8, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
-    const SENTIMENT_BATCH = 5;
+    const SENTIMENT_BATCH = 4;
     for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
       const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
       const sentimentResults = await Promise.allSettled(
