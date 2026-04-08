@@ -545,6 +545,53 @@ const ALLOWED_STRATEGIES = new Set([
   "momentum",
 ]);
 
+const ELITE_FALLBACK_UNIVERSE = [
+  { ticker: "MSFT", name: "Microsoft", sector: "Technology", marketCap: "mega", strategy: "equity" },
+  { ticker: "NVDA", name: "NVIDIA", sector: "Technology", marketCap: "mega", strategy: "momentum" },
+  { ticker: "AMZN", name: "Amazon", sector: "Consumer Discretionary", marketCap: "mega", strategy: "equity" },
+  { ticker: "META", name: "Meta Platforms", sector: "Communication", marketCap: "mega", strategy: "equity" },
+  { ticker: "GOOGL", name: "Alphabet", sector: "Communication", marketCap: "mega", strategy: "equity" },
+  { ticker: "AVGO", name: "Broadcom", sector: "Technology", marketCap: "large", strategy: "momentum" },
+  { ticker: "LLY", name: "Eli Lilly", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", marketCap: "large", strategy: "equity" },
+  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "COST", name: "Costco", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
+  { ticker: "ORCL", name: "Oracle", sector: "Technology", marketCap: "large", strategy: "equity" },
+  { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
+  { ticker: "ASML", name: "ASML", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "V", name: "Visa", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "MA", name: "Mastercard", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "QQQ", name: "Invesco QQQ ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
+  { ticker: "XLE", name: "Energy Select Sector SPDR", sector: "Energy", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+  { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+];
+
+const INDIA_FALLBACK_UNIVERSE = [
+  { ticker: "RELIANCE.NS", name: "Reliance Industries", sector: "Energy", marketCap: "mega", strategy: "equity" },
+  { ticker: "TCS.NS", name: "Tata Consultancy Services", sector: "Technology", marketCap: "mega", strategy: "equity" },
+  { ticker: "HDFCBANK.NS", name: "HDFC Bank", sector: "Financials", marketCap: "mega", strategy: "equity" },
+  { ticker: "INFY.NS", name: "Infosys", sector: "Technology", marketCap: "mega", strategy: "momentum" },
+  { ticker: "ICICIBANK.NS", name: "ICICI Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", sector: "Communication", marketCap: "large", strategy: "momentum" },
+  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "SBIN.NS", name: "State Bank of India", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "LT.NS", name: "Larsen & Toubro", sector: "Industrials", marketCap: "large", strategy: "equity" },
+  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
+  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
+  { ticker: "BAJFINANCE.NS", name: "Bajaj Finance", sector: "Financials", marketCap: "large", strategy: "momentum" },
+  { ticker: "MARUTI.NS", name: "Maruti Suzuki", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "TATAMOTORS.NS", name: "Tata Motors", sector: "Consumer Discretionary", marketCap: "large", strategy: "momentum" },
+  { ticker: "AXISBANK.NS", name: "Axis Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
+  { ticker: "SUNPHARMA.NS", name: "Sun Pharma", sector: "Healthcare", marketCap: "large", strategy: "equity" },
+  { ticker: "TITAN.NS", name: "Titan Company", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
+  { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
+  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
+  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
+];
+
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
   if (!ticker || ticker.length > 16) return null;
@@ -615,10 +662,46 @@ const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
   Commodities: { thesis: "Supply constraints and geopolitical risk premium supporting commodity prices. Portfolio diversification benefits in risk-off environments.", catalyst: "Central bank gold buying and inflation hedge demand from institutional allocators." },
   Index: { thesis: "Broad market exposure with low tracking error. Efficient vehicle for tactical allocation and hedging strategies.", catalyst: "Market breadth improvement and sectoral rotation supporting index-level returns." },
   Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
-  "Fixed Income": { thesis: "Duration exposure provides portfolio ballast during equity drawdowns. Yield curve positioning for rate cycle shifts.", catalyst: "Fed policy pivot expectations and flight-to-quality flows during risk-off episodes." },
 };
 
-
+function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
+  const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
+  const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
+  return universe
+    .filter((c) => !blocked.has(c.ticker))
+    .slice(0, 16)
+    .map((c, i) => {
+      const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
+      return {
+        ticker: c.ticker,
+        name: c.name,
+        assetClass: (c as any).assetClass || "Equity",
+        exchange: indiaMode ? "NSE" : "NASDAQ",
+        currency: indiaMode ? "INR" : "USD",
+        currentEstPrice: 0,
+        entryZone: [0, 0],
+        targetPrice: 0,
+        stopLoss: 0,
+        timeHorizon: i % 3 === 0 ? "1M" : "3M",
+        suggestedQty: 1,
+        confidence: 68,
+        thesis: "", // left empty — will be generated dynamically in enrichment
+        catalyst: "", // left empty — will be generated dynamically in enrichment
+        hedgingStrategy: "", // left empty — deriveHedgePlan will fill this
+        riskReward: "1:2.2",
+        sector: c.sector,
+        tags: ["liquid", "institutional", "momentum"],
+        riskProfile: ["medium_term", "high_conviction"],
+        strategy: c.strategy,
+        pairedInstrument: null,
+        pairedStructure: null,
+        capitalEfficiency: 1,
+        correlationToPortfolio: "low",
+        marketCap: c.marketCap,
+        _isFallback: true,
+      };
+    });
+}
 
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
@@ -653,9 +736,9 @@ serve(async (req) => {
         ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
         : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
-    // Anti-repeat instruction — rotate away from recent names, but do not hard-ban fair mainstream picks.
+    // Anti-repeat instruction
     const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ROTATION RULE:\nPrefer fresh names over these recently recommended tickers when equally attractive: ${previousTickers.join(", ")}. You MAY reuse a recent ticker only if it is one of the strongest mainstream blue-chip allocations needed for balance.\n`
+      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
@@ -733,85 +816,62 @@ serve(async (req) => {
     let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
     let candidates: any[] = [];
 
+    try {
       const aiOpts = {
-        systemPrompt: `You are a senior portfolio manager at a multi-strategy fund. Your mandate is to build a BALANCED basket mixing mainstream blue-chips with selective alpha opportunities.
-
-PORTFOLIO CONSTRUCTION RULES:
-1. 35-45% MAINSTREAM blue-chips and mega-caps (AAPL, MSFT, GOOGL, AMZN, NVDA, META, JPM, V, UNH, JNJ, etc.) — these are CORE holdings, not fillers. Include the best 4-5 from this tier.
-2. 30-40% quality mid-caps ($2B-$30B) with clear earnings catalysts or sector tailwinds
-3. 10-20% selective small-caps ($500M-$2B) with asymmetric upside
-4. Every pick needs a SPECIFIC catalyst — but blue-chips qualify with earnings momentum, buyback programs, market leadership, etc.
-5. Asymmetric risk/reward minimum 1:2
-6. Mix time horizons: swing (1-4 weeks) + position (1-6 months) + structural (6-12 months)
-7. VARY picks using the SEED — rotate which blue-chips and which mid/small-caps appear
-8. Do NOT avoid mainstream names — they are the backbone of any serious portfolio
-9. Look across sectors: Tech, Healthcare, Financials, Energy, Consumer, Industrials, etc.
-Use exact tickers supported by Yahoo Finance. Return valid JSON only. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips (RELIANCE.NS, TCS.NS, INFY.NS, HDFCBANK.NS, etc.) with quality mid/small-cap India names. No foreign stocks." : ""}`,
+        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
+Reject low-quality names, random microcaps, and weak momentum setups.
+Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
+Prefer large/mid-cap leaders, strong earnings trends, and positive sentiment dislocations with recovery setups.
+Use exact tickers supported by Yahoo Finance.
+Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Build a BALANCED basket of 14-16 names:
-1) 5-6 MAINSTREAM blue-chips (mega/large-cap household names like AAPL, MSFT, GOOGL, AMZN, NVDA, META, JPM, V, UNH, BRK-B, LLY, AVGO, etc.) — pick the ones with strongest near-term catalysts. These are NOT boring — they ARE the market.
-2) 4-5 quality mid-caps ($2B-$30B) with earnings inflection or sector momentum
-3) 2-3 selective small-caps with asymmetric risk/reward
-4) 1-2 hedges or defensive positions
-5) At least 4 different sectors
-6) Target 8+ names surviving quant filters
+Create 8-10 recommendations that prioritize:
+1) Positive earnings momentum + institutional participation
+2) Price trend confirmation (above key averages)
+3) Catalyst-driven upside in 1-6 months
+4) Sentiment-aware setups (avoid structural breakdowns)
+5) Liquidity and execution quality
 
 Hard constraints:
 - Maximum 2 ETFs
-- No penny stocks under $5
-- Minimum $500M market cap
-- Use SEED ${seed} to rotate which specific blue-chips and mid-caps appear
+- No penny stocks / meme stocks / niche illiquid names
+- No deteriorating fundamentals
+- Provide strategy diversity across at least 4 strategy types
 
 Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
-        maxTokens: 4200,
-        temperature: 0.45,
-        jsonMode: true,
+        maxTokens: 2800,
+        temperature: 0.35,
       };
 
-      const mergeParsedRecommendations = (rawText: string, source: string) => {
-        try {
-          const parsedChunk = safeParseJSON(rawText);
-          const recs = Array.isArray(parsedChunk?.recommendations) ? parsedChunk.recommendations : [];
-          console.log(`desirable-assets: ${source} yielded ${recs.length} parsed candidates`);
-          if (!parsed.marketCondition && parsedChunk?.marketCondition) {
-            parsed.marketCondition = parsedChunk.marketCondition;
-            parsed.regimeType = parsedChunk.regimeType || "transition";
-          }
-          candidates.push(...recs);
-          return recs.length;
-        } catch (parseError) {
-          console.error(`desirable-assets: failed to parse ${source} response:`, parseError);
-          return 0;
-        }
-      };
+      // Fire BOTH providers in parallel for 2x candidate power
+      const parallelResults = await callAIParallel(aiOpts);
+      console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
 
-      try {
-        const parallelResults = await callAIParallel(aiOpts);
-        console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
-        for (const result of parallelResults) {
-          mergeParsedRecommendations(result.text, result.provider);
+      for (const result of parallelResults) {
+        const p = safeParseJSON(result.text);
+        const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+        console.log(`desirable-assets: ${result.provider} returned ${recs.length} candidates`);
+        if (!parsed.marketCondition && p?.marketCondition) {
+          parsed.marketCondition = p.marketCondition;
+          parsed.regimeType = p.regimeType || "transition";
         }
-
-        if (candidates.length < 10) {
-          const fallbackResult = await callAI({ ...aiOpts, provider: effectiveProvider === "cloudflare" ? "cloudflare" : "mistral" });
-          mergeParsedRecommendations(fallbackResult.text, `${fallbackResult.provider}-fallback`);
-        }
-
-        candidates = dedupeCandidates(candidates);
-        console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
-      } catch (aiError) {
-        console.error("desirable-assets Stage 1 AI generation failed:", aiError);
-        return new Response(JSON.stringify({ error: "AI analysis failed. Please retry in a moment." }), {
-          status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        candidates.push(...recs);
       }
+      candidates = dedupeCandidates(candidates);
+      console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
+    } catch (aiError) {
+      console.error("desirable-assets Stage 1 AI generation failed:", aiError);
+    }
+
+    // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
+    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
@@ -822,13 +882,18 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    candidates = dedupeCandidates(candidates).slice(0, 28);
-    console.log(`desirable-assets: AI returned ${candidates.length} picks`);
+    // Only use fallback when AI returns fewer than 8 candidates
+    if (candidates.length < 8) {
+      const needed = 8 - candidates.length;
+      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
+      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
+    } else {
+      candidates = dedupeCandidates(candidates).slice(0, 28);
+      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
+    }
 
     if (candidates.length === 0) {
-      return new Response(JSON.stringify({ error: "AI returned no valid candidates. Please retry." }), {
-        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      throw new Error("No candidates available after deterministic fallback");
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
@@ -962,75 +1027,72 @@ Return via the tool call only.`,
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
-      // F2: Target validation — penalize stale/poor AI targets instead of rejecting the candidate outright
-      const targetBelowMarket = Boolean(rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95);
+      // F2: Target must be above current price
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
 
-      // F3: Liquidity + investability guards — penalize weak names instead of hard-killing almost the entire set
+      // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
-      const marketCapBucket = String(rec.marketCap || "").toLowerCase();
-      const lowLiquidity = !isHedge && dollarVolume < 3_000_000;
-      const microLiquidityFail = !isHedge && marketCapBucket === "micro" && dollarVolume < 5_000_000;
+      if (!isHedge && dollarVolume < 20_000_000) { filtered++; continue; }
+      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
       const sig60 = stddev(returns);
       let profitablePaths = 0;
-      const simPaths = 1200;
+      const simPaths = 5000;
       const simDays = 60;
       for (let p = 0; p < simPaths; p++) {
         let simPrice = price;
         for (let d = 0; d < simDays; d++) {
+          // Box-Muller for normal random
           const u1 = Math.random();
           const u2 = Math.random();
           const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
           simPrice *= Math.exp((mu60 - 0.5 * sig60 * sig60) + sig60 * z);
         }
-        if (simPrice > price * 1.02) profitablePaths++;
+        if (simPrice > price * 1.02) profitablePaths++; // >2% gain
       }
       const winRate = (profitablePaths / simPaths) * 100;
 
+      // Compute max profit target
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
-      const weakUpside = !isHedge && expectedUpsidePct < 2;
-      const veryWeakUpside = !isHedge && expectedUpsidePct < -4;
 
-      // Tiered pass logic — relaxed enough to consistently return a full 8-name set when live data exists,
-      // while still demoting weaker ideas into balanced/rescue tiers rather than presenting them as top quality.
+      // F4: Avoid weak upside profiles
+      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
+
+      // Tiered pass logic to avoid empty result sets while preserving quality.
       const strictPass = isHedge || (
-        sr >= 0 &&
-        mdd <= 45 &&
-        (!isPair ? price >= sma20 * 0.97 : true) &&
-        (!isPair ? trendStrength >= 45 : true) &&
-        cumReturn20d >= -10 &&
-        fiftyTwoPos >= 20 &&
-        (!isPair ? portCorr <= 0.82 : true) &&
-        (vol <= 95 || sr >= 0.15) &&
-        winRate >= 42 &&
-        momentum20d > -4 &&
-        !veryWeakUpside &&
-        !microLiquidityFail
+        sr >= 0.15 &&
+        mdd <= 35 &&
+        (!isPair ? price >= sma20 * 0.99 : true) &&
+        (!isPair ? trendStrength >= 55 : true) &&
+        cumReturn20d >= -8 &&
+        fiftyTwoPos >= 30 &&
+        (!isPair ? portCorr <= 0.75 : true) &&
+        (vol <= 85 || sr >= 0.3) &&
+        winRate >= 48 &&
+        momentum20d > -2
       );
 
       const balancedPass = isHedge || (
-        sr >= -0.25 &&
-        mdd <= 62 &&
-        (!isPair ? price >= sma20 * 0.92 : true) &&
-        (!isPair ? trendStrength >= 25 : true) &&
-        cumReturn20d >= -18 &&
-        fiftyTwoPos >= 8 &&
-        (!isPair ? portCorr <= 0.93 : true) &&
-        winRate >= 34 &&
-        momentum20d > -10 &&
-        !microLiquidityFail
+        sr >= -0.1 &&
+        mdd <= 50 &&
+        (!isPair ? price >= sma20 * 0.95 : true) &&
+        (!isPair ? trendStrength >= 35 : true) &&
+        cumReturn20d >= -15 &&
+        fiftyTwoPos >= 15 &&
+        (!isPair ? portCorr <= 0.88 : true) &&
+        winRate >= 40 &&
+        momentum20d > -6
       );
 
       const rescuePass = isHedge || (
-        sr >= -0.8 &&
-        mdd <= 95 &&
-        price >= 5 &&
-        winRate >= 18 &&
-        momentum20d > -25 &&
-        !microLiquidityFail
+        sr >= -0.35 &&
+        mdd <= 65 &&
+        (!isPair ? price >= sma20 * 0.9 : true) &&
+        winRate >= 34 &&
+        momentum20d > -12
       );
 
       if (!strictPass && !balancedPass && !rescuePass) { filtered++; continue; }
@@ -1040,41 +1102,29 @@ Return via the tool call only.`,
           ? "balanced"
           : "rescue";
 
+      // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
       const conf = (rec.confidence || 50) / 100;
-      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1);
+      const momScore = Math.min(Math.max(momentum20d / 20, -1), 1); // normalize momentum
       const trendScore = trendStrength / 100;
       const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
-      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.04;
-      const capBalanceBonus = marketCapBucket === "mid"
-        ? 0.06
-        : marketCapBucket === "small"
-          ? 0.04
-          : ["mega", "large"].includes(marketCapBucket)
-            ? 0.05
-            : 0;
-      const penaltyPoints =
-        (targetBelowMarket ? 12 : 0) +
-        (lowLiquidity ? 8 : 0) +
-        (weakUpside ? 8 : 0) +
-        (veryWeakUpside ? 10 : 0);
+      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.06;
 
       const quantScore = Math.round(
-        (0.20 * (normSharpe + 1) / 2 +
-         0.15 * diversification +
-         0.10 * conf +
-         0.05 * Math.min(capEff / 5, 1) +
-         0.10 * Math.max(0, 1 - mdd / 45) +
-         0.15 * (momScore + 1) / 2 +
-         0.10 * trendScore +
-         0.15 * winRateScore +
+        (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
+         0.15 * diversification +            // Portfolio diversification
+         0.10 * conf +                       // AI confidence
+         0.05 * Math.min(capEff / 5, 1) +   // Capital efficiency
+         0.10 * Math.max(0, 1 - mdd / 35) + // Low drawdown reward
+         0.15 * (momScore + 1) / 2 +         // Momentum (NEW)
+         0.10 * trendScore +                 // Trend strength (NEW)
+         0.15 * winRateScore +               // Monte Carlo win rate (NEW)
          hedgeBonus +
-         tierBonus +
-         capBalanceBonus) * 100
-      ) - penaltyPoints;
+         tierBonus) * 100
+      );
 
       scored.push({
         rec,
@@ -1083,7 +1133,7 @@ Return via the tool call only.`,
         portfolioCorrelation: Math.round(portCorr * 100) / 100,
         volatility: Math.round(vol * 10) / 10,
         zScore: Math.round(zs * 100) / 100,
-        quantScore: clamp(quantScore, 1, 99),
+        quantScore: Math.min(quantScore, 99),
         priceVerified: true,
         stalePrice: td.stalePrice || false,
         realPrice: td.price,
@@ -1113,10 +1163,10 @@ Return via the tool call only.`,
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
     const sentimentCandidates = [...scored]
       .sort((a, b) => b.quantScore - a.quantScore)
-      .slice(0, Math.min(8, scored.length));
+      .slice(0, Math.min(12, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
-    const SENTIMENT_BATCH = 4;
+    const SENTIMENT_BATCH = 5;
     for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
       const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
       const sentimentResults = await Promise.allSettled(
@@ -1150,7 +1200,7 @@ Return via the tool call only.`,
       s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
     }
 
-    // ── STAGE 4: Select top candidates by score with guaranteed balanced coverage ─────────────────
+    // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
     const strictPool = scored.filter((s) => s.filterTier === "strict");
@@ -1163,58 +1213,125 @@ Return via the tool call only.`,
     } else if (balancedPool.length >= 8) {
       selectionPool = balancedPool;
     } else {
-      selectionPool = scored.filter((s) => s.quantScore >= 24);
-      if (selectionPool.length < Math.min(8, scored.length)) selectionPool = scored;
+      selectionPool = scored.filter((s) => s.quantScore >= 32);
+      if (selectionPool.length === 0) selectionPool = scored;
     }
 
-    const targetCount = Math.min(8, selectionPool.length);
     const selected: ScoredRec[] = [];
     const selectedTickers = new Set<string>();
-    const selectedSectors = new Set<string>();
-    const sortedPool = [...selectionPool].sort((a, b) => b.quantScore - a.quantScore);
 
-    const addCandidate = (candidate: ScoredRec) => {
-      selected.push(candidate);
-      selectedTickers.add(candidate.rec.ticker);
-      selectedSectors.add(String(candidate.rec.sector || "Diversified"));
-    };
-
-    const takeFromPool = (pool: ScoredRec[], limit: number, preferFreshSector: boolean = false) => {
-      let remaining = limit;
-      for (const candidate of pool) {
-        if (remaining <= 0 || selected.length >= targetCount) break;
-        if (selectedTickers.has(candidate.rec.ticker)) continue;
-        const sector = String(candidate.rec.sector || "Diversified");
-        if (preferFreshSector && selectedSectors.has(sector)) continue;
-        addCandidate(candidate);
-        remaining -= 1;
+    // First: try to pick one from each available strategy bucket for diversity
+    const strategyBuckets: Record<string, ScoredRec[]> = {};
+    for (const s of selectionPool) {
+      const strat = s.rec.strategy || "equity";
+      if (!strategyBuckets[strat]) strategyBuckets[strat] = [];
+      strategyBuckets[strat].push(s);
+    }
+    for (const strat of Object.keys(strategyBuckets)) {
+      const bucket = strategyBuckets[strat];
+      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
+        selected.push(bucket[0]);
+        selectedTickers.add(bucket[0].rec.ticker);
       }
-      if (preferFreshSector && remaining > 0) {
-        takeFromPool(pool, remaining, false);
+    }
+
+    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
+    for (const s of selectionPool) {
+      if (selected.length >= 25) break;
+      if (!selectedTickers.has(s.rec.ticker)) {
+        selected.push(s);
+        selectedTickers.add(s.rec.ticker);
       }
-    };
+    }
 
-    const hedgePool = sortedPool.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || "")));
-    const mainstreamPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && ["mega", "large"].includes(String(s.rec.marketCap || "").toLowerCase()));
-    const midCapPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && String(s.rec.marketCap || "").toLowerCase() === "mid");
-    const smallCapPool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && ["small", "micro"].includes(String(s.rec.marketCap || "").toLowerCase()));
-    const nonHedgePool = sortedPool.filter((s) => !HEDGE_STRATEGIES.has(String(s.rec.strategy || "")));
+    // Reliability backstop: ensure at least 8 output candidates when market filters are too harsh.
+    if (selected.length < 8) {
+      for (const fallbackRec of deterministicCandidates) {
+        if (selected.length >= 8) break;
+        if (selectedTickers.has(fallbackRec.ticker) || portfolioTickers.includes(fallbackRec.ticker)) continue;
 
-    takeFromPool(mainstreamPool, Math.min(3, targetCount), true);
-    takeFromPool(midCapPool, Math.min(3, Math.max(0, targetCount - selected.length)), true);
-    takeFromPool(smallCapPool, Math.min(1, Math.max(0, targetCount - selected.length)), true);
-    takeFromPool(hedgePool, hedgePool.length > 0 ? 1 : 0, false);
-    takeFromPool(nonHedgePool, Math.max(0, targetCount - selected.length), true);
-    takeFromPool(sortedPool, Math.max(0, targetCount - selected.length), false);
+        const td = tickerData[fallbackRec.ticker];
+        if (!td || td.closes.length < 20 || td.price <= 0) continue;
+
+        const returns = logReturns(td.closes);
+        const sr = sharpeRatio(returns);
+        const mdd = maxDrawdown(td.closes);
+        const vol = annualizedVol(returns);
+        const zs = zScore(td.closes);
+        const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+        const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
+
+        selected.push({
+          rec: fallbackRec,
+          sharpeRatio: Math.round(sr * 100) / 100,
+          maxDrawdown: Math.round(mdd * 10) / 10,
+          portfolioCorrelation: Math.round(portCorr * 100) / 100,
+          volatility: Math.round(vol * 10) / 10,
+          zScore: Math.round(zs * 100) / 100,
+          quantScore: 42,
+          priceVerified: true,
+          stalePrice: td.stalePrice || false,
+          realPrice: td.price,
+          realCurrency: td.currency,
+          priceChange24h: Math.round(td.change * 100) / 100,
+          volume: td.volume,
+          fiftyTwoHigh: td.fiftyTwoHigh,
+          fiftyTwoLow: td.fiftyTwoLow,
+          closes: td.closes.slice(-60),
+          highs: (td.highs || []).slice(-60),
+          maxProfitTarget: mpt.maxTarget,
+          maxProfitConfidence: mpt.confidence,
+          maxProfitMethod: mpt.method,
+          momentum20d: Math.round((((td.price - mean(td.closes.slice(-20))) / mean(td.closes.slice(-20))) * 100) * 100) / 100,
+          momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
+          trendStrength: 50,
+          winRate: 50,
+          filterTier: "rescue" as const,
+            sentimentScore: 0,
+            sentimentLabel: "Neutral",
+            earningsSignal: "neutral",
+            sentimentHeadline: "",
+            sentimentArticleCount: 0,
+        });
+        selectedTickers.add(fallbackRec.ticker);
+      }
+    }
+
+    // Ensure hedge coverage exists in final set.
+    const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
+    let hedgeCount = selected.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""))).length;
+    if (hedgeCount < minHedgeCount) {
+      const hedgePool = scored
+        .filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || "")) && !selectedTickers.has(s.rec.ticker))
+        .sort((a, b) => b.quantScore - a.quantScore);
+
+      for (const hedgeCandidate of hedgePool) {
+        if (hedgeCount >= minHedgeCount) break;
+
+        if (selected.length >= 25) {
+          let replaceIdx = -1;
+          for (let i = selected.length - 1; i >= 0; i--) {
+            if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
+              replaceIdx = i;
+              break;
+            }
+          }
+          if (replaceIdx >= 0) {
+            selectedTickers.delete(selected[replaceIdx].rec.ticker);
+            selected.splice(replaceIdx, 1);
+          } else {
+            break;
+          }
+        }
+
+        selected.push(hedgeCandidate);
+        selectedTickers.add(hedgeCandidate.rec.ticker);
+        hedgeCount += 1;
+      }
+    }
 
     if (selected.length === 0 && scored.length > 0) {
       selected.push(...scored.slice(0, Math.min(8, scored.length)));
-    }
-
-    if (selected.length === 0) {
-      return new Response(JSON.stringify({ error: "No candidates passed quant validation. Market conditions may be unfavorable. Please retry." }), {
-        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // Verify strategy diversity
