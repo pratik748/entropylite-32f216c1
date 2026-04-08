@@ -977,7 +977,6 @@ Return via the tool call only.`,
 
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
-      const targetBelowMarket = Boolean(rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95);
       const weakUpside = !isHedge && expectedUpsidePct < 2;
       const veryWeakUpside = !isHedge && expectedUpsidePct < -4;
 
