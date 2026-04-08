@@ -734,39 +734,38 @@ serve(async (req) => {
     let candidates: any[] = [];
 
       const aiOpts = {
-        systemPrompt: `You are a hedge fund alpha-seeking PM who balances conviction blue-chips with non-obvious edge plays. Your job is to surface a MIX of quality large-caps AND asymmetric mid/small-cap opportunities most analysts miss.
+        systemPrompt: `You are a senior portfolio manager at a multi-strategy fund. Your mandate is to build a BALANCED basket mixing mainstream blue-chips with selective alpha opportunities.
 
 PORTFOLIO CONSTRUCTION RULES:
-1. 30-40% large/mega-cap quality names (strong fundamentals, institutional ownership) — but VARY which ones, don't always pick the same 10
-2. 40-50% mid-caps ($2B-$30B) with earnings inflection, margin expansion, or structural catalysts — this is where alpha lives
-3. 10-20% high-conviction small-caps ($500M-$2B) or thematic plays with asymmetric upside
-4. Every pick must have a SPECIFIC, TIME-BOUND catalyst (not generic "AI tailwinds" or "strong fundamentals")
-5. Include at least 2 names with <15 sell-side analysts covering them
-6. Asymmetric risk/reward minimum 1:2
-7. Mix time horizons: swing trades (1-4 weeks) + position trades (1-6 months) + structural themes (6-12 months)
-8. VARY your picks on every call — use the SEED to randomize sector emphasis and market cap tilt
-9. Look for: insider buying clusters, earnings acceleration, sector rotation tailwinds, M&A optionality, contrarian recovery setups, post-selloff quality names
-Use exact tickers supported by Yahoo Finance. Return valid JSON only. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips with under-covered mid/small-cap India names. No foreign stocks." : ""}`,
+1. 35-45% MAINSTREAM blue-chips and mega-caps (AAPL, MSFT, GOOGL, AMZN, NVDA, META, JPM, V, UNH, JNJ, etc.) — these are CORE holdings, not fillers. Include the best 4-5 from this tier.
+2. 30-40% quality mid-caps ($2B-$30B) with clear earnings catalysts or sector tailwinds
+3. 10-20% selective small-caps ($500M-$2B) with asymmetric upside
+4. Every pick needs a SPECIFIC catalyst — but blue-chips qualify with earnings momentum, buyback programs, market leadership, etc.
+5. Asymmetric risk/reward minimum 1:2
+6. Mix time horizons: swing (1-4 weeks) + position (1-6 months) + structural (6-12 months)
+7. VARY picks using the SEED — rotate which blue-chips and which mid/small-caps appear
+8. Do NOT avoid mainstream names — they are the backbone of any serious portfolio
+9. Look across sectors: Tech, Healthcare, Financials, Energy, Consumer, Industrials, etc.
+Use exact tickers supported by Yahoo Finance. Return valid JSON only. Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations. Mix NIFTY 50 blue-chips (RELIANCE.NS, TCS.NS, INFY.NS, HDFCBANK.NS, etc.) with quality mid/small-cap India names. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
 
-Find 14-16 opportunities with REAL VARIETY — mix blue-chips with hidden gems:
-1) 3-4 quality large-caps with strong momentum or upcoming catalysts (rotate which ones, but allow best-in-class mainstream names when justified)
-2) 5-6 under-covered mid-caps ($2B-$30B) with earnings inflection points, margin expansion, or structural tailwinds
-3) 2-3 high-conviction small-caps or thematic plays with asymmetric payoff
-4) 1-2 hedges or pair trades for portfolio protection
-5) At least 4 different sectors represented
-6) Aim to provide enough viable candidates so the final quant-ranked basket can contain 8 balanced names
+Build a BALANCED basket of 14-16 names:
+1) 5-6 MAINSTREAM blue-chips (mega/large-cap household names like AAPL, MSFT, GOOGL, AMZN, NVDA, META, JPM, V, UNH, BRK-B, LLY, AVGO, etc.) — pick the ones with strongest near-term catalysts. These are NOT boring — they ARE the market.
+2) 4-5 quality mid-caps ($2B-$30B) with earnings inflection or sector momentum
+3) 2-3 selective small-caps with asymmetric risk/reward
+4) 1-2 hedges or defensive positions
+5) At least 4 different sectors
+6) Target 8+ names surviving quant filters
 
 Hard constraints:
-- Maximum 2 ETFs (prefer thematic/niche over broad index)
+- Maximum 2 ETFs
 - No penny stocks under $5
 - Minimum $500M market cap
-- At least 4 different strategy types when possible
-- Use SEED ${seed} to vary sector emphasis and avoid stale recommendations
+- Use SEED ${seed} to rotate which specific blue-chips and mid-caps appear
 
 Return via the tool call only.`,
         tools: candidateTools,
