@@ -733,7 +733,6 @@ serve(async (req) => {
     let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
     let candidates: any[] = [];
 
-    try {
       const aiOpts = {
         systemPrompt: `You are a hedge fund alpha-seeking PM who balances conviction blue-chips with non-obvious edge plays. Your job is to surface a MIX of quality large-caps AND asymmetric mid/small-cap opportunities most analysts miss.
 
@@ -814,8 +813,6 @@ Return via the tool call only.`,
           status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      }
-    }
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
