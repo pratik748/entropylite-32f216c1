@@ -814,6 +814,7 @@ Return via the tool call only.`,
           status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      }
     }
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
