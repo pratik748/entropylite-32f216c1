@@ -1032,8 +1032,11 @@ Return via the tool call only.`,
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
-      if (!isHedge && dollarVolume < 20_000_000) { filtered++; continue; }
-      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
+      const isFallback = rec._isFallback === true;
+      // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold; fallbacks always pass
+      const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
+      if (!isHedge && !isFallback && dollarVolume < minDollarVol) { filtered++; continue; }
+      if (!isHedge && !isFallback && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
