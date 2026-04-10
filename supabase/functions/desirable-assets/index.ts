@@ -1061,8 +1061,9 @@ Return via the tool call only.`,
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
 
-      // F4: Avoid weak upside profiles
-      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
+      // F4: Avoid weak upside profiles — relaxed for fallback candidates
+      if (!isHedge && !isFallback && expectedUpsidePct < 4) { filtered++; continue; }
+      if (!isHedge && isFallback && expectedUpsidePct < 1) { filtered++; continue; }
 
       // Tiered pass logic to avoid empty result sets while preserving quality.
       const strictPass = isHedge || (
@@ -1090,12 +1091,17 @@ Return via the tool call only.`,
         momentum20d > -6
       );
 
-      const rescuePass = isHedge || (
-        sr >= -0.35 &&
-        mdd <= 65 &&
-        (!isPair ? price >= sma20 * 0.9 : true) &&
-        winRate >= 34 &&
-        momentum20d > -12
+      // Fallback candidates get an even more lenient rescue tier
+      const rescueThresholds = isFallback
+        ? { sr: -0.6, mdd: 80, smaFactor: 0.8, winRate: 25, momentum: -20 }
+        : { sr: -0.35, mdd: 65, smaFactor: 0.9, winRate: 34, momentum: -12 };
+
+      const rescuePass = isHedge || isFallback || (
+        sr >= rescueThresholds.sr &&
+        mdd <= rescueThresholds.mdd &&
+        (!isPair ? price >= sma20 * rescueThresholds.smaFactor : true) &&
+        winRate >= rescueThresholds.winRate &&
+        momentum20d > rescueThresholds.momentum
       );
 
       if (!strictPass && !balancedPass && !rescuePass) { filtered++; continue; }
