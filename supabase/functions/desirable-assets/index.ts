@@ -1224,8 +1224,8 @@ Return via the tool call only.`,
     } else if (balancedPool.length >= 8) {
       selectionPool = balancedPool;
     } else {
-      selectionPool = scored.filter((s) => s.quantScore >= 32);
-      if (selectionPool.length === 0) selectionPool = scored;
+      selectionPool = scored.filter((s) => s.quantScore >= 20);
+      if (selectionPool.length < 6) selectionPool = scored; // take everything
     }
 
     const selected: ScoredRec[] = [];
