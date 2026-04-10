@@ -324,19 +324,6 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     setAddedTickers(prev => new Set(prev).add(rec.ticker));
     toast({ title: `Added ${rec.ticker}`, description: `${rec.suggestedQty} units at ${getCurrencySymbol(rec.realCurrency || rec.currency)}${price.toLocaleString()}` });
 
-    // Auto-add hedge instrument as paired trade
-    if (rec.hedgeInstrument && rec.hedgeInstrument !== "SELF-HEDGE" && rec.hedgeRatioPct && rec.hedgeRatioPct > 0) {
-      const hedgeTicker = rec.hedgeInstrument;
-      const hedgeNotional = price * (rec.suggestedQty || 1) * (rec.hedgeRatioPct / 100);
-      // We add the hedge with notional value as price (1 unit) — the analyzer will fetch real price
-      setTimeout(() => {
-        onAddToPortfolio(hedgeTicker, hedgeNotional, 1);
-        toast({
-          title: `Hedge Added: ${hedgeTicker}`,
-          description: `Paired with ${rec.ticker} at ~${rec.hedgeRatioPct}% notional (${getCurrencySymbol(rec.realCurrency || rec.currency)}${hedgeNotional.toLocaleString()})`,
-        });
-      }, 500);
-    }
   };
 
   if (loading && recommendations.length === 0) {
@@ -643,7 +630,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   onClick={() => handleAdd(rec)}
                   className="h-7 gap-1 text-[10px]"
                 >
-                  {justAdded ? (rec.hedgeInstrument && rec.hedgeInstrument !== "SELF-HEDGE" ? "Paired ✓" : "Added ✓") : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add + Hedge</>}
+                  {justAdded ? "Added ✓" : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add</>}
                 </Button>
               </div>
             </div>
