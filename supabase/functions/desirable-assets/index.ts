@@ -1161,12 +1161,14 @@ Return via the tool call only.`,
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
-    const sentimentCandidates = [...scored]
-      .sort((a, b) => b.quantScore - a.quantScore)
-      .slice(0, Math.min(12, scored.length));
+    // Skip sentiment if we're running on fallback-only (no AI candidates) to save time
+    const hasAICandidates = candidates.some((c: any) => !c._isFallback);
+    const sentimentCandidates = hasAICandidates
+      ? [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(8, scored.length))
+      : [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(4, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
-    const SENTIMENT_BATCH = 5;
+    const SENTIMENT_BATCH = 4;
     for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
       const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
       const sentimentResults = await Promise.allSettled(
