@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI + Mistral + Lovable AI Gateway fallback.
+ * AI caller — Cloudflare Workers AI + Mistral + OpenAI fallback chain.
  */
 
 interface CallAIOptions {
@@ -10,13 +10,13 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral";
+  provider?: "cloudflare" | "mistral" | "openai";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral";
+  provider: "cloudflare" | "mistral" | "openai";
   toolCall?: any;
 }
 
@@ -223,6 +223,68 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "mistral" };
 }
 
+async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+
+  const model = "gpt-4o-mini";
+
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 8192,
+  };
+
+  if (opts.tools) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  if (opts.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
+  const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`OpenAI error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `OpenAI ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  if (!choice) throw new Error("Empty OpenAI response");
+
+  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+    const toolCall = choice.message.tool_calls[0];
+    return {
+      text: typeof toolCall.function?.arguments === "string"
+        ? toolCall.function.arguments
+        : JSON.stringify(toolCall.function?.arguments),
+      provider: "openai",
+      toolCall,
+    };
+  }
+
+  const raw = (choice.message?.content || "").trim();
+  if (!raw) throw new Error("Empty OpenAI response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "openai" };
+}
+
 // Optimized: 2 attempts max, instant 429 fallback
 const RETRY_DELAYS = [0, 1500];
 
@@ -244,14 +306,12 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       } catch (err: any) {
         lastError = err;
         console.error(`callAI → Cloudflare attempt ${attempt + 1} failed:`, err.message || err);
-        // ANY 429 → immediate Mistral fallback (no retry)
         if (err.status === 429) {
           console.log("callAI → Cloudflare 429, falling back to Mistral immediately");
           break;
         }
         if (err.status === 401 || err.status === 403) break;
         if (err.status >= 500 && err.status < 600) continue;
-        // Abort/timeout errors
         if (err.name === "AbortError") {
           console.log("callAI → Cloudflare timed out, falling back to Mistral");
           break;
@@ -266,8 +326,22 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       return result;
     } catch (mistralErr: any) {
       console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
-      throw lastError;
+      // Final fallback: OpenAI
+      console.log("callAI → Mistral failed, falling back to OpenAI");
+      try {
+        const result = await callOpenAI(opts);
+        console.log("callAI → OpenAI fallback success");
+        return result;
+      } catch (openaiErr: any) {
+        console.error("callAI → OpenAI fallback also failed:", openaiErr.message || openaiErr);
+        throw lastError;
+      }
     }
+  }
+
+  if (provider === "openai") {
+    console.log("callAI → OpenAI (forced by provider preference)");
+    return await callOpenAI(opts);
   }
 
   // Mistral (forced)
@@ -276,10 +350,10 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
 }
 
 /**
- * Fire Cloudflare + Mistral in parallel, return all successful results.
+ * Fire Cloudflare + Mistral + OpenAI in parallel, return all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
+  console.log("callAIParallel → firing Cloudflare + Mistral + OpenAI simultaneously");
 
   const promises = [
     callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
@@ -290,13 +364,18 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       console.warn("callAIParallel → Mistral failed:", err.message || err);
       return null;
     }),
+    callOpenAI({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.05) }).then(r => ({ ...r, provider: "openai" as const })).catch((err) => {
+      console.warn("callAIParallel → OpenAI failed:", err.message || err);
+      return null;
+    }),
   ];
 
-  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 30000));
+  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 35000));
   
   const results = await Promise.allSettled([
     Promise.race([promises[0], timeoutPromise]),
     Promise.race([promises[1], timeoutPromise]),
+    Promise.race([promises[2], timeoutPromise]),
   ]);
 
   const successes: AIResult[] = [];
@@ -305,15 +384,21 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    console.log("callAIParallel → all failed, final Mistral attempt");
+    console.log("callAIParallel → all failed, final OpenAI attempt");
     try {
-      const finalAttempt = await callMistral(opts);
+      const finalAttempt = await callOpenAI(opts);
       return [finalAttempt];
     } catch {
-      throw new Error("callAIParallel: all providers failed");
+      console.log("callAIParallel → final OpenAI also failed, trying Mistral");
+      try {
+        const lastAttempt = await callMistral(opts);
+        return [lastAttempt];
+      } catch {
+        throw new Error("callAIParallel: all providers failed");
+      }
     }
   }
 
-  console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
+  console.log(`callAIParallel → ${successes.length}/3 providers succeeded`);
   return successes;
 }
