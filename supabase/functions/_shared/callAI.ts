@@ -16,7 +16,7 @@ interface CallAIOptions {
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral" | "lovable";
+  provider: "cloudflare" | "mistral";
   toolCall?: any;
 }
 
@@ -223,55 +223,6 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   return { text, provider: "mistral" };
 }
 
-/**
- * Lovable AI Gateway fallback — uses gemini-2.5-flash via Lovable's built-in AI proxy.
- * No API key needed; uses LOVABLE_API_KEY secret.
- */
-async function callLovableAI(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not set");
-
-  const model = "google/gemini-2.5-flash";
-
-  // Lovable AI Gateway doesn't support tool_choice, so we use jsonMode instead
-  const body: any = {
-    model,
-    messages: [
-      { role: "system", content: opts.systemPrompt + "\n\nRespond ONLY with valid JSON. No markdown, no explanation." },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
-    response_format: { type: "json_object" },
-  };
-
-  // Note: Lovable AI doesn't support tool calls, we rely on JSON mode
-  const timeout = 40000;
-  const res = await fetchWithTimeout("https://ai-gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Lovable AI error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `LovableAI ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  if (!choice) throw new Error("Empty Lovable AI response");
-
-  const raw = (choice.message?.content || "").trim();
-  if (!raw) throw new Error("Empty Lovable AI response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "lovable" };
-}
-
 // Optimized: 2 attempts max, instant 429 fallback
 const RETRY_DELAYS = [0, 1500];
 
@@ -315,16 +266,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       return result;
     } catch (mistralErr: any) {
       console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
-      // Third fallback: Lovable AI
-      console.log("callAI → trying Lovable AI as last resort");
-      try {
-        const result = await callLovableAI(opts);
-        console.log("callAI → Lovable AI fallback success");
-        return result;
-      } catch (lovableErr: any) {
-        console.error("callAI → Lovable AI also failed:", lovableErr.message || lovableErr);
-        throw lastError;
-      }
+      throw lastError;
     }
   }
 
@@ -334,13 +276,11 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
 }
 
 /**
- * Fire Cloudflare, Mistral, AND Lovable AI in parallel, return all successful results.
- * Use different seeds/temperatures per provider for diversity.
+ * Fire Cloudflare + Mistral in parallel, return all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Cloudflare + Mistral + Lovable AI simultaneously");
+  console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
 
-  // Race: collect results as they come, return after 30s max or when all done
   const promises = [
     callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
       console.warn("callAIParallel → Cloudflare failed:", err.message || err);
@@ -350,19 +290,13 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       console.warn("callAIParallel → Mistral failed:", err.message || err);
       return null;
     }),
-    callLovableAI({ ...opts, temperature: Math.min(0.45, (opts.temperature ?? 0.35) + 0.05) }).then(r => ({ ...r, provider: "lovable" as const })).catch((err) => {
-      console.warn("callAIParallel → Lovable AI failed:", err.message || err);
-      return null;
-    }),
   ];
 
-  // Wait for all but with a 30s ceiling
   const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 30000));
   
   const results = await Promise.allSettled([
     Promise.race([promises[0], timeoutPromise]),
     Promise.race([promises[1], timeoutPromise]),
-    Promise.race([promises[2], timeoutPromise]),
   ]);
 
   const successes: AIResult[] = [];
@@ -371,23 +305,15 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    // Last resort: try just Lovable AI with generous timeout
-    console.log("callAIParallel → all failed, last-resort Lovable AI call");
+    console.log("callAIParallel → all failed, final Mistral attempt");
     try {
-      const lastResort = await callLovableAI(opts);
-      return [lastResort];
+      const finalAttempt = await callMistral(opts);
+      return [finalAttempt];
     } catch {
-      // Final fallback: try Mistral one more time
-      console.log("callAIParallel → Lovable AI also failed, final Mistral attempt");
-      try {
-        const finalAttempt = await callMistral(opts);
-        return [finalAttempt];
-      } catch {
-        throw new Error("callAIParallel: all providers failed");
-      }
+      throw new Error("callAIParallel: all providers failed");
     }
   }
 
-  console.log(`callAIParallel → ${successes.length}/3 providers succeeded`);
+  console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
   return successes;
 }
