@@ -643,7 +643,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   onClick={() => handleAdd(rec)}
                   className="h-7 gap-1 text-[10px]"
                 >
-                  {justAdded ? "Added ✓" : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add</>}
+                  {justAdded ? (rec.hedgeInstrument && rec.hedgeInstrument !== "SELF-HEDGE" ? "Paired ✓" : "Added ✓") : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add + Hedge</>}
                 </Button>
               </div>
             </div>
