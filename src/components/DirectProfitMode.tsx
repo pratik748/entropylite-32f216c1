@@ -90,14 +90,25 @@ const DirectProfitMode = () => {
     if (!synth) return;
     const cs = getCurrencySymbol(indiaMode ? "INR" : "USD");
     let text = "";
-    if (result.action === "BUY") {
-      text = `Buy between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Exit below ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
-    } else if (result.action === "SELL") {
-      text = `Sell between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Stop at ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+    if (indiaMode) {
+      if (result.action === "BUY") {
+        text = `खरीदें, ${cs}${result.entryLow} से ${cs}${result.entryHigh} के बीच। लक्ष्य ${cs}${result.targetPrice}। ${cs}${result.stopLoss} से नीचे जाएं तो बाहर निकलें। समय सीमा: ${result.timeframe}।`;
+      } else if (result.action === "SELL") {
+        text = `बेचें, ${cs}${result.entryLow} से ${cs}${result.entryHigh} के बीच। लक्ष्य ${cs}${result.targetPrice}। स्टॉप लॉस ${cs}${result.stopLoss}। समय सीमा: ${result.timeframe}।`;
+      } else {
+        text = `रुकें। विश्वास स्तर कम है, ${result.confidence} प्रतिशत। ${result.directionReason}।`;
+      }
     } else {
-      text = `Wait. Confidence is low at ${result.confidence}%. ${result.directionReason}.`;
+      if (result.action === "BUY") {
+        text = `Buy between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Exit below ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+      } else if (result.action === "SELL") {
+        text = `Sell between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Stop at ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+      } else {
+        text = `Wait. Confidence is low at ${result.confidence}%. ${result.directionReason}.`;
+      }
     }
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = indiaMode ? "hi-IN" : "en-US";
     utterance.rate = 0.95;
     utterance.onend = () => setSpeaking(false);
     setSpeaking(true);
