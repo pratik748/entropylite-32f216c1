@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2 } from "lucide-react";
+import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2, BarChart3, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -20,6 +20,11 @@ interface TradeResult {
   negativeNews: string;
   protection: string;
   currentPrice: number;
+  quantScore?: number;
+  volatilityRegime?: "LOW" | "NORMAL" | "HIGH";
+  riskRewardRatio?: number;
+  providersUsed?: number;
+  consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
 }
 
 const DirectProfitMode = () => {
