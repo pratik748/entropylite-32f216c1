@@ -400,11 +400,46 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     ? best.volatilityRegime
     : deriveVolatilityRegime(tech.annualizedVol);
 
-  let confidence = clamp(Math.round(Number(best?.confidence) || 50), action === "WAIT" ? 20 : 25, 92);
+  // --- Data-driven confidence floor based on REAL technical signals ---
+  const aiConfidence = Math.round(Number(best?.confidence) || 50);
+  
+  // Calculate signal-derived confidence floor
+  let signalFloor = 40; // base floor
+  if (action !== "WAIT") {
+    const absMomentum = Math.abs(tech.momentumScore);
+    const absZ = Math.abs(tech.zScore);
+    const volConfirm = tech.volumeRatio >= 1.1;
+    
+    // Strong momentum alignment = higher floor
+    if (absMomentum >= 3) signalFloor = 68;
+    else if (absMomentum >= 2) signalFloor = 58;
+    else if (absMomentum >= 1) signalFloor = 48;
+    
+    // Mean reversion signal boosts floor
+    if (absZ >= 1.5) signalFloor += 8;
+    else if (absZ >= 0.8) signalFloor += 4;
+    
+    // Volume confirmation
+    if (volConfirm) signalFloor += 5;
+    
+    // Low VIX environment = slightly more confidence
+    if (tech.annualizedVol < 20) signalFloor += 3;
+    
+    // Penalize high vol regime
+    if (tech.annualizedVol > 45) signalFloor -= 8;
+  } else {
+    signalFloor = 30; // WAIT should still show meaningful confidence
+  }
+  
+  // Use the HIGHER of AI confidence and signal-derived floor
+  let confidence = Math.max(aiConfidence, signalFloor);
+  confidence = clamp(confidence, action === "WAIT" ? 25 : 35, 92);
+  
+  // Multi-provider consensus adjustments
   if (parsedCount > 1) {
-    if (consensusCount === parsedCount) confidence = clamp(confidence + 4, 20, 92);
-    else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 2, 20, 92);
-    else if (action === "WAIT") confidence = clamp(confidence - 4, 18, 88);
+    if (consensusCount === parsedCount) confidence = clamp(confidence + 5, 25, 92);
+    else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 3, 25, 92);
+    else confidence = clamp(confidence - 3, 25, 88);
   }
 
   let entryLow = Number(best?.entryLow);
