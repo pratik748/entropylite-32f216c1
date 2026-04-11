@@ -74,6 +74,46 @@ function roundPrice(value: number) {
   return Number.isFinite(value) ? Number(value.toFixed(2)) : 0;
 }
 
+/** Known price floors for major tickers to reject wrong-symbol matches */
+const PRICE_SANITY: Record<string, { min: number; max: number }> = {
+  // Indian blue chips (INR)
+  "SBIN.NS": { min: 200, max: 2000 }, "SBIN.BO": { min: 200, max: 2000 },
+  "RELIANCE.NS": { min: 500, max: 5000 }, "RELIANCE.BO": { min: 500, max: 5000 },
+  "TCS.NS": { min: 1000, max: 8000 }, "TCS.BO": { min: 1000, max: 8000 },
+  "INFY.NS": { min: 500, max: 3000 }, "INFY.BO": { min: 500, max: 3000 },
+  "HDFCBANK.NS": { min: 500, max: 3000 }, "HDFCBANK.BO": { min: 500, max: 3000 },
+  "ICICIBANK.NS": { min: 300, max: 2500 }, "ICICIBANK.BO": { min: 300, max: 2500 },
+  "TATAMOTORS.NS": { min: 100, max: 1500 }, "TATAMOTORS.BO": { min: 100, max: 1500 },
+  "ITC.NS": { min: 100, max: 1000 }, "ITC.BO": { min: 100, max: 1000 },
+  "KOTAKBANK.NS": { min: 500, max: 3000 }, "KOTAKBANK.BO": { min: 500, max: 3000 },
+  "BHARTIARTL.NS": { min: 400, max: 3000 }, "BHARTIARTL.BO": { min: 400, max: 3000 },
+  "BAJFINANCE.NS": { min: 2000, max: 15000 }, "BAJFINANCE.BO": { min: 2000, max: 15000 },
+  "MARUTI.NS": { min: 3000, max: 20000 }, "MARUTI.BO": { min: 3000, max: 20000 },
+  "LT.NS": { min: 1000, max: 6000 }, "LT.BO": { min: 1000, max: 6000 },
+  "TATASTEEL.NS": { min: 50, max: 500 }, "TATASTEEL.BO": { min: 50, max: 500 },
+  "SUNPHARMA.NS": { min: 400, max: 3000 }, "SUNPHARMA.BO": { min: 400, max: 3000 },
+  "TITAN.NS": { min: 1000, max: 6000 }, "TITAN.BO": { min: 1000, max: 6000 },
+  "HINDUNILVR.NS": { min: 1000, max: 5000 }, "HINDUNILVR.BO": { min: 1000, max: 5000 },
+  "MRF.NS": { min: 50000, max: 200000 }, "MRF.BO": { min: 50000, max: 200000 },
+  // US majors (USD)
+  "AAPL": { min: 80, max: 400 },
+  "MSFT": { min: 150, max: 700 },
+  "GOOGL": { min: 50, max: 300 },
+  "AMZN": { min: 50, max: 400 },
+  "TSLA": { min: 50, max: 600 },
+  "NVDA": { min: 30, max: 300 },
+  "META": { min: 100, max: 1000 },
+  // Crypto
+  "BTC-USD": { min: 10000, max: 500000 },
+  "ETH-USD": { min: 500, max: 50000 },
+};
+
+function passesSanityCheck(symbol: string, price: number): boolean {
+  const check = PRICE_SANITY[symbol];
+  if (!check) return true; // no check = accept
+  return price >= check.min && price <= check.max;
+}
+
 async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<MarketSnapshot | null> {
   const symbolsToTry = buildTickerCandidates(ticker);
   let result: MarketSnapshot | null = null;
@@ -91,6 +131,10 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
         const raw = data?.chart?.result?.[0];
         const meta = raw?.meta;
         if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
+          if (!passesSanityCheck(symbol, meta.regularMarketPrice)) {
+            console.warn(`direct-profit SANITY FAIL ${symbol}: got ${meta.regularMarketPrice}, rejecting`);
+            continue;
+          }
           result = {
             currentPrice: meta.regularMarketPrice,
             prevClose: meta.chartPreviousClose || meta.previousClose || 0,
@@ -123,6 +167,10 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
         const pm = data?.quoteSummary?.result?.[0]?.price;
         const p = pm?.regularMarketPrice?.raw;
         if (p && p > 0) {
+          if (!passesSanityCheck(symbol, p)) {
+            console.warn(`direct-profit SANITY FAIL ${symbol}: got ${p}, rejecting`);
+            continue;
+          }
           result = {
             currentPrice: p,
             prevClose: pm?.regularMarketPreviousClose?.raw || 0,
@@ -149,7 +197,7 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
   if (!result) {
     for (const symbol of symbolsToTry) {
       const av = await fetchAlphaVantage(symbol);
-      if (av && av.price > 0) {
+      if (av && av.price > 0 && passesSanityCheck(symbol, av.price)) {
         result = {
           currentPrice: av.price,
           prevClose: av.prevClose,
