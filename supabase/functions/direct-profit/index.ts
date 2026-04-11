@@ -2,28 +2,40 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
 import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-// ── Same data pipeline as analyze-stock ──
-
 async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
   const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
   if (!apiKey) return null;
+
   try {
     const cleanSymbol = symbol.replace(/\.(NS|BO)$/, "");
     const exchange = symbol.endsWith(".BO") ? "BSE" : "NSE";
-    const avSymbol = (symbol.endsWith(".NS") || symbol.endsWith(".BO")) ? `${exchange}:${cleanSymbol}` : cleanSymbol;
+    const avSymbol = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
     const res = await fetch(url);
-    if (!res.ok) { await res.text(); return null; }
+    if (!res.ok) {
+      await res.text();
+      return null;
+    }
     const data = await res.json();
     const q = data?.["Global Quote"];
     if (!q || !q["05. price"]) return null;
-    return { price: parseFloat(q["05. price"]), prevClose: parseFloat(q["08. previous close"] || "0"), high: parseFloat(q["03. high"] || "0"), low: parseFloat(q["04. low"] || "0"), volume: parseInt(q["06. volume"] || "0") };
-  } catch { return null; }
+
+    return {
+      price: parseFloat(q["05. price"]),
+      prevClose: parseFloat(q["08. previous close"] || "0"),
+      high: parseFloat(q["03. high"] || "0"),
+      low: parseFloat(q["04. low"] || "0"),
+      volume: parseInt(q["06. volume"] || "0"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface MarketSnapshot {
@@ -39,6 +51,29 @@ interface MarketSnapshot {
   volumes: number[];
 }
 
+interface TechnicalSnapshot {
+  sma5: number;
+  sma20: number;
+  momentumScore: number;
+  annualizedVol: number;
+  zScore: number;
+  posIn52w: number;
+  volumeRatio: number;
+  changePct: number;
+  support: number;
+  resistance: number;
+  prices5d: number[];
+  dailyVol: number;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundPrice(value: number) {
+  return Number.isFinite(value) ? Number(value.toFixed(2)) : 0;
+}
+
 async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<MarketSnapshot | null> {
   const symbolsToTry = buildTickerCandidates(ticker);
   let result: MarketSnapshot | null = null;
@@ -46,17 +81,16 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
   for (const symbol of symbolsToTry) {
     if (result) break;
 
-    // v8 chart — get 1mo of daily data for technicals
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo&_t=${Date.now()}`;
-      const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache" } });
+      const res = await fetch(url, {
+        headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
+      });
       if (res.ok) {
         const data = await res.json();
-        const r = data?.chart?.result?.[0];
-        const meta = r?.meta;
+        const raw = data?.chart?.result?.[0];
+        const meta = raw?.meta;
         if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
-          const closes = (r.indicators?.quote?.[0]?.close || []).filter((v: any) => v != null);
-          const vols = (r.indicators?.quote?.[0]?.volume || []).filter((v: any) => v != null);
           result = {
             currentPrice: meta.regularMarketPrice,
             prevClose: meta.chartPreviousClose || meta.previousClose || 0,
@@ -65,20 +99,25 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
             volume: meta.regularMarketVolume || 0,
             fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || 0,
             fiftyTwoWeekLow: meta.fiftyTwoWeekLow || 0,
-            currency: isIndian ? "INR" : (meta.currency || "USD"),
-            closes,
-            volumes: vols,
+            currency: isIndian ? "INR" : meta.currency || "USD",
+            closes: (raw?.indicators?.quote?.[0]?.close || []).filter((v: any) => v != null),
+            volumes: (raw?.indicators?.quote?.[0]?.volume || []).filter((v: any) => v != null),
           };
-          console.log(`✓ ${symbol} via v8: ${result.currency} ${result.currentPrice}`);
+          console.log(`direct-profit ✓ ${symbol} via v8: ${result.currency} ${result.currentPrice}`);
           break;
         }
-      } else { await res.text(); }
-    } catch { /* next */ }
+      } else {
+        await res.text();
+      }
+    } catch {
+      // continue to next fallback
+    }
 
-    // v10 quoteSummary fallback
     try {
       const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
-      const res = await fetch(url, { headers: { "User-Agent": UA } });
+      const res = await fetch(url, {
+        headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
+      });
       if (res.ok) {
         const data = await res.json();
         const pm = data?.quoteSummary?.result?.[0]?.price;
@@ -92,29 +131,38 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
             volume: pm?.regularMarketVolume?.raw || 0,
             fiftyTwoWeekHigh: pm?.fiftyTwoWeekHigh?.raw || 0,
             fiftyTwoWeekLow: pm?.fiftyTwoWeekLow?.raw || 0,
-            currency: isIndian ? "INR" : (pm?.currency || "USD"),
+            currency: isIndian ? "INR" : pm?.currency || "USD",
             closes: [],
             volumes: [],
           };
-          console.log(`✓ ${symbol} via v10: ${result.currency} ${result.currentPrice}`);
+          console.log(`direct-profit ✓ ${symbol} via v10: ${result.currency} ${result.currentPrice}`);
           break;
         }
-      } else { await res.text(); }
-    } catch { /* next */ }
+      } else {
+        await res.text();
+      }
+    } catch {
+      // continue to next fallback
+    }
   }
 
-  // Alpha Vantage fallback
   if (!result) {
     for (const symbol of symbolsToTry) {
       const av = await fetchAlphaVantage(symbol);
       if (av && av.price > 0) {
         result = {
-          currentPrice: av.price, prevClose: av.prevClose,
-          dayHigh: av.high, dayLow: av.low, volume: av.volume,
-          fiftyTwoWeekHigh: 0, fiftyTwoWeekLow: 0,
-          currency: isIndian ? "INR" : "USD", closes: [], volumes: [],
+          currentPrice: av.price,
+          prevClose: av.prevClose,
+          dayHigh: av.high,
+          dayLow: av.low,
+          volume: av.volume,
+          fiftyTwoWeekHigh: 0,
+          fiftyTwoWeekLow: 0,
+          currency: isIndian ? "INR" : "USD",
+          closes: [],
+          volumes: [],
         };
-        console.log(`✓ ${symbol} via AlphaVantage: ${result.currency} ${result.currentPrice}`);
+        console.log(`direct-profit ✓ ${symbol} via Alpha Vantage: ${result.currency} ${result.currentPrice}`);
         break;
       }
     }
@@ -127,16 +175,19 @@ async function fetchVIX(): Promise<number> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d&_t=${Date.now()}`;
     const res = await fetch(url, { headers: { "User-Agent": UA } });
-    if (!res.ok) { await res.text(); return 0; }
+    if (!res.ok) {
+      await res.text();
+      return 0;
+    }
     const data = await res.json();
     return data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
-  } catch { return 0; }
+  } catch {
+    return 0;
+  }
 }
 
-// ── Dynamic technicals (not hardcoded rules) ──
-
-function computeTechnicals(snap: MarketSnapshot) {
-  const { currentPrice, closes, volumes, fiftyTwoWeekHigh, fiftyTwoWeekLow, volume } = snap;
+function computeTechnicals(snap: MarketSnapshot): TechnicalSnapshot {
+  const { currentPrice, closes, volumes, fiftyTwoWeekHigh, fiftyTwoWeekLow, volume, prevClose } = snap;
   const prices5d = closes.slice(-5);
   const prices20d = closes.slice(-20);
 
@@ -151,26 +202,216 @@ function computeTechnicals(snap: MarketSnapshot) {
   }
   const meanReturn = returns20d.length > 0 ? returns20d.reduce((a, b) => a + b, 0) / returns20d.length : 0;
   const variance = returns20d.length > 0 ? returns20d.reduce((a, b) => a + (b - meanReturn) ** 2, 0) / returns20d.length : 0;
-  const dailyVol = Math.sqrt(variance);
-  const annualizedVol = dailyVol * Math.sqrt(252) * 100;
-
-  const zScore = sma20 > 0 && dailyVol > 0 ? (currentPrice - sma20) / (sma20 * dailyVol * Math.sqrt(20)) : 0;
+  const dailyVolRaw = Math.sqrt(variance);
+  const annualizedVol = dailyVolRaw * Math.sqrt(252) * 100;
+  const zScore = sma20 > 0 && dailyVolRaw > 0 ? (currentPrice - sma20) / (sma20 * dailyVolRaw * Math.sqrt(20)) : 0;
 
   const range52w = (fiftyTwoWeekHigh || currentPrice) - (fiftyTwoWeekLow || currentPrice);
-  const posIn52w = range52w > 0 ? ((currentPrice - fiftyTwoWeekLow) / range52w) * 100 : 50;
-
-  const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : volume;
+  const posIn52w = range52w > 0 ? ((currentPrice - (fiftyTwoWeekLow || currentPrice)) / range52w) * 100 : 50;
+  const avgVolume = volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : volume;
   const volumeRatio = avgVolume > 0 ? volume / avgVolume : 1;
 
-  const changePct = snap.prevClose > 0 ? ((currentPrice - snap.prevClose) / snap.prevClose) * 100 : 0;
+  const supportCandidates = [...prices20d.slice(-10).filter((p: number) => p > 0), currentPrice];
+  const resistanceCandidates = [...prices20d.slice(-10).filter((p: number) => p > 0), currentPrice];
 
   return {
-    sma5: +sma5.toFixed(2), sma20: +sma20.toFixed(2),
-    momentumScore, annualizedVol: +annualizedVol.toFixed(1),
-    zScore: +zScore.toFixed(2), posIn52w: +posIn52w.toFixed(1),
-    volumeRatio: +volumeRatio.toFixed(2), changePct: +changePct.toFixed(2),
-    prices5d, dailyVol: +(dailyVol * 100).toFixed(3),
+    sma5: roundPrice(sma5),
+    sma20: roundPrice(sma20),
+    momentumScore,
+    annualizedVol: Number(annualizedVol.toFixed(1)),
+    zScore: Number(zScore.toFixed(2)),
+    posIn52w: Number(posIn52w.toFixed(1)),
+    volumeRatio: Number(volumeRatio.toFixed(2)),
+    changePct: prevClose > 0 ? Number((((currentPrice - prevClose) / prevClose) * 100).toFixed(2)) : 0,
+    support: roundPrice(Math.min(...supportCandidates)),
+    resistance: roundPrice(Math.max(...resistanceCandidates)),
+    prices5d,
+    dailyVol: Number((dailyVolRaw * 100).toFixed(3)),
   };
+}
+
+function deriveVolatilityRegime(annualizedVol: number): "LOW" | "NORMAL" | "HIGH" {
+  if (annualizedVol >= 45) return "HIGH";
+  if (annualizedVol >= 18) return "NORMAL";
+  return "LOW";
+}
+
+function buildDeterministicFallback(
+  snap: MarketSnapshot,
+  tech: TechnicalSnapshot,
+  currency: string,
+  market: string,
+  vix: number,
+) {
+  const bullishSignals: string[] = [];
+  const bearishSignals: string[] = [];
+
+  if (tech.momentumScore >= 2) bullishSignals.push("strong momentum");
+  if (tech.momentumScore <= -2) bearishSignals.push("weak momentum");
+  if (snap.currentPrice > tech.sma20) bullishSignals.push("price above 20-day average");
+  if (snap.currentPrice < tech.sma20) bearishSignals.push("price below 20-day average");
+  if (tech.zScore <= -1.2) bullishSignals.push("oversold mean reversion");
+  if (tech.zScore >= 1.2) bearishSignals.push("overbought extension");
+  if (tech.changePct >= 2) bullishSignals.push("positive daily follow-through");
+  if (tech.changePct <= -2) bearishSignals.push("negative daily pressure");
+  if (tech.volumeRatio >= 1.15) {
+    if (bullishSignals.length >= bearishSignals.length) bullishSignals.push("volume confirmation");
+    else bearishSignals.push("volume confirmation");
+  }
+  if (tech.volumeRatio < 0.75) bearishSignals.push("thin participation");
+  if (vix >= 25) bearishSignals.push("risk-off backdrop");
+
+  const bullScore = bullishSignals.length;
+  const bearScore = bearishSignals.length;
+  const scoreDiff = bullScore - bearScore;
+
+  const action = scoreDiff >= 2 ? "BUY" : scoreDiff <= -2 ? "SELL" : "WAIT";
+  const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
+  const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
+
+  const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
+  const targetWidth = clamp(entryWidth * 2.4, 0.018, 0.08);
+  const stopWidth = clamp(entryWidth * 1.2, 0.012, 0.04);
+
+  let entryLow = snap.currentPrice * (1 - entryWidth);
+  let entryHigh = snap.currentPrice * (1 + entryWidth * 0.35);
+  let targetPrice = snap.currentPrice;
+  let stopLoss = snap.currentPrice;
+  let riskRewardRatio = 0;
+
+  if (action === "BUY") {
+    targetPrice = Math.max(snap.currentPrice * (1 + targetWidth), tech.resistance || 0);
+    stopLoss = Math.min(snap.currentPrice * (1 - stopWidth), tech.support || snap.currentPrice * (1 - stopWidth));
+    riskRewardRatio = (targetPrice - ((entryLow + entryHigh) / 2)) / Math.max(((entryLow + entryHigh) / 2) - stopLoss, 0.01);
+  } else if (action === "SELL") {
+    entryLow = snap.currentPrice * (1 - entryWidth * 0.35);
+    entryHigh = snap.currentPrice * (1 + entryWidth);
+    targetPrice = Math.min(snap.currentPrice * (1 - targetWidth), tech.support || snap.currentPrice * (1 - targetWidth));
+    stopLoss = Math.max(snap.currentPrice * (1 + stopWidth), tech.resistance || snap.currentPrice * (1 + stopWidth));
+    riskRewardRatio = ((((entryLow + entryHigh) / 2) - targetPrice) / Math.max(stopLoss - ((entryLow + entryHigh) / 2), 0.01));
+  } else {
+    entryLow = snap.currentPrice * 0.99;
+    entryHigh = snap.currentPrice * 1.01;
+    targetPrice = tech.resistance || snap.currentPrice * 1.02;
+    stopLoss = tech.support || snap.currentPrice * 0.98;
+  }
+
+  const alignmentScore = Math.max(bullScore, bearScore);
+  const confidenceBase = action === "WAIT" ? 42 : 52;
+  const confidence = clamp(Math.round(confidenceBase + alignmentScore * 6 - (tech.volumeRatio < 0.75 ? 6 : 0) - (vix >= 28 ? 4 : 0)), 35, 78);
+  const quantScore = clamp(Math.round(40 + alignmentScore * 10), 35, 82);
+
+  const strongestBull = bullishSignals[0] || `Stable ${market} setup`;
+  const strongestBear = bearishSignals[0] || "No major downside catalyst";
+  const directionReason = action === "BUY"
+    ? strongestBull
+    : action === "SELL"
+      ? strongestBear
+      : bullScore === bearScore
+        ? "Signals are mixed"
+        : bullScore > bearScore
+          ? strongestBull
+          : strongestBear;
+
+  return {
+    action,
+    confidence,
+    entryLow: roundPrice(entryLow),
+    entryHigh: roundPrice(entryHigh),
+    targetPrice: roundPrice(targetPrice),
+    stopLoss: roundPrice(stopLoss),
+    timeframe: volatilityRegime === "HIGH" ? "2-5 days" : "1-3 weeks",
+    direction,
+    directionReason: directionReason.slice(0, 60),
+    positiveNews: (bullScore > 0 ? strongestBull : `No clear upside catalyst in ${currency}`).slice(0, 120),
+    negativeNews: (bearScore > 0 ? strongestBear : "No clear downside catalyst").slice(0, 120),
+    protection: action === "WAIT"
+      ? "Wait for a cleaner setup before taking risk."
+      : action === "BUY"
+        ? `Exit below ${currency} ${roundPrice(stopLoss)} if momentum breaks.`
+        : `Cover above ${currency} ${roundPrice(stopLoss)} if the squeeze starts.`,
+    currentPrice: roundPrice(snap.currentPrice),
+    quantScore,
+    volatilityRegime,
+    riskRewardRatio: action === "WAIT" ? 0 : Number(Math.abs(riskRewardRatio).toFixed(2)),
+  };
+}
+
+function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number) {
+  const action = ["BUY", "SELL", "WAIT"].includes(best?.action) ? best.action : "WAIT";
+  const realPrice = roundPrice(snap.currentPrice);
+  const volatilityRegime = ["LOW", "NORMAL", "HIGH"].includes(best?.volatilityRegime)
+    ? best.volatilityRegime
+    : deriveVolatilityRegime(tech.annualizedVol);
+
+  let confidence = clamp(Math.round(Number(best?.confidence) || 50), action === "WAIT" ? 20 : 25, 92);
+  if (parsedCount > 1) {
+    if (consensusCount === parsedCount) confidence = clamp(confidence + 4, 20, 92);
+    else if (consensusCount === 1) confidence = clamp(confidence - 6, 20, 92);
+  }
+
+  let entryLow = Number(best?.entryLow);
+  let entryHigh = Number(best?.entryHigh);
+  let targetPrice = Number(best?.targetPrice);
+  let stopLoss = Number(best?.stopLoss);
+
+  if (!Number.isFinite(entryLow)) entryLow = realPrice * 0.985;
+  if (!Number.isFinite(entryHigh)) entryHigh = realPrice * 1.01;
+  if (entryLow > entryHigh) [entryLow, entryHigh] = [entryHigh, entryLow];
+
+  if (Math.abs(entryLow - realPrice) / Math.max(realPrice, 1) > 0.18) entryLow = realPrice * 0.985;
+  if (Math.abs(entryHigh - realPrice) / Math.max(realPrice, 1) > 0.18) entryHigh = realPrice * 1.01;
+
+  if (!Number.isFinite(targetPrice)) {
+    targetPrice = action === "SELL" ? realPrice * 0.95 : realPrice * 1.05;
+  }
+  if (!Number.isFinite(stopLoss)) {
+    stopLoss = action === "SELL" ? realPrice * 1.04 : realPrice * 0.96;
+  }
+
+  if (action === "BUY") {
+    if (targetPrice <= entryHigh) targetPrice = Math.max(realPrice * 1.04, tech.resistance || realPrice * 1.04);
+    if (stopLoss >= entryLow) stopLoss = Math.min(realPrice * 0.96, tech.support || realPrice * 0.96);
+  } else if (action === "SELL") {
+    if (targetPrice >= entryLow) targetPrice = Math.min(realPrice * 0.96, tech.support || realPrice * 0.96);
+    if (stopLoss <= entryHigh) stopLoss = Math.max(realPrice * 1.04, tech.resistance || realPrice * 1.04);
+  } else {
+    targetPrice = tech.resistance || realPrice * 1.02;
+    stopLoss = tech.support || realPrice * 0.98;
+  }
+
+  const midEntry = (entryLow + entryHigh) / 2;
+  const riskRewardRatio = action === "BUY"
+    ? (targetPrice - midEntry) / Math.max(midEntry - stopLoss, 0.01)
+    : action === "SELL"
+      ? (midEntry - targetPrice) / Math.max(stopLoss - midEntry, 0.01)
+      : 0;
+
+  const output: Record<string, unknown> = {
+    action,
+    confidence,
+    entryLow: roundPrice(entryLow),
+    entryHigh: roundPrice(entryHigh),
+    targetPrice: roundPrice(targetPrice),
+    stopLoss: roundPrice(stopLoss),
+    timeframe: typeof best?.timeframe === "string" && best.timeframe.trim() ? best.timeframe.slice(0, 40) : "1-3 weeks",
+    direction: ["UP", "DOWN", "SIDEWAYS"].includes(best?.direction) ? best.direction : action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : "SIDEWAYS",
+    directionReason: (typeof best?.directionReason === "string" && best.directionReason.trim() ? best.directionReason : "Signal alignment is mixed").slice(0, 60),
+    positiveNews: (typeof best?.positiveNews === "string" && best.positiveNews.trim() ? best.positiveNews : "No significant positive catalyst").slice(0, 120),
+    negativeNews: (typeof best?.negativeNews === "string" && best.negativeNews.trim() ? best.negativeNews : "No significant downside catalyst").slice(0, 120),
+    protection: (typeof best?.protection === "string" && best.protection.trim() ? best.protection : "Exit if price breaks the stop level.").slice(0, 120),
+    currentPrice: realPrice,
+    quantScore: clamp(Math.round(Number(best?.quantScore) || 50), 0, 100),
+    volatilityRegime,
+    riskRewardRatio: action === "WAIT" ? 0 : Number(Math.abs(riskRewardRatio).toFixed(2)),
+    providersUsed: parsedCount,
+  };
+
+  if (parsedCount > 1) {
+    output.consensus = consensusCount === parsedCount ? "UNANIMOUS" : consensusCount > 1 ? "MAJORITY" : "SPLIT";
+  }
+
+  return output;
 }
 
 Deno.serve(async (req) => {
@@ -182,18 +423,17 @@ Deno.serve(async (req) => {
     const { ticker, indiaMode } = await req.json();
     if (!ticker || typeof ticker !== "string") {
       return new Response(JSON.stringify({ error: "ticker required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Use the SAME ticker normalization as the core system
     const resolvedTicker = normalizeTickerInput(ticker.trim());
-    const isIndian = indiaMode || isIndianTicker(resolvedTicker);
+    const isIndian = indiaMode === true || isIndianTicker(resolvedTicker);
     const currency = isIndian ? "INR" : "USD";
     const currencySymbol = isIndian ? "₹" : "$";
     const market = isIndian ? "India (NSE/BSE)" : "US/Global";
 
-    // ── Fetch real data using same pipeline as analyze-stock ──
     const [snap, vix] = await Promise.all([
       fetchFullSnapshot(resolvedTicker, isIndian),
       fetchVIX(),
@@ -201,192 +441,75 @@ Deno.serve(async (req) => {
 
     if (!snap || snap.currentPrice <= 0) {
       return new Response(JSON.stringify({
-        error: `Could not fetch price data for ${resolvedTicker}. Check the ticker symbol.`,
-      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        error: `Could not fetch price data for ${resolvedTicker}. Check the ticker symbol and try again.`,
+      }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const tech = computeTechnicals(snap);
-    const dayChange = snap.prevClose > 0 ? ((snap.currentPrice - snap.prevClose) / snap.prevClose * 100).toFixed(2) : "N/A";
-    const from52High = snap.fiftyTwoWeekHigh > 0 ? ((snap.currentPrice - snap.fiftyTwoWeekHigh) / snap.fiftyTwoWeekHigh * 100).toFixed(1) : "N/A";
+    console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix}`);
 
-    console.log(`direct-profit: ${resolvedTicker} price=${snap.currentPrice} chg=${dayChange}% vol=${tech.annualizedVol}% momentum=${tech.momentumScore} z=${tech.zScore} vix=${vix}`);
-
-    // ── Same depth of analysis prompt as core system, output formatted for Direct Profit ──
     const quantContext = isIndian
-      ? `Indian market context:
-- NSE/BSE listed, all prices in INR
-- Reference NIFTY 50 and SENSEX as benchmarks
-- Consider FII/DII flow patterns, RBI policy stance, INR strength
-- Indian market hours: 9:15 AM - 3:30 PM IST
-- Weekly NIFTY options expiry on Thursday
-- For hedging reference NIFTY PUT options or Gold BEES`
-      : `US/Global market context:
-- NYSE/NASDAQ listed, all prices in USD
-- Reference S&P 500 and VIX as benchmarks
-- Consider institutional flow and dark pool activity
-- Factor in Fed policy stance and DXY strength
-- US market hours: 9:30 AM - 4:00 PM ET
-- For hedging reference SPY PUT options or TLT`;
+      ? `Indian market context:\n- NSE/BSE listed, all prices in INR\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
+      : `US/Global market context:\n- NYSE/NASDAQ listed, all prices in USD\n- Reference S&P 500 and VIX as benchmarks\n- Consider institutional flow, macro regime, and index leadership\n- Protection can reference SPY puts or TLT when relevant`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. You MUST respond with ONLY valid JSON, no explanation or markdown.
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT when signals are mixed\n\nAdaptive guidance:\n- Let confidence emerge from signal alignment; do not force high confidence\n- BUY/SELL only with a clear edge and executable protection\n- WAIT is the correct answer when edge is weak or conflicting\n- Keep directionReason under 8 words\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
 
-You have REAL market data below. Your decision MUST be grounded in this data. Do NOT fabricate prices.
+    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency}\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nProduce a complete, executable trade decision. Keep it simple for the user, but grounded in the data above.`;
 
-ANALYSIS FRAMEWORK (same as institutional desk):
-1. MOMENTUM: Evaluate SMA alignment (5d vs 20d vs price), trend direction
-2. VOLATILITY: Current vol regime relative to historical, VIX context
-3. SUPPORT/RESISTANCE: Key levels from price structure and 52-week range
-4. RISK/REWARD: Calculate realistic target/stop ratio from support/resistance
-5. VOLUME: Conviction signal from volume vs average
-6. REGIME: Broader market risk appetite from VIX and index context
-7. MEAN REVERSION: Z-score from 20d mean for extreme readings
-8. FUNDAMENTALS: Sector context, macro backdrop, any known catalysts
-
-DECISION GUIDELINES (adaptive, not rigid):
-- Let the data drive the decision. If signals conflict, output WAIT.
-- Confidence should reflect how many signals align. Mixed signals = lower confidence naturally.
-- WAIT is a valid and often correct output.
-- BUY/SELL only when there is a clear edge with defined risk/reward.
-- All prices must be realistic and in ${currency}.
-
-${quantContext}
-
-JSON schema:
-{
-  "action": "BUY" | "SELL" | "WAIT",
-  "confidence": number (0-100, reflects actual signal alignment),
-  "entryLow": number,
-  "entryHigh": number,
-  "targetPrice": number,
-  "stopLoss": number,
-  "timeframe": string,
-  "direction": "UP" | "DOWN" | "SIDEWAYS",
-  "directionReason": string (max 8 words, must reference a real signal),
-  "positiveNews": string (one short sentence, real catalyst or "None"),
-  "negativeNews": string (one short sentence, real risk or "None"),
-  "protection": string (one sentence: what to do if trade fails),
-  "currentPrice": number,
-  "quantScore": number (0-100),
-  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",
-  "riskRewardRatio": number
-}`;
-
-    const userPrompt = `Ticker: ${resolvedTicker}
-Market: ${market}
-Currency: ${currency}
-Date: ${new Date().toISOString().split("T")[0]}
-
-=== REAL-TIME MARKET DATA ===
-Current Price: ${currencySymbol}${snap.currentPrice}
-Previous Close: ${currencySymbol}${snap.prevClose}
-Day Change: ${dayChange}%
-Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}
-Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)
-52-Week High: ${currencySymbol}${snap.fiftyTwoWeekHigh}
-52-Week Low: ${currencySymbol}${snap.fiftyTwoWeekLow}
-Distance from 52W High: ${from52High}%
-Position in 52W range: ${tech.posIn52w}%
-
-=== COMPUTED TECHNICALS ===
-SMA 5-day: ${currencySymbol}${tech.sma5}
-SMA 20-day: ${currencySymbol}${tech.sma20}
-Momentum Score: ${tech.momentumScore}/3 (${tech.momentumScore >= 2 ? 'strong bullish' : tech.momentumScore >= 1 ? 'mild bullish' : tech.momentumScore <= -2 ? 'strong bearish' : tech.momentumScore <= -1 ? 'mild bearish' : 'neutral'})
-Annualized Volatility: ${tech.annualizedVol}%
-Z-Score (mean reversion): ${tech.zScore} (${Math.abs(tech.zScore) > 2 ? 'EXTREME' : Math.abs(tech.zScore) > 1 ? 'elevated' : 'normal'})
-VIX: ${vix > 0 ? vix.toFixed(1) : 'N/A'}
-
-Last 5 daily closes: ${tech.prices5d.map((p: number) => p.toFixed(2)).join(', ')}
-
-Analyze all signals together. Let conflicting signals naturally lower confidence. Produce the trade decision JSON now.`;
-
-    // ── Same multi-provider consensus as core system ──
     const results = await callAIParallel({
-      systemPrompt, userPrompt,
-      maxTokens: 2048, temperature: 0.3, jsonMode: true,
+      systemPrompt,
+      userPrompt,
+      maxTokens: 1800,
+      temperature: 0.25,
+      jsonMode: true,
     });
 
     const parsed: any[] = [];
-    for (const r of results) {
+    for (const result of results) {
       try {
         let obj: any;
-        try { obj = JSON.parse(r.text); } catch {
-          const match = r.text.match(/\{[\s\S]*\}/);
+        try {
+          obj = JSON.parse(result.text);
+        } catch {
+          const match = result.text.match(/\{[\s\S]*\}/);
           if (match) obj = JSON.parse(match[0]);
         }
         if (obj && obj.action) {
-          obj._provider = r.provider;
-          obj.currentPrice = snap.currentPrice; // force real price
+          obj._provider = result.provider;
+          obj.currentPrice = snap.currentPrice;
           parsed.push(obj);
         }
-      } catch { console.warn(`Failed to parse result from ${r.provider}`); }
+      } catch {
+        console.warn(`direct-profit parse failed for ${result.provider}`);
+      }
     }
 
-    if (parsed.length === 0) throw new Error("All AI providers failed to produce valid output");
+    let output: Record<string, unknown>;
 
-    // Consensus
-    const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
-    for (const p of parsed) {
-      if (actionVotes[p.action] !== undefined) actionVotes[p.action]++;
+    if (parsed.length === 0) {
+      console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
+      output = {
+        ...buildDeterministicFallback(snap, tech, currency, market, vix),
+        fallback: true,
+      };
+    } else {
+      const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
+      for (const item of parsed) {
+        if (actionVotes[item.action] !== undefined) actionVotes[item.action]++;
+      }
+
+      const [consensusAction, consensusCount] = Object.entries(actionVotes).sort((a, b) => b[1] - a[1])[0];
+      const best = parsed
+        .filter((item) => item.action === consensusAction)
+        .sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0))[0] || parsed[0];
+
+      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount);
     }
-    const consensusAction = Object.entries(actionVotes).sort((a, b) => b[1] - a[1])[0][0];
-    const consensusCount = actionVotes[consensusAction];
 
-    // Pick best result matching consensus
-    const best = parsed
-      .filter(p => p.action === consensusAction)
-      .sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0))[0] || parsed[0];
-
-    // Dynamic confidence adjustment based on consensus strength (not hardcoded caps)
-    let confidence = Number(best.confidence) || 50;
-    if (parsed.length > 1) {
-      const agreementRatio = consensusCount / parsed.length;
-      // Scale: unanimous = +5, majority = +2, split = -10
-      if (agreementRatio === 1) confidence += 5;
-      else if (agreementRatio >= 0.5) confidence += 2;
-      else confidence -= 10;
-    }
-    confidence = Math.min(100, Math.max(5, Math.round(confidence)));
-
-    // Validate entry/target/SL against real price (sanity, not rigid)
-    const realPrice = snap.currentPrice;
-    let entryLow = Number(best.entryLow) || realPrice * 0.98;
-    let entryHigh = Number(best.entryHigh) || realPrice * 1.02;
-    if (Math.abs(entryLow - realPrice) / realPrice > 0.15) entryLow = realPrice * 0.98;
-    if (Math.abs(entryHigh - realPrice) / realPrice > 0.15) entryHigh = realPrice * 1.02;
-
-    const targetPrice = Number(best.targetPrice) || realPrice * 1.05;
-    const stopLoss = Number(best.stopLoss) || realPrice * 0.95;
-    const midEntry = (entryLow + entryHigh) / 2;
-    const rr = best.action === "BUY"
-      ? (targetPrice - midEntry) / Math.max(midEntry - stopLoss, 0.01)
-      : best.action === "SELL"
-        ? (midEntry - targetPrice) / Math.max(stopLoss - midEntry, 0.01)
-        : 0;
-
-    const volRegime = tech.annualizedVol > 45 ? "HIGH" : tech.annualizedVol > 18 ? "NORMAL" : "LOW";
-
-    const output = {
-      action: ["BUY", "SELL", "WAIT"].includes(best.action) ? best.action : "WAIT",
-      confidence,
-      entryLow: +entryLow.toFixed(2),
-      entryHigh: +entryHigh.toFixed(2),
-      targetPrice: +targetPrice.toFixed(2),
-      stopLoss: +stopLoss.toFixed(2),
-      timeframe: best.timeframe || "1 week",
-      direction: ["UP", "DOWN", "SIDEWAYS"].includes(best.direction) ? best.direction : "SIDEWAYS",
-      directionReason: (best.directionReason || "Insufficient data").slice(0, 60),
-      positiveNews: (best.positiveNews || "No significant positive catalyst").slice(0, 120),
-      negativeNews: (best.negativeNews || "No significant risk detected").slice(0, 120),
-      protection: (best.protection || "Exit at stop loss if trade fails").slice(0, 120),
-      currentPrice: realPrice,
-      quantScore: Math.min(100, Math.max(0, Number(best.quantScore) || 50)),
-      volatilityRegime: volRegime,
-      riskRewardRatio: +Math.abs(rr).toFixed(2),
-      providersUsed: parsed.length,
-      consensus: consensusCount === parsed.length ? "UNANIMOUS" : consensusCount > 1 ? "MAJORITY" : "SPLIT",
-    };
-
-    console.log(`direct-profit result: ${resolvedTicker} → ${output.action} ${output.confidence}% (${output.consensus}, ${output.providersUsed} providers)`);
+    console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%)`);
 
     return new Response(JSON.stringify(output), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -394,7 +517,8 @@ Analyze all signals together. Let conflicting signals naturally lower confidence
   } catch (err: any) {
     console.error("direct-profit error:", err);
     return new Response(JSON.stringify({ error: err.message || "Analysis failed" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
