@@ -2,10 +2,15 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut } from "lucide-react";
+import { LogOut, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
-const Header = () => {
+interface HeaderProps {
+  directProfitMode?: boolean;
+  onToggleDirectProfit?: () => void;
+}
+
+const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, indiaMode, setIndiaMode } = useFX();
 
@@ -47,6 +52,20 @@ const Header = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          {/* Direct Profit Mode Toggle */}
+          {onToggleDirectProfit && (
+            <button
+              onClick={onToggleDirectProfit}
+              className={`flex items-center gap-1 px-2 py-1 rounded-sm border transition-colors text-[10px] font-mono font-semibold ${
+                directProfitMode
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-surface-2 text-muted-foreground hover:text-foreground hover:border-primary/40"
+              }`}
+            >
+              <Zap className="h-3 w-3" />
+              <span className="hidden sm:inline">Direct Profit</span>
+            </button>
+          )}
           {/* India Mode Toggle */}
           <div className="flex items-center gap-1.5">
             <span className="text-[10px]">🇮🇳</span>
