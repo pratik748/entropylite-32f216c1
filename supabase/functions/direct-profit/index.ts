@@ -400,11 +400,46 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     ? best.volatilityRegime
     : deriveVolatilityRegime(tech.annualizedVol);
 
-  let confidence = clamp(Math.round(Number(best?.confidence) || 50), action === "WAIT" ? 20 : 25, 92);
+  // --- Data-driven confidence floor based on REAL technical signals ---
+  const aiConfidence = Math.round(Number(best?.confidence) || 50);
+  
+  // Calculate signal-derived confidence floor
+  let signalFloor = 40; // base floor
+  if (action !== "WAIT") {
+    const absMomentum = Math.abs(tech.momentumScore);
+    const absZ = Math.abs(tech.zScore);
+    const volConfirm = tech.volumeRatio >= 1.1;
+    
+    // Strong momentum alignment = higher floor
+    if (absMomentum >= 3) signalFloor = 68;
+    else if (absMomentum >= 2) signalFloor = 58;
+    else if (absMomentum >= 1) signalFloor = 48;
+    
+    // Mean reversion signal boosts floor
+    if (absZ >= 1.5) signalFloor += 8;
+    else if (absZ >= 0.8) signalFloor += 4;
+    
+    // Volume confirmation
+    if (volConfirm) signalFloor += 5;
+    
+    // Low VIX environment = slightly more confidence
+    if (tech.annualizedVol < 20) signalFloor += 3;
+    
+    // Penalize high vol regime
+    if (tech.annualizedVol > 45) signalFloor -= 8;
+  } else {
+    signalFloor = 30; // WAIT should still show meaningful confidence
+  }
+  
+  // Use the HIGHER of AI confidence and signal-derived floor
+  let confidence = Math.max(aiConfidence, signalFloor);
+  confidence = clamp(confidence, action === "WAIT" ? 25 : 35, 92);
+  
+  // Multi-provider consensus adjustments
   if (parsedCount > 1) {
-    if (consensusCount === parsedCount) confidence = clamp(confidence + 4, 20, 92);
-    else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 2, 20, 92);
-    else if (action === "WAIT") confidence = clamp(confidence - 4, 18, 88);
+    if (consensusCount === parsedCount) confidence = clamp(confidence + 5, 25, 92);
+    else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 3, 25, 92);
+    else confidence = clamp(confidence - 3, 25, 88);
   }
 
   let entryLow = Number(best?.entryLow);
@@ -512,7 +547,7 @@ Deno.serve(async (req) => {
       ? `Indian market context:\n- NSE/BSE listed, all prices in INR\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
       : `US/Global market context:\n- NYSE/NASDAQ listed, all prices in USD\n- Reference S&P 500 and VIX as benchmarks\n- Consider institutional flow, macro regime, and index leadership\n- Protection can reference SPY puts or TLT when relevant`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT when signals are mixed\n\nAdaptive guidance:\n- Let confidence emerge from signal alignment; do not force high confidence\n- BUY/SELL only with a clear edge and executable protection\n- WAIT is the correct answer when edge is weak or conflicting\n- Keep directionReason under 8 words\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT only when signals genuinely conflict\n\nConfidence calibration (CRITICAL):\n- confidence represents how aligned the signals are, NOT how certain the future is\n- Momentum 3/3 with volume confirmation = confidence 65-80\n- Momentum 2/3 with supporting z-score = confidence 50-65\n- Mixed signals with 1 clear edge = confidence 40-55\n- Genuinely conflicting signals = WAIT at confidence 30-45\n- NEVER return confidence below 35 for a BUY or SELL action\n- BUY/SELL only with a clear edge and executable protection\n- Keep directionReason under 8 words\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
 
     const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency}\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nProduce a complete, executable trade decision. Keep it simple for the user, but grounded in the data above.`;
 
