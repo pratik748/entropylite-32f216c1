@@ -265,7 +265,12 @@ function buildDeterministicFallback(
   const bearScore = bearishSignals.length;
   const scoreDiff = bullScore - bearScore;
 
-  const action = scoreDiff >= 2 ? "BUY" : scoreDiff <= -2 ? "SELL" : "WAIT";
+  const directionalEdge = Math.max(bullScore, bearScore);
+  const action = scoreDiff >= 1 && bullScore >= 2
+    ? "BUY"
+    : scoreDiff <= -1 && bearScore >= 2
+      ? "SELL"
+      : "WAIT";
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
@@ -296,10 +301,13 @@ function buildDeterministicFallback(
     stopLoss = tech.support || snap.currentPrice * 0.98;
   }
 
-  const alignmentScore = Math.max(bullScore, bearScore);
-  const confidenceBase = action === "WAIT" ? 42 : 52;
-  const confidence = clamp(Math.round(confidenceBase + alignmentScore * 6 - (tech.volumeRatio < 0.75 ? 6 : 0) - (vix >= 28 ? 4 : 0)), 35, 78);
-  const quantScore = clamp(Math.round(40 + alignmentScore * 10), 35, 82);
+  const confidenceBase = action === "WAIT" ? 40 : 54;
+  const confidence = clamp(
+    Math.round(confidenceBase + directionalEdge * 5 - Math.max(0, Math.min(bullScore, bearScore)) * 3 - (tech.volumeRatio < 0.75 ? 5 : 0) - (vix >= 28 ? 4 : 0)),
+    34,
+    80,
+  );
+  const quantScore = clamp(Math.round(42 + directionalEdge * 9 - Math.min(bullScore, bearScore) * 3), 35, 84);
 
   const strongestBull = bullishSignals[0] || `Stable ${market} setup`;
   const strongestBear = bearishSignals[0] || "No major downside catalyst";
@@ -347,7 +355,8 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
   let confidence = clamp(Math.round(Number(best?.confidence) || 50), action === "WAIT" ? 20 : 25, 92);
   if (parsedCount > 1) {
     if (consensusCount === parsedCount) confidence = clamp(confidence + 4, 20, 92);
-    else if (consensusCount === 1) confidence = clamp(confidence - 6, 20, 92);
+    else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 2, 20, 92);
+    else if (action === "WAIT") confidence = clamp(confidence - 4, 18, 88);
   }
 
   let entryLow = Number(best?.entryLow);
@@ -501,10 +510,24 @@ Deno.serve(async (req) => {
         if (actionVotes[item.action] !== undefined) actionVotes[item.action]++;
       }
 
+      const scored = parsed.map((item) => {
+        const confidence = Number(item.confidence) || 0;
+        const quantScore = Number(item.quantScore) || 0;
+        const rr = Number(item.riskRewardRatio) || 0;
+        const directionalBonus = item.action === "WAIT" ? 0 : 8;
+        return {
+          ...item,
+          _score: confidence + quantScore * 0.35 + Math.min(rr, 4) * 6 + directionalBonus,
+        };
+      });
+
       const [consensusAction, consensusCount] = Object.entries(actionVotes).sort((a, b) => b[1] - a[1])[0];
-      const best = parsed
-        .filter((item) => item.action === consensusAction)
-        .sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0))[0] || parsed[0];
+      const majorityExists = consensusCount > parsed.length / 2;
+      const best = majorityExists
+        ? scored
+            .filter((item) => item.action === consensusAction)
+            .sort((a, b) => b._score - a._score)[0]
+        : scored.sort((a, b) => b._score - a._score)[0];
 
       output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount);
     }
