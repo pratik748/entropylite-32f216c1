@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2 } from "lucide-react";
+import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2, BarChart3, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -20,6 +20,11 @@ interface TradeResult {
   negativeNews: string;
   protection: string;
   currentPrice: number;
+  quantScore?: number;
+  volatilityRegime?: "LOW" | "NORMAL" | "HIGH";
+  riskRewardRatio?: number;
+  providersUsed?: number;
+  consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
 }
 
 const DirectProfitMode = () => {
@@ -220,7 +225,49 @@ const DirectProfitMode = () => {
               </div>
             </div>
 
-            {/* 5. NEWS SNAPSHOT */}
+            {/* 5. QUANT METRICS */}
+            {(result.quantScore !== undefined || result.riskRewardRatio !== undefined) && (
+              <div className="border-b border-border p-4 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+                  <BarChart3 className="h-3.5 w-3.5 text-primary" />
+                  Quant Signals
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  {result.quantScore !== undefined && (
+                    <div className="text-center">
+                      <div className={`text-lg font-bold ${result.quantScore >= 70 ? "text-gain" : result.quantScore >= 40 ? "text-foreground" : "text-loss"}`}>
+                        {result.quantScore}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Quant Score</div>
+                    </div>
+                  )}
+                  {result.riskRewardRatio !== undefined && result.riskRewardRatio > 0 && (
+                    <div className="text-center">
+                      <div className={`text-lg font-bold ${result.riskRewardRatio >= 2 ? "text-gain" : "text-loss"}`}>
+                        {result.riskRewardRatio.toFixed(1)}:1
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Risk/Reward</div>
+                    </div>
+                  )}
+                  {result.volatilityRegime && (
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Activity className={`h-3.5 w-3.5 ${result.volatilityRegime === "HIGH" ? "text-loss" : result.volatilityRegime === "LOW" ? "text-gain" : "text-muted-foreground"}`} />
+                        <span className="text-sm font-bold text-foreground">{result.volatilityRegime}</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Volatility</div>
+                    </div>
+                  )}
+                </div>
+                {result.consensus && result.providersUsed && result.providersUsed > 1 && (
+                  <div className="text-center text-[10px] text-muted-foreground mt-1">
+                    {result.consensus === "UNANIMOUS" ? "✓ All engines agree" : result.consensus === "MAJORITY" ? "⚡ Majority consensus" : "⚠ Split signal"} ({result.providersUsed} engines)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 6. NEWS SNAPSHOT */}
             <div className="p-4 space-y-1.5">
               <div className="flex items-center gap-2 text-sm">
                 <span>🟢</span>
