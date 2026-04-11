@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw } from "lucide-react";
+import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
@@ -64,6 +65,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [directProfitMode, setDirectProfitMode] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
@@ -217,7 +219,15 @@ const IndexContent = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <Header />
+      <Header directProfitMode={directProfitMode} onToggleDirectProfit={() => setDirectProfitMode(p => !p)} />
+
+      {/* Direct Profit Mode — replaces entire UI */}
+      {directProfitMode ? (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <DirectProfitMode />
+        </div>
+      ) : (
+      <>
 
       {/* Refresh Banner */}
       {isRefreshing && (
@@ -396,6 +406,8 @@ const IndexContent = () => {
       {/* System Status Bar */}
       <SystemStatusBar stockCount={stocks.filter(s => s.analysis).length} />
       <ThemeToggle />
+      </>
+      )}
     </div>
   );
 };
