@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2, BarChart3, Activity } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Mic, MicOff, Search, ArrowUp, ArrowDown, Minus, Shield, TrendingUp, Clock, Zap, Volume2, BarChart3, Activity, Plus, Trash2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -27,20 +27,50 @@ interface TradeResult {
   consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
 }
 
+interface PortfolioItem {
+  ticker: string;
+  action: "BUY" | "SELL";
+  entryPrice: number;
+  targetPrice: number;
+  stopLoss: number;
+  currentPrice: number;
+  addedAt: number;
+}
+
+const STORAGE_KEY = "dp-portfolio";
+
+function loadPortfolio(): PortfolioItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePortfolio(items: PortfolioItem[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
 const DirectProfitMode = () => {
   const [ticker, setTicker] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TradeResult | null>(null);
+  const [activeTicker, setActiveTicker] = useState("");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>(loadPortfolio);
+  const [added, setAdded] = useState(false);
   const recognitionRef = useRef<any>(null);
   const { indiaMode } = useFX();
+
+  useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
   const analyze = useCallback(async (inputTicker: string) => {
     const t = inputTicker.trim().toUpperCase();
     if (!t) return;
     setLoading(true);
     setResult(null);
+    setAdded(false);
+    setActiveTicker(t);
     try {
       const { data, error } = await governedInvoke("direct-profit", {
         body: { ticker: t, indiaMode },
@@ -57,6 +87,27 @@ const DirectProfitMode = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     analyze(ticker);
+  };
+
+  const addToPortfolio = () => {
+    if (!result || !activeTicker || result.action === "WAIT") return;
+    const exists = portfolio.some(p => p.ticker === activeTicker);
+    if (exists) return;
+    const item: PortfolioItem = {
+      ticker: activeTicker,
+      action: result.action,
+      entryPrice: (result.entryLow + result.entryHigh) / 2,
+      targetPrice: result.targetPrice,
+      stopLoss: result.stopLoss,
+      currentPrice: result.currentPrice,
+      addedAt: Date.now(),
+    };
+    setPortfolio(prev => [item, ...prev]);
+    setAdded(true);
+  };
+
+  const removeFromPortfolio = (t: string) => {
+    setPortfolio(prev => prev.filter(p => p.ticker !== t));
   };
 
   const toggleVoice = () => {
@@ -120,9 +171,27 @@ const DirectProfitMode = () => {
   const actionBg = result?.action === "BUY" ? "bg-gain/10 border-gain/30" : result?.action === "SELL" ? "bg-loss/10 border-loss/30" : "bg-muted/20 border-border";
   const dirIcon = result?.direction === "UP" ? <ArrowUp className="h-5 w-5 text-gain" /> : result?.direction === "DOWN" ? <ArrowDown className="h-5 w-5 text-loss" /> : <Minus className="h-5 w-5 text-muted-foreground" />;
 
+  const alreadyInPortfolio = result ? portfolio.some(p => p.ticker === activeTicker) : false;
+
+  // Portfolio summary
+  const totalPnl = portfolio.reduce((sum, p) => {
+    const diff = p.action === "BUY"
+      ? p.currentPrice - p.entryPrice
+      : p.entryPrice - p.currentPrice;
+    return sum + diff;
+  }, 0);
+  const totalPnlPct = portfolio.length > 0
+    ? (portfolio.reduce((sum, p) => {
+        const diff = p.action === "BUY"
+          ? ((p.currentPrice - p.entryPrice) / p.entryPrice) * 100
+          : ((p.entryPrice - p.currentPrice) / p.entryPrice) * 100;
+        return sum + diff;
+      }, 0) / portfolio.length)
+    : 0;
+
   return (
-    <div className="h-full flex items-center justify-center p-4">
-      <div className="w-full max-w-lg space-y-6">
+    <div className="h-full overflow-auto p-4">
+      <div className="max-w-lg mx-auto space-y-6">
         {/* Title */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
@@ -279,7 +348,7 @@ const DirectProfitMode = () => {
             )}
 
             {/* 6. NEWS SNAPSHOT */}
-            <div className="p-4 space-y-1.5">
+            <div className="border-b border-border p-4 space-y-1.5">
               <div className="flex items-center gap-2 text-sm">
                 <span>🟢</span>
                 <span className="text-foreground">{result.positiveNews}</span>
@@ -290,8 +359,24 @@ const DirectProfitMode = () => {
               </div>
             </div>
 
-            {/* Voice playback */}
-            <div className="border-t border-border p-3 flex justify-center">
+            {/* Actions: Add + Voice */}
+            <div className="border-t border-border p-3 flex items-center justify-between">
+              {result.action !== "WAIT" && (
+                <Button
+                  size="sm"
+                  variant={added || alreadyInPortfolio ? "outline" : "default"}
+                  disabled={added || alreadyInPortfolio}
+                  onClick={addToPortfolio}
+                  className="text-xs h-8 gap-1.5"
+                >
+                  {added || alreadyInPortfolio ? (
+                    <>✓ Added</>
+                  ) : (
+                    <><Plus className="h-3.5 w-3.5" /> Add to Portfolio</>
+                  )}
+                </Button>
+              )}
+              {result.action === "WAIT" && <div />}
               <button
                 onClick={speakResult}
                 disabled={speaking}
@@ -300,6 +385,79 @@ const DirectProfitMode = () => {
                 <Volume2 className={`h-3.5 w-3.5 ${speaking ? "animate-pulse text-primary" : ""}`} />
                 {speaking ? "Speaking..." : "Read aloud"}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Portfolio Tracker */}
+        {portfolio.length > 0 && (
+          <div className="glass-panel rounded-xl overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">My Trades</span>
+                  <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{portfolio.length}</span>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm font-bold font-mono ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
+                    {totalPnl >= 0 ? "+" : ""}{cs}{Math.abs(totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className={`text-[10px] ${totalPnlPct >= 0 ? "text-gain" : "text-loss"}`}>
+                    {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% avg
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="divide-y divide-border">
+              {portfolio.map((item) => {
+                const pnl = item.action === "BUY"
+                  ? item.currentPrice - item.entryPrice
+                  : item.entryPrice - item.currentPrice;
+                const pnlPct = (pnl / item.entryPrice) * 100;
+                const hitTarget = item.action === "BUY"
+                  ? item.currentPrice >= item.targetPrice
+                  : item.currentPrice <= item.targetPrice;
+                const hitStop = item.action === "BUY"
+                  ? item.currentPrice <= item.stopLoss
+                  : item.currentPrice >= item.stopLoss;
+
+                return (
+                  <div key={item.ticker} className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold font-mono text-foreground">{item.ticker}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${item.action === "BUY" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
+                            {item.action}
+                          </span>
+                          {hitTarget && <span className="text-[10px] text-gain">🎯 Target Hit</span>}
+                          {hitStop && <span className="text-[10px] text-loss">⛔ Stop Hit</span>}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                          Entry {cs}{item.entryPrice.toLocaleString()} → Target {cs}{item.targetPrice.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className={`text-sm font-bold font-mono ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                          {pnl >= 0 ? "+" : ""}{cs}{Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className={`text-[10px] ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
+                          {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeFromPortfolio(item.ticker)}
+                        className="text-muted-foreground hover:text-loss transition-colors p-1"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
