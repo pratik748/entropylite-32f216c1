@@ -19,7 +19,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden" style={{ background: "#f0ede8" }}>
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Great+Vibes&display=swap"
         rel="stylesheet"
@@ -30,23 +30,15 @@ export default function AuthPage() {
         src={entropyLogoFull}
         alt=""
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vmin] max-w-[800px] select-none pointer-events-none"
-        style={{ filter: "contrast(1.3)", opacity: 0.9 }}
+        style={{ filter: "contrast(1.3)", opacity: 0.06 }}
       />
 
-      {/* Frosted translucent glass card */}
-      <div
-        className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-2xl border border-white/50"
-        style={{
-          background: "rgba(255, 255, 255, 0.25)",
-          backdropFilter: "blur(24px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)",
-        }}
-      >
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-lg border border-black/5 bg-white">
         <img
           src={entropyLogo}
           alt="Entropy"
-          className="h-16 object-contain"
+          className="h-24 object-contain"
         />
 
         <h1
