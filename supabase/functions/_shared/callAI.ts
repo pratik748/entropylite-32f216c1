@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI + Mistral + OpenAI fallback chain.
+ * AI caller — Gemini (primary) + Cloudflare + Mistral + OpenAI fallback chain.
  */
 
 interface CallAIOptions {
@@ -10,13 +10,13 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral" | "openai";
+  provider?: "gemini" | "cloudflare" | "mistral" | "openai";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral" | "openai";
+  provider: "gemini" | "cloudflare" | "mistral" | "openai";
   toolCall?: any;
 }
 
