@@ -126,7 +126,10 @@ const DirectProfitMode = () => {
   const [speaking, setSpeaking] = useState(false);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(loadPortfolio);
   const [added, setAdded] = useState(false);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<number>(0);
   const recognitionRef = useRef<any>(null);
+  const portfolioTickersRef = useRef<string[]>([]);
   const { indiaMode } = useFX();
 
   useEffect(() => {
