@@ -788,7 +788,7 @@ Deno.serve(async (req) => {
     if (parsed.length === 0) {
       console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
       output = {
-        ...buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines),
+        ...buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol),
         fallback: true,
       };
     } else {
