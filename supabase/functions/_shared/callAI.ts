@@ -330,73 +330,56 @@ async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
 const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const provider = opts.provider || "cloudflare";
+  const provider = opts.provider || "gemini";
 
-  if (provider === "cloudflare") {
-    let lastError: any;
-    for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
-      if (RETRY_DELAYS[attempt] > 0) {
-        console.log(`callAI → retry #${attempt} after ${RETRY_DELAYS[attempt]}ms`);
-        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-      }
-      try {
-        console.log(`callAI → Cloudflare attempt ${attempt + 1}`);
-        const result = await callCloudflare(opts);
-        console.log(`callAI → Cloudflare success on attempt ${attempt + 1}`);
-        return result;
-      } catch (err: any) {
-        lastError = err;
-        console.error(`callAI → Cloudflare attempt ${attempt + 1} failed:`, err.message || err);
-        if (err.status === 429) {
-          console.log("callAI → Cloudflare 429, falling back to Mistral immediately");
-          break;
-        }
-        if (err.status === 401 || err.status === 403) break;
-        if (err.status >= 500 && err.status < 600) continue;
-        if (err.name === "AbortError") {
-          console.log("callAI → Cloudflare timed out, falling back to Mistral");
-          break;
-        }
-        break;
-      }
-    }
-    console.log("callAI → Cloudflare exhausted, falling back to Mistral");
+  // Gemini first (primary)
+  if (provider === "gemini" || provider === "cloudflare") {
+    // Try Gemini first
     try {
-      const result = await callMistral(opts);
-      console.log("callAI → Mistral fallback success");
+      console.log("callAI → Gemini attempt");
+      const result = await callGemini(opts);
+      console.log("callAI → Gemini success");
       return result;
-    } catch (mistralErr: any) {
-      console.error("callAI → Mistral fallback also failed:", mistralErr.message || mistralErr);
-      // Final fallback: OpenAI
-      console.log("callAI → Mistral failed, falling back to OpenAI");
-      try {
-        const result = await callOpenAI(opts);
-        console.log("callAI → OpenAI fallback success");
-        return result;
-      } catch (openaiErr: any) {
-        console.error("callAI → OpenAI fallback also failed:", openaiErr.message || openaiErr);
-        throw lastError;
-      }
+    } catch (gemErr: any) {
+      console.warn("callAI → Gemini failed:", gemErr.message || gemErr);
     }
-  }
 
-  if (provider === "openai") {
-    console.log("callAI → OpenAI (forced by provider preference)");
+    // Cloudflare fallback
+    try {
+      console.log("callAI → Cloudflare fallback");
+      return await callCloudflare(opts);
+    } catch (cfErr: any) {
+      console.warn("callAI → Cloudflare failed:", cfErr.message || cfErr);
+    }
+
+    // Mistral fallback
+    try {
+      console.log("callAI → Mistral fallback");
+      return await callMistral(opts);
+    } catch (msErr: any) {
+      console.warn("callAI → Mistral failed:", msErr.message || msErr);
+    }
+
+    // OpenAI final
+    console.log("callAI → OpenAI final fallback");
     return await callOpenAI(opts);
   }
 
-  // Mistral (forced)
-  console.log("callAI → Mistral (forced by provider preference)");
+  if (provider === "openai") return await callOpenAI(opts);
   return await callMistral(opts);
 }
 
 /**
- * Fire Cloudflare + Mistral + OpenAI in parallel, return all successful results.
+ * Fire Gemini + Cloudflare + Mistral in parallel, return all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Cloudflare + Mistral + OpenAI simultaneously");
+  console.log("callAIParallel → firing Gemini + Cloudflare + Mistral simultaneously");
 
   const promises = [
+    callGemini(opts).then(r => ({ ...r, provider: "gemini" as const })).catch((err) => {
+      console.warn("callAIParallel → Gemini failed:", err.message || err);
+      return null;
+    }),
     callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
       console.warn("callAIParallel → Cloudflare failed:", err.message || err);
       return null;
@@ -405,13 +388,9 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       console.warn("callAIParallel → Mistral failed:", err.message || err);
       return null;
     }),
-    callOpenAI({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.05) }).then(r => ({ ...r, provider: "openai" as const })).catch((err) => {
-      console.warn("callAIParallel → OpenAI failed:", err.message || err);
-      return null;
-    }),
   ];
 
-  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 35000));
+  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 45000));
   
   const results = await Promise.allSettled([
     Promise.race([promises[0], timeoutPromise]),
@@ -425,14 +404,14 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    console.log("callAIParallel → all failed, final OpenAI attempt");
+    console.log("callAIParallel → all failed, final Gemini attempt");
     try {
-      const finalAttempt = await callOpenAI(opts);
+      const finalAttempt = await callGemini(opts);
       return [finalAttempt];
     } catch {
-      console.log("callAIParallel → final OpenAI also failed, trying Mistral");
+      console.log("callAIParallel → Gemini retry failed, trying OpenAI");
       try {
-        const lastAttempt = await callMistral(opts);
+        const lastAttempt = await callOpenAI(opts);
         return [lastAttempt];
       } catch {
         throw new Error("callAIParallel: all providers failed");
