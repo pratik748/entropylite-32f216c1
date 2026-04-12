@@ -74,6 +74,24 @@ function roundPrice(value: number) {
   return Number.isFinite(value) ? Number(value.toFixed(2)) : 0;
 }
 
+function getCurrencySymbol(currency: string) {
+  const symbols: Record<string, string> = {
+    USD: "$",
+    INR: "₹",
+    EUR: "€",
+    GBP: "£",
+    JPY: "¥",
+    CNY: "¥",
+    HKD: "HK$",
+    KRW: "₩",
+    CAD: "C$",
+    AUD: "A$",
+    CHF: "Fr",
+  };
+
+  return symbols[currency] || "$";
+}
+
 /** Known price floors for major tickers to reject wrong-symbol matches */
 const PRICE_SANITY: Record<string, { min: number; max: number }> = {
   // Indian blue chips (INR)
@@ -372,6 +390,7 @@ function buildDeterministicFallback(
   return {
     action,
     confidence,
+    currency,
     entryLow: roundPrice(entryLow),
     entryHigh: roundPrice(entryHigh),
     targetPrice: roundPrice(targetPrice),
@@ -482,6 +501,7 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
   const output: Record<string, unknown> = {
     action,
     confidence,
+    currency: snap.currency || "USD",
     entryLow: roundPrice(entryLow),
     entryHigh: roundPrice(entryHigh),
     targetPrice: roundPrice(targetPrice),
@@ -522,8 +542,6 @@ Deno.serve(async (req) => {
 
     const resolvedTicker = normalizeTickerInput(ticker.trim());
     const isIndian = indiaMode === true || isIndianTicker(resolvedTicker);
-    const currency = isIndian ? "INR" : "USD";
-    const currencySymbol = isIndian ? "₹" : "$";
     const market = isIndian ? "India (NSE/BSE)" : "US/Global";
 
     const [snap, vix] = await Promise.all([
@@ -540,16 +558,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    const currency = snap.currency || (isIndian ? "INR" : "USD");
+    const currencySymbol = getCurrencySymbol(currency);
+
     const tech = computeTechnicals(snap);
     console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix}`);
 
     const quantContext = isIndian
-      ? `Indian market context:\n- NSE/BSE listed, all prices in INR\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
-      : `US/Global market context:\n- NYSE/NASDAQ listed, all prices in USD\n- Reference S&P 500 and VIX as benchmarks\n- Consider institutional flow, macro regime, and index leadership\n- Protection can reference SPY puts or TLT when relevant`;
+      ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
+      : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- Protection should stay aligned to the asset's quoted currency when possible`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT only when signals genuinely conflict\n\nConfidence calibration (CRITICAL):\n- confidence represents how aligned the signals are, NOT how certain the future is\n- Momentum 3/3 with volume confirmation = confidence 65-80\n- Momentum 2/3 with supporting z-score = confidence 50-65\n- Mixed signals with 1 clear edge = confidence 40-55\n- Genuinely conflicting signals = WAIT at confidence 30-45\n- NEVER return confidence below 35 for a BUY or SELL action\n- BUY/SELL only with a clear edge and executable protection\n- Keep directionReason under 8 words\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT only when signals genuinely conflict\n\nConfidence calibration (CRITICAL):\n- confidence represents how aligned the signals are, NOT how certain the future is\n- Momentum 3/3 with volume confirmation = confidence 65-80\n- Momentum 2/3 with supporting z-score = confidence 50-65\n- Mixed signals with 1 clear edge = confidence 40-55\n- Genuinely conflicting signals = WAIT at confidence 30-45\n- NEVER return confidence below 35 for a BUY or SELL action\n- BUY/SELL only with a clear edge and executable protection\n- Keep directionReason under 8 words\n- ALL prices MUST remain in the provided currency\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
 
-    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency}\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nProduce a complete, executable trade decision. Keep it simple for the user, but grounded in the data above.`;
+    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nProduce a complete, executable trade decision. Keep it simple for the user, but grounded in the data above.`;
 
     const results = await callAIParallel({
       systemPrompt,
@@ -571,6 +592,7 @@ Deno.serve(async (req) => {
         }
         if (obj && obj.action) {
           obj._provider = result.provider;
+          obj.currency = currency;
           obj.currentPrice = snap.currentPrice;
           parsed.push(obj);
         }

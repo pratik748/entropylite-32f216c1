@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useFX } from "@/hooks/useFX";
-import { getCurrencySymbol } from "@/lib/currency";
+import { getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -12,20 +12,6 @@ interface DataPoint {
   t: number;
   value: number;
   pnl: number;
-}
-
-/** Detect currency for a stock: use analysis currency, or infer from ticker suffix */
-function detectCurrency(s: PortfolioStock): string {
-  if (s.analysis?.currency) return s.analysis.currency;
-  const t = s.ticker.toUpperCase();
-  if (t.endsWith(".NS") || t.endsWith(".BO")) return "INR";
-  if (t.endsWith(".L")) return "GBP";
-  if (t.endsWith(".T")) return "JPY";
-  if (t.endsWith(".HK")) return "HKD";
-  if (t.endsWith(".DE") || t.endsWith(".PA")) return "EUR";
-  if (t.endsWith(".TO")) return "CAD";
-  if (t.endsWith(".AX")) return "AUD";
-  return "USD";
 }
 
 const MAX_POINTS = 60; // ~15 min at 15s intervals
@@ -44,7 +30,7 @@ const PortfolioSparkline = ({ stocks }: Props) => {
     let totalInvested = 0;
 
     analyzed.forEach(s => {
-      const ccy = detectCurrency(s);
+      const ccy = resolveAssetCurrency(s.ticker, s.analysis?.currency);
       const curPrice = s.analysis!.currentPrice ?? 0;
       totalValue += convertToBase(curPrice * s.quantity, ccy);
       totalInvested += convertToBase(s.buyPrice * s.quantity, ccy);
