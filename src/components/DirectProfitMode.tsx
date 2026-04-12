@@ -164,7 +164,7 @@ const DirectProfitMode = () => {
     return () => clearInterval(interval);
   }, [activeTicker, loading]);
 
-
+  useEffect(() => {
     return () => {
       recognitionRef.current?.stop?.();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
