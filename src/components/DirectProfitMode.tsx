@@ -472,6 +472,18 @@ const DirectProfitMode = () => {
                 {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence — {" "}
                 <span className="font-bold text-foreground">{result.confidence}%</span>
               </div>
+              {/* Live price ticker */}
+              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+                <span className="font-mono font-semibold text-foreground">
+                  {cs}{(livePrice || result.currentPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                {lastPriceUpdate > 0 && (
+                  <span className="text-[10px]">
+                    updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago
+                  </span>
+                )}
+              </div>
               {result.fallback && (
                 <div className="mt-2 text-[11px] text-muted-foreground">
                   Running on resilient rules fallback while live AI consensus is unavailable.
