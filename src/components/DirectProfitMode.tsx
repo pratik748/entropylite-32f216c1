@@ -140,6 +140,42 @@ const DirectProfitMode = () => {
     };
   }, []);
 
+  // Live price refresh for portfolio items every 15 seconds
+  useEffect(() => {
+    if (portfolio.length === 0) return;
+
+    const refreshPrices = async () => {
+      const tickers = portfolio.map((p) => p.ticker);
+      try {
+        const { data } = await governedInvoke<{ prices: Record<string, { price: number; currency: string }> }>(
+          "price-feed",
+          { body: { tickers }, tier: "realtime", force: true }
+        );
+        if (data?.prices) {
+          setPortfolio((prev) => {
+            let changed = false;
+            const updated = prev.map((item) => {
+              const priceData = data.prices[item.ticker] || data.prices[item.ticker.toUpperCase()];
+              if (priceData && priceData.price > 0 && priceData.price !== item.currentPrice) {
+                changed = true;
+                return { ...item, currentPrice: priceData.price };
+              }
+              return item;
+            });
+            return changed ? updated : prev;
+          });
+        }
+      } catch (err) {
+        console.warn("Portfolio price refresh failed:", err);
+      }
+    };
+
+    // Refresh immediately on mount / portfolio change
+    refreshPrices();
+    const interval = setInterval(refreshPrices, 15_000);
+    return () => clearInterval(interval);
+  }, [portfolio.length]); // only re-setup when count changes, not on every price update
+
   const analyze = useCallback(async (inputTicker: string) => {
     const trimmed = inputTicker.trim();
     const normalizedTicker = trimmed.toUpperCase();
