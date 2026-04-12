@@ -474,6 +474,8 @@ function buildDeterministicFallback(
   riskMetrics: RiskMetrics,
   clankSignals: ClankSignal[],
   newsHeadlines: string[],
+  resolvedTicker: string,
+  currencySymbol: string,
 ) {
   const bullishSignals: string[] = [];
   const bearishSignals: string[] = [];
