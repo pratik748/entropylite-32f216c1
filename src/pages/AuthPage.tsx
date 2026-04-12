@@ -25,13 +25,6 @@ export default function AuthPage() {
         rel="stylesheet"
       />
 
-      {/* Full-screen Entropy logo centered as background */}
-      <img
-        src={entropyLogoFull}
-        alt=""
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vmin] max-w-[800px] select-none pointer-events-none"
-        style={{ filter: "contrast(1.3)", opacity: 0.06 }}
-      />
 
       {/* Card */}
       <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-lg border border-black/5 bg-white">
