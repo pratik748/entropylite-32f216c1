@@ -19,24 +19,30 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden" style={{ background: "#f0ede8" }}>
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Great+Vibes&display=swap"
         rel="stylesheet"
       />
 
-      {/* Full-screen Entropy logo as THE background */}
-      <div className="absolute inset-0 flex items-center justify-center bg-white">
-        <img
-          src={entropyLogoFull}
-          alt=""
-          className="w-full h-full object-contain p-8 sm:p-16 select-none"
-          style={{ filter: "contrast(1.2)" }}
-        />
-      </div>
+      {/* Full-screen Entropy logo centered as background */}
+      <img
+        src={entropyLogoFull}
+        alt=""
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vmin] max-w-[800px] select-none pointer-events-none"
+        style={{ filter: "contrast(1.3)", opacity: 0.9 }}
+      />
 
-      {/* Frosted glass card */}
-      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-sm border border-black/10 bg-white/60 backdrop-blur-3xl shadow-2xl">
+      {/* Frosted translucent glass card */}
+      <div
+        className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-2xl border border-white/50"
+        style={{
+          background: "rgba(255, 255, 255, 0.25)",
+          backdropFilter: "blur(24px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.6)",
+        }}
+      >
         <img
           src={entropyLogo}
           alt="Entropy"
