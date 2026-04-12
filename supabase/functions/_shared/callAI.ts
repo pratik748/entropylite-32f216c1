@@ -89,47 +89,6 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-async function callGemini(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("GOOGLE_GEMINI_KEY");
-  if (!apiKey) throw new Error("GOOGLE_GEMINI_KEY not set");
-
-  const model = opts.model || "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const body: any = {
-    contents: [
-      { role: "user", parts: [{ text: `${opts.systemPrompt}\n\n${opts.userPrompt}` }] },
-    ],
-    generationConfig: {
-      temperature: opts.temperature ?? 0.6,
-      maxOutputTokens: opts.maxTokens ?? 8192,
-      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
-    },
-  };
-
-  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 3000 ? 35000 : 20000;
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Gemini error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const candidate = data.candidates?.[0];
-  if (!candidate) throw new Error("Empty Gemini response");
-
-  const raw = candidate.content?.parts?.map((p: any) => p.text || "").join("").trim();
-  if (!raw) throw new Error("Empty Gemini response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "gemini" };
-}
-
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
