@@ -36,9 +36,9 @@ export default function AuthPage() {
       {/* Card */}
       <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-lg border border-black/5 bg-white">
         <img
-          src={entropyLogo}
+          src={entropyLogoFull}
           alt="Entropy"
-          className="h-24 object-contain"
+          className="h-20 object-contain"
         />
 
         <h1
