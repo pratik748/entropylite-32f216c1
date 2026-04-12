@@ -1,5 +1,5 @@
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
+import { getCurrencySymbol, formatCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
 
 interface StockSummaryProps {
@@ -12,25 +12,26 @@ interface StockSummaryProps {
 
 const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: StockSummaryProps) => {
   const { baseCurrency, convertToBase } = useFX();
+  const assetCurrency = resolveAssetCurrency(ticker, currency);
   const invested = buyPrice * quantity;
   const currentValue = currentPrice * quantity;
   const pnl = currentValue - invested;
   const pnlPercent = ((pnl / invested) * 100);
   const isProfit = pnl >= 0;
-  const sym = getCurrencySymbol(currency);
+  const sym = getCurrencySymbol(assetCurrency);
 
-  const showConverted = currency && currency !== baseCurrency;
+  const showConverted = assetCurrency !== baseCurrency;
   const baseSym = getCurrencySymbol(baseCurrency);
-  const convertedPrice = showConverted ? convertToBase(currentPrice, currency) : null;
-  const convertedValue = showConverted ? convertToBase(currentValue, currency) : null;
-  const convertedPnl = showConverted ? convertToBase(pnl, currency) : null;
+  const convertedPrice = showConverted ? convertToBase(currentPrice, assetCurrency) : null;
+  const convertedValue = showConverted ? convertToBase(currentValue, assetCurrency) : null;
+  const convertedPnl = showConverted ? convertToBase(pnl, assetCurrency) : null;
 
   return (
     <div className="rounded-sm border border-border bg-card p-3 sm:p-5 animate-slide-up">
       <div className="mb-3 sm:mb-4 flex items-center justify-between">
         <div>
           <p className="font-mono text-base sm:text-xl font-bold text-foreground">{ticker}</p>
-          <p className="text-xs sm:text-sm text-muted-foreground">{currency || "USD"}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">{assetCurrency}</p>
         </div>
         <div className={`flex items-center gap-1 rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 ${isProfit ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
           {isProfit ? <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4" />}
@@ -43,16 +44,16 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
       <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
         <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Current Price</p>
-          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentPrice, currency)}</p>
+          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentPrice, assetCurrency)}</p>
           {convertedPrice !== null && (
             <p className="font-mono text-[9px] sm:text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
           )}
         </div>
-        <MetricCard label="Buy Price" value={formatCurrency(buyPrice, currency)} />
+        <MetricCard label="Buy Price" value={formatCurrency(buyPrice, assetCurrency)} />
         <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
           <p className="text-[10px] sm:text-xs text-muted-foreground">P&L</p>
           <p className={`mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold ${isProfit ? "text-gain" : "text-loss"}`}>
-            {isProfit ? "+" : ""}{formatCurrency(Math.abs(pnl), currency)}
+            {isProfit ? "+" : ""}{formatCurrency(Math.abs(pnl), assetCurrency)}
           </p>
           {convertedPnl !== null && (
             <p className={`font-mono text-[9px] sm:text-[10px] mt-0.5 ${isProfit ? "text-gain/60" : "text-loss/60"}`}>
@@ -62,7 +63,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
         </div>
         <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
           <p className="text-[10px] sm:text-xs text-muted-foreground">Portfolio Value</p>
-          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentValue, currency)}</p>
+          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentValue, assetCurrency)}</p>
           {convertedValue !== null && (
             <p className="font-mono text-[9px] sm:text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
           )}

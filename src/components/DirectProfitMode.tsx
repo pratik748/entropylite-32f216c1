@@ -400,12 +400,11 @@ const DirectProfitMode = () => {
     : null;
 
   const totalInvestedBase = portfolio.reduce((sum, p) => sum + convertToBase(p.entryPrice, p.currency), 0);
-  const totalCurrentBase = portfolio.reduce((sum, p) => sum + convertToBase(p.currentPrice, p.currency), 0);
   const totalPnl = portfolio.reduce((sum, p) => {
     const diff = p.action === "BUY" ? p.currentPrice - p.entryPrice : p.entryPrice - p.currentPrice;
     return sum + convertToBase(diff, p.currency);
   }, 0);
-  const totalPnlPct = totalInvestedBase > 0 ? ((totalCurrentBase - totalInvestedBase) / totalInvestedBase) * 100 : 0;
+  const totalPnlPct = totalInvestedBase > 0 ? (totalPnl / totalInvestedBase) * 100 : 0;
 
   return (
     <div className="h-full overflow-auto p-4">
