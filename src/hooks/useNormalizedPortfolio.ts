@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getCurrencySymbol, formatCompact } from "@/lib/currency";
+import { getCurrencySymbol, formatCompact, resolveAssetCurrency } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 
@@ -12,7 +12,7 @@ export function useNormalizedPortfolio(stocks: PortfolioStock[]) {
   const { totalValue, totalInvested, totalPnl, holdings } = useMemo(() => {
     let tv = 0, ti = 0;
     const h = analyzed.map(st => {
-      const cur = st.analysis?.currency || "USD";
+      const cur = resolveAssetCurrency(st.ticker, st.analysis?.currency);
       const price = st.analysis?.currentPrice || st.buyPrice;
       const rawValue = price * st.quantity;
       const rawInvested = st.buyPrice * st.quantity;

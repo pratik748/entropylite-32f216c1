@@ -1,7 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useFX } from "@/hooks/useFX";
-import { getCurrencySymbol } from "@/lib/currency";
+import { getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -15,7 +15,7 @@ const PnLWaterfall = ({ stocks }: Props) => {
   if (analyzed.length === 0) return null;
 
   const data = analyzed.map(s => {
-    const ccy = s.analysis!.currency || "USD";
+    const ccy = resolveAssetCurrency(s.ticker, s.analysis?.currency);
     const pnl = convertToBase((s.analysis!.currentPrice - s.buyPrice) * s.quantity, ccy);
     return {
       name: s.ticker.replace(".NS", "").replace(".BO", ""),

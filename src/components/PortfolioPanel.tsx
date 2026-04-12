@@ -1,7 +1,7 @@
 import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency } from "@/lib/currency";
+import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
 
@@ -58,7 +58,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
   let totalInvested = 0;
   let totalCurrent = 0;
   stocks.forEach(s => {
-    const cur = s.analysis?.currency || "USD";
+    const cur = resolveAssetCurrency(s.ticker, s.analysis?.currency);
     const invested = s.buyPrice * s.quantity;
     const current = (s.analysis?.currentPrice ?? s.buyPrice) * s.quantity;
     totalInvested += convertToBase(invested, cur);
@@ -130,16 +130,16 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
         {stocks.map((stock) => {
-          const cur = stock.analysis?.currency;
+          const cur = resolveAssetCurrency(stock.ticker, stock.analysis?.currency, baseCurrency);
           const s = getCurrencySymbol(cur);
           const pnl = stock.analysis ? (stock.analysis.currentPrice - stock.buyPrice) * stock.quantity : 0;
           const pnlPct = stock.analysis ? ((stock.analysis.currentPrice - stock.buyPrice) / stock.buyPrice) * 100 : 0;
           const isActive = stock.id === activeStockId;
-          const pnlBase = cur && cur !== baseCurrency ? convertToBase(pnl, cur) : null;
+          const pnlBase = cur !== baseCurrency ? convertToBase(pnl, cur) : null;
           const freshness = priceStatus?.[stock.id]?.status;
 
           // Dual currency: show converted price if asset currency differs from base
-          const convertedPrice = stock.analysis && cur && cur !== baseCurrency
+          const convertedPrice = stock.analysis && cur !== baseCurrency
             ? convertToBase(stock.analysis.currentPrice, cur)
             : null;
 

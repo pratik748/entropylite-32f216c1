@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
-import { getCurrencySymbol } from "@/lib/currency";
+import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 import { cleanAIText } from "@/lib/utils";
 
 interface TradeResult {
@@ -41,6 +41,7 @@ interface TradeResult {
   negativeNews: string;
   protection: string;
   currentPrice: number;
+  currency?: string;
   quantScore?: number;
   volatilityRegime?: "LOW" | "NORMAL" | "HIGH";
   riskRewardRatio?: number;
@@ -56,6 +57,7 @@ interface PortfolioItem {
   targetPrice: number;
   stopLoss: number;
   currentPrice: number;
+  currency: string;
   addedAt: number;
 }
 
@@ -107,6 +109,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     negativeNews: cleanAIText(value.negativeNews || "No significant downside catalyst").slice(0, 120),
     protection: cleanAIText(value.protection || "Exit if price breaks the stop level.").slice(0, 120),
     currentPrice: normalizeNumber(value.currentPrice),
+    currency: typeof value.currency === "string" && value.currency.trim() ? value.currency.trim().toUpperCase() : undefined,
     quantScore: value.quantScore !== undefined ? Math.max(0, Math.min(100, Math.round(normalizeNumber(value.quantScore)))) : undefined,
     volatilityRegime: ["LOW", "NORMAL", "HIGH"].includes(value.volatilityRegime) ? value.volatilityRegime : undefined,
     riskRewardRatio: value.riskRewardRatio !== undefined ? Math.abs(normalizeNumber(value.riskRewardRatio)) : undefined,
@@ -127,10 +130,11 @@ const DirectProfitMode = () => {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(loadPortfolio);
   const [added, setAdded] = useState(false);
   const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [liveCurrency, setLiveCurrency] = useState<string | null>(null);
   const [lastPriceUpdate, setLastPriceUpdate] = useState<number>(0);
   const recognitionRef = useRef<any>(null);
   const portfolioTickersRef = useRef<string[]>([]);
-  const { indiaMode } = useFX();
+  const { indiaMode, baseCurrency, convertToBase } = useFX();
 
   useEffect(() => {
     savePortfolio(portfolio);
@@ -154,6 +158,7 @@ const DirectProfitMode = () => {
         const p = data?.prices?.[activeTicker] || data?.prices?.[activeTicker.toUpperCase()];
         if (p && p.price > 0) {
           setLivePrice(p.price);
+          setLiveCurrency(p.currency || null);
           setLastPriceUpdate(Date.now());
         }
       } catch {}
@@ -187,9 +192,9 @@ const DirectProfitMode = () => {
             let changed = false;
             const updated = prev.map((item) => {
               const priceData = data.prices[item.ticker] || data.prices[item.ticker.toUpperCase()];
-              if (priceData && priceData.price > 0 && priceData.price !== item.currentPrice) {
+              if (priceData && priceData.price > 0 && (priceData.price !== item.currentPrice || (priceData.currency && priceData.currency !== item.currency))) {
                 changed = true;
-                return { ...item, currentPrice: priceData.price };
+                return { ...item, currentPrice: priceData.price, currency: priceData.currency || item.currency };
               }
               return item;
             });
@@ -217,6 +222,9 @@ const DirectProfitMode = () => {
     setResult(null);
     setAdded(false);
     setActiveTicker(normalizedTicker);
+    setLivePrice(null);
+    setLiveCurrency(null);
+    setLastPriceUpdate(0);
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error("Analysis is taking too long. Please try again.")), ANALYSIS_TIMEOUT_MS);
@@ -241,6 +249,9 @@ const DirectProfitMode = () => {
       }
 
       setResult(normalized);
+      setLivePrice(normalized.currentPrice > 0 ? normalized.currentPrice : null);
+      setLiveCurrency(normalized.currency || null);
+      setLastPriceUpdate(Date.now());
     } catch (err: any) {
       const message = typeof err?.message === "string" && err.message.trim()
         ? err.message
@@ -273,7 +284,8 @@ const DirectProfitMode = () => {
       entryPrice: (result.entryLow + result.entryHigh) / 2,
       targetPrice: result.targetPrice,
       stopLoss: result.stopLoss,
-      currentPrice: result.currentPrice,
+      currentPrice: livePrice ?? result.currentPrice,
+      currency: resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD"),
       addedAt: Date.now(),
     };
 
@@ -334,7 +346,8 @@ const DirectProfitMode = () => {
     }
 
     synth.cancel();
-    const cs = getCurrencySymbol(indiaMode ? "INR" : "USD");
+    const speechCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD");
+    const cs = getCurrencySymbol(speechCurrency);
     let text = "";
 
     if (indiaMode) {
@@ -368,7 +381,9 @@ const DirectProfitMode = () => {
     synth.speak(utterance);
   };
 
-  const cs = getCurrencySymbol(indiaMode ? "INR" : "USD");
+  const activeCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result?.currency, indiaMode ? "INR" : "USD");
+  const cs = getCurrencySymbol(activeCurrency);
+  const baseSym = getCurrencySymbol(baseCurrency);
   const actionColor = result?.action === "BUY" ? "text-gain" : result?.action === "SELL" ? "text-loss" : "text-muted-foreground";
   const actionBg = result?.action === "BUY" ? "bg-gain/10 border-gain/30" : result?.action === "SELL" ? "bg-loss/10 border-loss/30" : "bg-muted/20 border-border";
   const dirIcon = result?.direction === "UP"
@@ -379,19 +394,17 @@ const DirectProfitMode = () => {
 
   const alreadyInPortfolio = result ? portfolio.some((p) => p.ticker === activeTicker) : false;
 
+  const displayedActivePrice = livePrice ?? result?.currentPrice ?? 0;
+  const convertedActivePrice = result && activeCurrency !== baseCurrency
+    ? convertToBase(displayedActivePrice, activeCurrency)
+    : null;
+
+  const totalInvestedBase = portfolio.reduce((sum, p) => sum + convertToBase(p.entryPrice, p.currency), 0);
   const totalPnl = portfolio.reduce((sum, p) => {
     const diff = p.action === "BUY" ? p.currentPrice - p.entryPrice : p.entryPrice - p.currentPrice;
-    return sum + diff;
+    return sum + convertToBase(diff, p.currency);
   }, 0);
-
-  const totalPnlPct = portfolio.length > 0
-    ? portfolio.reduce((sum, p) => {
-        const diff = p.action === "BUY"
-          ? ((p.currentPrice - p.entryPrice) / p.entryPrice) * 100
-          : ((p.entryPrice - p.currentPrice) / p.entryPrice) * 100;
-        return sum + diff;
-      }, 0) / portfolio.length
-    : 0;
+  const totalPnlPct = totalInvestedBase > 0 ? (totalPnl / totalInvestedBase) * 100 : 0;
 
   return (
     <div className="h-full overflow-auto p-4">
@@ -476,8 +489,11 @@ const DirectProfitMode = () => {
               <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
                 <span className="font-mono font-semibold text-foreground">
-                  {cs}{(livePrice || result.currentPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {cs}{displayedActivePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
+                {convertedActivePrice !== null && (
+                  <span className="text-[10px]">≈ {formatCurrency(convertedActivePrice, baseCurrency)}</span>
+                )}
                 {lastPriceUpdate > 0 && (
                   <span className="text-[10px]">
                     updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago
@@ -625,7 +641,7 @@ const DirectProfitMode = () => {
                 </div>
                 <div className="text-right">
                   <div className={`text-sm font-bold font-mono ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-                    {totalPnl >= 0 ? "+" : ""}{cs}{Math.abs(totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {totalPnl >= 0 ? "+" : ""}{baseSym}{Math.abs(totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className={`text-[10px] ${totalPnlPct >= 0 ? "text-gain" : "text-loss"}`}>
                     {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% avg
@@ -635,8 +651,11 @@ const DirectProfitMode = () => {
             </div>
             <div className="divide-y divide-border">
               {portfolio.map((item) => {
+                const itemCurrency = resolveAssetCurrency(item.ticker, item.currency, indiaMode ? "INR" : "USD");
+                const itemSym = getCurrencySymbol(itemCurrency);
                 const pnl = item.action === "BUY" ? item.currentPrice - item.entryPrice : item.entryPrice - item.currentPrice;
                 const pnlPct = (pnl / item.entryPrice) * 100;
+                const pnlBase = itemCurrency !== baseCurrency ? convertToBase(pnl, itemCurrency) : null;
                 const hitTarget = item.action === "BUY" ? item.currentPrice >= item.targetPrice : item.currentPrice <= item.targetPrice;
                 const hitStop = item.action === "BUY" ? item.currentPrice <= item.stopLoss : item.currentPrice >= item.stopLoss;
 
@@ -653,18 +672,23 @@ const DirectProfitMode = () => {
                           {hitStop && <span className="text-[10px] text-loss">⛔ Stop Hit</span>}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                          Entry {cs}{item.entryPrice.toLocaleString()} → Target {cs}{item.targetPrice.toLocaleString()}
+                          Entry {itemSym}{item.entryPrice.toLocaleString()} → Target {itemSym}{item.targetPrice.toLocaleString()}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right">
                         <div className={`text-sm font-bold font-mono ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                          {pnl >= 0 ? "+" : ""}{cs}{Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {pnl >= 0 ? "+" : ""}{itemSym}{Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                         <div className={`text-[10px] ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
                           {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
                         </div>
+                        {pnlBase !== null && (
+                          <div className={`text-[10px] font-mono ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
+                            ≈ {pnlBase >= 0 ? "+" : "-"}{formatCurrency(Math.abs(pnlBase), baseCurrency)}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => removeFromPortfolio(item.ticker)}
