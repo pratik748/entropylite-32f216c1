@@ -124,26 +124,10 @@ serve(async (req) => {
       }));
 
       const aiResults = await callAIParallel({
-        systemPrompt: `You are an institutional derivatives intelligence engine for a professional finance terminal.
-Return ONLY valid JSON.
-No markdown, no bullets, no stars, no emojis, no commentary outside JSON.
-Keep language concise, professional, and execution-oriented.
-Maintain this exact top-level structure:
-{
-  "correlations": { "pairs": [], "divergences": [] },
-  "pair_trades": [],
-  "options_intel": [],
-  "futures": [],
-  "neutrality": { "beta_exposure": number, "sector_tilts": [], "factor_exposures": [], "hedge_suggestions": [] },
-  "opportunities": [],
-  "simulations": [],
-  "discoveries": [],
-  "market_bias": string
-}
-Preserve one options_intel entry per ticker whenever possible, keep discoveries cross-market and timely, and make every reasoning string read like a sell-side desk note rather than consumer AI prose.`,
-        userPrompt: `Portfolio snapshot:\n${JSON.stringify(portfolioSnapshot, null, 2)}\n\nLive market context:\n- News: ${news_context || "None provided"}\n- Macro: ${macro_context || "None provided"}\n- Sentiment: ${sentiment_context || "None provided"}\n- Discovery mode: ${discovery_mode ? "on" : "off"}\n- Region mode: ${indiaMode ? "India" : "Global"}\n- Base currency: ${baseCurrency || "USD"}\n\nUse this deterministic scaffold as the minimum completeness baseline. You may improve it materially, but do not drop keys or return partial structures:\n${JSON.stringify(fallback)}`,
+        systemPrompt: `Derivatives intelligence engine. Return ONLY valid JSON with keys: correlations{pairs,divergences}, pair_trades, options_intel, futures, neutrality{beta_exposure,sector_tilts,factor_exposures,hedge_suggestions}, opportunities, simulations, discoveries, market_bias. Concise sell-side language.`,
+        userPrompt: `Portfolio: ${JSON.stringify(portfolioSnapshot)}\nContext: news=${news_context||"none"} macro=${macro_context||"none"} sentiment=${sentiment_context||"none"} discovery=${discovery_mode} region=${indiaMode?"India":"Global"} ccy=${baseCurrency||"USD"}\nBaseline:\n${JSON.stringify(fallback)}`,
         temperature: 0.25,
-        maxTokens: Math.min(6800, 3000 + tickers.length * 320 + (discovery_mode ? 1200 : 0)),
+        maxTokens: Math.min(4000, 2000 + tickers.length * 200 + (discovery_mode ? 800 : 0)),
         jsonMode: true,
       });
 
