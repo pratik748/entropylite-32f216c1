@@ -573,8 +573,8 @@ function buildDeterministicFallback(
     protection: action === "WAIT"
       ? "Wait for a cleaner setup before taking risk."
       : action === "BUY"
-        ? `Exit below ${currency} ${roundPrice(stopLoss)} if momentum breaks.`
-        : `Cover above ${currency} ${roundPrice(stopLoss)} if the squeeze starts.`,
+        ? `${resolvedTicker} ${roundPrice(stopLoss)} PE as hedge. Trail stop at ${currencySymbol}${roundPrice(stopLoss)}. Risk per share: ${currencySymbol}${roundPrice(snap.currentPrice - stopLoss)}.`
+        : `Cover above ${currencySymbol}${roundPrice(stopLoss)} with ${resolvedTicker} ${roundPrice(stopLoss)} CE. Max loss: ${currencySymbol}${roundPrice(stopLoss - snap.currentPrice)}/share.`,
     currentPrice: roundPrice(snap.currentPrice),
     quantScore,
     volatilityRegime,
@@ -737,8 +737,8 @@ Deno.serve(async (req) => {
     console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix} | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 
     const quantContext = isIndian
-      ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
-      : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- Protection should stay aligned to the asset's quoted currency when possible`;
+      ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- CRITICAL: Protection MUST be specific to ${resolvedTicker} — use ${resolvedTicker} PUT options at specific strikes derived from support/stop-loss levels, or tight trailing stops. NEVER suggest generic "Nifty puts" unless the ticker IS Nifty. Include strike price, expiry guidance, and position size context.`
+      : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- CRITICAL: Protection MUST be specific to ${resolvedTicker} — use ${resolvedTicker} PUT options at specific strikes near stop-loss, or collar strategies with the stock's own options. Include strike price and expiry guidance. NEVER give vague advice.`;
 
     const clankContext = clankSignals.length > 0
       ? `\n\nACTIVE STRUCTURAL CONSTRAINTS (CLANK Engine):\n${clankSignals.map(s => `- [${s.severity}] ${s.label}: ${s.description}`).join("\n")}\nFactor these institutional flow constraints into your confidence and action.`
