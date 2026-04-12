@@ -11,21 +11,16 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
   const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
   if (!apiKey) return null;
-
   try {
     const cleanSymbol = symbol.replace(/\.(NS|BO)$/, "");
     const exchange = symbol.endsWith(".BO") ? "BSE" : "NSE";
     const avSymbol = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
     const res = await fetch(url);
-    if (!res.ok) {
-      await res.text();
-      return null;
-    }
+    if (!res.ok) { await res.text(); return null; }
     const data = await res.json();
     const q = data?.["Global Quote"];
     if (!q || !q["05. price"]) return null;
-
     return {
       price: parseFloat(q["05. price"]),
       prevClose: parseFloat(q["08. previous close"] || "0"),
@@ -33,9 +28,7 @@ async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevC
       low: parseFloat(q["04. low"] || "0"),
       volume: parseInt(q["06. volume"] || "0"),
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 interface MarketSnapshot {
@@ -66,6 +59,25 @@ interface TechnicalSnapshot {
   dailyVol: number;
 }
 
+interface RiskMetrics {
+  var95: number;
+  cvar95: number;
+  var99: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  betaEstimate: number;
+  kellyFraction: number;
+}
+
+interface ClankSignal {
+  id: string;
+  label: string;
+  active: boolean;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  description: string;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
@@ -76,25 +88,13 @@ function roundPrice(value: number) {
 
 function getCurrencySymbol(currency: string) {
   const symbols: Record<string, string> = {
-    USD: "$",
-    INR: "₹",
-    EUR: "€",
-    GBP: "£",
-    JPY: "¥",
-    CNY: "¥",
-    HKD: "HK$",
-    KRW: "₩",
-    CAD: "C$",
-    AUD: "A$",
-    CHF: "Fr",
+    USD: "$", INR: "₹", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥",
+    HKD: "HK$", KRW: "₩", CAD: "C$", AUD: "A$", CHF: "Fr",
   };
-
   return symbols[currency] || "$";
 }
 
-/** Known price floors for major tickers to reject wrong-symbol matches */
 const PRICE_SANITY: Record<string, { min: number; max: number }> = {
-  // Indian blue chips (INR)
   "SBIN.NS": { min: 200, max: 2000 }, "SBIN.BO": { min: 200, max: 2000 },
   "RELIANCE.NS": { min: 500, max: 5000 }, "RELIANCE.BO": { min: 500, max: 5000 },
   "TCS.NS": { min: 1000, max: 8000 }, "TCS.BO": { min: 1000, max: 8000 },
@@ -113,7 +113,6 @@ const PRICE_SANITY: Record<string, { min: number; max: number }> = {
   "TITAN.NS": { min: 1000, max: 6000 }, "TITAN.BO": { min: 1000, max: 6000 },
   "HINDUNILVR.NS": { min: 1000, max: 5000 }, "HINDUNILVR.BO": { min: 1000, max: 5000 },
   "MRF.NS": { min: 50000, max: 200000 }, "MRF.BO": { min: 50000, max: 200000 },
-  // US majors (USD)
   "AAPL": { min: 80, max: 400 },
   "MSFT": { min: 150, max: 700 },
   "GOOGL": { min: 50, max: 300 },
@@ -121,14 +120,13 @@ const PRICE_SANITY: Record<string, { min: number; max: number }> = {
   "TSLA": { min: 50, max: 600 },
   "NVDA": { min: 30, max: 300 },
   "META": { min: 100, max: 1000 },
-  // Crypto
   "BTC-USD": { min: 10000, max: 500000 },
   "ETH-USD": { min: 500, max: 50000 },
 };
 
 function passesSanityCheck(symbol: string, price: number): boolean {
   const check = PRICE_SANITY[symbol];
-  if (!check) return true; // no check = accept
+  if (!check) return true;
   return price >= check.min && price <= check.max;
 }
 
@@ -138,21 +136,15 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
 
   for (const symbol of symbolsToTry) {
     if (result) break;
-
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo&_t=${Date.now()}`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
-      });
+      const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
       if (res.ok) {
         const data = await res.json();
         const raw = data?.chart?.result?.[0];
         const meta = raw?.meta;
         if (meta?.regularMarketPrice && meta.regularMarketPrice > 0) {
-          if (!passesSanityCheck(symbol, meta.regularMarketPrice)) {
-            console.warn(`direct-profit SANITY FAIL ${symbol}: got ${meta.regularMarketPrice}, rejecting`);
-            continue;
-          }
+          if (!passesSanityCheck(symbol, meta.regularMarketPrice)) continue;
           result = {
             currentPrice: meta.regularMarketPrice,
             prevClose: meta.chartPreviousClose || meta.previousClose || 0,
@@ -165,30 +157,20 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
             closes: (raw?.indicators?.quote?.[0]?.close || []).filter((v: any) => v != null),
             volumes: (raw?.indicators?.quote?.[0]?.volume || []).filter((v: any) => v != null),
           };
-          console.log(`direct-profit ✓ ${symbol} via v8: ${result.currency} ${result.currentPrice}`);
           break;
         }
-      } else {
-        await res.text();
-      }
-    } catch {
-      // continue to next fallback
-    }
+      } else { await res.text(); }
+    } catch { /* next */ }
 
     try {
       const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
-      });
+      const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
       if (res.ok) {
         const data = await res.json();
         const pm = data?.quoteSummary?.result?.[0]?.price;
         const p = pm?.regularMarketPrice?.raw;
         if (p && p > 0) {
-          if (!passesSanityCheck(symbol, p)) {
-            console.warn(`direct-profit SANITY FAIL ${symbol}: got ${p}, rejecting`);
-            continue;
-          }
+          if (!passesSanityCheck(symbol, p)) continue;
           result = {
             currentPrice: p,
             prevClose: pm?.regularMarketPreviousClose?.raw || 0,
@@ -201,15 +183,10 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
             closes: [],
             volumes: [],
           };
-          console.log(`direct-profit ✓ ${symbol} via v10: ${result.currency} ${result.currentPrice}`);
           break;
         }
-      } else {
-        await res.text();
-      }
-    } catch {
-      // continue to next fallback
-    }
+      } else { await res.text(); }
+    } catch { /* next */ }
   }
 
   if (!result) {
@@ -228,12 +205,10 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
           closes: [],
           volumes: [],
         };
-        console.log(`direct-profit ✓ ${symbol} via Alpha Vantage: ${result.currency} ${result.currentPrice}`);
         break;
       }
     }
   }
-
   return result;
 }
 
@@ -241,14 +216,38 @@ async function fetchVIX(): Promise<number> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d&_t=${Date.now()}`;
     const res = await fetch(url, { headers: { "User-Agent": UA } });
-    if (!res.ok) {
-      await res.text();
-      return 0;
-    }
+    if (!res.ok) { await res.text(); return 0; }
     const data = await res.json();
     return data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+  } catch { return 0; }
+}
+
+async function fetchRecentNews(ticker: string): Promise<string[]> {
+  try {
+    const cleanTicker = ticker.replace(/\.(NS|BO)$/i, "");
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(cleanTicker + " stock")}&hl=en&gl=US&ceid=US:en`;
+    const res = await fetch(url, { headers: { "User-Agent": UA } });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const titles: string[] = [];
+    const matches = xml.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g);
+    for (const m of matches) {
+      if (titles.length >= 5) break;
+      const t = m[1].trim();
+      if (t && !t.startsWith("Google News") && t.length > 10) titles.push(t);
+    }
+    // Fallback: plain <title>
+    if (titles.length === 0) {
+      const plainMatches = xml.matchAll(/<title>(.*?)<\/title>/g);
+      for (const m of plainMatches) {
+        if (titles.length >= 5) break;
+        const t = m[1].trim();
+        if (t && !t.startsWith("Google News") && t.length > 10) titles.push(t);
+      }
+    }
+    return titles;
   } catch {
-    return 0;
+    return [];
   }
 }
 
@@ -296,6 +295,170 @@ function computeTechnicals(snap: MarketSnapshot): TechnicalSnapshot {
   };
 }
 
+/** Compute VaR, CVaR, Sharpe, Sortino, Max Drawdown, Kelly from historical closes */
+function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: number): RiskMetrics {
+  const closes = snap.closes;
+  const returns: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0) returns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+
+  if (returns.length < 3) {
+    // Not enough data — estimate from annualized vol
+    const dailyVol = tech.annualizedVol / (Math.sqrt(252) * 100) || 0.015;
+    const notional = snap.currentPrice;
+    return {
+      var95: roundPrice(notional * dailyVol * 1.645),
+      cvar95: roundPrice(notional * dailyVol * 2.063),
+      var99: roundPrice(notional * dailyVol * 2.326),
+      sharpeRatio: 0,
+      sortinoRatio: 0,
+      maxDrawdown: 0,
+      betaEstimate: 1,
+      kellyFraction: 0,
+    };
+  }
+
+  const sorted = [...returns].sort((a, b) => a - b);
+  const n = sorted.length;
+
+  // VaR: percentile of losses
+  const idx95 = Math.max(0, Math.floor(n * 0.05) - 1);
+  const idx99 = Math.max(0, Math.floor(n * 0.01) - 1);
+  const var95Pct = Math.abs(sorted[idx95]);
+  const var99Pct = Math.abs(sorted[idx99]);
+
+  // CVaR: average of returns below VaR threshold
+  const tailCount = Math.max(1, Math.ceil(n * 0.05));
+  const tailSum = sorted.slice(0, tailCount).reduce((s, v) => s + v, 0);
+  const cvar95Pct = Math.abs(tailSum / tailCount);
+
+  const notional = snap.currentPrice;
+
+  // Sharpe ratio (annualized, risk-free ≈ 4.5%)
+  const meanReturn = returns.reduce((s, v) => s + v, 0) / n;
+  const stdDev = Math.sqrt(returns.reduce((s, v) => s + (v - meanReturn) ** 2, 0) / n);
+  const annualReturn = meanReturn * 252;
+  const annualStd = stdDev * Math.sqrt(252);
+  const riskFreeRate = 0.045;
+  const sharpeRatio = annualStd > 0 ? Number(((annualReturn - riskFreeRate) / annualStd).toFixed(2)) : 0;
+
+  // Sortino ratio (downside deviation only)
+  const negReturns = returns.filter(r => r < 0);
+  const downsideVar = negReturns.length > 0
+    ? negReturns.reduce((s, v) => s + v ** 2, 0) / negReturns.length
+    : 0;
+  const downsideDev = Math.sqrt(downsideVar) * Math.sqrt(252);
+  const sortinoRatio = downsideDev > 0 ? Number(((annualReturn - riskFreeRate) / downsideDev).toFixed(2)) : 0;
+
+  // Max drawdown from closes
+  let peak = closes[0];
+  let maxDD = 0;
+  for (const p of closes) {
+    if (p > peak) peak = p;
+    const dd = (peak - p) / peak;
+    if (dd > maxDD) maxDD = dd;
+  }
+
+  // Beta estimate from VIX proxy
+  const betaEstimate = vix > 0
+    ? Number(clamp(1 + (tech.annualizedVol - 20) / 40, 0.3, 2.5).toFixed(2))
+    : 1;
+
+  // Kelly fraction: f* = (p*b - q) / b  where p=win rate, b=avg win/avg loss
+  const wins = returns.filter(r => r > 0);
+  const losses = returns.filter(r => r < 0);
+  const winRate = wins.length / Math.max(n, 1);
+  const avgWin = wins.length > 0 ? wins.reduce((s, v) => s + v, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 1;
+  const b = avgLoss > 0 ? avgWin / avgLoss : 1;
+  const kellyFraction = b > 0 ? Number(clamp((winRate * b - (1 - winRate)) / b, 0, 0.5).toFixed(2)) : 0;
+
+  return {
+    var95: roundPrice(notional * var95Pct),
+    cvar95: roundPrice(notional * cvar95Pct),
+    var99: roundPrice(notional * var99Pct),
+    sharpeRatio,
+    sortinoRatio,
+    maxDrawdown: Number((maxDD * 100).toFixed(2)),
+    betaEstimate,
+    kellyFraction,
+  };
+}
+
+/** Detect CLANK-style structural constraints from market data */
+function detectClankSignals(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: number): ClankSignal[] {
+  const signals: ClankSignal[] = [];
+
+  // Volatility Control Fund trigger
+  if (tech.annualizedVol > 35 || vix > 25) {
+    signals.push({
+      id: "vol-control",
+      label: "Volatility Control Fund Trigger",
+      active: true,
+      severity: vix > 30 || tech.annualizedVol > 50 ? "CRITICAL" : "HIGH",
+      description: `Annualized vol ${tech.annualizedVol}% + VIX ${vix > 0 ? vix.toFixed(1) : "N/A"} → forced deleveraging likely`,
+    });
+  }
+
+  // CTA Trend Trigger
+  if (Math.abs(tech.momentumScore) >= 3) {
+    signals.push({
+      id: "cta-trend",
+      label: "CTA Trend-Following Signal",
+      active: true,
+      severity: "MEDIUM",
+      description: `Momentum ${tech.momentumScore}/3 → systematic trend funds likely ${tech.momentumScore > 0 ? "adding" : "reducing"} exposure`,
+    });
+  }
+
+  // Gamma Squeeze / Dealer Gamma Flip
+  if (tech.volumeRatio > 2.0 && Math.abs(tech.changePct) > 3) {
+    signals.push({
+      id: "gamma-squeeze",
+      label: "Dealer Gamma Dislocation",
+      active: true,
+      severity: "HIGH",
+      description: `Volume ${tech.volumeRatio.toFixed(1)}x avg with ${tech.changePct}% move → potential gamma squeeze / pin risk`,
+    });
+  }
+
+  // Mean Reversion Extreme
+  if (Math.abs(tech.zScore) > 2.0) {
+    signals.push({
+      id: "mean-reversion",
+      label: "Extreme Mean Reversion Zone",
+      active: true,
+      severity: "HIGH",
+      description: `Z-score ${tech.zScore} → ${tech.zScore > 0 ? "severely overbought" : "severely oversold"}, institutional rebalancing probable`,
+    });
+  }
+
+  // 52-Week Extremes (index rebalancing risk)
+  if (tech.posIn52w > 95 || tech.posIn52w < 5) {
+    signals.push({
+      id: "52w-extreme",
+      label: "52-Week Range Extreme",
+      active: true,
+      severity: "MEDIUM",
+      description: `At ${tech.posIn52w.toFixed(0)}% of 52W range → index rebalancing or option hedging flows expected`,
+    });
+  }
+
+  // Liquidity Vacuum
+  if (tech.volumeRatio < 0.5) {
+    signals.push({
+      id: "liquidity-vacuum",
+      label: "Liquidity Vacuum Detected",
+      active: true,
+      severity: "MEDIUM",
+      description: `Volume only ${(tech.volumeRatio * 100).toFixed(0)}% of average → thin book, outsized moves possible`,
+    });
+  }
+
+  return signals;
+}
+
 function deriveVolatilityRegime(annualizedVol: number): "LOW" | "NORMAL" | "HIGH" {
   if (annualizedVol >= 45) return "HIGH";
   if (annualizedVol >= 18) return "NORMAL";
@@ -308,6 +471,9 @@ function buildDeterministicFallback(
   currency: string,
   market: string,
   vix: number,
+  riskMetrics: RiskMetrics,
+  clankSignals: ClankSignal[],
+  newsHeadlines: string[],
 ) {
   const bullishSignals: string[] = [];
   const bearishSignals: string[] = [];
@@ -326,6 +492,10 @@ function buildDeterministicFallback(
   }
   if (tech.volumeRatio < 0.75) bearishSignals.push("thin participation");
   if (vix >= 25) bearishSignals.push("risk-off backdrop");
+
+  // CLANK-derived signals
+  const criticalClank = clankSignals.filter(s => s.severity === "CRITICAL");
+  if (criticalClank.length > 0) bearishSignals.push("structural constraint active");
 
   const bullScore = bullishSignals.length;
   const bearScore = bearishSignals.length;
@@ -409,52 +579,48 @@ function buildDeterministicFallback(
     quantScore,
     volatilityRegime,
     riskRewardRatio: action === "WAIT" ? 0 : Number(Math.abs(riskRewardRatio).toFixed(2)),
+    riskMetrics,
+    clankSignals,
+    newsHeadlines: newsHeadlines.slice(0, 5),
   };
 }
 
-function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number) {
+function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number, riskMetrics: RiskMetrics, clankSignals: ClankSignal[], newsHeadlines: string[]) {
   const action = ["BUY", "SELL", "WAIT"].includes(best?.action) ? best.action : "WAIT";
   const realPrice = roundPrice(snap.currentPrice);
   const volatilityRegime = ["LOW", "NORMAL", "HIGH"].includes(best?.volatilityRegime)
     ? best.volatilityRegime
     : deriveVolatilityRegime(tech.annualizedVol);
 
-  // --- Data-driven confidence floor based on REAL technical signals ---
   const aiConfidence = Math.round(Number(best?.confidence) || 50);
   
-  // Calculate signal-derived confidence floor
-  let signalFloor = 40; // base floor
+  let signalFloor = 40;
   if (action !== "WAIT") {
     const absMomentum = Math.abs(tech.momentumScore);
     const absZ = Math.abs(tech.zScore);
     const volConfirm = tech.volumeRatio >= 1.1;
     
-    // Strong momentum alignment = higher floor
     if (absMomentum >= 3) signalFloor = 68;
     else if (absMomentum >= 2) signalFloor = 58;
     else if (absMomentum >= 1) signalFloor = 48;
     
-    // Mean reversion signal boosts floor
     if (absZ >= 1.5) signalFloor += 8;
     else if (absZ >= 0.8) signalFloor += 4;
-    
-    // Volume confirmation
     if (volConfirm) signalFloor += 5;
-    
-    // Low VIX environment = slightly more confidence
     if (tech.annualizedVol < 20) signalFloor += 3;
-    
-    // Penalize high vol regime
     if (tech.annualizedVol > 45) signalFloor -= 8;
+
+    // CLANK penalty: active critical constraints reduce confidence
+    const critCount = clankSignals.filter(s => s.severity === "CRITICAL").length;
+    const highCount = clankSignals.filter(s => s.severity === "HIGH").length;
+    signalFloor -= critCount * 6 + highCount * 3;
   } else {
-    signalFloor = 30; // WAIT should still show meaningful confidence
+    signalFloor = 30;
   }
   
-  // Use the HIGHER of AI confidence and signal-derived floor
   let confidence = Math.max(aiConfidence, signalFloor);
   confidence = clamp(confidence, action === "WAIT" ? 25 : 35, 92);
   
-  // Multi-provider consensus adjustments
   if (parsedCount > 1) {
     if (consensusCount === parsedCount) confidence = clamp(confidence + 5, 25, 92);
     else if (consensusCount > parsedCount / 2) confidence = clamp(confidence + 3, 25, 92);
@@ -517,6 +683,9 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     volatilityRegime,
     riskRewardRatio: action === "WAIT" ? 0 : Number(Math.abs(riskRewardRatio).toFixed(2)),
     providersUsed: parsedCount,
+    riskMetrics,
+    clankSignals,
+    newsHeadlines: newsHeadlines.slice(0, 5),
   };
 
   if (parsedCount > 1) {
@@ -544,9 +713,10 @@ Deno.serve(async (req) => {
     const isIndian = indiaMode === true || isIndianTicker(resolvedTicker);
     const market = isIndian ? "India (NSE/BSE)" : "US/Global";
 
-    const [snap, vix] = await Promise.all([
+    const [snap, vix, newsHeadlines] = await Promise.all([
       fetchFullSnapshot(resolvedTicker, isIndian),
       fetchVIX(),
+      fetchRecentNews(resolvedTicker),
     ]);
 
     if (!snap || snap.currentPrice <= 0) {
@@ -560,17 +730,29 @@ Deno.serve(async (req) => {
 
     const currency = snap.currency || (isIndian ? "INR" : "USD");
     const currencySymbol = getCurrencySymbol(currency);
-
     const tech = computeTechnicals(snap);
-    console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix}`);
+    const riskMetrics = computeRiskMetrics(snap, tech, vix);
+    const clankSignals = detectClankSignals(snap, tech, vix);
+
+    console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix} | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 
     const quantContext = isIndian
       ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- Protection can reference NIFTY PUTs or Gold BEES when relevant`
       : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- Protection should stay aligned to the asset's quoted currency when possible`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, so the output must be ultra-simple for the user, but the reasoning must still use full institutional logic.\n\nYou have REAL market data below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and macro backdrop\n3. Support/resistance and position within 52-week range\n4. Volume conviction\n5. Mean reversion from 20-day average\n6. Risk/reward versus stop distance\n7. Use WAIT only when signals genuinely conflict\n\nConfidence calibration (CRITICAL):\n- confidence represents how aligned the signals are, NOT how certain the future is\n- Momentum 3/3 with volume confirmation = confidence 65-80\n- Momentum 2/3 with supporting z-score = confidence 50-65\n- Mixed signals with 1 clear edge = confidence 40-55\n- Genuinely conflicting signals = WAIT at confidence 30-45\n- NEVER return confidence below 35 for a BUY or SELL action\n- BUY/SELL only with a clear edge and executable protection\n- Keep directionReason under 8 words\n- ALL prices MUST remain in the provided currency\n\n${quantContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string,\n  "positiveNews": string,\n  "negativeNews": string,\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+    const clankContext = clankSignals.length > 0
+      ? `\n\nACTIVE STRUCTURAL CONSTRAINTS (CLANK Engine):\n${clankSignals.map(s => `- [${s.severity}] ${s.label}: ${s.description}`).join("\n")}\nFactor these institutional flow constraints into your confidence and action.`
+      : "";
 
-    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nProduce a complete, executable trade decision. Keep it simple for the user, but grounded in the data above.`;
+    const newsContext = newsHeadlines.length > 0
+      ? `\n\nRECENT NEWS HEADLINES:\n${newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}\nIncorporate sentiment from these headlines into positiveNews/negativeNews fields.`
+      : "";
+
+    const riskContext = `\n\nQUANTITATIVE RISK METRICS (computed from real returns):\n- 1-Day VaR (95%): ${currencySymbol}${riskMetrics.var95} per share\n- 1-Day CVaR (95%): ${currencySymbol}${riskMetrics.cvar95} per share\n- 1-Day VaR (99%): ${currencySymbol}${riskMetrics.var99} per share\n- Sharpe Ratio (annualized): ${riskMetrics.sharpeRatio}\n- Sortino Ratio: ${riskMetrics.sortinoRatio}\n- Max Drawdown (30D): ${riskMetrics.maxDrawdown}%\n- Beta Estimate: ${riskMetrics.betaEstimate}\n- Kelly Fraction: ${riskMetrics.kellyFraction}\nUse these to calibrate your confidence level — low Sharpe + high VaR = lower confidence, etc.`;
+
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode — output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment — high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality — negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints — active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\n${quantContext}${clankContext}${newsContext}${riskContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string,\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+
+    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nRISK METRICS:\n- VaR 95%: ${currencySymbol}${riskMetrics.var95}/share | CVaR 95%: ${currencySymbol}${riskMetrics.cvar95}/share\n- VaR 99%: ${currencySymbol}${riskMetrics.var99}/share\n- Sharpe: ${riskMetrics.sharpeRatio} | Sortino: ${riskMetrics.sortinoRatio}\n- Max DD: ${riskMetrics.maxDrawdown}% | Beta: ${riskMetrics.betaEstimate}\n- Kelly: ${riskMetrics.kellyFraction}\n\n${clankSignals.length > 0 ? "STRUCTURAL CONSTRAINTS:\n" + clankSignals.map(s => `[${s.severity}] ${s.label}`).join("\n") : "No active structural constraints."}\n\n${newsHeadlines.length > 0 ? "RECENT NEWS:\n" + newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n") : "No recent headlines available."}\n\nProduce a complete, executable trade decision grounded in ALL the data above.`;
 
     const results = await callAIParallel({
       systemPrompt,
@@ -584,9 +766,7 @@ Deno.serve(async (req) => {
     for (const result of results) {
       try {
         let obj: any;
-        try {
-          obj = JSON.parse(result.text);
-        } catch {
+        try { obj = JSON.parse(result.text); } catch {
           const match = result.text.match(/\{[\s\S]*\}/);
           if (match) obj = JSON.parse(match[0]);
         }
@@ -606,7 +786,7 @@ Deno.serve(async (req) => {
     if (parsed.length === 0) {
       console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
       output = {
-        ...buildDeterministicFallback(snap, tech, currency, market, vix),
+        ...buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines),
         fallback: true,
       };
     } else {
@@ -634,10 +814,10 @@ Deno.serve(async (req) => {
             .sort((a, b) => b._score - a._score)[0]
         : scored.sort((a, b) => b._score - a._score)[0];
 
-      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount);
+      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines);
     }
 
-    console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%)`);
+    console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%) | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 
     return new Response(JSON.stringify(output), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

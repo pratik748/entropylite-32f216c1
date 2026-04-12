@@ -18,6 +18,8 @@ import {
   Briefcase,
   AlertTriangle,
   RefreshCw,
+  Gauge,
+  Newspaper,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,25 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 import { cleanAIText } from "@/lib/utils";
+
+interface RiskMetrics {
+  var95: number;
+  cvar95: number;
+  var99: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  betaEstimate: number;
+  kellyFraction: number;
+}
+
+interface ClankSignal {
+  id: string;
+  label: string;
+  active: boolean;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  description: string;
+}
 
 interface TradeResult {
   action: "BUY" | "SELL" | "WAIT";
@@ -48,6 +69,9 @@ interface TradeResult {
   providersUsed?: number;
   consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
   fallback?: boolean;
+  riskMetrics?: RiskMetrics;
+  clankSignals?: ClankSignal[];
+  newsHeadlines?: string[];
 }
 
 interface PortfolioItem {
@@ -62,15 +86,13 @@ interface PortfolioItem {
 }
 
 const STORAGE_KEY = "dp-portfolio";
-const ANALYSIS_TIMEOUT_MS = 20000;
+const ANALYSIS_TIMEOUT_MS = 25000;
 
 function loadPortfolio(): PortfolioItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 function savePortfolio(items: PortfolioItem[]) {
@@ -116,6 +138,9 @@ function normalizeTradeResult(value: any): TradeResult | null {
     providersUsed: value.providersUsed !== undefined ? Math.max(0, Math.round(normalizeNumber(value.providersUsed))) : undefined,
     consensus: ["UNANIMOUS", "MAJORITY", "SPLIT"].includes(value.consensus) ? value.consensus : undefined,
     fallback: Boolean(value.fallback),
+    riskMetrics: value.riskMetrics || undefined,
+    clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
+    newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
   };
 }
 
@@ -136,11 +161,8 @@ const DirectProfitMode = () => {
   const portfolioTickersRef = useRef<string[]>([]);
   const { indiaMode, baseCurrency, convertToBase } = useFX();
 
-  useEffect(() => {
-    savePortfolio(portfolio);
-  }, [portfolio]);
+  useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
-  // Keep portfolio tickers ref in sync (avoids re-creating interval on every price update)
   useEffect(() => {
     portfolioTickersRef.current = portfolio.map((p) => p.ticker);
   }, [portfolio]);
@@ -148,7 +170,6 @@ const DirectProfitMode = () => {
   // Live price refresh for the currently-analyzed stock
   useEffect(() => {
     if (!activeTicker || loading) return;
-
     const refreshActivePrice = async () => {
       try {
         const { data } = await governedInvoke<{ prices: Record<string, { price: number; currency: string }> }>(
@@ -163,7 +184,6 @@ const DirectProfitMode = () => {
         }
       } catch {}
     };
-
     refreshActivePrice();
     const interval = setInterval(refreshActivePrice, 10_000);
     return () => clearInterval(interval);
@@ -179,7 +199,6 @@ const DirectProfitMode = () => {
   // Live price refresh for portfolio items every 15 seconds
   useEffect(() => {
     if (portfolio.length === 0) return;
-
     const refreshPrices = async () => {
       const tickers = portfolio.map((p) => p.ticker);
       try {
@@ -201,16 +220,12 @@ const DirectProfitMode = () => {
             return changed ? updated : prev;
           });
         }
-      } catch (err) {
-        console.warn("Portfolio price refresh failed:", err);
-      }
+      } catch (err) { console.warn("Portfolio price refresh failed:", err); }
     };
-
-    // Refresh immediately on mount / portfolio change
     refreshPrices();
     const interval = setInterval(refreshPrices, 15_000);
     return () => clearInterval(interval);
-  }, [portfolio.length]); // only re-setup when count changes, not on every price update
+  }, [portfolio.length]);
 
   const analyze = useCallback(async (inputTicker: string) => {
     const trimmed = inputTicker.trim();
@@ -244,9 +259,7 @@ const DirectProfitMode = () => {
       if (error) throw error;
 
       const normalized = normalizeTradeResult(data);
-      if (!normalized) {
-        throw new Error("Direct Profit returned an incomplete trade plan. Please retry.");
-      }
+      if (!normalized) throw new Error("Direct Profit returned an incomplete trade plan. Please retry.");
 
       setResult(normalized);
       setLivePrice(normalized.currentPrice > 0 ? normalized.currentPrice : null);
@@ -258,15 +271,10 @@ const DirectProfitMode = () => {
         : "Could not analyze this asset right now. Please try again.";
       console.error("Direct profit error:", err);
       setErrorMessage(message);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [indiaMode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    analyze(ticker);
-  };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
 
   const retryAnalysis = () => {
     const retryTicker = ticker.trim() || activeTicker;
@@ -277,7 +285,6 @@ const DirectProfitMode = () => {
     if (!result || !activeTicker || result.action === "WAIT") return;
     const exists = portfolio.some((p) => p.ticker === activeTicker);
     if (exists) return;
-
     const item: PortfolioItem = {
       ticker: activeTicker,
       action: result.action,
@@ -288,7 +295,6 @@ const DirectProfitMode = () => {
       currency: resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD"),
       addedAt: Date.now(),
     };
-
     setPortfolio((prev) => [item, ...prev]);
     setAdded(true);
   };
@@ -298,39 +304,22 @@ const DirectProfitMode = () => {
   };
 
   const toggleVoice = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
-
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      setErrorMessage("Voice input is not supported in this browser.");
-      return;
-    }
-
+    if (!SR) { setErrorMessage("Voice input is not supported in this browser."); return; }
     const recognition = new SR();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.lang = indiaMode ? "hi-IN" : "en-US";
-
     recognition.onresult = (e: any) => {
       const transcript = e.results?.[0]?.[0]?.transcript?.trim();
-      if (!transcript) {
-        setErrorMessage("Could not hear the symbol clearly. Please try again.");
-        setListening(false);
-        return;
-      }
+      if (!transcript) { setErrorMessage("Could not hear the symbol clearly. Please try again."); setListening(false); return; }
       setTicker(transcript);
       setListening(false);
       analyze(transcript);
     };
-    recognition.onerror = () => {
-      setListening(false);
-      setErrorMessage("Voice input failed. Please type the asset instead.");
-    };
+    recognition.onerror = () => { setListening(false); setErrorMessage("Voice input failed. Please type the asset instead."); };
     recognition.onend = () => setListening(false);
     recognitionRef.current = recognition;
     recognition.start();
@@ -340,43 +329,25 @@ const DirectProfitMode = () => {
   const speakResult = () => {
     if (!result || speaking) return;
     const synth = window.speechSynthesis;
-    if (!synth) {
-      setErrorMessage("Read aloud is not supported in this browser.");
-      return;
-    }
-
+    if (!synth) { setErrorMessage("Read aloud is not supported in this browser."); return; }
     synth.cancel();
     const speechCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD");
-    const cs = getCurrencySymbol(speechCurrency);
+    const cSym = getCurrencySymbol(speechCurrency);
     let text = "";
-
     if (indiaMode) {
-      if (result.action === "BUY") {
-        text = `खरीदें, ${cs}${result.entryLow} से ${cs}${result.entryHigh} के बीच। लक्ष्य ${cs}${result.targetPrice}। ${cs}${result.stopLoss} से नीचे जाएं तो बाहर निकलें। समय सीमा: ${result.timeframe}।`;
-      } else if (result.action === "SELL") {
-        text = `बेचें, ${cs}${result.entryLow} से ${cs}${result.entryHigh} के बीच। लक्ष्य ${cs}${result.targetPrice}। स्टॉप लॉस ${cs}${result.stopLoss}। समय सीमा: ${result.timeframe}।`;
-      } else {
-        text = `रुकें। संकेत मिश्रित हैं। विश्वास स्तर ${result.confidence} प्रतिशत है। ${result.directionReason}।`;
-      }
+      if (result.action === "BUY") text = `खरीदें, ${cSym}${result.entryLow} से ${cSym}${result.entryHigh} के बीच। लक्ष्य ${cSym}${result.targetPrice}। ${cSym}${result.stopLoss} से नीचे जाएं तो बाहर निकलें। समय सीमा: ${result.timeframe}।`;
+      else if (result.action === "SELL") text = `बेचें, ${cSym}${result.entryLow} से ${cSym}${result.entryHigh} के बीच। लक्ष्य ${cSym}${result.targetPrice}। स्टॉप लॉस ${cSym}${result.stopLoss}। समय सीमा: ${result.timeframe}।`;
+      else text = `रुकें। संकेत मिश्रित हैं। विश्वास स्तर ${result.confidence} प्रतिशत है। ${result.directionReason}।`;
     } else {
-      if (result.action === "BUY") {
-        text = `Buy between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Exit below ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
-      } else if (result.action === "SELL") {
-        text = `Sell between ${cs}${result.entryLow} and ${cs}${result.entryHigh}. Target ${cs}${result.targetPrice}. Stop at ${cs}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
-      } else {
-        text = `Wait. Signals are mixed. Confidence is ${result.confidence} percent. ${result.directionReason}.`;
-      }
+      if (result.action === "BUY") text = `Buy between ${cSym}${result.entryLow} and ${cSym}${result.entryHigh}. Target ${cSym}${result.targetPrice}. Exit below ${cSym}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+      else if (result.action === "SELL") text = `Sell between ${cSym}${result.entryLow} and ${cSym}${result.entryHigh}. Target ${cSym}${result.targetPrice}. Stop at ${cSym}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+      else text = `Wait. Signals are mixed. Confidence is ${result.confidence} percent. ${result.directionReason}.`;
     }
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = indiaMode ? "hi-IN" : "en-US";
     utterance.rate = 0.95;
     utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => {
-      setSpeaking(false);
-      setErrorMessage("Read aloud failed. Please try again.");
-    };
-
+    utterance.onerror = () => { setSpeaking(false); setErrorMessage("Read aloud failed. Please try again."); };
     setSpeaking(true);
     synth.speak(utterance);
   };
@@ -393,11 +364,9 @@ const DirectProfitMode = () => {
       : <Minus className="h-5 w-5 text-muted-foreground" />;
 
   const alreadyInPortfolio = result ? portfolio.some((p) => p.ticker === activeTicker) : false;
-
   const displayedActivePrice = livePrice ?? result?.currentPrice ?? 0;
   const convertedActivePrice = result && activeCurrency !== baseCurrency
-    ? convertToBase(displayedActivePrice, activeCurrency)
-    : null;
+    ? convertToBase(displayedActivePrice, activeCurrency) : null;
 
   const totalInvestedBase = portfolio.reduce((sum, p) => sum + convertToBase(p.entryPrice, p.currency), 0);
   const totalPnl = portfolio.reduce((sum, p) => {
@@ -405,6 +374,10 @@ const DirectProfitMode = () => {
     return sum + convertToBase(diff, p.currency);
   }, 0);
   const totalPnlPct = totalInvestedBase > 0 ? (totalPnl / totalInvestedBase) * 100 : 0;
+
+  const rm = result?.riskMetrics;
+  const clank = result?.clankSignals?.filter(s => s.active) || [];
+  const news = result?.newsHeadlines || [];
 
   return (
     <div className="h-full overflow-auto p-4">
@@ -459,8 +432,7 @@ const DirectProfitMode = () => {
               <p>{errorMessage}</p>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={retryAnalysis} disabled={!ticker.trim() && !activeTicker}>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Retry
+                  <RefreshCw className="h-3.5 w-3.5" /> Retry
                 </Button>
               </div>
             </AlertDescription>
@@ -472,20 +444,19 @@ const DirectProfitMode = () => {
             <div className="h-16 bg-muted/30 rounded-lg" />
             <div className="h-24 bg-muted/30 rounded-lg" />
             <div className="h-12 bg-muted/30 rounded-lg" />
+            <div className="h-20 bg-muted/30 rounded-lg" />
           </div>
         )}
 
         {result && !loading && (
           <div className="glass-panel rounded-xl overflow-hidden animate-fade-in">
+            {/* Action Header */}
             <div className={`border-b ${actionBg} p-5 text-center`}>
-              <div className={`text-4xl font-black tracking-tight ${actionColor}`}>
-                {result.action}
-              </div>
+              <div className={`text-4xl font-black tracking-tight ${actionColor}`}>{result.action}</div>
               <div className="mt-1 text-sm text-muted-foreground">
                 {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence — {" "}
                 <span className="font-bold text-foreground">{result.confidence}%</span>
               </div>
-              {/* Live price ticker */}
               <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
                 <span className="font-mono font-semibold text-foreground">
@@ -495,9 +466,7 @@ const DirectProfitMode = () => {
                   <span className="text-[10px]">≈ {formatCurrency(convertedActivePrice, baseCurrency)}</span>
                 )}
                 {lastPriceUpdate > 0 && (
-                  <span className="text-[10px]">
-                    updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago
-                  </span>
+                  <span className="text-[10px]">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</span>
                 )}
               </div>
               {result.fallback && (
@@ -507,6 +476,7 @@ const DirectProfitMode = () => {
               )}
             </div>
 
+            {/* Trade Plan */}
             <div className="border-b border-border p-4 space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
@@ -532,6 +502,82 @@ const DirectProfitMode = () => {
               </div>
             </div>
 
+            {/* Risk Metrics Panel */}
+            {rm && (
+              <div className="border-b border-border p-4 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+                  <Gauge className="h-3.5 w-3.5 text-primary" />
+                  Risk Intelligence
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.var95}</div>
+                    <div className="text-[9px] text-muted-foreground">VaR 95%</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.cvar95}</div>
+                    <div className="text-[9px] text-muted-foreground">CVaR 95%</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-sm font-bold font-mono ${rm.sharpeRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sharpeRatio}</div>
+                    <div className="text-[9px] text-muted-foreground">Sharpe</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-sm font-bold font-mono ${rm.sortinoRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sortinoRatio}</div>
+                    <div className="text-[9px] text-muted-foreground">Sortino</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  <div className="text-center">
+                    <div className="text-sm font-bold font-mono text-loss">{rm.maxDrawdown}%</div>
+                    <div className="text-[9px] text-muted-foreground">Max DD</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold font-mono text-foreground">{rm.betaEstimate}</div>
+                    <div className="text-[9px] text-muted-foreground">Beta</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.var99}</div>
+                    <div className="text-[9px] text-muted-foreground">VaR 99%</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-sm font-bold font-mono ${rm.kellyFraction > 0 ? "text-gain" : "text-muted-foreground"}`}>{(rm.kellyFraction * 100).toFixed(0)}%</div>
+                    <div className="text-[9px] text-muted-foreground">Kelly</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CLANK Structural Alerts */}
+            {clank.length > 0 && (
+              <div className="border-b border-border p-4 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+                  <AlertTriangle className="h-3.5 w-3.5 text-loss" />
+                  Structural Constraints (CLANK)
+                </div>
+                <div className="space-y-1.5">
+                  {clank.map((s) => (
+                    <div key={s.id} className={`rounded-lg px-3 py-2 text-xs border ${
+                      s.severity === "CRITICAL" ? "border-loss/40 bg-loss/5" :
+                      s.severity === "HIGH" ? "border-loss/25 bg-loss/5" :
+                      "border-border bg-muted/10"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          s.severity === "CRITICAL" ? "bg-loss/20 text-loss" :
+                          s.severity === "HIGH" ? "bg-loss/15 text-loss" :
+                          "bg-muted/30 text-muted-foreground"
+                        }`}>{s.severity}</span>
+                        <span className="font-semibold text-foreground">{s.label}</span>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">{s.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Protection */}
             <div className="border-b border-border p-4">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 <Shield className="h-3.5 w-3.5 text-primary" />
@@ -540,6 +586,7 @@ const DirectProfitMode = () => {
               <p className="text-sm text-muted-foreground">{result.protection}</p>
             </div>
 
+            {/* Direction */}
             <div className="border-b border-border p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
@@ -550,6 +597,7 @@ const DirectProfitMode = () => {
               </div>
             </div>
 
+            {/* Quant Signals */}
             {(result.quantScore !== undefined || result.riskRewardRatio !== undefined) && (
               <div className="border-b border-border p-4 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -591,6 +639,25 @@ const DirectProfitMode = () => {
               </div>
             )}
 
+            {/* News Headlines */}
+            {news.length > 0 && (
+              <div className="border-b border-border p-4 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+                  <Newspaper className="h-3.5 w-3.5 text-primary" />
+                  Live News
+                </div>
+                <div className="space-y-1">
+                  {news.map((headline, i) => (
+                    <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                      <span className="text-primary font-mono shrink-0">{i + 1}.</span>
+                      <span>{headline}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* News Sentiment */}
             <div className="border-b border-border p-4 space-y-1.5">
               <div className="flex items-center gap-2 text-sm">
                 <span>🟢</span>
@@ -602,6 +669,7 @@ const DirectProfitMode = () => {
               </div>
             </div>
 
+            {/* Actions */}
             <div className="border-t border-border p-3 flex items-center justify-between">
               {result.action !== "WAIT" ? (
                 <Button
@@ -611,11 +679,7 @@ const DirectProfitMode = () => {
                   onClick={addToPortfolio}
                   className="text-xs h-8 gap-1.5"
                 >
-                  {added || alreadyInPortfolio ? (
-                    <>✓ Added</>
-                  ) : (
-                    <><Plus className="h-3.5 w-3.5" /> Add to Portfolio</>
-                  )}
+                  {added || alreadyInPortfolio ? <>✓ Added</> : <><Plus className="h-3.5 w-3.5" /> Add to Portfolio</>}
                 </Button>
               ) : <div />}
               <button
@@ -630,6 +694,7 @@ const DirectProfitMode = () => {
           </div>
         )}
 
+        {/* Portfolio */}
         {portfolio.length > 0 && (
           <div className="glass-panel rounded-xl overflow-hidden">
             <div className="p-4 border-b border-border">
@@ -690,10 +755,7 @@ const DirectProfitMode = () => {
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => removeFromPortfolio(item.ticker)}
-                        className="text-muted-foreground hover:text-loss transition-colors p-1"
-                      >
+                      <button onClick={() => removeFromPortfolio(item.ticker)} className="text-muted-foreground hover:text-loss transition-colors p-1">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
