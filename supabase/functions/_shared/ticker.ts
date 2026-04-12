@@ -169,6 +169,11 @@ export function normalizeTickerInput(rawTicker: string): string {
   let ticker = (rawTicker || "").trim().toUpperCase();
   if (!ticker) return "";
 
+  // Strip common noise words
+  ticker = ticker
+    .replace(/\b(LIMITED|LTD|INC|CORP|CORPORATION|COMPANY|CO|GROUP|INDUSTRIES|ENTERPRISE|ENTERPRISES)\b/g, "")
+    .trim();
+
   ticker = ticker
     .replace(/\.NSE$/, ".NS")
     .replace(/\.BSE$/, ".BO")
@@ -176,10 +181,21 @@ export function normalizeTickerInput(rawTicker: string): string {
     .replace(/^BSE\s*:\s*/i, "")
     .replace(/\s+/g, " ");
 
+  // Check global name aliases first (handles "Bitcoin", "Apple", "Gold", etc.)
+  const compactForGlobal = ticker.replace(/[^A-Z0-9]/g, "");
+  const globalMatch = GLOBAL_NAME_ALIASES[compactForGlobal];
+  if (globalMatch) return globalMatch;
+
   const exchange = /\.NS$/.test(ticker) ? "NS" : /\.BO$/.test(ticker) ? "BO" : null;
   const rawBase = ticker.replace(/\.(NS|BO)$/, "");
   const normalizedBase = normalizeIndianBase(rawBase);
   const looksIndian = Boolean(exchange) || KNOWN_INDIAN_BASE.has(normalizedBase);
+
+  // Also check if the compact form matches an Indian alias
+  const indianAliasMatch = INDIAN_ALIASES[compactForGlobal];
+  if (indianAliasMatch && !globalMatch) {
+    return `${indianAliasMatch}.${exchange || "NS"}`;
+  }
 
   if (looksIndian) {
     return `${normalizedBase}.${exchange || "NS"}`;
