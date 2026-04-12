@@ -136,7 +136,35 @@ const DirectProfitMode = () => {
     savePortfolio(portfolio);
   }, [portfolio]);
 
+  // Keep portfolio tickers ref in sync (avoids re-creating interval on every price update)
   useEffect(() => {
+    portfolioTickersRef.current = portfolio.map((p) => p.ticker);
+  }, [portfolio]);
+
+  // Live price refresh for the currently-analyzed stock
+  useEffect(() => {
+    if (!activeTicker || loading) return;
+
+    const refreshActivePrice = async () => {
+      try {
+        const { data } = await governedInvoke<{ prices: Record<string, { price: number; currency: string }> }>(
+          "price-feed",
+          { body: { tickers: [activeTicker] }, tier: "realtime", force: false }
+        );
+        const p = data?.prices?.[activeTicker] || data?.prices?.[activeTicker.toUpperCase()];
+        if (p && p.price > 0) {
+          setLivePrice(p.price);
+          setLastPriceUpdate(Date.now());
+        }
+      } catch {}
+    };
+
+    refreshActivePrice();
+    const interval = setInterval(refreshActivePrice, 10_000);
+    return () => clearInterval(interval);
+  }, [activeTicker, loading]);
+
+
     return () => {
       recognitionRef.current?.stop?.();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
