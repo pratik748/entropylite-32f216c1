@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import entropyLogo from "@/assets/entropy-logo-auth.jpeg";
 import authBg from "@/assets/auth-bg-horse.jpeg";
+import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -26,14 +27,23 @@ export default function AuthPage() {
         rel="stylesheet"
       />
 
-      {/* Background image with subtle blur for glass aesthetic */}
+      {/* Background image */}
       <img
         src={authBg}
         alt=""
         className="absolute inset-0 w-full h-full object-cover object-center"
       />
+      {/* Full Entropy logo as background watermark */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <img
+          src={entropyLogoFull}
+          alt=""
+          className="w-[70vw] max-w-[700px] opacity-10 select-none"
+          style={{ filter: "contrast(1.5)" }}
+        />
+      </div>
       {/* Light frosted overlay */}
-      <div className="absolute inset-0 bg-white/20" />
+      <div className="absolute inset-0 bg-white/10" />
 
       {/* Single centered card — everything in one block, no overlaps */}
       <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-sm border border-white/40 bg-white/30 backdrop-blur-2xl shadow-lg">
