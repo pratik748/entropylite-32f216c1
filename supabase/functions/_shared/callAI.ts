@@ -19,20 +19,6 @@ interface AIResult {
   provider: "cloudflare" | "mistral" | "openai";
   toolCall?: any;
 }
-  maxTokens?: number;
-  temperature?: number;
-  tools?: any[];
-  toolChoice?: any;
-  model?: string;
-  provider?: "gemini" | "cloudflare" | "mistral" | "openai";
-  jsonMode?: boolean;
-}
-
-interface AIResult {
-  text: string;
-  provider: "gemini" | "cloudflare" | "mistral" | "openai";
-  toolCall?: any;
-}
 
 function stripThinkingBlocks(text: string): string {
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
