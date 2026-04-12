@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import entropyLogo from "@/assets/entropy-logo-auth.jpeg";
-import authBg from "@/assets/auth-bg-horse.jpeg";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 
 export default function AuthPage() {
@@ -21,32 +20,23 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
-      {/* Load signature font */}
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Great+Vibes&display=swap"
         rel="stylesheet"
       />
 
-      {/* Background image */}
-      <img
-        src={authBg}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover object-center"
-      />
-      {/* Full Entropy logo as background watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* Full-screen Entropy logo as THE background */}
+      <div className="absolute inset-0 flex items-center justify-center bg-white">
         <img
           src={entropyLogoFull}
           alt=""
-          className="w-[70vw] max-w-[700px] opacity-10 select-none"
-          style={{ filter: "contrast(1.5)" }}
+          className="w-full h-full object-contain p-8 sm:p-16 select-none"
+          style={{ filter: "contrast(1.2)" }}
         />
       </div>
-      {/* Light frosted overlay */}
-      <div className="absolute inset-0 bg-white/10" />
 
-      {/* Single centered card — everything in one block, no overlaps */}
-      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-sm border border-white/40 bg-white/30 backdrop-blur-2xl shadow-lg">
+      {/* Frosted glass card */}
+      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-sm border border-black/10 bg-white/60 backdrop-blur-3xl shadow-2xl">
         <img
           src={entropyLogo}
           alt="Entropy"
