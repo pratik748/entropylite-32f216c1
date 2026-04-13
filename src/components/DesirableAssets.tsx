@@ -269,6 +269,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioSectors,
           portfolioValue: totalValue || 100000,
           baseCurrency,
+          indiaMode: baseCurrency === "INR",
           previousTickers: getPreviousTickers(),
           userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
           preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
