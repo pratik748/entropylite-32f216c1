@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, DollarSign } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
