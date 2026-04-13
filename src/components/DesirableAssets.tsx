@@ -399,6 +399,92 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       </div>
 
+      {/* Needs & Constraints Bar */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <button
+          onClick={() => setShowConstraints(!showConstraints)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
+          <span className="text-[10px] text-muted-foreground ml-1">
+            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
+              ? `${[budget ? `₹${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+              : "Set your preferences"}
+          </span>
+          <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
+        </button>
+
+        {showConstraints && (
+          <div className="space-y-3 pt-2 border-t border-border">
+            {/* Budget */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Budget</label>
+              <div className="relative">
+                <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="e.g. 50000"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  className="pl-8 h-8 text-sm bg-background"
+                />
+              </div>
+            </div>
+
+            {/* Asset Type */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Asset Type</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ASSET_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => toggleChip(selectedAssetTypes, setSelectedAssetTypes, type)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedAssetTypes.has(type)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sectors */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Sectors</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SECTORS.map((sector) => (
+                  <button
+                    key={sector}
+                    onClick={() => toggleChip(selectedSectors, setSelectedSectors, sector)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedSectors.has(sector)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Apply */}
+            <Button
+              size="sm"
+              onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}
+              className="w-full h-8 text-xs gap-1.5"
+            >
+              <Sparkles className="h-3 w-3" />
+              Find Assets
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Error Banner */}
       {error && recommendations.length === 0 && (
         <div className="rounded-xl border border-loss/20 bg-loss/5 p-4 flex items-center gap-3">
