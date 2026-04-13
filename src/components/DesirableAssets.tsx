@@ -406,7 +406,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
           <span className="text-[10px] text-muted-foreground ml-1">
             {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
-              ? `${[budget ? `₹${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
               : "Set your preferences"}
           </span>
           <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
