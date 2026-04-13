@@ -832,6 +832,9 @@ Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
 ${antiRepeatBlock}
 Home-market rule: ${homeMarketRule}
+${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
+${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
+${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
 
 Create 8-10 recommendations that prioritize:
 1) Positive earnings momentum + institutional participation
@@ -841,7 +844,7 @@ Create 8-10 recommendations that prioritize:
 5) Liquidity and execution quality
 
 Hard constraints:
-- Maximum 2 ETFs
+- Maximum 2 ETFs${preferredAssetTypes?.includes("ETFs") ? " (relaxed: up to 5 ETFs since user prefers ETFs)" : ""}
 - No penny stocks / meme stocks / niche illiquid names
 - No deteriorating fundamentals
 - Provide strategy diversity across at least 4 strategy types
