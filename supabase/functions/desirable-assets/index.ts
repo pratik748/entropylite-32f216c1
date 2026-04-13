@@ -844,7 +844,7 @@ Create 8-10 recommendations that prioritize:
 5) Liquidity and execution quality
 
 Hard constraints:
-- Maximum 2 ETFs${preferredAssetTypes?.includes("ETFs") ? " (relaxed: up to 5 ETFs since user prefers ETFs)" : ""}
+${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
 - No penny stocks / meme stocks / niche illiquid names
 - No deteriorating fundamentals
 - Provide strategy diversity across at least 4 strategy types
