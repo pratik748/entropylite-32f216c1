@@ -494,6 +494,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
+      {/* Initial state — no search yet */}
+      {!hasSearched && !loading && recommendations.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Target className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-medium text-foreground">Set your preferences above</p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Configure your budget, preferred asset types, and sectors, then click <strong>Find Assets</strong> to get tailored recommendations.
+          </p>
+        </div>
+      )}
+
       {/* Market Condition */}
       {marketCondition && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
