@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, DollarSign } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -406,7 +406,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
           <span className="text-[10px] text-muted-foreground ml-1">
             {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
-              ? `${[budget ? `₹${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
               : "Set your preferences"}
           </span>
           <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
@@ -418,7 +418,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Budget</label>
               <div className="relative">
-                <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">{getCurrencySymbol(baseCurrency)}</span>
                 <Input
                   type="text"
                   placeholder="e.g. 50000"
