@@ -390,7 +390,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
           <span className="text-[9px] font-mono text-muted-foreground">Cached 2h</span>
-          <Button size="sm" variant="ghost" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
+          <Button size="sm" variant="ghost" onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
