@@ -317,7 +317,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
  * Fire Cloudflare + Mistral in parallel (lighter), return all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Cloudflare + Mistral simultaneously");
+  console.log("callAIParallel → firing Cloudflare + Mistral + OpenAI simultaneously");
 
   const promises = [
     callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
@@ -328,14 +328,17 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       console.warn("callAIParallel → Mistral failed:", err.message || err);
       return null;
     }),
+    callOpenAI({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.05) }).then(r => ({ ...r, provider: "openai" as const })).catch((err) => {
+      console.warn("callAIParallel → OpenAI failed:", err.message || err);
+      return null;
+    }),
   ];
 
-  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 40000));
+  const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 55000));
   
-  const results = await Promise.allSettled([
-    Promise.race([promises[0], timeoutPromise]),
-    Promise.race([promises[1], timeoutPromise]),
-  ]);
+  const results = await Promise.allSettled(
+    promises.map(p => Promise.race([p, timeoutPromise]))
+  );
 
   const successes: AIResult[] = [];
   for (const r of results) {
@@ -343,20 +346,16 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    // Single final attempt with Cloudflare
-    try {
-      const finalAttempt = await callCloudflare(opts);
-      return [finalAttempt];
-    } catch {
+    // Sequential final attempts
+    for (const fn of [callCloudflare, callMistral, callOpenAI]) {
       try {
-        const lastAttempt = await callMistral(opts);
-        return [lastAttempt];
-      } catch {
-        throw new Error("callAIParallel: all providers failed");
-      }
+        const result = await fn(opts);
+        return [result];
+      } catch { /* try next */ }
     }
+    throw new Error("callAIParallel: all providers failed");
   }
 
-  console.log(`callAIParallel → ${successes.length}/2 providers succeeded`);
+  console.log(`callAIParallel → ${successes.length}/3 providers succeeded`);
   return successes;
 }
