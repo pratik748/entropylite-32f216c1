@@ -472,7 +472,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             {/* Apply */}
             <Button
               size="sm"
-              onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}
+              onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, true); }}
               className="w-full h-8 text-xs gap-1.5"
             >
               <Sparkles className="h-3 w-3" />
