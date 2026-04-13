@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
@@ -192,6 +193,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const { getAssetBoost } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
+  // Needs & Constraints state
+  const [budget, setBudget] = useState("");
+  const ASSET_TYPES = ["Stocks", "ETFs", "Mutual Funds", "Bonds", "Commodities", "Crypto"] as const;
+  const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [showConstraints, setShowConstraints] = useState(false);
+
+  const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value); else next.add(value);
+    setter(next);
+  };
+
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
     if (!forceRefresh) {
       const cached = getCachedDA();
@@ -254,6 +269,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           portfolioValue: totalValue || 100000,
           baseCurrency,
           previousTickers: getPreviousTickers(),
+          userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
+          preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
+          preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
         },
       });
 
@@ -379,6 +397,92 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
+      </div>
+
+      {/* Needs & Constraints Bar */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <button
+          onClick={() => setShowConstraints(!showConstraints)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
+          <span className="text-[10px] text-muted-foreground ml-1">
+            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
+              ? `${[budget ? `₹${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+              : "Set your preferences"}
+          </span>
+          <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
+        </button>
+
+        {showConstraints && (
+          <div className="space-y-3 pt-2 border-t border-border">
+            {/* Budget */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Budget</label>
+              <div className="relative">
+                <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="e.g. 50000"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  className="pl-8 h-8 text-sm bg-background"
+                />
+              </div>
+            </div>
+
+            {/* Asset Type */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Asset Type</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ASSET_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => toggleChip(selectedAssetTypes, setSelectedAssetTypes, type)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedAssetTypes.has(type)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sectors */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Sectors</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SECTORS.map((sector) => (
+                  <button
+                    key={sector}
+                    onClick={() => toggleChip(selectedSectors, setSelectedSectors, sector)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedSectors.has(sector)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Apply */}
+            <Button
+              size="sm"
+              onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}
+              className="w-full h-8 text-xs gap-1.5"
+            >
+              <Sparkles className="h-3 w-3" />
+              Find Assets
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Error Banner */}
