@@ -664,11 +664,57 @@ const SECTOR_THESIS: Record<string, { thesis: string; catalyst: string }> = {
   Hedge: { thesis: "Inverse correlation provides portfolio insurance during drawdown events. Tactical position to reduce net market exposure.", catalyst: "Elevated VIX regime and macro uncertainty creating positive expected value for hedges." },
 };
 
-function buildDeterministicCandidates(previousTickers: string[], indiaMode: boolean): any[] {
+function normalizeAssetType(value: string): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "stocks" || normalized === "stock" || normalized === "equity" || normalized === "equities") return "equity";
+  if (normalized === "etfs" || normalized === "etf") return "etf";
+  if (normalized === "mutual funds" || normalized === "mutual fund" || normalized === "fund") return "mutual_fund";
+  if (normalized === "bonds" || normalized === "bond" || normalized === "fixed income") return "bond";
+  if (normalized === "commodities" || normalized === "commodity") return "commodity";
+  if (normalized === "crypto" || normalized === "cryptocurrency") return "crypto";
+  return normalized;
+}
+
+function normalizeSectorPreference(value: string): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["banking", "financial", "financials"].includes(normalized)) return "financials";
+  if (["fmcg", "consumer staples"].includes(normalized)) return "consumer staples";
+  if (["consumer", "consumer discretionary"].includes(normalized)) return "consumer discretionary";
+  if (["auto", "automobile", "automobiles"].includes(normalized)) return "consumer discretionary";
+  if (["pharma", "healthcare"].includes(normalized)) return "healthcare";
+  if (["infrastructure", "industrials"].includes(normalized)) return "industrials";
+  if (["metals", "materials"].includes(normalized)) return "materials";
+  return normalized;
+}
+
+function buildDeterministicCandidates(
+  previousTickers: string[],
+  indiaMode: boolean,
+  preferredAssetTypes?: string[],
+  preferredSectors?: string[],
+): any[] {
   const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
   const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
+  const preferredTypeSet = new Set((preferredAssetTypes || []).map(normalizeAssetType));
+  const preferredSectorSet = new Set((preferredSectors || []).map(normalizeSectorPreference));
+
   return universe
     .filter((c) => !blocked.has(c.ticker))
+    .map((c) => {
+      const assetType = normalizeAssetType((c as any).assetClass || "Equity");
+      const sector = normalizeSectorPreference(c.sector || "");
+      const assetTypeMatch = preferredTypeSet.size === 0 || preferredTypeSet.has(assetType);
+      const sectorMatch = preferredSectorSet.size === 0 || preferredSectorSet.has(sector);
+      const matchScore = (assetTypeMatch ? 2 : 0) + (sectorMatch ? 1 : 0);
+      return { c, matchScore, assetTypeMatch, sectorMatch };
+    })
+    .sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      if (a.assetTypeMatch !== b.assetTypeMatch) return Number(b.assetTypeMatch) - Number(a.assetTypeMatch);
+      if (a.sectorMatch !== b.sectorMatch) return Number(b.sectorMatch) - Number(a.sectorMatch);
+      return 0;
+    })
+    .map(({ c }) => c)
     .slice(0, 16)
     .map((c, i) => {
       const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
@@ -877,7 +923,12 @@ Return via the tool call only.`,
     }
 
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(previousTickers, indiaMode);
+    const deterministicCandidates = buildDeterministicCandidates(
+      previousTickers,
+      indiaMode,
+      preferredAssetTypes,
+      preferredSectors,
+    );
 
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
@@ -1034,7 +1085,7 @@ Return via the tool call only.`,
       if (portfolioTickers.includes(rec.ticker)) continue;
 
       // F2: Target must be above current price
-      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+      if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
