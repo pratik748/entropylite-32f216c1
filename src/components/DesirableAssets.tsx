@@ -193,6 +193,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const { getAssetBoost } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
+  // Needs & Constraints state
+  const [budget, setBudget] = useState("");
+  const ASSET_TYPES = ["Stocks", "ETFs", "Mutual Funds", "Bonds", "Commodities", "Crypto"] as const;
+  const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [showConstraints, setShowConstraints] = useState(false);
+
+  const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value); else next.add(value);
+    setter(next);
+  };
+
   const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
     if (!forceRefresh) {
       const cached = getCachedDA();
