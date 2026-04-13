@@ -180,7 +180,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
   const [regimeType, setRegimeType] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number | null>(null);
@@ -199,7 +200,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [showConstraints, setShowConstraints] = useState(false);
+  const [showConstraints, setShowConstraints] = useState(true);
 
   const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
     const next = new Set(set);
@@ -330,11 +331,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     }
   }, [stocks.length, baseCurrency]);
 
-  useEffect(() => {
-    fetchRecommendations();
-    const interval = setInterval(() => fetchRecommendations(false), 600_000);
-    return () => clearInterval(interval);
-  }, [fetchRecommendations]);
+  // No auto-fetch on mount — user must set constraints and click "Find Assets"
 
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
@@ -393,7 +390,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
           <span className="text-[9px] font-mono text-muted-foreground">Cached 2h</span>
-          <Button size="sm" variant="ghost" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
+          <Button size="sm" variant="ghost" onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -475,7 +472,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             {/* Apply */}
             <Button
               size="sm"
-              onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}
+              onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, true); }}
               className="w-full h-8 text-xs gap-1.5"
             >
               <Sparkles className="h-3 w-3" />
@@ -494,6 +491,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
           </div>
           <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">Retry</Button>
+        </div>
+      )}
+
+      {/* Initial state — no search yet */}
+      {!hasSearched && !loading && recommendations.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Target className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-medium text-foreground">Set your preferences above</p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Configure your budget, preferred asset types, and sectors, then click <strong>Find Assets</strong> to get tailored recommendations.
+          </p>
         </div>
       )}
 
