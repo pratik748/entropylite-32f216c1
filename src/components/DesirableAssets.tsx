@@ -331,11 +331,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     }
   }, [stocks.length, baseCurrency]);
 
-  useEffect(() => {
-    fetchRecommendations();
-    const interval = setInterval(() => fetchRecommendations(false), 600_000);
-    return () => clearInterval(interval);
-  }, [fetchRecommendations]);
+  // No auto-fetch on mount — user must set constraints and click "Find Assets"
 
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
