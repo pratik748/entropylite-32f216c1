@@ -200,7 +200,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [showConstraints, setShowConstraints] = useState(false);
+  const [showConstraints, setShowConstraints] = useState(true);
 
   const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
     const next = new Set(set);
