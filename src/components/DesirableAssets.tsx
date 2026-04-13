@@ -329,7 +329,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         progressTimer.current = null;
       }
     }
-  }, [stocks.length, baseCurrency]);
+  }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors]);
 
   // No auto-fetch on mount — user must set constraints and click "Find Assets"
 
