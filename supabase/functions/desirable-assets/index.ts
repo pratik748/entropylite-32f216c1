@@ -563,8 +563,15 @@ const ELITE_FALLBACK_UNIVERSE = [
   { ticker: "V", name: "Visa", sector: "Financials", marketCap: "large", strategy: "equity" },
   { ticker: "MA", name: "Mastercard", sector: "Financials", marketCap: "large", strategy: "equity" },
   { ticker: "QQQ", name: "Invesco QQQ ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
+  { ticker: "SPY", name: "SPDR S&P 500 ETF Trust", sector: "Index", marketCap: "large", strategy: "equity", assetClass: "ETF" },
+  { ticker: "VTI", name: "Vanguard Total Stock Market ETF", sector: "Index", marketCap: "large", strategy: "equity", assetClass: "ETF" },
+  { ticker: "IWM", name: "iShares Russell 2000 ETF", sector: "Index", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
+  { ticker: "XLF", name: "Financial Select Sector SPDR", sector: "Financials", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+  { ticker: "XLV", name: "Health Care Select Sector SPDR", sector: "Healthcare", marketCap: "large", strategy: "equity", assetClass: "ETF" },
+  { ticker: "SMH", name: "VanEck Semiconductor ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
   { ticker: "XLE", name: "Energy Select Sector SPDR", sector: "Energy", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
   { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "TLT", name: "iShares 20+ Year Treasury Bond ETF", sector: "Bonds", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
   { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
 ];
 
@@ -589,6 +596,9 @@ const INDIA_FALLBACK_UNIVERSE = [
   { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
   { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
   { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
+  { ticker: "JUNIORBEES.NS", name: "Nippon India Junior BeES", sector: "Index", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
+  { ticker: "BANKBEES.NS", name: "Nippon India Bank BeES", sector: "Financials", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
+  { ticker: "ITBEES.NS", name: "Nippon India ETF Nifty IT", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
   { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
 ];
 
@@ -689,23 +699,26 @@ function normalizeSectorPreference(value: string): string {
 
 function buildDeterministicCandidates(
   previousTickers: string[],
+  portfolioTickers: string[],
   indiaMode: boolean,
   preferredAssetTypes?: string[],
   preferredSectors?: string[],
 ): any[] {
   const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
-  const blocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
+  const hardBlocked = new Set((portfolioTickers || []).map((t) => String(t).trim().toUpperCase()));
+  const softBlocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
   const preferredTypeSet = new Set((preferredAssetTypes || []).map(normalizeAssetType));
   const preferredSectorSet = new Set((preferredSectors || []).map(normalizeSectorPreference));
 
-  return universe
+  const rankUniverse = (blocked: Set<string>) => universe
     .filter((c) => !blocked.has(c.ticker))
     .map((c) => {
       const assetType = normalizeAssetType((c as any).assetClass || "Equity");
       const sector = normalizeSectorPreference(c.sector || "");
       const assetTypeMatch = preferredTypeSet.size === 0 || preferredTypeSet.has(assetType);
       const sectorMatch = preferredSectorSet.size === 0 || preferredSectorSet.has(sector);
-      const matchScore = (assetTypeMatch ? 2 : 0) + (sectorMatch ? 1 : 0);
+      const strategicBonus = HEDGE_STRATEGIES.has(String((c as any).strategy || "")) ? 0.35 : 0;
+      const matchScore = (assetTypeMatch ? 4 : 0) + (sectorMatch ? 2 : 0) + strategicBonus;
       return { c, matchScore, assetTypeMatch, sectorMatch };
     })
     .sort((a, b) => {
@@ -714,8 +727,13 @@ function buildDeterministicCandidates(
       if (a.sectorMatch !== b.sectorMatch) return Number(b.sectorMatch) - Number(a.sectorMatch);
       return 0;
     })
-    .map(({ c }) => c)
-    .slice(0, 16)
+    .map(({ c }) => c);
+
+  const primaryUniverse = rankUniverse(new Set([...hardBlocked, ...softBlocked]));
+  const relaxedUniverse = rankUniverse(hardBlocked);
+
+  return dedupeCandidates([...primaryUniverse, ...relaxedUniverse])
+    .slice(0, preferredTypeSet.size > 0 ? 24 : 18)
     .map((c, i) => {
       const sectorInfo = SECTOR_THESIS[c.sector] || SECTOR_THESIS["Technology"];
       return {
@@ -925,6 +943,7 @@ Return via the tool call only.`,
     // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
     const deterministicCandidates = buildDeterministicCandidates(
       previousTickers,
+      portfolioTickers,
       indiaMode,
       preferredAssetTypes,
       preferredSectors,
@@ -940,10 +959,12 @@ Return via the tool call only.`,
     }
 
     // Only use fallback when AI returns fewer than 8 candidates
-    if (candidates.length < 8) {
-      const needed = 8 - candidates.length;
+    const aiCandidateCount = candidates.length;
+    const minimumCandidateCount = preferredAssetTypes?.length || preferredSectors?.length ? 10 : 8;
+    if (candidates.length < minimumCandidateCount) {
+      const needed = minimumCandidateCount - candidates.length;
       candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
-      console.log(`desirable-assets: AI returned ${candidates.length - needed} picks, padded with ${needed} fallback`);
+      console.log(`desirable-assets: AI returned ${aiCandidateCount} picks, padded with ${Math.max(0, candidates.length - aiCandidateCount)} fallback`);
     } else {
       candidates = dedupeCandidates(candidates).slice(0, 28);
       console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
@@ -1031,6 +1052,55 @@ Return via the tool call only.`,
     }
 
     const scored: ScoredRec[] = [];
+
+    const buildDeterministicScoredRec = (fallbackRec: any, forcedQuantScore = 42): ScoredRec | null => {
+      if (portfolioTickers.includes(fallbackRec.ticker)) return null;
+
+      const td = tickerData[fallbackRec.ticker];
+      if (!td || td.closes.length < 20 || td.price <= 0) return null;
+
+      const returns = logReturns(td.closes);
+      const sr = sharpeRatio(returns);
+      const mdd = maxDrawdown(td.closes);
+      const vol = annualizedVol(returns);
+      const zs = zScore(td.closes);
+      const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+      const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
+      const sma20 = mean(td.closes.slice(-20));
+
+      return {
+        rec: fallbackRec,
+        sharpeRatio: Math.round(sr * 100) / 100,
+        maxDrawdown: Math.round(mdd * 10) / 10,
+        portfolioCorrelation: Math.round(portCorr * 100) / 100,
+        volatility: Math.round(vol * 10) / 10,
+        zScore: Math.round(zs * 100) / 100,
+        quantScore: forcedQuantScore,
+        priceVerified: true,
+        stalePrice: td.stalePrice || false,
+        realPrice: td.price,
+        realCurrency: td.currency,
+        priceChange24h: Math.round(td.change * 100) / 100,
+        volume: td.volume,
+        fiftyTwoHigh: td.fiftyTwoHigh,
+        fiftyTwoLow: td.fiftyTwoLow,
+        closes: td.closes.slice(-60),
+        highs: (td.highs || []).slice(-60),
+        maxProfitTarget: mpt.maxTarget,
+        maxProfitConfidence: mpt.confidence,
+        maxProfitMethod: mpt.method,
+        momentum20d: Math.round((((td.price - sma20) / Math.max(sma20, 1)) * 100) * 100) / 100,
+        momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
+        trendStrength: 50,
+        winRate: 50,
+        filterTier: "rescue",
+        sentimentScore: 0,
+        sentimentLabel: "Neutral",
+        earningsSignal: "neutral",
+        sentimentHeadline: "",
+        sentimentArticleCount: 0,
+      };
+    };
 
     let noData = 0, thinData = 0, filtered = 0;
     for (const rec of candidates) {
@@ -1226,6 +1296,18 @@ Return via the tool call only.`,
       });
     }
 
+    if (scored.length === 0) {
+      const hardRescue = deterministicCandidates
+        .map((fallbackRec) => buildDeterministicScoredRec(fallbackRec, 38))
+        .filter((value): value is ScoredRec => value !== null)
+        .slice(0, 8);
+
+      if (hardRescue.length > 0) {
+        scored.push(...hardRescue);
+        console.log(`desirable-assets: hard rescue appended ${hardRescue.length} deterministic candidates after zero-score pass`);
+      }
+    }
+
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
     // Skip sentiment if we're running on fallback-only (no AI candidates) to save time
     const hasAICandidates = candidates.some((c: any) => !c._isFallback);
@@ -1318,49 +1400,10 @@ Return via the tool call only.`,
         if (selected.length >= 8) break;
         if (selectedTickers.has(fallbackRec.ticker) || portfolioTickers.includes(fallbackRec.ticker)) continue;
 
-        const td = tickerData[fallbackRec.ticker];
-        if (!td || td.closes.length < 20 || td.price <= 0) continue;
+        const fallbackScored = buildDeterministicScoredRec(fallbackRec, 42);
+        if (!fallbackScored) continue;
 
-        const returns = logReturns(td.closes);
-        const sr = sharpeRatio(returns);
-        const mdd = maxDrawdown(td.closes);
-        const vol = annualizedVol(returns);
-        const zs = zScore(td.closes);
-        const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
-        const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
-
-        selected.push({
-          rec: fallbackRec,
-          sharpeRatio: Math.round(sr * 100) / 100,
-          maxDrawdown: Math.round(mdd * 10) / 10,
-          portfolioCorrelation: Math.round(portCorr * 100) / 100,
-          volatility: Math.round(vol * 10) / 10,
-          zScore: Math.round(zs * 100) / 100,
-          quantScore: 42,
-          priceVerified: true,
-          stalePrice: td.stalePrice || false,
-          realPrice: td.price,
-          realCurrency: td.currency,
-          priceChange24h: Math.round(td.change * 100) / 100,
-          volume: td.volume,
-          fiftyTwoHigh: td.fiftyTwoHigh,
-          fiftyTwoLow: td.fiftyTwoLow,
-          closes: td.closes.slice(-60),
-          highs: (td.highs || []).slice(-60),
-          maxProfitTarget: mpt.maxTarget,
-          maxProfitConfidence: mpt.confidence,
-          maxProfitMethod: mpt.method,
-          momentum20d: Math.round((((td.price - mean(td.closes.slice(-20))) / mean(td.closes.slice(-20))) * 100) * 100) / 100,
-          momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
-          trendStrength: 50,
-          winRate: 50,
-          filterTier: "rescue" as const,
-            sentimentScore: 0,
-            sentimentLabel: "Neutral",
-            earningsSignal: "neutral",
-            sentimentHeadline: "",
-            sentimentArticleCount: 0,
-        });
+        selected.push(fallbackScored);
         selectedTickers.add(fallbackRec.ticker);
       }
     }
