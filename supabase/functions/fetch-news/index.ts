@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { scrapePremiumNews } from "../_shared/scraper.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -282,15 +283,36 @@ serve(async (req) => {
 
     console.log("Multi-source news fetch for:", query);
 
-    const [rssResult, gdeltArticles, newsdataArticles] = await Promise.all([
+    // Scrape premium sources only when a specific ticker is provided (saves credits)
+    const shouldScrapePremium = !!cleanTicker && cleanTicker.length <= 5;
+
+    const [rssResult, gdeltArticles, newsdataArticles, premiumResult] = await Promise.all([
       fetchAllRSS(),
       fetchGDELT(query),
       fetchNewsdata(query),
+      shouldScrapePremium
+        ? scrapePremiumNews(cleanTicker).catch(e => { console.warn("Premium scrape failed:", e.message); return { articles: [], scrapedSources: [] }; })
+        : Promise.resolve({ articles: [], scrapedSources: [] }),
     ]);
 
     const rssFeeds = rssResult.successCount;
 
+    // Convert premium scraped articles to standard format
+    const premiumArticles: Article[] = (premiumResult.articles || []).map((a) => ({
+      title: a.title,
+      description: a.summary || null,
+      link: a.url,
+      source: a.source,
+      pubDate: new Date().toISOString(),
+      imageUrl: null,
+      category: "business",
+      sentiment: a.sentiment || null,
+      sourceTier: getSourceTier(a.source),
+      origin: "scraped",
+    }));
+
     const allArticles = [
+      ...premiumArticles, // Premium scraped content first
       ...rssResult.articles,
       ...gdeltArticles,
       ...newsdataArticles,
@@ -317,7 +339,10 @@ serve(async (req) => {
     const deduplicated = deduplicateArticles(filtered);
     const top = deduplicated.slice(0, 40);
 
-    const sourcesPolled = rssFeeds + (gdeltArticles.length > 0 ? 1 : 0) + (newsdataArticles.length > 0 ? 1 : 0);
+    const sourcesPolled = rssFeeds
+      + (gdeltArticles.length > 0 ? 1 : 0)
+      + (newsdataArticles.length > 0 ? 1 : 0)
+      + (premiumResult.scrapedSources?.length || 0);
 
     return new Response(
       JSON.stringify({
@@ -328,6 +353,8 @@ serve(async (req) => {
           rss: rssResult.articles.length,
           gdelt: gdeltArticles.length,
           newsdata: newsdataArticles.length,
+          scraped: premiumArticles.length,
+          scrapedSources: premiumResult.scrapedSources || [],
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
