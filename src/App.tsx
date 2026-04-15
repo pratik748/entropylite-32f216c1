@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +23,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (initialized.current) return;
     initialized.current = true;
 
-    // 1. Subscribe to auth changes FIRST (before getSession)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -30,7 +30,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // 2. Then restore session from storage
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
@@ -59,9 +58,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <AuthGate>
                 <Index />
