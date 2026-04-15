@@ -12,3 +12,6 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /reset-password
+
+Sitemap: https://entropylite.lovable.app/sitemap.xml
