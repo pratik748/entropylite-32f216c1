@@ -77,19 +77,23 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
           <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
-          <Button
-            size="sm"
-            className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide"
-            onClick={() => navigate("/dashboard")}
-          >
-            Sign In <ArrowRight className="ml-1 h-3 w-3" />
-          </Button>
+          <div className="flex items-center gap-4">
+            <span className="font-mono text-[9px] text-black/35 tracking-wide hidden sm:block">by Pratik Sehwag</span>
+            <Button
+              size="sm"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide"
+              onClick={() => navigate("/dashboard")}
+            >
+              Sign In <ArrowRight className="ml-1 h-3 w-3" />
+            </Button>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
       <header className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-6 pt-24 pb-20 text-center">
+        <div className="max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
+          <img src={entropyLogoFull} alt="Entropy Lite" className="h-28 sm:h-36 object-contain mx-auto mb-8" />
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">
             Institutional-Grade Intelligence
           </p>
