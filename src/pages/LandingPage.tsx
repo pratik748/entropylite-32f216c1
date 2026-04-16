@@ -122,7 +122,7 @@ export default function LandingPage() {
               How Entropy Lite Works
             </h2>
             <p className="text-sm sm:text-base text-black/50 max-w-2xl mx-auto">
-              From raw market data to probabilistic intelligence — a six-stage pipeline that continuously processes, 
+              From raw market data to probabilistic intelligence: a six-stage pipeline that continuously processes, 
               analyzes, and models global financial markets in real time.
             </p>
           </div>
@@ -165,7 +165,7 @@ export default function LandingPage() {
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">CLANK Structural Constraint Engine</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                CLANK stands for Constraint, Liquidity, Accumulation, Narrative, and Kinetic — five structural forces 
+                CLANK stands for Constraint, Liquidity, Accumulation, Narrative, and Kinetic: five structural forces 
                 that define how markets behave at critical inflection points.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
