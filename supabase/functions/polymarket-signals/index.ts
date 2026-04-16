@@ -104,31 +104,17 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const categories = body.categories || ["macro", "geopolitical", "crypto", "elections", "tech"];
-    const limit = body.limit || 30;
+    const limit = body.limit || 50;
 
-    // Fetch active markets from Polymarket CLOB API
-    const marketsUrl = `https://clob.polymarket.com/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
-    const marketsRes = await fetch(marketsUrl, {
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
+    // Use Gamma API directly — it has question/slug fields
+    const gammaUrl = `https://gamma-api.polymarket.com/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
+    const gammaRes = await fetch(gammaUrl);
     let markets: any[] = [];
-    if (marketsRes.ok) {
-      const marketsData = await marketsRes.json();
-      markets = Array.isArray(marketsData) ? marketsData : (marketsData.data || marketsData.markets || []);
+    if (gammaRes.ok) {
+      const gammaData = await gammaRes.json();
+      markets = Array.isArray(gammaData) ? gammaData : (gammaData.data || []);
     } else {
-      // Fallback: try the gamma API
-      const gammaUrl = `https://gamma-api.polymarket.com/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
-      const gammaRes = await fetch(gammaUrl);
-      if (gammaRes.ok) {
-        const gammaData = await gammaRes.json();
-        markets = Array.isArray(gammaData) ? gammaData : (gammaData.data || []);
-      } else {
-        await gammaRes.text();
-      }
+      await gammaRes.text();
     }
 
     // Process markets into signals
