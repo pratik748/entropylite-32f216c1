@@ -1,4 +1,5 @@
-import { Target, ArrowRight, CheckCircle2, Circle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { Target, CheckCircle2, Circle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
 
 interface ProfitTaskbarProps {
   ticker: string;
@@ -36,16 +37,17 @@ const ProfitTaskbar = ({
   const pnlPct = (pnl / invested) * 100;
   const isProfit = pnl >= 0;
 
-  // Calculate targets
-  const target10 = buyPrice * 1.10;
-  const target20 = buyPrice * 1.20;
-  const stopLoss = buyPrice * 0.92;
+  // Key levels
+  const projectedUpside = buyPrice * 1.10;
+  const projectedUpside20 = buyPrice * 1.20;
+  const invalidationZone = buyPrice * 0.92;
 
+  const sc = getScenarioConfig(suggestion);
   const tasks: Task[] = [];
 
-  // Task 1: Entry analysis done
+  // Task 1: Analysis complete
   tasks.push({
-    label: "Entry Analysis Complete",
+    label: "Intelligence Analysis Complete",
     detail: `Analyzed ${ticker} at ₹${buyPrice.toLocaleString("en-IN")}`,
     status: "done",
     icon: <CheckCircle2 className="h-4 w-4" />,
@@ -54,7 +56,7 @@ const ProfitTaskbar = ({
   // Task 2: Risk assessment
   tasks.push({
     label: `Risk Level: ${riskLevel}`,
-    detail: riskLevel === "High" ? "Consider reducing position size" : riskLevel === "Medium" ? "Monitor closely for changes" : "Favorable risk profile",
+    detail: riskLevel === "High" ? "Elevated volatility — monitor positioning" : riskLevel === "Medium" ? "Moderate risk — standard monitoring" : "Favorable risk profile observed",
     status: "done",
     icon: <AlertTriangle className="h-4 w-4" />,
   });
@@ -63,62 +65,62 @@ const ProfitTaskbar = ({
   if (isProfit) {
     tasks.push({
       label: `Unrealized Gain: ${pnlPct.toFixed(1)}%`,
-      detail: `+₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} on ${quantity} shares`,
+      detail: `+₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} on ${quantity} units`,
       status: pnlPct >= 10 ? "done" : "active",
       icon: <TrendingUp className="h-4 w-4" />,
     });
   } else {
     tasks.push({
       label: `Unrealized Loss: ${pnlPct.toFixed(1)}%`,
-      detail: `₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} — hold if fundamentals intact`,
+      detail: `₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} — reassess thesis if fundamentals shift`,
       status: "active",
       icon: <TrendingDown className="h-4 w-4" />,
     });
   }
 
-  // Task 4: Next action
+  // Task 4: Scenario outlook
   if (suggestion === "Add" && confidence >= 60) {
     tasks.push({
-      label: "Consider Adding Position",
-      detail: `AI suggests adding with ${confidence}% confidence. Bull target: ₹${bullRange[1].toLocaleString("en-IN")}`,
+      label: "Upside Scenario Detected",
+      detail: `${confidence}% confidence. Projected upper range: ₹${bullRange[1].toLocaleString("en-IN")}`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
   } else if (suggestion === "Exit") {
     tasks.push({
-      label: "Consider Exiting Position",
-      detail: `AI suggests exit. Set stop-loss at ₹${stopLoss.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
+      label: "Downside Scenario Detected",
+      detail: `Invalidation zone near ₹${invalidationZone.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
   } else {
     tasks.push({
-      label: "Hold & Monitor",
-      detail: `Watch for breakout above ₹${target10.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
+      label: "Observe & Monitor",
+      detail: `Reaction zone above ₹${projectedUpside.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
   }
 
-  // Task 5: Profit target
-  const hitTarget10 = currentPrice >= target10;
-  const hitTarget20 = currentPrice >= target20;
+  // Task 5: Projected range
+  const hitUpside10 = currentPrice >= projectedUpside;
+  const hitUpside20 = currentPrice >= projectedUpside20;
   tasks.push({
-    label: hitTarget20 ? "20% Target Reached" : hitTarget10 ? "10% Target Reached — Trail Stop" : `Target: ₹${target10.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
-    detail: hitTarget20
-      ? "Consider booking partial profits"
-      : hitTarget10
-      ? `Next target: ₹${target20.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+20%)`
-      : `Stop-loss: ₹${stopLoss.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (-8%)`,
-    status: hitTarget20 ? "done" : hitTarget10 ? "active" : "pending",
+    label: hitUpside20 ? "20% Projected Range Reached" : hitUpside10 ? "10% Projected Range Reached" : `Projected Range: ₹${projectedUpside.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
+    detail: hitUpside20
+      ? "Upper projected range achieved — reassess positioning"
+      : hitUpside10
+      ? `Next level: ₹${projectedUpside20.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+20%)`
+      : `Invalidation zone: ₹${invalidationZone.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (-8%)`,
+    status: hitUpside20 ? "done" : hitUpside10 ? "active" : "pending",
     icon: <Target className="h-4 w-4" />,
   });
 
-  // Task 6: Bear protection
+  // Task 6: Bear zone
   if (currentPrice <= bearRange[0]) {
     tasks.push({
-      label: "Price in Bear Zone",
-      detail: `Below ₹${bearRange[0].toLocaleString("en-IN")} — reassess thesis or exit`,
+      label: "Price in Downside Zone",
+      detail: `Below ₹${bearRange[0].toLocaleString("en-IN")} — reassess thesis`,
       status: "active",
       icon: <AlertTriangle className="h-4 w-4" />,
     });
@@ -128,7 +130,7 @@ const ProfitTaskbar = ({
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-4 flex items-center gap-2">
         <Target className="h-5 w-5 text-foreground" />
-        <h2 className="text-base font-semibold text-foreground">Action Plan</h2>
+        <h2 className="text-base font-semibold text-foreground">Scenario Roadmap</h2>
         <span className="ml-auto rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
           {ticker}
         </span>
@@ -137,7 +139,6 @@ const ProfitTaskbar = ({
       <div className="space-y-1">
         {tasks.map((task, i) => (
           <div key={i} className="flex items-start gap-3 group">
-            {/* Timeline connector */}
             <div className="flex flex-col items-center">
               <div className={`rounded-full p-0.5 ${
                 task.status === "done" ? "text-gain" : task.status === "active" ? "text-foreground" : "text-muted-foreground/40"
@@ -160,6 +161,10 @@ const ProfitTaskbar = ({
           </div>
         ))}
       </div>
+
+      <p className="text-[8px] text-muted-foreground/40 mt-3 border-t border-border/20 pt-2">
+        {MICRO_DISCLAIMER}
+      </p>
     </div>
   );
 };
