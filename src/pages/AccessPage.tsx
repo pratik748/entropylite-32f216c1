@@ -1,0 +1,95 @@
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, Shield, Activity, Globe } from "lucide-react";
+import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
+
+export default function AccessPage() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "Get Access — Entropy Lite | Market Intelligence Platform";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", "Get founding access to Entropy Lite. Institutional-grade market intelligence, predictive analytics, and structural analysis for serious investors.");
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white text-black">
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
+          <button onClick={() => navigate("/")} className="flex items-center">
+            <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
+          </button>
+          <div className="flex items-center gap-6">
+            <button onClick={() => navigate("/pricing")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">Pricing</button>
+            <button onClick={() => navigate("/about")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">About</button>
+            <Button size="sm" className="bg-black text-white hover:bg-black/85 font-mono text-xs" onClick={() => navigate("/dashboard")}>
+              Sign In
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-4xl mx-auto px-6 py-20">
+        <div className="text-center mb-16">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+            Access Institutional Intelligence
+          </h1>
+          <p className="text-black/50 max-w-xl mx-auto text-lg">
+            Join investors using Entropy Lite for market structure analysis, predictive modeling, and quantitative risk analytics previously available only to institutional desks.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-6 mb-16">
+          <div className="border border-black/5 rounded-lg p-6 text-center">
+            <Activity className="h-6 w-6 mx-auto text-black/40 mb-4" />
+            <h3 className="font-semibold text-sm mb-2">Real-Time Intelligence</h3>
+            <p className="text-[13px] text-black/50">Live market structure analysis with regime-aware recalibration across your entire portfolio.</p>
+          </div>
+          <div className="border border-black/5 rounded-lg p-6 text-center">
+            <Shield className="h-6 w-6 mx-auto text-black/40 mb-4" />
+            <h3 className="font-semibold text-sm mb-2">Structural Risk Detection</h3>
+            <p className="text-[13px] text-black/50">CLANK engine identifies constraint boundaries and liquidity risks before they activate.</p>
+          </div>
+          <div className="border border-black/5 rounded-lg p-6 text-center">
+            <Globe className="h-6 w-6 mx-auto text-black/40 mb-4" />
+            <h3 className="font-semibold text-sm mb-2">Predictive Decision Layer</h3>
+            <p className="text-[13px] text-black/50">Monte Carlo simulations, causal modeling, and positioning signals for informed decisions.</p>
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto text-center">
+          <div className="border border-black/10 rounded-xl p-8 mb-6">
+            <p className="font-mono text-[11px] text-black/40 tracking-wider uppercase mb-2">Founding Access</p>
+            <div className="flex items-baseline justify-center gap-1 mb-4">
+              <span className="text-4xl font-bold">₹999</span>
+              <span className="text-black/40 font-mono text-sm">/month</span>
+            </div>
+            <p className="text-[13px] text-black/40 mb-6">Full platform access. Price increases after founding period.</p>
+            <Button
+              className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs h-12"
+              onClick={() => navigate("/dashboard")}
+            >
+              Create Account <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          <p className="font-mono text-[10px] text-black/30">
+            Already have an account?{" "}
+            <button onClick={() => navigate("/dashboard")} className="underline hover:text-black/60">Sign in</button>
+          </p>
+        </div>
+      </main>
+
+      <footer className="border-t border-black/5 py-8">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} Entropy Lite. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
+            <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
+            <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
