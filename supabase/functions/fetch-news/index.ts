@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { requireAuth } from "../_shared/auth.ts";
+
 import { scrapePremiumNews } from "../_shared/scraper.ts";
 
 const corsHeaders = {
@@ -261,7 +261,6 @@ serve(async (req) => {
   }
 
   try {
-    await requireAuth(req, corsHeaders);
     const { ticker, region, indiaMode } = await req.json();
     const cleanTicker = (ticker || "").replace(/\.(NS|BO|BSE)$/i, "").trim();
 
