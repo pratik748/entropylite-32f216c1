@@ -261,7 +261,6 @@ serve(async (req) => {
   }
 
   try {
-    await requireAuth(req, corsHeaders);
     const { ticker, region, indiaMode } = await req.json();
     const cleanTicker = (ticker || "").replace(/\.(NS|BO|BSE)$/i, "").trim();
 
