@@ -126,7 +126,9 @@ serve(async (req) => {
         const slug = market.slug || market.condition_id || "";
         const category = categorizeMarket(title, slug);
 
-        if (!categories.includes(category) && category !== "other") continue;
+        // Skip sports, entertainment, and other non-financial markets
+        if (category === "other") continue;
+        if (!categories.includes(category)) continue;
 
         // Parse outcome prices (probability)
         let probability = 0.5;
