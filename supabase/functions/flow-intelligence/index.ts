@@ -12,7 +12,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, vix, marketRegime, provider } = await req.json();
+    const { portfolio, vix, marketRegime, provider, polymarketSignals } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
@@ -25,22 +25,27 @@ serve(async (req) => {
       sector: s.sector || "Unknown", weight: s.weight || 0,
     }));
 
+    // Build Polymarket context if available
+    const polyContext = polymarketSignals && Array.isArray(polymarketSignals) && polymarketSignals.length > 0
+      ? `\nPrediction Market Signals (Polymarket):\n${polymarketSignals.map((s: any) => `- "${s.market}": ${(s.probability * 100).toFixed(0)}% prob, ${s.direction}, $${(s.volume24h / 1000).toFixed(0)}K vol`).join("\n")}`
+      : "";
+
     const result = await callAI({
       provider,
-      systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure and market context to detect flow signals.
+      systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure, market context, and prediction market signals to detect flow signals.
 Return ONLY valid JSON array of flow signals:
 [{
-  "name": string (signal name like "ETF Rebalancing", "Vol Targeting", "CTA Momentum", etc.),
-  "category": "STRUCT" | "FLOW" | "RISK" | "OPTIONS",
+  "name": string (signal name like "ETF Rebalancing", "Vol Targeting", "CTA Momentum", "Polymarket Macro Skew", etc.),
+  "category": "STRUCT" | "FLOW" | "RISK" | "OPTIONS" | "PRED",
   "intensity": number (0-100),
   "direction": "BUY" | "SELL" | "NEUTRAL",
   "impact": number (0-100),
   "reasoning": string (1 sentence explanation)
 }]
-Generate 6-10 signals covering: ETF Rebalancing, Vol Targeting, Liquidity Stress, CTA Momentum, Gamma Exposure, Dark Pool Activity, Risk Parity, Pension Rebalance. Base signals on the actual portfolio composition and market conditions.`,
+Generate 6-12 signals covering: ETF Rebalancing, Vol Targeting, Liquidity Stress, CTA Momentum, Gamma Exposure, Dark Pool Activity, Risk Parity, Pension Rebalance. If prediction market data is available, include 2-3 "PRED" category signals based on Polymarket probabilities. Base signals on the actual portfolio composition, market conditions, and prediction market odds.`,
       userPrompt: `Portfolio holdings: ${JSON.stringify(summary)}
-VIX: ${vix || "N/A"}, Regime: ${marketRegime || "Unknown"}
-Detect institutional flow patterns based on the portfolio's beta exposure, sector concentration, and risk profile.`,
+VIX: ${vix || "N/A"}, Regime: ${marketRegime || "Unknown"}${polyContext}
+Detect institutional flow patterns and prediction market-informed signals based on the portfolio's beta exposure, sector concentration, and risk profile.`,
       temperature: 0.5,
       maxTokens: 2048,
     });

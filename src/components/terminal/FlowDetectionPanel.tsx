@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import FlowRadarChart from "@/components/charts/FlowRadarChart";
-import { Brain, Zap } from "lucide-react";
+import { Brain, Zap, Globe } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
+import { usePolymarket } from "@/hooks/usePolymarket";
 
 interface FlowDetectionPanelProps {
   stocks: PortfolioStock[];
@@ -23,6 +24,7 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
   const [aiLoading, setAiLoading] = useState(false);
   const tickers = stocks.map(s => s.ticker);
   const { data: instFlows } = useInstitutionalFlows(tickers);
+  const { data: polyData, loading: polyLoading } = usePolymarket(true);
 
   const analyzed = stocks.filter(s => s.analysis);
 
@@ -95,7 +97,20 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
     return sigs;
   }, [instFlows]);
 
-  const signals = [...(aiSignals || staticSignals), ...instSignals];
+  // Polymarket prediction signals
+  const polySignals: FlowSignal[] = useMemo(() => {
+    if (!polyData?.signals) return [];
+    return polyData.signals.slice(0, 8).map(s => ({
+      name: `PM: ${s.market.length > 30 ? s.market.slice(0, 28) + "…" : s.market}`,
+      category: s.category === "macro" ? "MACRO" : s.category === "geopolitical" ? "GEO" : s.category === "crypto" ? "CRYP" : s.category === "elections" ? "ELEC" : "PRED",
+      intensity: Math.round(s.probability * 100),
+      direction: s.direction === "BULLISH" ? "BUY" as const : s.direction === "BEARISH" ? "SELL" as const : "NEUTRAL" as const,
+      impact: s.conviction,
+      reasoning: s.reasoning,
+    }));
+  }, [polyData]);
+
+  const signals = [...(aiSignals || staticSignals), ...instSignals, ...polySignals];
 
   const getIntensityColor = (v: number) => {
     if (v >= 70) return "bg-loss/60";
@@ -117,7 +132,8 @@ const FlowDetectionPanel = ({ stocks }: FlowDetectionPanelProps) => {
         <span className="text-[8px] text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           {aiSignals && <Brain className="h-2.5 w-2.5 text-gain" />}
           {instFlows && <Zap className="h-2.5 w-2.5 text-warning" />}
-          {aiLoading ? "AI Computing..." : aiSignals ? "AI + Institutional" : instFlows ? "Flow + Institutional" : "Flow Signals"}
+          {polyData && <Globe className="h-2.5 w-2.5 text-primary" />}
+          {aiLoading || polyLoading ? "Computing..." : aiSignals ? (polyData ? "AI + Inst + Polymarket" : "AI + Institutional") : instFlows ? "Flow + Institutional" : "Flow Signals"}
         </span>
         <button onClick={() => setShowRadar(!showRadar)} className="text-[8px] text-primary hover:text-primary/80 transition-colors">
           {showRadar ? "List" : "Radar"}

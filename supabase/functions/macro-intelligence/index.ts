@@ -116,9 +116,53 @@ async function fetchWorldBank(): Promise<MacroIndicator[]> {
   return indicators;
 }
 
-function classifyRegime(indicators: MacroIndicator[]): MacroRegime {
-  const signals: string[] = [];
-  let expansionScore = 0;
+// Fetch Polymarket signals for macro skew
+async function fetchPolymarketSkew(): Promise<{ skew: number; signals: string[] }> {
+  const apiKey = Deno.env.get("POLYMARKET_API_KEY");
+  if (!apiKey) return { skew: 0, signals: [] };
+
+  try {
+    const url = `https://gamma-api.polymarket.com/markets?limit=15&active=true&closed=false&order=volume24hr&ascending=false`;
+    const res = await fetch(url);
+    if (!res.ok) { await res.text(); return { skew: 0, signals: [] }; }
+    const markets = await res.json();
+
+    let skew = 0;
+    const signals: string[] = [];
+    const macroKeywords = ["recession", "fed", "rate", "inflation", "gdp", "unemployment", "tariff", "trade-war", "debt"];
+
+    for (const m of (Array.isArray(markets) ? markets : [])) {
+      const title = (m.question || m.title || "").toLowerCase();
+      if (!macroKeywords.some(k => title.includes(k))) continue;
+
+      let prob = 0.5;
+      if (m.outcomePrices) {
+        try {
+          const prices = typeof m.outcomePrices === "string" ? JSON.parse(m.outcomePrices) : m.outcomePrices;
+          prob = parseFloat(prices[0]) || 0.5;
+        } catch { prob = 0.5; }
+      }
+
+      const bearishKeywords = ["recession", "crash", "decline", "shutdown", "default"];
+      const isBearish = bearishKeywords.some(k => title.includes(k));
+
+      if (prob > 0.6) {
+        const impact = isBearish ? -1 : 1;
+        skew += impact;
+        signals.push(`Polymarket: "${(m.question || m.title || "").slice(0, 50)}" at ${(prob * 100).toFixed(0)}% → ${isBearish ? "bearish" : "bullish"} skew`);
+      }
+    }
+
+    return { skew: Math.max(-3, Math.min(3, skew)), signals };
+  } catch (e) {
+    console.error("Polymarket skew fetch failed:", e);
+    return { skew: 0, signals: [] };
+  }
+}
+
+function classifyRegime(indicators: MacroIndicator[], polySkew = 0, polySignals: string[] = []): MacroRegime {
+  const signals: string[] = [...polySignals];
+  let expansionScore = polySkew; // Start with Polymarket skew
 
   const yieldCurve = indicators.find(i => i.id === "T10Y2Y");
   if (yieldCurve && typeof yieldCurve.value === "number") {
@@ -156,22 +200,22 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const indiaMode = body.indiaMode === true;
-    const [fredData, wbData] = await Promise.all([fetchFRED(), fetchWorldBank()]);
+    const [fredData, wbData, polySkewData] = await Promise.all([fetchFRED(), fetchWorldBank(), fetchPolymarketSkew()]);
     let allIndicators = [...fredData, ...wbData];
     
-    // In India mode, add India-specific context labels
     if (indiaMode) {
       allIndicators = allIndicators.map(i => ({
         ...i,
         name: `${i.name} (Impact on India)`,
       }));
     }
-    const regime = classifyRegime(allIndicators);
+    const regime = classifyRegime(allIndicators, polySkewData.skew, polySkewData.signals);
 
     return new Response(JSON.stringify({
       indicators: allIndicators,
       regime,
-      sources: { fred: fredData.length, worldBank: wbData.length },
+      sources: { fred: fredData.length, worldBank: wbData.length, polymarket: polySkewData.signals.length },
+      polymarketSkew: polySkewData.skew,
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
