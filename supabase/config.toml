@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.historical-prices]
 verify_jwt = false
+
+[functions.polymarket-signals]
+verify_jwt = false
