@@ -157,14 +157,12 @@ export default function LandingPage() {
             >
               Get Access <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 text-black hover:bg-black/[0.02] w-full sm:w-auto"
+            <button
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/pricing")}
             >
               View Pricing
-            </Button>
+            </button>
           </div>
         </div>
       </header>
@@ -348,14 +346,12 @@ export default function LandingPage() {
             >
               Get Founding Access <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 text-black w-full sm:w-auto"
+            <button
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
               Learn More
-            </Button>
+            </button>
           </div>
         </div>
       </section>
