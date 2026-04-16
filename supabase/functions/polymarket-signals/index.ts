@@ -36,21 +36,26 @@ interface PolymarketSignal {
 // Key prediction markets that skew financial signals
 const MARKET_CATEGORIES: Record<string, string[]> = {
   macro: [
-    "fed-rate", "recession", "inflation", "gdp", "unemployment",
-    "interest-rate", "treasury", "debt-ceiling", "government-shutdown",
+    "fed", "rate", "recession", "inflation", "gdp", "unemployment", "interest",
+    "treasury", "debt", "ceiling", "shutdown", "cpi", "fomc", "central bank",
+    "monetary", "fiscal", "stimulus", "default", "bond", "yield",
   ],
   geopolitical: [
-    "war", "china", "russia", "ukraine", "taiwan", "sanctions",
-    "trade-war", "tariff", "nato", "middle-east", "iran",
+    "war", "china", "russia", "ukraine", "taiwan", "sanctions", "military",
+    "trade", "tariff", "nato", "middle-east", "iran", "israel", "conflict",
+    "invasion", "ceasefire", "peace", "nuclear", "korea", "india", "border",
   ],
   crypto: [
-    "bitcoin", "ethereum", "crypto", "btc", "eth", "sec-crypto",
+    "bitcoin", "ethereum", "crypto", "btc", "eth", "solana", "defi", "nft",
+    "stablecoin", "usdc", "tether", "binance", "coinbase", "sec",
   ],
   elections: [
-    "president", "election", "congress", "senate", "trump", "biden",
+    "president", "election", "congress", "senate", "trump", "biden", "governor",
+    "vote", "poll", "primary", "inaug", "democrat", "republican", "cabinet",
   ],
   tech: [
-    "ai", "openai", "google", "apple", "nvidia", "regulation",
+    "ai ", "openai", "google", "apple", "nvidia", "regulation", "antitrust",
+    "microsoft", "meta", "amazon", "spacex", "tesla",
   ],
 };
 
