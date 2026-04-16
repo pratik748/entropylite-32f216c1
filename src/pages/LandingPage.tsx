@@ -160,7 +160,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               variant="outline"
-              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 hover:bg-black/[0.02] w-full sm:w-auto"
+              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 text-black hover:bg-black/[0.02] w-full sm:w-auto"
               onClick={() => navigate("/pricing")}
             >
               View Pricing
@@ -351,7 +351,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               variant="outline"
-              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 w-full sm:w-auto"
+              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 text-black w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
               Learn More
