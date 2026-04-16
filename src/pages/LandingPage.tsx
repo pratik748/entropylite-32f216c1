@@ -193,12 +193,12 @@ export default function LandingPage() {
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Statistical Arbitrage & Co-Integration</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The StatArb engine analyzes your portfolio for mean-reversion opportunities by computing 
+                The StatArb engine analyzes your portfolio for mean-reversion scenarios by computing 
                 co-integration relationships between asset pairs using the Augmented Dickey-Fuller test.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
-                Z-scores track how far each spread has deviated from its historical mean, generating 
-                entry and exit signals when spreads reach statistically significant levels.
+                Z-scores track how far each spread has deviated from its historical mean, highlighting 
+                reaction zones when spreads reach statistically significant levels.
               </p>
             </div>
             <div>
@@ -218,23 +218,23 @@ export default function LandingPage() {
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Causal Effects Simulator</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                Before executing any trade, the Causal Effects Engine models cascading impacts across three orders: 
+                The Causal Effects Engine models cascading impacts across three orders: 
                 direct price and volatility effects, correlated sector contagion, and systemic ripple effects.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
-                This gives you a complete picture of how a single event propagates through the financial system 
-                and affects your portfolio.
+                This maps how a single event propagates through the financial system 
+                and affects portfolio exposure.
               </p>
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Strategy Factory & Backtesting</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The Strategy Factory autonomously generates trade strategies based on current market conditions, 
-                your portfolio composition, and identified opportunities.
+                The Strategy Factory autonomously generates scenario-based positioning insights based on current 
+                market conditions, portfolio composition, and identified structural patterns.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
-                Strategies are backtested against historical data, then validated through paper trading simulation 
-                before any live execution. The Aftermath Matrix previews expected market reaction.
+                Scenarios are validated against historical data through paper simulation. 
+                The Aftermath Matrix previews expected market structure reaction.
               </p>
             </div>
           </div>
@@ -269,16 +269,21 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-black/5 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="font-mono text-[10px] text-black/30 tracking-wider">
-            © {new Date().getFullYear()} Entropy Lite. All rights reserved.
+      <footer className="border-t border-black/5 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <p className="font-mono text-[9px] text-black/25 leading-relaxed mb-4 max-w-4xl">
+            EntropyLite is a market intelligence and probabilistic scenario engine. It does not provide investment advice, trading recommendations, or portfolio management services. All outputs are research-based observations and scenario projections. Users make independent investment decisions at their own risk.
           </p>
-          <div className="flex items-center gap-6">
-            <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
-            <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
-            <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="font-mono text-[10px] text-black/30 tracking-wider">
+              © {new Date().getFullYear()} EntropyLite. All rights reserved.
+            </p>
+            <div className="flex items-center gap-6">
+              <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
+              <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
+              <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+              <button onClick={() => navigate("/disclaimer")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Disclaimer</button>
+            </div>
           </div>
         </div>
       </footer>
