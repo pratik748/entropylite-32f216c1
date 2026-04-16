@@ -83,7 +83,7 @@ const PortfolioCommandCenter = ({ stocks }: Props) => {
                   <td className="px-2 py-2.5">
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                       a.suggestion === "Add" ? "bg-gain/15 text-gain" : a.suggestion === "Exit" ? "bg-loss/15 text-loss" : "bg-warning/15 text-warning"
-                    }`}>{a.suggestion}</span>
+                    }`}>{a.suggestion === "Add" ? "UPSIDE" : a.suggestion === "Exit" ? "DOWNSIDE" : "OBSERVE"}</span>
                   </td>
                 </tr>
               ))}
