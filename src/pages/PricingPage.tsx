@@ -21,9 +21,9 @@ export default function PricingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Pricing — Entropy Lite | Founding Access at ₹999";
+    document.title = "Pricing — Entropy Lite | Founding Access";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Founding access to Entropy Lite at ₹999. Full institutional-grade market intelligence, quantitative risk analytics, and predictive decision systems.");
+    if (meta) meta.setAttribute("content", "Founding access to Entropy Lite. Full institutional-grade market intelligence, quantitative risk analytics, and predictive decision systems.");
   }, []);
 
   return (
@@ -33,9 +33,10 @@ export default function PricingPage() {
           <button onClick={() => navigate("/")} className="flex items-center">
             <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
           </button>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6">
             <button onClick={() => navigate("/about")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">About</button>
             <button onClick={() => navigate("/access")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">Access</button>
+            <span className="font-mono text-[9px] text-black/35 tracking-wide">by Pratik Sehwag</span>
             <Button size="sm" className="bg-black text-white hover:bg-black/85 font-mono text-xs" onClick={() => navigate("/dashboard")}>
               Sign In
             </Button>
@@ -53,10 +54,9 @@ export default function PricingPage() {
 
         <div className="border border-black/10 rounded-xl p-8 sm:p-12 max-w-lg mx-auto">
           <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-5xl font-bold">₹999</span>
-            <span className="text-black/40 font-mono text-sm">/month</span>
+            <span className="text-5xl font-bold">Founding</span>
           </div>
-          <p className="text-black/40 font-mono text-[11px] mb-8">Founding member rate. Price will increase.</p>
+          <p className="text-black/40 font-mono text-[11px] mb-8">Early access rate. Price will increase at general availability.</p>
 
           <ul className="space-y-3 mb-10">
             {FEATURES.map((f) => (
