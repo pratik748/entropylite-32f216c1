@@ -416,6 +416,49 @@
   }
 }
 
+/* ═══════ Mobile-first optimizations (≤768px) ═══════ */
+@media (max-width: 768px) {
+  /* Readable body text */
+  body {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Touch-friendly tap targets */
+  button, a, [role="button"], input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Except inline/icon buttons that set their own size */
+  .inline-btn, nav button, header button {
+    min-height: unset;
+    min-width: unset;
+  }
+
+  /* No horizontal overflow */
+  html, body, #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Smooth momentum scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tighter line heights for compact mobile reading */
+  p, li {
+    line-height: 1.6;
+  }
+
+  /* Prevent layout shifts on mobile */
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
 /* Leaflet dark theme overrides */
 .leaflet-container {
   background: hsl(0, 0%, 2%) !important;

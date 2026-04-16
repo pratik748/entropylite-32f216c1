@@ -19,15 +19,14 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-white px-4">
       <link
         href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Great+Vibes&display=swap"
         rel="stylesheet"
       />
 
-
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm mx-4 flex flex-col items-center gap-8 px-8 py-10 rounded-xl shadow-lg border border-black/5 bg-white">
+      <div className="relative z-10 w-full max-w-sm mx-auto flex flex-col items-center gap-6 sm:gap-8 px-6 sm:px-8 py-8 sm:py-10 rounded-xl shadow-lg border border-black/5 bg-white">
         <img
           src={entropyLogoFull}
           alt="Entropy"
