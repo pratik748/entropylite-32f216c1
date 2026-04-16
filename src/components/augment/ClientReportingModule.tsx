@@ -128,7 +128,7 @@ const ClientReportingModule = ({ stocks }: Props) => {
                   <td className={`px-2 py-2 font-mono ${s.pnlSign ? "text-gain" : "text-loss"}`}>{s.ret}</td>
                   <td className="px-2 py-2">
                     <span className={`font-mono text-xs font-bold ${s.suggestion === "Add" ? "text-gain" : s.suggestion === "Exit" ? "text-loss" : "text-foreground"}`}>
-                      {s.suggestion}
+                      {s.suggestion === "Add" ? "UPSIDE" : s.suggestion === "Exit" ? "DOWNSIDE" : "OBSERVE"}
                     </span>
                   </td>
                 </tr>

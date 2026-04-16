@@ -144,7 +144,7 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium h-9 text-sm"
         >
           <Search className="mr-2 h-3.5 w-3.5" />
-          {isLoading ? "Analyzing..." : "Run Deep Analysis"}
+          {isLoading ? "Processing..." : "Run Intelligence Analysis"}
         </Button>
       </form>
     </div>

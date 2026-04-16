@@ -1,5 +1,6 @@
 import { History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getScenarioConfig } from "@/lib/sebiCompliance";
 
 export interface HistoryEntry {
   id: string;
@@ -39,12 +40,7 @@ const AnalysisHistory = ({ entries, onClear, onSelect }: AnalysisHistoryProps) =
       <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
         {entries.map((entry) => {
           const pnlPct = ((entry.currentPrice - entry.buyPrice) / entry.buyPrice * 100);
-          const suggestionColor =
-            entry.suggestion === "Add"
-              ? "text-gain"
-              : entry.suggestion === "Exit"
-              ? "text-loss"
-              : "text-warning";
+          const sc = getScenarioConfig(entry.suggestion);
 
           return (
             <button
@@ -55,7 +51,7 @@ const AnalysisHistory = ({ entries, onClear, onSelect }: AnalysisHistoryProps) =
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm font-semibold text-foreground">{entry.ticker}</span>
-                  <span className={`text-xs font-medium ${suggestionColor}`}>{entry.suggestion}</span>
+                  <span className={`text-xs font-medium ${sc.color}`}>{sc.label}</span>
                 </div>
                 <span className="text-[10px] text-muted-foreground">
                   {new Date(entry.timestamp).toLocaleDateString("en-IN", {

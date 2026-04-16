@@ -25,7 +25,7 @@ export default function AboutPage() {
 
         <div className="space-y-8 sm:space-y-10 text-black/60 leading-relaxed">
           <p className="text-base sm:text-lg">
-            Entropy Lite is a market intelligence operating system built to surface structural signals that traditional platforms miss. It combines quantitative risk analytics, regime detection, liquidity flow analysis, and predictive modeling into a single, institutional-grade terminal.
+            EntropyLite is a market intelligence engine built to surface structural scenarios that traditional platforms miss. It combines quantitative risk analytics, regime detection, liquidity flow analysis, and probabilistic modeling into a single, institutional-grade research terminal.
           </p>
 
           <div>
@@ -38,7 +38,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">The System</h2>
             <p className="text-sm sm:text-base mb-3">
-              Entropy Lite bridges this gap by delivering institutional capabilities without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and generates actionable intelligence — all in real time.
+              EntropyLite bridges this gap by delivering institutional-grade research capabilities without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and generates probabilistic intelligence — all in real time.
             </p>
             <p className="text-sm sm:text-base">
               The system is organized into interconnected intelligence modules, each handling a specific analytical domain: risk quantification, statistical arbitrage, geopolitical monitoring, regime classification, causal chain modeling, and autonomous strategy generation.
@@ -48,7 +48,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Market Structure Analysis</h2>
             <p className="text-sm sm:text-base mb-3">
-              Every asset exists within a web of structural forces — liquidity constraints, positioning signals, regime shifts, and geopolitical pressure. Entropy Lite maps these forces continuously, providing a predictive decision layer that adapts as market structure evolves.
+              Every asset exists within a web of structural forces — liquidity constraints, positioning patterns, regime shifts, and geopolitical pressure. EntropyLite maps these forces continuously, providing a probabilistic intelligence layer that adapts as market structure evolves.
             </p>
             <p className="text-sm sm:text-base">
               The CLANK engine (Constraint, Liquidity, Accumulation, Narrative, Kinetic) monitors five structural dimensions simultaneously, generating alerts when any dimension approaches a critical threshold.
@@ -70,23 +70,23 @@ export default function AboutPage() {
           </div>
 
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Strategy & Execution</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Scenario Intelligence & Hypothesis Testing</h2>
             <p className="text-sm sm:text-base">
-              The Strategy Factory autonomously generates trade strategies calibrated to current market regime, your portfolio composition, and identified opportunities. Each strategy includes precise entry/exit levels, risk-based position sizing, and backtested performance metrics. Paper trading validates strategies before live execution.
+              The Strategy Factory autonomously generates scenario-based positioning hypotheses calibrated to current market regime, portfolio composition, and identified structural patterns. Each scenario includes key levels, projected ranges, and risk-based sizing metrics. Paper simulation validates hypotheses before any live positioning.
             </p>
           </div>
 
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Continuous Learning</h2>
             <p className="text-sm sm:text-base">
-              The Scar Memory system records every trade outcome, market prediction, and signal accuracy. The Outcome Gradient engine uses this historical record to continuously improve signal quality and model calibration.
+              The Scar Memory system records every market outcome and scenario accuracy. The Outcome Gradient engine uses this historical record to continuously improve confidence calibration and model quality.
             </p>
           </div>
 
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Built by Pratik Sehwag</h2>
             <p className="text-sm sm:text-base">
-              Entropy Lite is designed and built as a research-grade intelligence system. Every module — from the statistical arbitrage engine to the causal effects simulator — is grounded in quantitative methodology and real market data.
+              EntropyLite is designed and built as a research-grade intelligence system. Every module — from the statistical arbitrage engine to the causal effects simulator — is grounded in quantitative methodology and real market data. The platform provides intelligence, not advice — all investment decisions remain with the user.
             </p>
           </div>
         </div>
@@ -102,13 +102,19 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <footer className="border-t border-black/5 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} Entropy Lite. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
-            <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
-            <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+      <footer className="border-t border-black/5 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <p className="font-mono text-[9px] text-black/25 leading-relaxed mb-4 max-w-4xl">
+            EntropyLite is a market intelligence and probabilistic scenario engine. It does not provide investment advice. All outputs are research-based observations. Users make independent decisions at their own risk.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} EntropyLite. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
+              <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
+              <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+              <button onClick={() => navigate("/disclaimer")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Disclaimer</button>
+            </div>
           </div>
         </div>
       </footer>
