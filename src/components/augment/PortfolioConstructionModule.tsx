@@ -25,7 +25,7 @@ const BG = "hsl(0,0%,3%)";
 
 const strategies: { id: Strategy; label: string; icon: typeof Scale; desc: string }[] = [
   { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "Uniform allocation across all positions" },
-  { id: "risk_parity", label: "Risk Parity", icon: ShieldAlert, desc: "Weight inversely by volatility — equalize risk contribution" },
+  { id: "risk_parity", label: "Risk Parity", icon: ShieldAlert, desc: "Weight inversely by volatility to equalize risk contribution" },
   { id: "momentum", label: "Momentum Tilt", icon: TrendingUp, desc: "Overweight winners, underweight losers" },
   { id: "min_variance", label: "Min Variance", icon: Target, desc: "Minimize portfolio variance via low-beta overweight" },
 ];

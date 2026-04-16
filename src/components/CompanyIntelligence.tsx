@@ -118,7 +118,7 @@ export default function CompanyIntelligence({ ticker }: Props) {
         <div>
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Building2 className="h-4 w-4 text-primary" />
-            {data.companyName || ticker} — Intelligence Dossier
+            {data.companyName || ticker}: Intelligence Dossier
           </h2>
           <p className="text-[10px] text-muted-foreground mt-0.5">
             {data.sector} · {data.industry} · {data.headquarters} · Est. {data.founded}
@@ -240,8 +240,8 @@ export default function CompanyIntelligence({ ticker }: Props) {
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-1">
                       {compositeScore >= 70 ? "Strong fundamentals with favorable signal alignment" :
-                       compositeScore >= 45 ? "Mixed signals — monitor for regime shifts" :
-                       "Elevated risk profile — defensive posture recommended"}
+                       compositeScore >= 45 ? "Mixed signals. Monitor for regime shifts." :
+                       "Elevated risk profile. Defensive posture recommended."}
                     </p>
                   </div>
                 </div>
@@ -306,7 +306,7 @@ export default function CompanyIntelligence({ ticker }: Props) {
                   <p className="text-[10px] font-bold text-foreground uppercase mb-2">Distribution Network</p>
                   <div className="flex flex-wrap gap-2">
                     {data.supplyChain.distributors?.map((d, i) => (
-                      <Badge key={i} variant="secondary" className="text-[9px]">{d.name} — {d.region}</Badge>
+                      <Badge key={i} variant="secondary" className="text-[9px]">{d.name} · {d.region}</Badge>
                     ))}
                   </div>
                 </div>

@@ -8,7 +8,7 @@ export default function AboutPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "About — Entropy Lite | Market Intelligence Operating System";
+    document.title = "About | Entropy Lite - The Operating System of Finance";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Entropy Lite is an institutional-grade market intelligence operating system. Built for structural market analysis, liquidity flow detection, and predictive decision modeling.");
   }, []);

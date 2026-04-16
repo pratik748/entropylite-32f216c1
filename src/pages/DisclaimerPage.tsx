@@ -7,9 +7,9 @@ export default function DisclaimerPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Disclaimer — EntropyLite | Market Intelligence Platform";
+    document.title = "Disclaimer | EntropyLite - Market Intelligence Platform";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Legal disclaimer for EntropyLite market intelligence platform. EntropyLite provides probabilistic scenario analysis — not investment advice.");
+    if (meta) meta.setAttribute("content", "Legal disclaimer for EntropyLite market intelligence platform. EntropyLite provides probabilistic scenario analysis, not investment advice.");
   }, []);
 
   return (
