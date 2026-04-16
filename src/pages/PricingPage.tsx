@@ -11,8 +11,8 @@ const FEATURES = [
   "Geopolitical event monitoring with market impact scoring",
   "Statistical arbitrage and co-integration analysis",
   "Deep company intelligence dossiers",
-  "Strategy Factory with backtesting",
-  "Real-time execution with Alpaca integration",
+  "Scenario Factory with hypothesis validation",
+  "Probabilistic positioning insights with aftermath simulation",
   "Portfolio-wide regime detection",
   "Unlimited assets and watchlists",
 ];
@@ -21,9 +21,9 @@ export default function PricingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Pricing — Entropy Lite | Founding Access";
+    document.title = "Pricing — EntropyLite | Founding Access";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Founding access to Entropy Lite. Full institutional-grade market intelligence, quantitative risk analytics, and predictive decision systems.");
+    if (meta) meta.setAttribute("content", "Founding access to EntropyLite. Full institutional-grade market intelligence, quantitative risk analytics, and probabilistic scenario systems.");
   }, []);
 
   return (
@@ -62,13 +62,19 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <footer className="border-t border-black/5 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} Entropy Lite. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
-            <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
-            <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+      <footer className="border-t border-black/5 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <p className="font-mono text-[9px] text-black/25 leading-relaxed mb-4 max-w-4xl">
+            EntropyLite provides probabilistic market intelligence — not investment advice. All decisions are made independently by users.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} EntropyLite. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
+              <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
+              <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+              <button onClick={() => navigate("/disclaimer")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Disclaimer</button>
+            </div>
           </div>
         </div>
       </footer>
