@@ -20,9 +20,10 @@ export default function AccessPage() {
           <button onClick={() => navigate("/")} className="flex items-center">
             <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
           </button>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6">
             <button onClick={() => navigate("/pricing")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">Pricing</button>
             <button onClick={() => navigate("/about")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">About</button>
+            <span className="font-mono text-[9px] text-black/35 tracking-wide">by Pratik Sehwag</span>
             <Button size="sm" className="bg-black text-white hover:bg-black/85 font-mono text-xs" onClick={() => navigate("/dashboard")}>
               Sign In
             </Button>
@@ -61,11 +62,8 @@ export default function AccessPage() {
         <div className="max-w-md mx-auto text-center">
           <div className="border border-black/10 rounded-xl p-8 mb-6">
             <p className="font-mono text-[11px] text-black/40 tracking-wider uppercase mb-2">Founding Access</p>
-            <div className="flex items-baseline justify-center gap-1 mb-4">
-              <span className="text-4xl font-bold">₹999</span>
-              <span className="text-black/40 font-mono text-sm">/month</span>
-            </div>
-            <p className="text-[13px] text-black/40 mb-6">Full platform access. Price increases after founding period.</p>
+            <p className="text-lg font-semibold mb-4">Full platform access during founding period</p>
+            <p className="text-[13px] text-black/40 mb-6">All intelligence modules. No feature restrictions.</p>
             <Button
               className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs h-12"
               onClick={() => navigate("/dashboard")}
