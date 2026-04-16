@@ -12,47 +12,47 @@ const FEATURES = [
   {
     icon: Activity,
     title: "Quantitative Risk Engine",
-    desc: "Value at Risk, CVaR, and liquidity-adjusted risk metrics at 95% and 99% confidence intervals.",
+    desc: "Value at Risk, CVaR, and liquidity-adjusted risk metrics at 95% and 99% confidence intervals for institutional-grade portfolio protection.",
   },
   {
     icon: Shield,
     title: "CLANK Constraint Detection",
-    desc: "AI-powered structural constraint engine that identifies institutional-grade risk boundaries before they activate.",
+    desc: "AI-powered structural constraint engine that identifies institutional risk boundaries and liquidity thresholds before they activate.",
   },
   {
     icon: Globe,
     title: "Geopolitical Intelligence",
-    desc: "Real-time global event monitoring with market impact scoring and regime-aware portfolio recalibration.",
+    desc: "Real-time global event monitoring with market impact scoring, regime-aware recalibration, and positioning signal analysis.",
   },
   {
     icon: TrendingUp,
     title: "Monte Carlo Simulations",
-    desc: "10,000-path Geometric Brownian Motion simulations for probabilistic outcome modeling across your portfolio.",
+    desc: "10,000-path Geometric Brownian Motion simulations for probabilistic outcome modeling and predictive market analysis.",
   },
   {
     icon: Layers,
     title: "Statistical Arbitrage",
-    desc: "Portfolio-wide quantitative engine with mean-reversion detection, co-integration analysis, and Z-score tracking.",
+    desc: "Portfolio-wide quantitative engine with mean-reversion detection, co-integration analysis, and structural Z-score tracking.",
   },
   {
     icon: Target,
     title: "Desirable Asset Discovery",
-    desc: "Multi-stage AI funnel that identifies high-conviction opportunities using momentum, value, and quality factors.",
+    desc: "Multi-stage intelligence funnel identifying high-conviction opportunities using momentum, value, and quality factor analysis.",
   },
   {
     icon: BarChart3,
     title: "Deep Company Intelligence",
-    desc: "Bloomberg++ dossiers mapping 12 corporate dimensions including management DNA, capital flows, and structural risk.",
+    desc: "Institutional dossiers mapping 12 corporate dimensions including management DNA, capital flows, and structural risk assessment.",
   },
   {
     icon: Sparkles,
     title: "Strategy Factory",
-    desc: "Autonomous strategy generation with backtesting, regime-aware calibration, and paper trading simulation.",
+    desc: "Autonomous strategy generation with backtesting, regime-aware calibration, and paper trading simulation for decision validation.",
   },
   {
     icon: Zap,
-    title: "Real-Time Execution",
-    desc: "Institutional-grade order management with Alpaca integration, aftermath simulation, and causal effects modeling.",
+    title: "Real-Time Execution Layer",
+    desc: "Institutional-grade order management with live execution, aftermath simulation, and causal effects modeling across portfolios.",
   },
 ];
 
@@ -61,6 +61,7 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    document.title = "Entropy Lite — Market Intelligence Operating System";
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate("/dashboard", { replace: true });
@@ -76,9 +77,11 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
-          <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
-          <div className="flex items-center gap-4">
-            <span className="font-mono text-[9px] text-black/35 tracking-wide hidden sm:block">by Pratik Sehwag</span>
+          <img src={entropyLogoFull} alt="Entropy Lite — Market Intelligence System" className="h-8 object-contain" />
+          <div className="flex items-center gap-4 sm:gap-6">
+            <button onClick={() => navigate("/about")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors hidden sm:block">About</button>
+            <button onClick={() => navigate("/pricing")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors hidden sm:block">Pricing</button>
+            <span className="font-mono text-[9px] text-black/35 tracking-wide hidden md:block">by Pratik Sehwag</span>
             <Button
               size="sm"
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide"
@@ -95,24 +98,32 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
           <img src={entropyLogoFull} alt="Entropy Lite" className="h-28 sm:h-36 object-contain mx-auto mb-8" />
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-6">
-            Institutional-Grade Intelligence
+            Market Intelligence Operating System
           </p>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-6">
-            The Operating System
+            Structural Market Intelligence
             <br />
-            <span className="text-black/60">of Finance</span>
+            <span className="text-black/60">for Serious Investors</span>
           </h1>
           <p className="text-lg sm:text-xl text-black/55 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Quantitative risk analytics, regime detection, Monte Carlo simulations,
-            and predictive intelligence — built for serious investors.
+            Predictive market analysis, liquidity flow detection, and real-time intelligence layers — 
+            the institutional trading insights platform built for precision decision-making.
           </p>
           <div className="flex items-center justify-center gap-4">
             <Button
               size="lg"
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/access")}
             >
-              Get Started <ChevronRight className="ml-1 h-4 w-4" />
+              Get Access <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10 hover:bg-black/[0.02]"
+              onClick={() => navigate("/pricing")}
+            >
+              View Pricing
             </Button>
           </div>
         </div>
@@ -122,11 +133,11 @@ export default function LandingPage() {
       <section className="max-w-6xl mx-auto px-6 pb-28">
         <div className="text-center mb-16">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-            Institutional Capabilities
+            Institutional-Grade Capabilities
           </h2>
           <p className="text-black/50 max-w-xl mx-auto">
-            Every module a professional terminal offers — quantitative analytics,
-            AI-driven insights, and execution tools — in one unified platform.
+            Market structure analysis, trading signals, and predictive decision systems — 
+            every module a professional terminal offers, unified in one platform.
           </p>
         </div>
 
@@ -148,19 +159,29 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-black/[0.02]">
         <div className="max-w-3xl mx-auto px-6 py-20 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
-            Ready to upgrade your edge?
+            Intelligence that was previously institutional-only
           </h2>
           <p className="text-black/50 mb-8 max-w-lg mx-auto">
-            Join investors using Entropy Lite for portfolio intelligence that was
-            previously only available to institutional desks.
+            Founding access at ₹999/month. Full market intelligence terminal with 
+            structural analysis, predictive modeling, and real-time liquidity signals.
           </p>
-          <Button
-            size="lg"
-            className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
-            onClick={() => navigate("/dashboard")}
-          >
-            Start Now — Free <ArrowRight className="ml-1 h-4 w-4" />
-          </Button>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            <Button
+              size="lg"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
+              onClick={() => navigate("/access")}
+            >
+              Start Now — ₹999/mo <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="font-mono text-xs tracking-wide px-8 h-12 border-black/10"
+              onClick={() => navigate("/about")}
+            >
+              Learn More
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -170,9 +191,11 @@ export default function LandingPage() {
           <p className="font-mono text-[10px] text-black/30 tracking-wider">
             © {new Date().getFullYear()} Entropy Lite. All rights reserved.
           </p>
-          <p className="font-mono text-[10px] text-black/30 tracking-wider">
-            Institutional Intelligence Platform
-          </p>
+          <div className="flex items-center gap-6">
+            <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
+            <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
+            <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
+          </div>
         </div>
       </footer>
     </div>

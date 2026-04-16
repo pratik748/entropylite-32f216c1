@@ -11,6 +11,9 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import LandingPage from "./pages/LandingPage";
+import PricingPage from "./pages/PricingPage";
+import AboutPage from "./pages/AboutPage";
+import AccessPage from "./pages/AccessPage";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +62,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/access" element={<AccessPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/dashboard"
