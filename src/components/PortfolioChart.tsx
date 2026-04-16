@@ -5,6 +5,7 @@ import { getCurrencySymbol, inferAssetCurrency } from "@/lib/currency";
 
 interface PortfolioChartProps {
   stocks: PortfolioStock[];
+  onAssetTap?: (ticker: string) => void;
 }
 
 const COLORS = [
@@ -18,7 +19,7 @@ const COLORS = [
   "hsl(0, 0%, 38%)",
 ];
 
-const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
+const PortfolioChart = ({ stocks, onAssetTap }: PortfolioChartProps) => {
   const { baseCurrency, convertToBase } = useFX();
   const sym = getCurrencySymbol(baseCurrency);
 
@@ -75,8 +76,8 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
                 strokeWidth={1}
                 paddingAngle={1}
               >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {data.map((entry, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} onClick={() => onAssetTap?.(entry.name)} className={onAssetTap ? "cursor-pointer" : ""} />
                 ))}
               </Pie>
               <Tooltip
@@ -114,7 +115,8 @@ const PortfolioChart = ({ stocks }: PortfolioChartProps) => {
               return (
                 <div
                   key={d.name}
-                  className="flex items-center gap-2 px-2 py-1 hover:bg-surface-2 transition-colors group"
+                  onClick={() => onAssetTap?.(d.name)}
+                  className={`flex items-center gap-2 px-2 py-1 hover:bg-surface-2 transition-colors group ${onAssetTap ? "cursor-pointer active:bg-surface-3" : ""}`}
                 >
                   <span
                     className="h-2 w-2 flex-shrink-0"

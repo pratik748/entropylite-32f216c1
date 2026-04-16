@@ -371,7 +371,13 @@ const IndexContent = () => {
                     )}
                     {stocks.filter((s) => s.analysis).length > 1 && (
                       <>
-                        <PortfolioChart stocks={stocks} />
+                        <PortfolioChart stocks={stocks} onAssetTap={(ticker) => {
+                          const stock = stocks.find(s => s.ticker === ticker || s.ticker.replace(".NS", "").replace(".BO", "") === ticker);
+                          if (stock) {
+                            setActiveStockId(stock.id);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }
+                        }} />
                         <PnLWaterfall stocks={stocks} />
                       </>
                     )}

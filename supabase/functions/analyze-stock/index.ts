@@ -58,6 +58,25 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Fetch Polymarket prediction signals for price skewing
+    let polymarketContext = "";
+    try {
+      const polyRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/polymarket-signals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
+        body: JSON.stringify({ ticker }),
+      });
+      if (polyRes.ok) {
+        const polyData = await polyRes.json();
+        if (polyData?.signals?.length > 0) {
+          const topSignals = polyData.signals.slice(0, 6);
+          polymarketContext = `\nPREDICTION MARKET SIGNALS (Polymarket — real money bets):\n${topSignals.map((s: any) => 
+            `- "${s.market}": ${(s.probability * 100).toFixed(0)}% probability, direction: ${s.direction}, conviction: ${s.conviction}/100, 24h volume: $${((s.volume24h || 0) / 1000).toFixed(0)}K`
+          ).join("\n")}\nUse these prediction market odds to SKEW your price targets and risk assessment. High-probability bearish signals should compress bull ranges and widen bear ranges. High-probability bullish signals should do the opposite.`;
+        }
+      }
+    } catch (e) { console.warn("Polymarket fetch for analyze-stock failed:", e.message); }
+
     const t = Date.now();
     let currentPrice = 0;
     const isIndian = isIndianTicker(ticker);
@@ -188,6 +207,7 @@ REAL-TIME MARKET DATA:
 - Distance from 52W High: ${from52High}%
 
 Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
+${polymarketContext}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
