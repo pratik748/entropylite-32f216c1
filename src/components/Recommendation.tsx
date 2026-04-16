@@ -1,4 +1,4 @@
-import { Brain, ArrowRight, Shield, Target } from "lucide-react";
+import { Brain, ArrowRight, Shield, Target, Globe } from "lucide-react";
 import { cleanAIText } from "@/lib/utils";
 
 interface RecommendationProps {
@@ -33,7 +33,12 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
           <div className="flex items-start gap-3">
             <Target className={`h-5 w-5 mt-0.5 shrink-0 ${config.color}`} />
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Verdict</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Verdict</p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest text-primary">
+                  <Globe className="h-2.5 w-2.5" /> Consensus
+                </span>
+              </div>
               <p className={`text-sm sm:text-base font-semibold leading-snug ${config.color}`}>{cleanAIText(verdict)}</p>
             </div>
             <div className="text-right shrink-0">
@@ -66,7 +71,12 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
           <div className="flex items-start gap-3">
             <Shield className="h-4 w-4 mt-0.5 shrink-0 text-info" />
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Hedge if Wrong</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Hedge if Wrong</p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest text-primary">
+                  <Globe className="h-2.5 w-2.5" /> Consensus
+                </span>
+              </div>
               <p className="text-sm leading-relaxed text-foreground">{cleanAIText(hedgeStrategy)}</p>
             </div>
           </div>

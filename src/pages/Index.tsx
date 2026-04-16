@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3 } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
@@ -325,7 +326,7 @@ const IndexContent = () => {
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
-                  <div className="p-1.5 space-y-1.5 pb-10">
+                  <div className="p-1.5 space-y-1.5 pb-20">
                     <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
                     {isLoading && <LoadingState />}
                     {analysis && !isLoading && (
@@ -366,7 +367,6 @@ const IndexContent = () => {
                         />
                         <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                         <CompanyIntelligence ticker={analysis.ticker} />
-                        <LiveNewsFeed ticker={analysis.ticker} compact />
                       </>
                     )}
                     {stocks.filter((s) => s.analysis).length > 1 && (
@@ -381,6 +381,57 @@ const IndexContent = () => {
                         <PnLWaterfall stocks={stocks} />
                       </>
                     )}
+
+                    {/* Mobile Floating Sidebar Toggles */}
+                    <div className="fixed bottom-12 left-0 right-0 z-40 flex justify-center gap-2 px-4">
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
+                            <LayoutDashboard className="h-3 w-3" /> Portfolio
+                          </button>
+                        </SheetTrigger>
+                        <SheetContent side="left" className="w-[85vw] max-w-sm p-0 bg-background border-border">
+                          <div className="h-full overflow-auto">
+                            <PortfolioBlotter
+                              stocks={stocks}
+                              activeStockId={activeStockId}
+                              onSelectStock={(id) => { setActiveStockId(id); }}
+                              onRemoveStock={handleRemoveStock}
+                              onAnalyze={handleAnalyze}
+                              isLoading={isLoading}
+                              priceStatus={priceStatus}
+                              tickerThreats={tickerThreats}
+                            />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
+                            <Newspaper className="h-3 w-3" /> News
+                          </button>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 bg-background border-border">
+                          <div className="h-full overflow-auto pt-10 px-2">
+                            <LiveNewsFeed ticker={analysis?.ticker} compact />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
+                            <BarChart3 className="h-3 w-3" /> Flows
+                          </button>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 bg-background border-border">
+                          <div className="h-full overflow-auto pt-10 px-2">
+                            <FlowDetectionPanel stocks={stocks} />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                    </div>
                   </div>
                 ) : (
                   /* Desktop: Bloomberg-style resizable 3-column layout */
