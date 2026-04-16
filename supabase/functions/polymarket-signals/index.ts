@@ -59,8 +59,19 @@ const MARKET_CATEGORIES: Record<string, string[]> = {
   ],
 };
 
+// Sports/entertainment keywords to filter out false positives
+const EXCLUDE_KEYWORDS = [
+  "nba", "nfl", "mlb", "nhl", "ufc", "pgl", "esport", "lpl", "lol", "cs2",
+  "warriors", "lakers", "yankees", "pirates", "nationals", "dodgers", "celtics",
+  "finals", "championship", "game ", "match", "tournament", "league",
+  "oscar", "grammy", "emmy", "box office", "movie", "album", "song",
+  "donk", "streamer", "twitch", "youtube",
+];
+
 function categorizeMarket(title: string, slug: string): string {
   const text = `${title} ${slug}`.toLowerCase();
+  // Exclude sports/entertainment
+  if (EXCLUDE_KEYWORDS.some(k => text.includes(k))) return "other";
   for (const [cat, keywords] of Object.entries(MARKET_CATEGORIES)) {
     if (keywords.some(k => text.includes(k))) return cat;
   }
