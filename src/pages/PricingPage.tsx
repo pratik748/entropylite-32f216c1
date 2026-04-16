@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check } from "lucide-react";
-import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
+import PublicNav from "@/components/PublicNav";
 
 const FEATURES = [
   "Full market intelligence terminal",
@@ -28,37 +28,23 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-black/5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-14">
-          <button onClick={() => navigate("/")} className="flex items-center">
-            <img src={entropyLogoFull} alt="Entropy Lite" className="h-8 object-contain" />
-          </button>
-          <div className="flex items-center gap-3 sm:gap-6">
-            <button onClick={() => navigate("/about")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">About</button>
-            <button onClick={() => navigate("/access")} className="font-mono text-[11px] text-black/50 hover:text-black transition-colors">Access</button>
-            <span className="font-mono text-[9px] text-black/35 tracking-wide">by Pratik Sehwag</span>
-            <Button size="sm" className="bg-black text-white hover:bg-black/85 font-mono text-xs" onClick={() => navigate("/dashboard")}>
-              Sign In
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <PublicNav />
 
-      <main className="max-w-3xl mx-auto px-6 py-20">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-center mb-4">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-center mb-4">
           Founding Access
         </h1>
-        <p className="text-center text-black/50 max-w-lg mx-auto mb-16">
+        <p className="text-center text-sm sm:text-base text-black/50 max-w-lg mx-auto mb-10 sm:mb-16">
           One plan. Full institutional intelligence. Lock in the founding rate before general availability.
         </p>
 
-        <div className="border border-black/10 rounded-xl p-8 sm:p-12 max-w-lg mx-auto">
+        <div className="border border-black/10 rounded-xl p-6 sm:p-12 max-w-lg mx-auto">
           <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-5xl font-bold">Founding</span>
+            <span className="text-3xl sm:text-5xl font-bold">Founding</span>
           </div>
-          <p className="text-black/40 font-mono text-[11px] mb-8">Early access rate. Price will increase at general availability.</p>
+          <p className="text-black/40 font-mono text-[11px] mb-6 sm:mb-8">Early access rate. Price will increase at general availability.</p>
 
-          <ul className="space-y-3 mb-10">
+          <ul className="space-y-3 mb-8 sm:mb-10">
             {FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-3 text-sm text-black/70">
                 <Check className="h-4 w-4 text-black/40 mt-0.5 flex-shrink-0" />
@@ -77,7 +63,7 @@ export default function PricingPage() {
       </main>
 
       <footer className="border-t border-black/5 py-8">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} Entropy Lite. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <button onClick={() => navigate("/")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Home</button>
