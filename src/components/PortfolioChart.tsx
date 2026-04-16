@@ -76,8 +76,8 @@ const PortfolioChart = ({ stocks, onAssetTap }: PortfolioChartProps) => {
                 strokeWidth={1}
                 paddingAngle={1}
               >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {data.map((entry, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} onClick={() => onAssetTap?.(entry.name)} className={onAssetTap ? "cursor-pointer" : ""} />
                 ))}
               </Pie>
               <Tooltip
