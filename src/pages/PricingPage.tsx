@@ -21,7 +21,7 @@ export default function PricingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Pricing — EntropyLite | Founding Access";
+    document.title = "Pricing | EntropyLite - Founding Access";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Founding access to EntropyLite. Full institutional-grade market intelligence, quantitative risk analytics, and probabilistic scenario systems.");
   }, []);
@@ -65,7 +65,7 @@ export default function PricingPage() {
       <footer className="border-t border-black/5 py-6">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <p className="font-mono text-[9px] text-black/25 leading-relaxed mb-4 max-w-4xl">
-            EntropyLite provides probabilistic market intelligence — not investment advice. All decisions are made independently by users.
+            EntropyLite provides probabilistic market intelligence, not investment advice. All decisions are made independently by users.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="font-mono text-[10px] text-black/30">© {new Date().getFullYear()} EntropyLite. All rights reserved.</p>

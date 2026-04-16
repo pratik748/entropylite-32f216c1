@@ -8,7 +8,7 @@ export default function AboutPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "About — Entropy Lite | Market Intelligence Operating System";
+    document.title = "About | Entropy Lite - The Operating System of Finance";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Entropy Lite is an institutional-grade market intelligence operating system. Built for structural market analysis, liquidity flow detection, and predictive decision modeling.");
   }, []);
@@ -31,7 +31,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">The Problem</h2>
             <p className="text-sm sm:text-base">
-              Retail investors make decisions with incomplete data. Institutional desks operate with Bloomberg terminals, proprietary quant models, and real-time flow intelligence. The gap between these two worlds has remained unchanged for decades. Most retail platforms offer charts and basic indicators — none provide the structural analysis, constraint detection, or predictive simulation that professional traders rely on daily.
+              Retail investors make decisions with incomplete data. Institutional desks operate with Bloomberg terminals, proprietary quant models, and real-time flow intelligence. The gap between these two worlds has remained unchanged for decades. Most retail platforms offer charts and basic indicators; none provide the structural analysis, constraint detection, or predictive simulation that professional traders rely on daily.
             </p>
           </div>
 
@@ -86,7 +86,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Built by Pratik Sehwag</h2>
             <p className="text-sm sm:text-base">
-              EntropyLite is designed and built as a research-grade intelligence system. Every module — from the statistical arbitrage engine to the causal effects simulator — is grounded in quantitative methodology and real market data. The platform provides intelligence, not advice — all investment decisions remain with the user.
+              EntropyLite is designed and built as a research-grade intelligence system. Every module, from the statistical arbitrage engine to the causal effects simulator, is grounded in quantitative methodology and real market data. The platform provides intelligence, not advice. All investment decisions remain with the user.
             </p>
           </div>
         </div>

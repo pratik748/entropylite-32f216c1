@@ -293,7 +293,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       {suggestions.length > 0 && (
         <div className="rounded-xl border border-primary/20 bg-card p-5">
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-primary" /> Recommended Actions — {params.label}
+            <Lightbulb className="h-4 w-4 text-primary" /> Recommended Actions: {params.label}
           </h3>
           <div className="space-y-2">
             {suggestions.map((s, i) => (
@@ -311,7 +311,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
 
       {/* Spaghetti Chart */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Simulation Paths — {params.label}</h3>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-3">Simulation Paths: {params.label}</h3>
 
         {/* View mode tabs */}
         <div className="flex items-center justify-center gap-1 mb-4">

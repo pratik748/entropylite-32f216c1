@@ -1,7 +1,7 @@
 /**
  * SEBI Compliance Layer
  * Maps internal suggestion values to non-advisory, probabilistic display labels.
- * EntropyLite is a market intelligence platform — NOT an investment advisor.
+ * EntropyLite is a market intelligence platform, NOT an investment advisor.
  */
 
 export const SCENARIO_LABELS: Record<string, { label: string; fullLabel: string; color: string; bg: string; border: string }> = {
@@ -14,7 +14,7 @@ export function getScenarioConfig(suggestion: string) {
   return SCENARIO_LABELS[suggestion] || SCENARIO_LABELS.Hold;
 }
 
-export const MICRO_DISCLAIMER = "EntropyLite provides probabilistic market intelligence — not investment advice. All decisions are yours.";
+export const MICRO_DISCLAIMER = "EntropyLite provides probabilistic market intelligence, not investment advice. All decisions are yours.";
 
 export const FOOTER_DISCLAIMER = "EntropyLite is a market intelligence and probabilistic scenario engine. It does not provide investment advice, trading recommendations, or portfolio management services. All outputs are research-based observations and scenario projections. Users make independent investment decisions at their own risk. Past performance and model outputs do not guarantee future results.";
 

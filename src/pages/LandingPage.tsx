@@ -24,7 +24,7 @@ const FEATURES = [
 
 const HOW_IT_WORKS = [
   { icon: Eye, step: "01", title: "Data Ingestion", desc: "EntropyLite continuously ingests real-time price feeds, macro indicators, news sentiment, geopolitical events, and institutional flow data from multiple sources. Every data point is timestamped, normalized, and fed into the intelligence pipeline." },
-  { icon: Cpu, step: "02", title: "Intelligence Processing", desc: "Raw data passes through layered AI engines — including CLANK constraint detection, Monte Carlo simulations, statistical arbitrage models, and regime classification. Each engine operates independently, then results are fused into a unified intelligence view." },
+  { icon: Cpu, step: "02", title: "Intelligence Processing", desc: "Raw data passes through layered AI engines, including CLANK constraint detection, Monte Carlo simulations, statistical arbitrage models, and regime classification. Each engine operates independently, then results are fused into a unified intelligence view." },
   { icon: Brain, step: "03", title: "Scenario Generation", desc: "The system generates probabilistic scenarios: risk alerts when portfolio VaR breaches thresholds, structural constraints approaching activation, and high-confidence positioning insights calibrated to the current market regime." },
   { icon: GitBranch, step: "04", title: "Causal Modeling", desc: "The Causal Effects Engine simulates cascading market impacts across correlated sectors, currencies, and asset classes. It models 1st-order price effects, 2nd-order sector contagion, and 3rd-order systemic ripple effects." },
   { icon: LineChart, step: "05", title: "Scenario Mapping", desc: "The Strategy Factory generates scenario-based positioning insights with key levels, projected ranges, invalidation zones, and aftermath simulation showing expected market structure reactions." },
@@ -36,7 +36,7 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite — Market Intelligence Operating System";
+    document.title = "Entropy Lite | The Operating System of Finance";
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
       setChecking(false);
@@ -59,7 +59,7 @@ export default function LandingPage() {
             loading="eager"
           />
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6">
-            Probabilistic Market Intelligence Engine
+            The Operating System of Finance
           </p>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6">
             Market Structure Intelligence
@@ -67,8 +67,8 @@ export default function LandingPage() {
             <span className="text-black/60">for Independent Thinkers</span>
           </h1>
           <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            Probabilistic scenario analysis, liquidity flow detection, and real-time intelligence layers — 
-            an institutional-grade research platform for data-driven market understanding.
+            Probabilistic scenario analysis, liquidity flow detection, and real-time intelligence layers.
+            An institutional-grade research platform for data-driven market understanding.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Button
@@ -95,8 +95,8 @@ export default function LandingPage() {
             Institutional-Grade Capabilities
           </h2>
           <p className="text-sm sm:text-base text-black/50 max-w-xl mx-auto">
-            Market structure analysis, probabilistic scenarios, and quantitative decision intelligence — 
-            every module a professional terminal offers, unified in one platform.
+            Market structure analysis, probabilistic scenarios, and quantitative decision intelligence.
+            Every module a professional terminal offers, unified in one platform.
           </p>
         </div>
 
@@ -122,7 +122,7 @@ export default function LandingPage() {
               How Entropy Lite Works
             </h2>
             <p className="text-sm sm:text-base text-black/50 max-w-2xl mx-auto">
-              From raw market data to probabilistic intelligence — a six-stage pipeline that continuously processes, 
+              From raw market data to probabilistic intelligence: a six-stage pipeline that continuously processes, 
               analyzes, and models global financial markets in real time.
             </p>
           </div>
@@ -165,12 +165,12 @@ export default function LandingPage() {
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">CLANK Structural Constraint Engine</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                CLANK stands for Constraint, Liquidity, Accumulation, Narrative, and Kinetic — five structural forces 
+                CLANK stands for Constraint, Liquidity, Accumulation, Narrative, and Kinetic: five structural forces 
                 that define how markets behave at critical inflection points.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
-                When a structural constraint approaches its activation threshold — such as a liquidity cliff, 
-                institutional positioning limit, or regulatory boundary — CLANK generates pre-emptive alerts 
+              When a structural constraint approaches its activation threshold, such as a liquidity cliff, 
+                institutional positioning limit, or regulatory boundary, CLANK generates pre-emptive alerts
                 with probability scores and expected impact magnitude.
               </p>
             </div>
@@ -204,8 +204,8 @@ export default function LandingPage() {
             <div>
               <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Geopolitical & Regime Intelligence</h3>
               <p className="text-sm text-black/55 leading-relaxed mb-3">
-                A continuous monitoring system tracks global geopolitical events — sanctions, conflicts, 
-                policy changes, central bank decisions — and scores their expected market impact.
+            A continuous monitoring system tracks global geopolitical events: sanctions, conflicts, 
+                policy changes, central bank decisions, and scores their expected market impact.
               </p>
               <p className="text-sm text-black/55 leading-relaxed">
                 The Regime Detection engine classifies current market conditions and automatically recalibrates 
@@ -249,7 +249,7 @@ export default function LandingPage() {
           </h2>
           <p className="text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto">
             Full market intelligence terminal with structural analysis, probabilistic modeling, 
-            and real-time liquidity scenario mapping — available during founding access.
+            and real-time liquidity scenario mapping, available during founding access.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Button

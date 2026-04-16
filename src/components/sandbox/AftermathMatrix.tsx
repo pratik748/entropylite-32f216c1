@@ -96,7 +96,7 @@ const AftermathMatrix = ({ stocks }: Props) => {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Aftermath Detail — Pre-Trade Simulation</h3>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Aftermath Detail: Pre-Trade Simulation</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>

@@ -274,7 +274,7 @@ const IndexContent = () => {
             <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
               <RefreshCw className="h-3 w-3 text-primary animate-spin" />
               <span className="text-[10px] font-mono text-primary tracking-wider">
-                UPDATING INTELLIGENCE — LIVE RECOMPUTATION IN PROGRESS
+                UPDATING INTELLIGENCE: LIVE RECOMPUTATION IN PROGRESS
               </span>
               <div className="ml-auto h-1 w-24 rounded-full bg-primary/20 overflow-hidden">
                 <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
@@ -467,8 +467,8 @@ const IndexContent = () => {
                                 </div>
                                 <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
                                 <p className="max-w-md text-center text-xs text-muted-foreground px-4">
-                                  Enter any global asset — stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or
-                                  commodities (GC=F) — for deep analysis with real-time pricing.
+                                  Enter any global asset: stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or
+                                  commodities (GC=F) for deep analysis with real-time pricing.
                                 </p>
                               </div>
                             )}

@@ -144,7 +144,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
             {analyzed.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-2 py-4 text-center text-muted-foreground text-[10px]">
-                  No positions — add assets above
+                  No positions. Add assets above.
                 </td>
               </tr>
             )}
