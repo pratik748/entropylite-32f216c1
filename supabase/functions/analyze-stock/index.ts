@@ -222,10 +222,10 @@ Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
   "bearRange": [<lower>, <upper>],
   "suggestion": "<Hold | Add | Exit>",
   "confidence": <0-100>,
-  "confidenceReasoning": "<2-3 sentence explanation>",
-  "verdict": "<1 sentence clear actionable verdict e.g. 'Buy aggressively on dips below 1500 with a 12-month target of 1850' or 'Exit immediately — downtrend confirmed with no catalyst in sight'>",
-  "hedgeStrategy": "<Specific hedge if the primary suggestion fails, e.g. 'Buy 1-month ATM put at strike 1450 (~2% premium) to cap downside at -5%' or 'Short Nifty IT index futures 1:0.5 ratio to hedge sector beta' — NEVER say 'no hedge needed', always provide a concrete defensive play>",
-  "summary": "<4-5 sentence deep analysis>",
+  "confidenceReasoning": "<2-3 sentence explanation of confidence score based on data quality, macro alignment, and structural factors>",
+  "verdict": "<1 sentence probabilistic scenario assessment e.g. 'High-probability upside scenario toward 1850 projected range if support at 1500 holds with current momentum structure' or 'Downside scenario likely — structural deterioration with volatility expansion forming below key levels'>",
+  "hedgeStrategy": "<Specific hedge positioning if primary scenario is invalidated, e.g. 'ATM put at strike 1450 (~2% premium) limits downside exposure to -5%' or 'Nifty IT index futures 1:0.5 ratio to offset sector beta exposure' — NEVER say 'no hedge needed', always provide a concrete defensive positioning>",
+  "summary": "<4-5 sentence deep analysis using observational and probabilistic language — describe what market structure indicates, not what the user should do>",
   "macroFactors": ["<factor1>", "<factor2>"],
   "overallSentiment": <-100 to 100>,
   "totalPressure": <number>,
@@ -256,7 +256,7 @@ Every data point must reflect current market reality.`;
     let jsonStr: string;
     try {
       const aiOpts = {
-        systemPrompt: `You are an institutional-grade financial analyst. Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
+        systemPrompt: `You are an institutional-grade market research analyst. You provide probabilistic scenario assessments — NOT investment advice. Use observational, data-driven language. Never use directive words like "buy", "sell", "enter", "exit". Instead use "market structure indicates", "high-probability scenario", "projected range", "liquidity zone forming", "volatility expansion likely". Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
         userPrompt: prompt,
         maxTokens: 8192,
       };

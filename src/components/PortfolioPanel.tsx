@@ -168,7 +168,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                         stock.analysis.suggestion === "Add" ? "bg-gain/10 text-gain" :
                         stock.analysis.suggestion === "Exit" ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"
-                      }`}>{stock.analysis.suggestion}</span>
+                      }`}>{stock.analysis.suggestion === "Add" ? "UPSIDE" : stock.analysis.suggestion === "Exit" ? "DOWNSIDE" : "OBSERVE"}</span>
                     )}
                     {cur && cur !== baseCurrency && <span className="text-[9px] text-muted-foreground font-mono">{cur}</span>}
                     {stock.analysis && <FreshnessIndicator status={freshness} />}
