@@ -380,11 +380,10 @@ export default function StatArbIntelligencePanel({ tickers, baseSignals, maxPair
                 const maxLen = Math.max(...intel.map(p => p.spread.length), 0);
                 return Array.from({ length: maxLen }, (_, i) => {
                   const point: Record<string, any> = { day: i };
-                  intel.forEach((p, idx) => {
+                  intel.forEach((p) => {
                     if (i < p.spread.length) {
-                      const mean = p.ou.mu;
-                      const std = Math.sqrt(p.ou.sigmaOU * p.ou.sigmaOU / (2 * p.ou.kappa));
-                      point[`${p.tickerA}/${p.tickerB}`] = std > 0 ? (p.spread[i] - mean) / std : 0;
+                      const std = p.ou.sigmaEq;
+                      point[`${p.tickerA}/${p.tickerB}`] = std > 0 ? (p.spread[i] - p.ou.mu) / std : 0;
                     }
                   });
                   return point;
