@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 
 const FEATURES = [
