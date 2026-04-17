@@ -89,7 +89,8 @@ export function useAlpacaTrading() {
 
   const submitOrder = useCallback(async (params: {
     symbol: string;
-    qty: number;
+    qty?: number;
+    notional?: number;
     side: "buy" | "sell";
     type?: "market" | "limit" | "stop" | "stop_limit";
     time_in_force?: "day" | "gtc" | "ioc";
