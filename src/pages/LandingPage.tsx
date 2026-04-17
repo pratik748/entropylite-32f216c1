@@ -136,11 +136,11 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {HOW_IT_WORKS.map((step) => (
-              <div key={step.step} className="flex gap-4 sm:gap-5">
+            {HOW_IT_WORKS.map((step, i) => (
+              <div key={step.step} className="reveal flex gap-4 sm:gap-5" style={{ transitionDelay: `${(i % 2) * 80}ms` }}>
                 <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center">
-                    <span className="font-mono text-[10px] font-bold text-black/40">{step.step}</span>
+                  <div className="relative w-10 h-10 rounded-full border border-black/10 flex items-center justify-center bg-white shadow-[inset_0_1px_0_hsl(0_0%_100%/1),0_2px_6px_-2px_hsl(0_0%_0%/0.08)]">
+                    <span className="font-mono text-[10px] font-bold text-black/50">{step.step}</span>
                   </div>
                 </div>
                 <div className="min-w-0">
