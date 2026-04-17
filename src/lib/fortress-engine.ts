@@ -187,12 +187,15 @@ export function scanThreats(
   const threats: Threat[] = [];
   const profile = deriveRegimeProfile(signals);
 
-  // 1. Concentration — regime-aware single position weight ceiling
+  // 1. Concentration — regime-aware ceiling + early-warning band (proactive, portfolio-wide)
+  const earlyConcBand = profile.concentrationLimit * 0.7; // start flagging at 70% of the regime limit
   holdings.forEach((h) => {
     const weight = h.value / totalValue;
-    if (weight >= profile.concentrationLimit) {
-      const sev: ThreatSeverity =
-        weight >= profile.concentrationLimit + 0.15
+    if (weight >= earlyConcBand) {
+      const overLimit = weight >= profile.concentrationLimit;
+      const sev: ThreatSeverity = !overLimit
+        ? "MED"
+        : weight >= profile.concentrationLimit + 0.15
           ? "CRITICAL"
           : weight >= profile.concentrationLimit + 0.07
             ? "HIGH"
@@ -202,7 +205,9 @@ export function scanThreats(
         kind: "concentration",
         target: h.ticker,
         severity: sev,
-        evidence: `Position weight ${(weight * 100).toFixed(1)}% — exceeds ${(profile.concentrationLimit * 100) | 0}% regime limit`,
+        evidence: overLimit
+          ? `Position weight ${(weight * 100).toFixed(1)}% — exceeds ${(profile.concentrationLimit * 100) | 0}% regime limit`
+          : `Position weight ${(weight * 100).toFixed(1)}% — approaching ${(profile.concentrationLimit * 100) | 0}% regime cap`,
         contributionToRisk: Math.round(weight * 60),
         source: "portfolio",
       });
