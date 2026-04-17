@@ -364,11 +364,10 @@ export function useFortressMode(
   }, []);
 
   const resetActions = useCallback(() => {
-    if (setStocks) {
-      setStocks((prev) => prev.filter((s) => !s.__fortress));
-    }
+    // Reset only clears the proposal ledger. Real portfolio mutations
+    // (trims, added hedges) stay — undo them manually from the dashboard.
     setState((s) => ({ ...s, dismissedActionIds: [], appliedActionIds: [] }));
-  }, [setStocks]);
+  }, []);
 
   return {
     active: state.active,

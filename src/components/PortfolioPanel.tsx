@@ -12,14 +12,6 @@ export interface PortfolioStock {
   quantity: number;
   analysis?: any;
   isLoading?: boolean;
-  /** Synthetic position injected by Fortress Mode (hedge / shield overlay). */
-  __fortress?: {
-    kind: "hedge" | "convert";
-    sourceActionId: string;
-    sourceTarget: string;
-    rationale: string;
-    appliedAt: number;
-  };
 }
 
 interface PortfolioPanelProps {
