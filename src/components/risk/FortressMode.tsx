@@ -59,6 +59,7 @@ const FortressMode = ({ stocks }: FortressModeProps) => {
     resetActions,
     aiNarratives,
     aiLoading,
+    signals,
   } = useFortressMode(stocks);
 
   const analyzed = useMemo(() => stocks.filter((s) => s.analysis), [stocks]);
