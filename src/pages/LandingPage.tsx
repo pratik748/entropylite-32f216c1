@@ -250,25 +250,26 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-black/5 bg-black/[0.02]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-4">
+      <section className="relative overflow-hidden border-t border-black/5 bg-black/[0.02]">
+        <div className="mesh-bg opacity-60" />
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
+          <h2 className="reveal text-xl sm:text-3xl font-bold tracking-tight mb-4">
             Intelligence that was previously institutional-only
           </h2>
-          <p className="text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto">
-            Full market intelligence terminal with structural analysis, probabilistic modeling, 
+          <p className="reveal text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto" style={{ transitionDelay: "80ms" }}>
+            Full market intelligence terminal with structural analysis, probabilistic modeling,
             and real-time liquidity scenario mapping, available during founding access.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <div className="reveal flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4" style={{ transitionDelay: "160ms" }}>
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shine-on-hover lift-on-hover"
               onClick={() => navigate("/access")}
             >
               Get Founding Access <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto lift-on-hover"
               onClick={() => navigate("/about")}
             >
               Learn More
