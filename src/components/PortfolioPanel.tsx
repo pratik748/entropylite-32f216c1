@@ -1,4 +1,4 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
