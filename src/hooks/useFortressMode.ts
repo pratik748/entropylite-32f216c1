@@ -265,7 +265,7 @@ export function useFortressMode(
             quantity: hedgeQty,
             isLoading: false,
             __fortress: {
-              kind: action.kind,
+              kind: action.kind as "hedge" | "convert",
               sourceActionId: action.id,
               sourceTarget: action.target,
               rationale: action.rationale,
