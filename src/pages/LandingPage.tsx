@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
-import { useScrollReveal } from "@/hooks/useScrollReveal";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 
 const FEATURES = [
@@ -35,7 +34,6 @@ const HOW_IT_WORKS = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
-  const revealRef = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
     document.title = "Entropy Lite | The Operating System of Finance";
@@ -48,43 +46,40 @@ export default function LandingPage() {
   if (checking) return null;
 
   return (
-    <div ref={revealRef} className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-white text-black">
       <PublicNav />
 
-      {/* Hero with animated mesh + grain */}
-      <header className="relative overflow-hidden grain-overlay">
-        <div className="mesh-bg" />
-        <div className="absolute inset-0 grid-texture opacity-[0.35] pointer-events-none" />
-
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20 text-center">
+      {/* Hero */}
+      <header className="relative overflow-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20 text-center">
           <img
             src={entropyLogoFull}
             alt="Entropy Lite"
-            className="h-20 sm:h-36 object-contain mx-auto mb-5 sm:mb-8 animate-scale-fade"
+            className="h-20 sm:h-36 object-contain mx-auto mb-5 sm:mb-8"
             loading="eager"
           />
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6 reveal">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6">
             The Operating System of Finance
           </p>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6 reveal" style={{ transitionDelay: "80ms" }}>
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6">
             Market Structure Intelligence
             <br />
             <span className="text-black/60">for Independent Thinkers</span>
           </h1>
-          <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed reveal" style={{ transitionDelay: "160ms" }}>
+          <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
             Probabilistic scenario analysis, liquidity flow detection, and real-time intelligence layers.
             An institutional-grade research platform for data-driven market understanding.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 reveal" style={{ transitionDelay: "240ms" }}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shine-on-hover lift-on-hover"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
               onClick={() => navigate("/access")}
             >
-              Get Access <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              Get Access <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto lift-on-hover"
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/pricing")}
             >
               View Pricing
@@ -96,26 +91,23 @@ export default function LandingPage() {
       {/* Features Grid */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-28">
         <div className="text-center mb-10 sm:mb-16">
-          <h2 className="reveal text-xl sm:text-3xl font-bold tracking-tight mb-3">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-3">
             Institutional-Grade Capabilities
           </h2>
-          <p className="reveal text-sm sm:text-base text-black/50 max-w-xl mx-auto" style={{ transitionDelay: "80ms" }}>
+          <p className="text-sm sm:text-base text-black/50 max-w-xl mx-auto">
             Market structure analysis, probabilistic scenarios, and quantitative decision intelligence.
             Every module a professional terminal offers, unified in one platform.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {FEATURES.map((f, i) => (
+          {FEATURES.map((f) => (
             <article
               key={f.title}
-              className="reveal group glass-tile rounded-lg p-5 sm:p-6 shine-on-hover lift-on-hover"
-              style={{ transitionDelay: `${(i % 3) * 60}ms` }}
+              className="group rounded-lg border border-black/5 bg-white p-5 sm:p-6 hover:shadow-md active:bg-black/[0.02] transition-all"
             >
-              <div className="relative inline-flex items-center justify-center h-9 w-9 rounded-md bg-black/[0.04] border border-black/[0.06] mb-3 sm:mb-4 group-hover:bg-black/[0.07] transition-colors">
-                <f.icon className="h-4 w-4 text-black/60 group-hover:text-black transition-colors" />
-              </div>
-              <h3 className="font-semibold text-sm mb-1.5 sm:mb-2 tracking-tight">{f.title}</h3>
+              <f.icon className="h-5 w-5 text-black/40 mb-3 sm:mb-4 group-hover:text-black/70 transition-colors" />
+              <h3 className="font-semibold text-sm mb-1.5 sm:mb-2">{f.title}</h3>
               <p className="text-sm text-black/50 leading-relaxed">{f.desc}</p>
             </article>
           ))}
@@ -136,11 +128,11 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {HOW_IT_WORKS.map((step, i) => (
-              <div key={step.step} className="reveal flex gap-4 sm:gap-5" style={{ transitionDelay: `${(i % 2) * 80}ms` }}>
+            {HOW_IT_WORKS.map((step) => (
+              <div key={step.step} className="flex gap-4 sm:gap-5">
                 <div className="flex-shrink-0">
-                  <div className="relative w-10 h-10 rounded-full border border-black/10 flex items-center justify-center bg-white shadow-[inset_0_1px_0_hsl(0_0%_100%/1),0_2px_6px_-2px_hsl(0_0%_0%/0.08)]">
-                    <span className="font-mono text-[10px] font-bold text-black/50">{step.step}</span>
+                  <div className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center">
+                    <span className="font-mono text-[10px] font-bold text-black/40">{step.step}</span>
                   </div>
                 </div>
                 <div className="min-w-0">
@@ -250,26 +242,25 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="relative overflow-hidden border-t border-black/5 bg-black/[0.02]">
-        <div className="mesh-bg opacity-60" />
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
-          <h2 className="reveal text-xl sm:text-3xl font-bold tracking-tight mb-4">
+      <section className="border-t border-black/5 bg-black/[0.02]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-4">
             Intelligence that was previously institutional-only
           </h2>
-          <p className="reveal text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto" style={{ transitionDelay: "80ms" }}>
-            Full market intelligence terminal with structural analysis, probabilistic modeling,
+          <p className="text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto">
+            Full market intelligence terminal with structural analysis, probabilistic modeling, 
             and real-time liquidity scenario mapping, available during founding access.
           </p>
-          <div className="reveal flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4" style={{ transitionDelay: "160ms" }}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shine-on-hover lift-on-hover"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
               onClick={() => navigate("/access")}
             >
               Get Founding Access <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto lift-on-hover"
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
               Learn More

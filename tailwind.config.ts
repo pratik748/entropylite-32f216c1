@@ -97,39 +97,6 @@ export default {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
-        "reveal-up": {
-          from: { opacity: "0", transform: "translateY(24px)", filter: "blur(6px)" },
-          to: { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
-        },
-        "shimmer": {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
-        "shine-sweep": {
-          "0%": { transform: "translateX(-150%) skewX(-20deg)" },
-          "100%": { transform: "translateX(250%) skewX(-20deg)" },
-        },
-        "mesh-drift": {
-          "0%, 100%": { transform: "translate3d(0,0,0) scale(1)" },
-          "33%": { transform: "translate3d(3%,-2%,0) scale(1.05)" },
-          "66%": { transform: "translate3d(-2%,3%,0) scale(0.97)" },
-        },
-        "float-y": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-6px)" },
-        },
-        "rotate-slow": {
-          from: { transform: "rotate(0deg)" },
-          to: { transform: "rotate(360deg)" },
-        },
-        "scale-fade": {
-          from: { opacity: "0", transform: "scale(0.96)" },
-          to: { opacity: "1", transform: "scale(1)" },
-        },
-        "border-flow": {
-          "0%, 100%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -137,14 +104,6 @@ export default {
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "slide-up": "slide-up 0.3s ease-out",
         "fade-in": "fade-in 0.25s ease-out",
-        "reveal-up": "reveal-up 0.7s cubic-bezier(0.22,1,0.36,1) both",
-        "shimmer": "shimmer 2.4s linear infinite",
-        "shine-sweep": "shine-sweep 1.2s ease-out",
-        "mesh-drift": "mesh-drift 18s ease-in-out infinite",
-        "float-y": "float-y 4s ease-in-out infinite",
-        "rotate-slow": "rotate-slow 32s linear infinite",
-        "scale-fade": "scale-fade 0.45s cubic-bezier(0.22,1,0.36,1) both",
-        "border-flow": "border-flow 6s ease-in-out infinite",
       },
     },
   },
