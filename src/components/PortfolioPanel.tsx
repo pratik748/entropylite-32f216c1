@@ -5,6 +5,9 @@ import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, reso
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
 
+/** Tickers that Fortress Mode adds as defensive hedges — used to render a Hedge badge. */
+const FORTRESS_HEDGES = new Set(["SH", "VXX", "PSQ", "SEF", "DUG", "GLD", "TLT", "UUP"]);
+
 export interface PortfolioStock {
   id: string;
   ticker: string;
@@ -163,13 +166,13 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-foreground truncate">{stock.ticker}</span>
-                    {stock.__fortress && (
+                    {FORTRESS_HEDGES.has(stock.ticker.toUpperCase()) && (
                       <span
                         className="flex items-center gap-1 rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest text-gain"
-                        title={`Fortress ${stock.__fortress.kind} on ${stock.__fortress.sourceTarget} — ${stock.__fortress.rationale}`}
+                        title="Defensive hedge added by Fortress Mode"
                       >
                         <ShieldCheck className="h-2.5 w-2.5" />
-                        SHIELD
+                        HEDGE
                       </span>
                     )}
                     {stock.isLoading && <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
