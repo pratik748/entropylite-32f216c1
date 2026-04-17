@@ -16,11 +16,12 @@ import * as SA from "@/lib/statarb-math";
 import { toast } from "@/components/ui/sonner";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useHistoricalPrices, type HistoricalData } from "@/hooks/useHistoricalPrices";
+import StatArbIntelligencePanel from "@/components/statarb/StatArbIntelligencePanel";
 
 interface Props { stocks: PortfolioStock[]; }
 
 const TABS = [
-  "Price Dynamics", "Portfolio Risk", "Optimization", "Time Series",
+  "Intelligence", "Price Dynamics", "Portfolio Risk", "Optimization", "Time Series",
   "Factor Model", "Liquidity", "Monte Carlo", "Stress Test",
   "Structural Flow", "Mean Reversion", "Foresight", "Real-Time",
 ] as const;
@@ -33,7 +34,7 @@ const PATH_COLORS = [
 ];
 
 const StatArbEngine = ({ stocks }: Props) => {
-  const [tab, setTab] = useState<Tab>("Price Dynamics");
+  const [tab, setTab] = useState<Tab>("Intelligence");
   const { totalValue, holdings, sym, fmt } = useNormalizedPortfolio(stocks);
   const { prices: historicalPrices, loading: histLoading, fetchHistorical } = useHistoricalPrices();
 
@@ -82,12 +83,13 @@ const StatArbEngine = ({ stocks }: Props) => {
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
-            {t === "Foresight" ? "🔮 Foresight" : t}
+            {t === "Foresight" ? "🔮 Foresight" : t === "Intelligence" ? "🧠 Intelligence" : t}
           </button>
         ))}
       </div>
 
       <div className="rounded-xl border border-border bg-card p-3 sm:p-5">
+        {tab === "Intelligence" && <StatArbIntelligencePanel tickers={analyzed.map(s => s.ticker)} />}
         {tab === "Price Dynamics" && <PriceDynamicsPanel assets={assetData} fmt={fmt} />}
         {tab === "Portfolio Risk" && <PortfolioRiskPanel assets={assetData} totalValue={totalValue} portfolioVol={portfolioVol} portfolioMu={portfolioMu} fmt={fmt} historicalPrices={historicalPrices} />}
         {tab === "Optimization" && <OptimizationPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
