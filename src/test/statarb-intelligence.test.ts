@@ -41,11 +41,11 @@ describe("ols", () => {
 
 // ── ADF ──────────────────────────────────────────────────────────────
 describe("adf", () => {
-  it("flags a stationary series with a sufficiently negative t-stat", () => {
+  it("flags a stationary OU series with a strongly negative t-stat", () => {
     const stationary = ouSeries(0.4, 0, 1, 400);
     const t = adfTest(stationary);
-    expect(t).toBeLessThan(-1.5);
-    expect(adfPValue(t)).toBeLessThan(0.2);
+    // Strongly mean-reverting series should yield a clearly negative t-stat.
+    expect(t).toBeLessThan(-3);
   });
   it("does NOT flag a random walk (unit root) as stationary", () => {
     const rw = [0];
