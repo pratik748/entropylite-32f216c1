@@ -68,15 +68,18 @@ export function adfTest(series: number[]): number {
 }
 
 /**
- * Approximate ADF p-value from MacKinnon (1996) critical-value table for
- * the no-constant case. Linear interpolation between key thresholds.
+ * Approximate p-value for the Engle-Granger residual-based ADF test.
+ * Uses MacKinnon (1996) critical values for the residual case with
+ * cointegrating vector of dim 2: roughly
+ *   1% ≈ -3.90,  5% ≈ -3.34,  10% ≈ -3.04
+ * These are stricter than the standard ADF thresholds because the
+ * residuals come from an estimated regression, not from raw data.
  */
 export function adfPValue(tStat: number): number {
-  // Critical values (no constant): 1% ≈ -2.58, 5% ≈ -1.95, 10% ≈ -1.62
-  if (tStat <= -2.58) return 0.01;
-  if (tStat <= -1.95) return 0.01 + (0.05 - 0.01) * ((tStat + 2.58) / (-1.95 + 2.58));
-  if (tStat <= -1.62) return 0.05 + (0.10 - 0.05) * ((tStat + 1.95) / (-1.62 + 1.95));
-  if (tStat <= 0)    return 0.10 + (0.50 - 0.10) * ((tStat + 1.62) / (0 + 1.62));
+  if (tStat <= -3.90) return 0.01;
+  if (tStat <= -3.34) return 0.01 + (0.05 - 0.01) * ((tStat + 3.90) / (-3.34 + 3.90));
+  if (tStat <= -3.04) return 0.05 + (0.10 - 0.05) * ((tStat + 3.34) / (-3.04 + 3.34));
+  if (tStat <= 0)    return 0.10 + (0.50 - 0.10) * ((tStat + 3.04) / (0 + 3.04));
   return Math.min(0.99, 0.50 + tStat * 0.1);
 }
 
