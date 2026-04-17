@@ -88,10 +88,13 @@ export function useCloudPortfolio() {
     if (!userId || savingRef.current) return;
     savingRef.current = true;
     try {
+      // Exclude fortress-injected synthetic positions — they are ephemeral defensive overlays
+      const persistable = updated.filter((s) => !s.__fortress);
+
       // Get current DB rows
       const { data: existing } = await supabase.from("user_portfolios").select("id, ticker").eq("user_id", userId);
       const existingIds = new Set((existing ?? []).map((r: any) => r.id));
-      const updatedIds = new Set(updated.map(s => s.id));
+      const updatedIds = new Set(persistable.map(s => s.id));
 
       // Delete removed
       const toDelete = [...existingIds].filter(id => !updatedIds.has(id));
@@ -100,8 +103,8 @@ export function useCloudPortfolio() {
       }
 
       // Upsert remaining
-      if (updated.length > 0) {
-        const rows = updated.map(s => ({
+      if (persistable.length > 0) {
+        const rows = persistable.map(s => ({
           id: s.id,
           user_id: userId,
           ticker: s.ticker,
