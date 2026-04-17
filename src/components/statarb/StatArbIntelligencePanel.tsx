@@ -8,7 +8,6 @@ import { ShieldAlert, Brain, AlertTriangle, ChevronDown, ChevronRight, BookOpenC
 import { useStatArbIntelligence, type PairInput, type PairIntel } from "@/hooks/useStatArbIntelligence";
 import OUBandChart from "./OUBandChart";
 import ProbabilityCone from "./ProbabilityCone";
-import RegimeTimeline from "./RegimeTimeline";
 import LearningLoopPanel from "./LearningLoopPanel";
 import type { RegimeState } from "@/lib/statarb/types";
 
@@ -190,12 +189,6 @@ export default function StatArbIntelligencePanel({ tickers, baseSignals, maxPair
   const { intel, suppressed, loading, error } = useStatArbIntelligence(pairs, "1y");
 
   const killCount = suppressed.length;
-  const hmmModelByPair = useMemo(() => {
-    // We re-derive an in-place model from the spread for the timeline.
-    // The hook already attached one, but RegimeTimeline expects an HMMModel —
-    // we accept that the "live" model is the same one used in compose.
-    return new Map<string, PairIntel>();
-  }, []);
 
   return (
     <div className="space-y-4">
