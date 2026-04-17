@@ -7,10 +7,15 @@ import {
   type DefensiveAction,
   type FortressMetrics,
   type FortressHolding,
+  type LiveSignals,
 } from "@/lib/fortress-engine";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { useMarketRegime } from "@/hooks/useMarketRegime";
+import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
+import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
+import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
 
 const STORAGE_KEY = "fortress-state-v1";
 
@@ -61,6 +66,7 @@ export interface UseFortressModeResult {
   resetActions: () => void;
   aiNarratives: Record<string, string>;
   aiLoading: boolean;
+  signals: LiveSignals;
 }
 
 export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult {
@@ -68,6 +74,43 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
   const [state, setState] = useState<FortressStoredState>(() => loadState());
   const [aiNarratives, setAiNarratives] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
+
+  // ── LIVE SYSTEM SIGNALS ──────────────────────────────────────────────
+  const regime = useMarketRegime(20_000);
+  const { tickerThreats } = useGeoIntelligence(stocks);
+  const { data: macroData } = useMacroIntelligence();
+  const tickerKey = useMemo(() => holdings.map((h) => h.rawTicker).join(","), [holdings]);
+  const { data: flowsData } = useInstitutionalFlows(
+    useMemo(() => holdings.map((h) => h.rawTicker), [tickerKey]),
+  );
+
+  const signals = useMemo<LiveSignals>(
+    () => ({
+      regime: regime
+        ? {
+            label: regime.regime,
+            vix: regime.vix,
+            moodScore: regime.moodScore,
+            conditions: regime.conditions,
+          }
+        : undefined,
+      macro: macroData?.regime
+        ? {
+            regime: macroData.regime.regime,
+            confidence: macroData.regime.confidence,
+            signals: macroData.regime.signals,
+          }
+        : undefined,
+      flows: flowsData?.aggregate
+        ? {
+            smartMoneyDirection: flowsData.aggregate.smartMoneyDirection,
+            unusualActivityCount: flowsData.aggregate.unusualActivityCount,
+          }
+        : undefined,
+      geoThreats: tickerThreats,
+    }),
+    [regime, macroData, flowsData, tickerThreats],
+  );
 
   useEffect(() => {
     saveState(state);
@@ -90,13 +133,13 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
   );
 
   const threats = useMemo(
-    () => scanThreats(fortressHoldings, totalValue),
-    [fortressHoldings, totalValue],
+    () => scanThreats(fortressHoldings, totalValue, signals),
+    [fortressHoldings, totalValue, signals],
   );
 
   const allActions = useMemo(
-    () => proposeActions(threats, fortressHoldings, totalValue),
-    [threats, fortressHoldings, totalValue],
+    () => proposeActions(threats, fortressHoldings, totalValue, signals),
+    [threats, fortressHoldings, totalValue, signals],
   );
 
   const actions = useMemo(
@@ -113,8 +156,8 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
   );
 
   const metrics = useMemo(
-    () => simulateDefensiveOutcome(fortressHoldings, totalValue, appliedActions, state.active),
-    [fortressHoldings, totalValue, appliedActions, state.active],
+    () => simulateDefensiveOutcome(fortressHoldings, totalValue, appliedActions, state.active, signals),
+    [fortressHoldings, totalValue, appliedActions, state.active, signals],
   );
 
   // AI overlay — refines rationales when fortress is ON. Falls back gracefully.
@@ -126,6 +169,9 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
       body: {
         baseCurrency,
         totalValue,
+        regime: signals.regime,
+        macro: signals.macro,
+        flows: signals.flows,
         holdings: fortressHoldings.map((h) => ({
           ticker: h.ticker,
           value: h.value,
@@ -133,6 +179,7 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
           risk: h.risk,
           sector: h.sector,
           pnlPct: h.pnlPct,
+          geoThreat: signals.geoThreats?.[h.rawTicker]?.threatLevel,
         })),
         threats,
         actions: actions.map((a) => ({
@@ -141,6 +188,7 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
           target: a.target,
           sizePct: a.sizePct,
           rationale: a.rationale,
+          upsideClippedPct: a.upsideClippedPct,
         })),
       },
     })
@@ -161,6 +209,10 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
     fortressHoldings.map((h) => h.ticker).join(","),
     baseCurrency,
     totalValue,
+    signals.regime?.label,
+    signals.regime?.vix,
+    signals.flows?.smartMoneyDirection,
+    signals.macro?.regime,
   ]);
 
   const toggle = useCallback(() => {
@@ -205,5 +257,6 @@ export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult
     resetActions,
     aiNarratives,
     aiLoading,
+    signals,
   };
 }
