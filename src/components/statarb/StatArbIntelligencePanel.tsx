@@ -16,7 +16,7 @@
  */
 import { useMemo, useState } from "react";
 import {
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import { ShieldAlert, Brain, AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useStatArbIntelligence, type PairInput, type PairIntel } from "@/hooks/useStatArbIntelligence";
@@ -24,6 +24,12 @@ import OUBandChart from "./OUBandChart";
 import ProbabilityCone from "./ProbabilityCone";
 import LearningLoopPanel from "./LearningLoopPanel";
 import type { RegimeState } from "@/lib/statarb/types";
+
+// Match Price Dynamics palette (PATH_COLORS-style multi-line series)
+const PAIR_COLORS = [
+  "hsl(var(--primary))", "hsl(var(--gain))", "hsl(var(--warning))", "hsl(var(--loss))",
+  "hsl(199 89% 48%)", "hsl(280 65% 60%)", "hsl(45 93% 58%)", "hsl(168 76% 42%)",
+];
 
 interface Props {
   tickers: string[];
@@ -355,35 +361,55 @@ export default function StatArbIntelligencePanel({ tickers, baseSignals, maxPair
         </div>
       )}
 
-      {/* Conviction bar chart */}
-      {insights && insights.chart.length > 0 && (
+      {/* Spread z-score dynamics (Price Dynamics style multi-line chart) */}
+      {intel.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-foreground">
-              Conviction by Pair (S_final, %)
+              Spread Z-Score Dynamics — {intel.length} Pairs
             </h4>
-            <span className="text-[9px] font-mono text-muted-foreground">positive = long spread</span>
+            <span className="text-[9px] font-mono text-muted-foreground">z = (spread − μ) / σ</span>
           </div>
-          <div className="h-44 sm:h-52">
+          <p className="text-[9px] text-muted-foreground">
+            OU residuals normalised to z-score. Mean = 0 (equilibrium). Bands at ±1σ / ±2σ. Each line = one pair spread over time.
+          </p>
+          <div className="h-56 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={insights.chart}>
+              <LineChart data={(() => {
+                // Build a time-indexed dataset: each pair contributes its spread z-scores
+                const maxLen = Math.max(...intel.map(p => p.spread.length), 0);
+                return Array.from({ length: maxLen }, (_, i) => {
+                  const point: Record<string, any> = { day: i };
+                  intel.forEach((p) => {
+                    if (i < p.spread.length) {
+                      const std = p.ou.sigmaEq;
+                      point[`${p.tickerA}/${p.tickerB}`] = std > 0 ? (p.spread[i] - p.ou.mu) / std : 0;
+                    }
+                  });
+                  return point;
+                });
+              })()}>
                 <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--border))" strokeOpacity={0.3} />
-                <XAxis dataKey="pair" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} width={35}
-                  tickFormatter={(v) => `${v}%`} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }}
-                  formatter={(v: number) => [`${v.toFixed(1)}%`, "S_final"]}
-                />
-                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.5} />
-                <ReferenceLine y={10} stroke="hsl(var(--gain))" strokeDasharray="3 3" strokeOpacity={0.4} />
-                <ReferenceLine y={-10} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.4} />
-                <Bar dataKey="sFinal" radius={[3, 3, 0, 0]}>
-                  {insights.chart.map((d, i) => (
-                    <Cell key={i} fill={REGIME_FILL[d.regime as RegimeState]} fillOpacity={0.75} />
-                  ))}
-                </Bar>
-              </BarChart>
+                <XAxis dataKey="day" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} />
+                <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }} width={35} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 10 }} />
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.5} label={{ value: "μ", fill: "hsl(var(--muted-foreground))", fontSize: 8 }} />
+                <ReferenceLine y={1} stroke="hsl(var(--warning))" strokeDasharray="4 4" strokeOpacity={0.35} />
+                <ReferenceLine y={-1} stroke="hsl(var(--warning))" strokeDasharray="4 4" strokeOpacity={0.35} />
+                <ReferenceLine y={2} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.4} label={{ value: "+2σ", fill: "hsl(var(--loss))", fontSize: 8, position: "right" }} />
+                <ReferenceLine y={-2} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.4} label={{ value: "−2σ", fill: "hsl(var(--loss))", fontSize: 8, position: "right" }} />
+                {intel.map((p, i) => (
+                  <Line
+                    key={p.id}
+                    dataKey={`${p.tickerA}/${p.tickerB}`}
+                    stroke={PAIR_COLORS[i % PAIR_COLORS.length]}
+                    strokeWidth={1.2}
+                    dot={false}
+                    name={`${p.tickerA}/${p.tickerB}`}
+                    strokeOpacity={0.8}
+                  />
+                ))}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
