@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3 } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
@@ -285,7 +285,7 @@ const IndexContent = () => {
           {/* Tab Navigation */}
           <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
             <div
-              className="px-0.5 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
+              className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
               {tabs.map((tab) => (
@@ -326,7 +326,7 @@ const IndexContent = () => {
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
-                  <div className="p-1.5 space-y-1.5 pb-20">
+                  <div className="p-1.5 space-y-1.5 pb-28">
                     <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
                     {isLoading && <LoadingState />}
                     {analysis && !isLoading && (
@@ -382,16 +382,25 @@ const IndexContent = () => {
                       </>
                     )}
 
-                    {/* Mobile Floating Sidebar Toggles */}
-                    <div className="fixed bottom-12 left-0 right-0 z-40 flex justify-center gap-2 px-4">
+                    {/* Mobile Bottom Dock — fixed above the system status bar (24px) */}
+                    <div
+                      className="fixed left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md grid grid-cols-3 gap-px bg-border"
+                      style={{ bottom: "24px" }}
+                    >
                       <Sheet>
                         <SheetTrigger asChild>
-                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
-                            <LayoutDashboard className="h-3 w-3" /> Portfolio
+                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
+                            <LayoutDashboard className="h-3.5 w-3.5" />
+                            <span>Portfolio</span>
                           </button>
                         </SheetTrigger>
-                        <SheetContent side="left" className="w-[85vw] max-w-sm p-0 bg-background border-border">
-                          <div className="h-full overflow-auto">
+                        <SheetContent side="left" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
+                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
+                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
+                              <LayoutDashboard className="h-3.5 w-3.5 text-primary" /> Portfolio
+                            </SheetTitle>
+                          </SheetHeader>
+                          <div className="flex-1 min-h-0 overflow-auto">
                             <PortfolioBlotter
                               stocks={stocks}
                               activeStockId={activeStockId}
@@ -408,12 +417,18 @@ const IndexContent = () => {
 
                       <Sheet>
                         <SheetTrigger asChild>
-                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
-                            <Newspaper className="h-3 w-3" /> News
+                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
+                            <Newspaper className="h-3.5 w-3.5" />
+                            <span>News</span>
                           </button>
                         </SheetTrigger>
-                        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 bg-background border-border">
-                          <div className="h-full overflow-auto pt-10 px-2">
+                        <SheetContent side="right" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
+                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
+                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
+                              <Newspaper className="h-3.5 w-3.5 text-primary" /> Live Intel
+                            </SheetTitle>
+                          </SheetHeader>
+                          <div className="flex-1 min-h-0 overflow-auto">
                             <LiveNewsFeed ticker={analysis?.ticker} compact />
                           </div>
                         </SheetContent>
@@ -421,12 +436,18 @@ const IndexContent = () => {
 
                       <Sheet>
                         <SheetTrigger asChild>
-                          <button className="flex items-center gap-1.5 rounded-full bg-card/95 backdrop-blur border border-border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground shadow-lg active:scale-95 transition-transform">
-                            <BarChart3 className="h-3 w-3" /> Flows
+                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            <span>Flows</span>
                           </button>
                         </SheetTrigger>
-                        <SheetContent side="right" className="w-[85vw] max-w-sm p-0 bg-background border-border">
-                          <div className="h-full overflow-auto pt-10 px-2">
+                        <SheetContent side="right" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
+                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
+                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
+                              <BarChart3 className="h-3.5 w-3.5 text-primary" /> Flow Detection
+                            </SheetTitle>
+                          </SheetHeader>
+                          <div className="flex-1 min-h-0 overflow-auto">
                             <FlowDetectionPanel stocks={stocks} />
                           </div>
                         </SheetContent>
