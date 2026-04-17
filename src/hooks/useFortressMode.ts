@@ -16,6 +16,7 @@ import { useMarketRegime } from "@/hooks/useMarketRegime";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
+import { useToast } from "@/hooks/use-toast";
 
 const STORAGE_KEY = "fortress-state-v1";
 
