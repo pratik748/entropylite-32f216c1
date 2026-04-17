@@ -219,6 +219,69 @@ export function useFortressMode(
     signals.macro?.regime,
   ]);
 
+  const { toast } = useToast();
+
+  // ── Materialize a defensive action onto the real portfolio ─────────────
+  const materializeAction = useCallback(
+    (action: DefensiveAction) => {
+      if (!setStocks) return;
+
+      // TRIM / REBALANCE → reduce quantity of the matching holding by sizePct
+      if (action.kind === "trim" || action.kind === "rebalance") {
+        setStocks((prev) =>
+          prev.map((s) => {
+            if (s.__fortress) return s;
+            if (s.ticker !== action.target) return s;
+            const reduction = Math.max(0.01, Math.min(0.95, action.sizePct / 100));
+            const newQty = +(s.quantity * (1 - reduction)).toFixed(6);
+            return newQty <= 0 ? s : { ...s, quantity: newQty };
+          }),
+        );
+        toast({
+          title: `Fortress · ${action.kind === "trim" ? "Trimmed" : "Rebalanced"} ${action.target}`,
+          description: `Reduced exposure by ${action.sizePct.toFixed(1)}% — risk −${action.riskReductionBps}bps`,
+        });
+        return;
+      }
+
+      // HEDGE / CONVERT → inject a synthetic shield position
+      if (action.kind === "hedge" || action.kind === "convert") {
+        const targetHolding = stocks.find((s) => s.ticker === action.target);
+        const refPrice =
+          targetHolding?.analysis?.currentPrice ?? targetHolding?.buyPrice ?? 100;
+        const notional =
+          (targetHolding ? targetHolding.quantity * refPrice : totalValue * 0.05) *
+          (action.sizePct / 100);
+        const hedgeQty = +(notional / refPrice).toFixed(4);
+        const shieldId = `fortress-${action.id}-${Date.now()}`;
+        const instrument = action.instrument ?? `SHIELD-${action.target}`;
+
+        setStocks((prev) => [
+          ...prev,
+          {
+            id: shieldId,
+            ticker: instrument,
+            buyPrice: refPrice,
+            quantity: hedgeQty,
+            isLoading: false,
+            __fortress: {
+              kind: action.kind,
+              sourceActionId: action.id,
+              sourceTarget: action.target,
+              rationale: action.rationale,
+              appliedAt: Date.now(),
+            },
+          },
+        ]);
+        toast({
+          title: `Fortress · Shield deployed on ${action.target}`,
+          description: `${instrument} sized to ${action.sizePct.toFixed(1)}% — cost ${action.costBps}bps`,
+        });
+      }
+    },
+    [setStocks, stocks, totalValue, toast],
+  );
+
   const toggle = useCallback(() => {
     setState((s) => ({
       ...s,
@@ -227,24 +290,40 @@ export function useFortressMode(
     }));
   }, []);
 
-  const applyAction = useCallback((id: string) => {
-    setState((s) => ({ ...s, appliedActionIds: Array.from(new Set([...s.appliedActionIds, id])) }));
-  }, []);
+  const applyAction = useCallback(
+    (id: string) => {
+      const action = allActions.find((a) => a.id === id);
+      if (!action) return;
+      setState((s) =>
+        s.appliedActionIds.includes(id)
+          ? s
+          : { ...s, appliedActionIds: [...s.appliedActionIds, id] },
+      );
+      materializeAction(action);
+    },
+    [allActions, materializeAction],
+  );
 
   const applyAll = useCallback(() => {
+    const pending = allActions.filter((a) => !state.appliedActionIds.includes(a.id));
+    if (pending.length === 0) return;
     setState((s) => ({
       ...s,
-      appliedActionIds: Array.from(new Set([...s.appliedActionIds, ...allActions.map((a) => a.id)])),
+      appliedActionIds: Array.from(new Set([...s.appliedActionIds, ...pending.map((a) => a.id)])),
     }));
-  }, [allActions]);
+    pending.forEach(materializeAction);
+  }, [allActions, state.appliedActionIds, materializeAction]);
 
   const dismiss = useCallback((id: string) => {
     setState((s) => ({ ...s, dismissedActionIds: Array.from(new Set([...s.dismissedActionIds, id])) }));
   }, []);
 
   const resetActions = useCallback(() => {
+    if (setStocks) {
+      setStocks((prev) => prev.filter((s) => !s.__fortress));
+    }
     setState((s) => ({ ...s, dismissedActionIds: [], appliedActionIds: [] }));
-  }, []);
+  }, [setStocks]);
 
   return {
     active: state.active,
