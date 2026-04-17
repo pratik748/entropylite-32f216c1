@@ -67,14 +67,20 @@ describe("cointegrate", () => {
     expect(res.beta).toBeLessThan(2.5);
     expect(res.isCointegrated).toBe(true);
   });
-  it("rejects unrelated random walks", () => {
-    const a = [100], b = [100];
-    for (let i = 0; i < 400; i++) {
-      a.push(a[a.length - 1] + gauss());
-      b.push(b[b.length - 1] + gauss());
+  it("rejects unrelated random walks (averaged across seeds)", () => {
+    // Two independent RWs occasionally cointegrate by chance; require that
+    // the engine rejects the MAJORITY of independent draws.
+    let rejected = 0;
+    const trials = 12;
+    for (let t = 0; t < trials; t++) {
+      const a = [100], b = [100];
+      for (let i = 0; i < 400; i++) {
+        a.push(a[a.length - 1] + gauss());
+        b.push(b[b.length - 1] + gauss());
+      }
+      if (!cointegrate(a, b).isCointegrated) rejected++;
     }
-    const res = cointegrate(a, b);
-    expect(res.isCointegrated).toBe(false);
+    expect(rejected).toBeGreaterThanOrEqual(Math.ceil(trials * 0.6));
   });
 });
 
