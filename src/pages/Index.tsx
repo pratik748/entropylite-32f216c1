@@ -285,7 +285,7 @@ const IndexContent = () => {
           {/* Tab Navigation */}
           <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
             <div
-              className="px-0.5 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
+              className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
               {tabs.map((tab) => (
