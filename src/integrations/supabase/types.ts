@@ -83,45 +83,6 @@ export type Database = {
         }
         Relationships: []
       }
-      statarb_outcomes: {
-        Row: {
-          actual_outcome: string
-          closed_at: string
-          created_at: string
-          expected_half_life: number
-          id: string
-          pair: string
-          pnl_bps: number
-          regime_at_entry: string
-          s_final: number
-          user_id: string
-        }
-        Insert: {
-          actual_outcome: string
-          closed_at?: string
-          created_at?: string
-          expected_half_life?: number
-          id?: string
-          pair: string
-          pnl_bps?: number
-          regime_at_entry: string
-          s_final?: number
-          user_id: string
-        }
-        Update: {
-          actual_outcome?: string
-          closed_at?: string
-          created_at?: string
-          expected_half_life?: number
-          id?: string
-          pair?: string
-          pnl_bps?: number
-          regime_at_entry?: string
-          s_final?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_analysis_history: {
         Row: {
           buy_price: number
