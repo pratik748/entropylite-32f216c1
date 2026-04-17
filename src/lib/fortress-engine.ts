@@ -236,11 +236,14 @@ export function scanThreats(
     }
   });
 
-  // 3. Trajectory deviation — regime-aware stop discipline
+  // 3. Trajectory deviation — regime-aware stop discipline + early-warning band
+  const earlyTrajBand = profile.trajectoryStopPct * 0.6; // e.g. -8% stop → warn at -4.8%
   holdings.forEach((h) => {
-    if (h.pnlPct <= profile.trajectoryStopPct) {
-      const sev: ThreatSeverity =
-        h.pnlPct <= profile.trajectoryStopPct - 12
+    if (h.pnlPct <= earlyTrajBand) {
+      const pastStop = h.pnlPct <= profile.trajectoryStopPct;
+      const sev: ThreatSeverity = !pastStop
+        ? "MED"
+        : h.pnlPct <= profile.trajectoryStopPct - 12
           ? "CRITICAL"
           : h.pnlPct <= profile.trajectoryStopPct - 4
             ? "HIGH"
@@ -250,24 +253,27 @@ export function scanThreats(
         kind: "trajectory",
         target: h.ticker,
         severity: sev,
-        evidence: `Trajectory deviation ${h.pnlPct.toFixed(1)}% — past regime stop ${profile.trajectoryStopPct}%`,
+        evidence: pastStop
+          ? `Trajectory ${h.pnlPct.toFixed(1)}% — past regime stop ${profile.trajectoryStopPct}%`
+          : `Trajectory ${h.pnlPct.toFixed(1)}% — drifting toward regime stop ${profile.trajectoryStopPct}%`,
         contributionToRisk: Math.min(40, Math.round(Math.abs(h.pnlPct))),
         source: "portfolio",
       });
     }
   });
 
-  // 4. Volatility — regime-aware beta + risk threshold
+  // 4. Volatility — flag any elevated-β position; risk score modulates severity, doesn't gate it
   holdings.forEach((h) => {
-    if (h.beta >= profile.volatilityBetaTrigger && h.risk >= 60) {
-      const sev: ThreatSeverity = h.beta >= profile.volatilityBetaTrigger + 0.4 ? "HIGH" : "MED";
+    if (h.beta >= profile.volatilityBetaTrigger || h.risk >= 65) {
+      const composite = (h.beta - 1) * 50 + (h.risk - 40) * 0.6;
+      const sev: ThreatSeverity = composite >= 60 ? "HIGH" : composite >= 30 ? "MED" : "MED";
       threats.push({
         id: `vol-${h.rawTicker}`,
         kind: "volatility",
         target: h.ticker,
         severity: sev,
         evidence: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100 — vulnerable in current vol regime`,
-        contributionToRisk: Math.round((h.risk / 100) * 30),
+        contributionToRisk: Math.round((h.risk / 100) * 30 + Math.max(0, h.beta - 1) * 20),
         source: "portfolio",
       });
     }
