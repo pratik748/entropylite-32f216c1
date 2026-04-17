@@ -51,9 +51,12 @@ serve(async (req) => {
 
     switch (action) {
       case "submit_order": {
-        const { symbol, qty, side, type = "market", time_in_force = "day", limit_price, stop_price } = params;
-        if (!symbol || !qty || !side) throw new Error("Missing required fields: symbol, qty, side");
-        const orderBody: Record<string, unknown> = { symbol: symbol.toUpperCase(), qty: String(qty), side, type, time_in_force };
+        const { symbol, qty, notional, side, type = "market", time_in_force = "day", limit_price, stop_price } = params;
+        if (!symbol || !side) throw new Error("Missing required fields: symbol, side");
+        if (!qty && !notional) throw new Error("Provide either qty or notional");
+        const orderBody: Record<string, unknown> = { symbol: symbol.toUpperCase(), side, type, time_in_force };
+        if (qty) orderBody.qty = String(qty);
+        if (notional) orderBody.notional = String(notional);
         if (limit_price) orderBody.limit_price = String(limit_price);
         if (stop_price) orderBody.stop_price = String(stop_price);
         result = await alpacaFetch("/v2/orders", "POST", orderBody);
