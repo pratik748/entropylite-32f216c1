@@ -160,7 +160,7 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
       upsideFloorPct: 28,
       trimAggressivenessMult: 1.15,
     };
-  } else if (label === "Trending Bull" && vix < 18 && flow !== "RISK_OFF") {
+  } else if (label === "Trending Bull" && vix < 18) {
     // Loosen so we don't over-hedge in a clean uptrend.
     p = {
       concentrationLimit: 0.3,
