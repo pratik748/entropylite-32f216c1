@@ -69,7 +69,10 @@ export interface UseFortressModeResult {
   signals: LiveSignals;
 }
 
-export function useFortressMode(stocks: PortfolioStock[]): UseFortressModeResult {
+export function useFortressMode(
+  stocks: PortfolioStock[],
+  setStocks?: React.Dispatch<React.SetStateAction<PortfolioStock[]>>,
+): UseFortressModeResult {
   const { holdings, totalValue, baseCurrency } = useNormalizedPortfolio(stocks);
   const [state, setState] = useState<FortressStoredState>(() => loadState());
   const [aiNarratives, setAiNarratives] = useState<Record<string, string>>({});
