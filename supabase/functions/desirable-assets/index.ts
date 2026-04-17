@@ -697,6 +697,39 @@ function normalizeSectorPreference(value: string): string {
   return normalized;
 }
 
+// Tickers we consider "hackneyed" — the household-name mega-caps that get pitched everywhere.
+// These are demoted (NOT removed) unless the user explicitly chose their sector/type or the AI
+// independently surfaced them.
+const OVERUSED_TICKERS_GLOBAL = new Set([
+  "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "GOOG", "META", "TSLA", "SPY", "QQQ",
+]);
+const OVERUSED_TICKERS_INDIA = new Set([
+  "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "NIFTYBEES.NS",
+]);
+
+// Daily-rotating shuffle so the same universe doesn't surface the same first picks every refresh.
+function rotationSeed(extraSalt = ""): number {
+  const day = Math.floor(Date.now() / (1000 * 60 * 60 * 6)); // rotate every 6h
+  let h = 2166136261;
+  const s = `${day}-${extraSalt}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const out = arr.slice();
+  let s = seed || 1;
+  for (let i = out.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 function buildDeterministicCandidates(
   previousTickers: string[],
   portfolioTickers: string[],
@@ -705,12 +738,17 @@ function buildDeterministicCandidates(
   preferredSectors?: string[],
 ): any[] {
   const universe = indiaMode ? INDIA_FALLBACK_UNIVERSE : ELITE_FALLBACK_UNIVERSE;
+  const overused = indiaMode ? OVERUSED_TICKERS_INDIA : OVERUSED_TICKERS_GLOBAL;
   const hardBlocked = new Set((portfolioTickers || []).map((t) => String(t).trim().toUpperCase()));
   const softBlocked = new Set(previousTickers.map((t) => String(t).trim().toUpperCase()));
   const preferredTypeSet = new Set((preferredAssetTypes || []).map(normalizeAssetType));
   const preferredSectorSet = new Set((preferredSectors || []).map(normalizeSectorPreference));
 
-  const rankUniverse = (blocked: Set<string>) => universe
+  // Time-rotating shuffle keyed on previousTickers so refresh actually changes the order.
+  const rotSeed = rotationSeed(previousTickers.slice(-6).join("|"));
+  const rotated = seededShuffle(universe, rotSeed);
+
+  const rankUniverse = (blocked: Set<string>) => rotated
     .filter((c) => !blocked.has(c.ticker))
     .map((c) => {
       const assetType = normalizeAssetType((c as any).assetClass || "Equity");
@@ -718,7 +756,9 @@ function buildDeterministicCandidates(
       const assetTypeMatch = preferredTypeSet.size === 0 || preferredTypeSet.has(assetType);
       const sectorMatch = preferredSectorSet.size === 0 || preferredSectorSet.has(sector);
       const strategicBonus = HEDGE_STRATEGIES.has(String((c as any).strategy || "")) ? 0.35 : 0;
-      const matchScore = (assetTypeMatch ? 4 : 0) + (sectorMatch ? 2 : 0) + strategicBonus;
+      // Demote household-name mega-caps unless the user's preferences specifically argue for them.
+      const overusedPenalty = overused.has(c.ticker) && !preferredTypeSet.has(assetType) && !preferredSectorSet.has(sector) ? -2.5 : 0;
+      const matchScore = (assetTypeMatch ? 4 : 0) + (sectorMatch ? 2 : 0) + strategicBonus + overusedPenalty;
       return { c, matchScore, assetTypeMatch, sectorMatch };
     })
     .sort((a, b) => {
@@ -884,11 +924,19 @@ serve(async (req) => {
     let candidates: any[] = [];
 
     try {
+      const overusedList = indiaMode
+        ? Array.from(OVERUSED_TICKERS_INDIA).join(", ")
+        : Array.from(OVERUSED_TICKERS_GLOBAL).join(", ");
+      const userExplicitlyWantsObvious =
+        (preferredSectors || []).some((s) => /tech|index/i.test(s)) ||
+        (preferredAssetTypes || []).some((t) => /etf/i.test(t));
+
       const aiOpts = {
         systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
 Reject low-quality names, random microcaps, and weak momentum setups.
 Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
-Prefer large/mid-cap leaders, strong earnings trends, and positive sentiment dislocations with recovery setups.
+Prefer durable mid-caps, recently-derisked large-caps, special situations, and quality compounders that are NOT yet consensus longs.
+ORIGINALITY MANDATE: Avoid the household-name mega-caps everyone already pitches (${overusedList}) UNLESS there is a specific, fresh catalyst this week. ${userExplicitlyWantsObvious ? "(User explicitly chose tech/index — obvious names allowed if there is a real edge.)" : "Lean into less-covered names with structural alpha."}
 Use exact tickers supported by Yahoo Finance.
 Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
@@ -958,16 +1006,17 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    // Only use fallback when AI returns fewer than 8 candidates
+    // Only pad with deterministic fallback when AI is genuinely thin (<5 picks).
+    // This stops Desirable Assets from being dominated by the same mega-cap fallbacks every refresh.
     const aiCandidateCount = candidates.length;
-    const minimumCandidateCount = preferredAssetTypes?.length || preferredSectors?.length ? 10 : 8;
-    if (candidates.length < minimumCandidateCount) {
-      const needed = minimumCandidateCount - candidates.length;
+    const padThreshold = preferredAssetTypes?.length || preferredSectors?.length ? 7 : 5;
+    if (candidates.length < padThreshold) {
+      const needed = padThreshold - candidates.length;
       candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
-      console.log(`desirable-assets: AI returned ${aiCandidateCount} picks, padded with ${Math.max(0, candidates.length - aiCandidateCount)} fallback`);
+      console.log(`desirable-assets: AI returned ${aiCandidateCount} picks (<${padThreshold}), padded with ${Math.max(0, candidates.length - aiCandidateCount)} rotated fallback`);
     } else {
       candidates = dedupeCandidates(candidates).slice(0, 28);
-      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback needed`);
+      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback padding`);
     }
 
     if (candidates.length === 0) {
