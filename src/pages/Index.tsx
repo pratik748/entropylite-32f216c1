@@ -560,7 +560,7 @@ const IndexContent = () => {
               )}
               {activeTab === "fortress" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <FortressMode key={refreshKey} stocks={stocks} />
+                  <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
               )}
             </PageTransition>

@@ -1,4 +1,4 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
@@ -12,6 +12,14 @@ export interface PortfolioStock {
   quantity: number;
   analysis?: any;
   isLoading?: boolean;
+  /** Synthetic position injected by Fortress Mode (hedge / shield overlay). */
+  __fortress?: {
+    kind: "hedge" | "convert";
+    sourceActionId: string;
+    sourceTarget: string;
+    rationale: string;
+    appliedAt: number;
+  };
 }
 
 interface PortfolioPanelProps {
@@ -163,6 +171,15 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-foreground truncate">{stock.ticker}</span>
+                    {stock.__fortress && (
+                      <span
+                        className="flex items-center gap-1 rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-widest text-gain"
+                        title={`Fortress ${stock.__fortress.kind} on ${stock.__fortress.sourceTarget} — ${stock.__fortress.rationale}`}
+                      >
+                        <ShieldCheck className="h-2.5 w-2.5" />
+                        SHIELD
+                      </span>
+                    )}
                     {stock.isLoading && <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />}
                     {stock.analysis && (
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${

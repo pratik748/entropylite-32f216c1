@@ -21,6 +21,7 @@ import { type Threat, type DefensiveAction } from "@/lib/fortress-engine";
 
 interface FortressModeProps {
   stocks: PortfolioStock[];
+  setStocks?: React.Dispatch<React.SetStateAction<PortfolioStock[]>>;
 }
 
 const sevColor = (s: Threat["severity"]) =>
@@ -43,7 +44,7 @@ const kindIcon = (k: DefensiveAction["kind"]) => {
   }
 };
 
-const FortressMode = ({ stocks }: FortressModeProps) => {
+const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
   const { fmt, sym } = useNormalizedPortfolio(stocks);
   const {
     active,
@@ -60,7 +61,7 @@ const FortressMode = ({ stocks }: FortressModeProps) => {
     aiNarratives,
     aiLoading,
     signals,
-  } = useFortressMode(stocks);
+  } = useFortressMode(stocks, setStocks);
 
   const analyzed = useMemo(() => stocks.filter((s) => s.analysis), [stocks]);
 
