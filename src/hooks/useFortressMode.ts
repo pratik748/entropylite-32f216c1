@@ -221,16 +221,18 @@ export function useFortressMode(
 
   const { toast } = useToast();
 
-  // ── Materialize a defensive action onto the real portfolio ─────────────
+  // ── Materialize a defensive action onto the REAL portfolio ─────────────
+  // Trims/rebalances reduce existing holdings. Hedges add real defensive
+  // instruments (inverse/safe-haven ETFs) as normal portfolio positions
+  // that persist to the cloud just like any user-added stock.
   const materializeAction = useCallback(
     (action: DefensiveAction) => {
       if (!setStocks) return;
 
-      // TRIM / REBALANCE → reduce quantity of the matching holding by sizePct
+      // TRIM / REBALANCE → reduce quantity of the matching holding
       if (action.kind === "trim" || action.kind === "rebalance") {
         setStocks((prev) =>
           prev.map((s) => {
-            if (s.__fortress) return s;
             if (s.ticker !== action.target) return s;
             const reduction = Math.max(0.01, Math.min(0.95, action.sizePct / 100));
             const newQty = +(s.quantity * (1 - reduction)).toFixed(6);
@@ -244,38 +246,44 @@ export function useFortressMode(
         return;
       }
 
-      // HEDGE / CONVERT → inject a synthetic shield position
+      // HEDGE / CONVERT → add a REAL defensive ETF position
       if (action.kind === "hedge" || action.kind === "convert") {
+        const hedgeSymbol = resolveHedgeSymbol(action);
         const targetHolding = stocks.find((s) => s.ticker === action.target);
         const refPrice =
           targetHolding?.analysis?.currentPrice ?? targetHolding?.buyPrice ?? 100;
-        const notional =
-          (targetHolding ? targetHolding.quantity * refPrice : totalValue * 0.05) *
-          (action.sizePct / 100);
-        const hedgeQty = +(notional / refPrice).toFixed(4);
-        const shieldId = `fortress-${action.id}-${Date.now()}`;
-        const instrument = action.instrument ?? `SHIELD-${action.target}`;
+        const baseNotional = targetHolding
+          ? targetHolding.quantity * refPrice
+          : totalValue * 0.05;
+        const notional = baseNotional * (action.sizePct / 100);
 
-        setStocks((prev) => [
-          ...prev,
-          {
-            id: shieldId,
-            ticker: instrument,
-            buyPrice: refPrice,
-            quantity: hedgeQty,
-            isLoading: false,
-            __fortress: {
-              kind: action.kind as "hedge" | "convert",
-              sourceActionId: action.id,
-              sourceTarget: action.target,
-              rationale: action.rationale,
-              appliedAt: Date.now(),
+        const hedgePrice = HEDGE_REF_PRICE[hedgeSymbol] ?? 30;
+        const hedgeQty = +Math.max(1, notional / hedgePrice).toFixed(4);
+
+        setStocks((prev) => {
+          // Top-up if we already hold this hedge symbol; otherwise add new position.
+          const existing = prev.find((s) => s.ticker.toUpperCase() === hedgeSymbol);
+          if (existing) {
+            return prev.map((s) =>
+              s.id === existing.id
+                ? { ...s, quantity: +(s.quantity + hedgeQty).toFixed(4) }
+                : s,
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: `fortress-${hedgeSymbol}-${Date.now()}`,
+              ticker: hedgeSymbol,
+              buyPrice: hedgePrice,
+              quantity: hedgeQty,
+              isLoading: false,
             },
-          },
-        ]);
+          ];
+        });
         toast({
-          title: `Fortress · Shield deployed on ${action.target}`,
-          description: `${instrument} sized to ${action.sizePct.toFixed(1)}% — cost ${action.costBps}bps`,
+          title: `Fortress · Hedge added: ${hedgeSymbol}`,
+          description: `${HEDGE_NOTES[hedgeSymbol] ?? "Defensive position"} sized to ${action.sizePct.toFixed(1)}%`,
         });
       }
     },
