@@ -125,7 +125,8 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
   const vix = signals?.regime?.vix ?? 20;
   const label = signals?.regime?.label ?? "";
   const macro = signals?.macro?.regime ?? "expansion";
-  const flow = signals?.flows?.smartMoneyDirection ?? "NEUTRAL";
+  const flow: "RISK_ON" | "RISK_OFF" | "NEUTRAL" =
+    signals?.flows?.smartMoneyDirection ?? "NEUTRAL";
 
   // Default = balanced regime
   let p: RegimeProfile = {
