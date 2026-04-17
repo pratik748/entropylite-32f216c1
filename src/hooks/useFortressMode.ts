@@ -18,6 +18,43 @@ import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
 import { useToast } from "@/hooks/use-toast";
 
+// ── Hedge instrument map ──────────────────────────────────────────────
+// Translate abstract action.instrument hints into REAL tradable defensive
+// ETFs. These become normal portfolio positions (added to the dashboard
+// and persisted to the cloud just like any user-entered ticker).
+const HEDGE_INSTRUMENTS: Array<{ match: RegExp; symbol: string }> = [
+  { match: /VIX/i, symbol: "VXX" },
+  { match: /index put|β.?overlay|beta overlay|portfolio β/i, symbol: "SH" },
+  { match: /collar/i, symbol: "SH" },
+  { match: /tech|nasdaq|qqq/i, symbol: "PSQ" },
+  { match: /financial|bank/i, symbol: "SEF" },
+  { match: /energy|oil/i, symbol: "DUG" },
+  { match: /gold|metal|safe.?haven/i, symbol: "GLD" },
+  { match: /bond|treasury|rate|duration/i, symbol: "TLT" },
+  { match: /dollar|usd|fx/i, symbol: "UUP" },
+];
+const HEDGE_NOTES: Record<string, string> = {
+  SH: "Inverse S&P 500",
+  VXX: "VIX volatility ETN",
+  PSQ: "Inverse Nasdaq-100",
+  SEF: "Inverse Financials",
+  DUG: "Inverse Oil & Gas",
+  GLD: "Gold (safe-haven)",
+  TLT: "Long Treasuries",
+  UUP: "USD Index",
+};
+// Conservative reference prices used only as initial cost-basis until the
+// real-time price feed updates the new position on next analysis cycle.
+const HEDGE_REF_PRICE: Record<string, number> = {
+  SH: 42, VXX: 55, PSQ: 30, SEF: 32, DUG: 35, GLD: 215, TLT: 90, UUP: 28,
+};
+const FORTRESS_HEDGE_SYMBOLS = new Set(Object.keys(HEDGE_NOTES));
+
+function resolveHedgeSymbol(action: DefensiveAction): string {
+  const hint = `${action.instrument || ""} ${action.target || ""}`;
+  return HEDGE_INSTRUMENTS.find((m) => m.match.test(hint))?.symbol || "SH";
+}
+
 const STORAGE_KEY = "fortress-state-v1";
 
 interface FortressStoredState {
@@ -221,16 +258,18 @@ export function useFortressMode(
 
   const { toast } = useToast();
 
-  // ── Materialize a defensive action onto the real portfolio ─────────────
+  // ── Materialize a defensive action onto the REAL portfolio ─────────────
+  // Trims/rebalances reduce existing holdings. Hedges add real defensive
+  // instruments (inverse/safe-haven ETFs) as normal portfolio positions
+  // that persist to the cloud just like any user-added stock.
   const materializeAction = useCallback(
     (action: DefensiveAction) => {
       if (!setStocks) return;
 
-      // TRIM / REBALANCE → reduce quantity of the matching holding by sizePct
+      // TRIM / REBALANCE → reduce quantity of the matching holding
       if (action.kind === "trim" || action.kind === "rebalance") {
         setStocks((prev) =>
           prev.map((s) => {
-            if (s.__fortress) return s;
             if (s.ticker !== action.target) return s;
             const reduction = Math.max(0.01, Math.min(0.95, action.sizePct / 100));
             const newQty = +(s.quantity * (1 - reduction)).toFixed(6);
@@ -244,38 +283,44 @@ export function useFortressMode(
         return;
       }
 
-      // HEDGE / CONVERT → inject a synthetic shield position
+      // HEDGE / CONVERT → add a REAL defensive ETF position
       if (action.kind === "hedge" || action.kind === "convert") {
+        const hedgeSymbol = resolveHedgeSymbol(action);
         const targetHolding = stocks.find((s) => s.ticker === action.target);
         const refPrice =
           targetHolding?.analysis?.currentPrice ?? targetHolding?.buyPrice ?? 100;
-        const notional =
-          (targetHolding ? targetHolding.quantity * refPrice : totalValue * 0.05) *
-          (action.sizePct / 100);
-        const hedgeQty = +(notional / refPrice).toFixed(4);
-        const shieldId = `fortress-${action.id}-${Date.now()}`;
-        const instrument = action.instrument ?? `SHIELD-${action.target}`;
+        const baseNotional = targetHolding
+          ? targetHolding.quantity * refPrice
+          : totalValue * 0.05;
+        const notional = baseNotional * (action.sizePct / 100);
 
-        setStocks((prev) => [
-          ...prev,
-          {
-            id: shieldId,
-            ticker: instrument,
-            buyPrice: refPrice,
-            quantity: hedgeQty,
-            isLoading: false,
-            __fortress: {
-              kind: action.kind as "hedge" | "convert",
-              sourceActionId: action.id,
-              sourceTarget: action.target,
-              rationale: action.rationale,
-              appliedAt: Date.now(),
+        const hedgePrice = HEDGE_REF_PRICE[hedgeSymbol] ?? 30;
+        const hedgeQty = +Math.max(1, notional / hedgePrice).toFixed(4);
+
+        setStocks((prev) => {
+          // Top-up if we already hold this hedge symbol; otherwise add new position.
+          const existing = prev.find((s) => s.ticker.toUpperCase() === hedgeSymbol);
+          if (existing) {
+            return prev.map((s) =>
+              s.id === existing.id
+                ? { ...s, quantity: +(s.quantity + hedgeQty).toFixed(4) }
+                : s,
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: `fortress-${hedgeSymbol}-${Date.now()}`,
+              ticker: hedgeSymbol,
+              buyPrice: hedgePrice,
+              quantity: hedgeQty,
+              isLoading: false,
             },
-          },
-        ]);
+          ];
+        });
         toast({
-          title: `Fortress · Shield deployed on ${action.target}`,
-          description: `${instrument} sized to ${action.sizePct.toFixed(1)}% — cost ${action.costBps}bps`,
+          title: `Fortress · Hedge added: ${hedgeSymbol}`,
+          description: `${HEDGE_NOTES[hedgeSymbol] ?? "Defensive position"} sized to ${action.sizePct.toFixed(1)}%`,
         });
       }
     },
@@ -319,11 +364,10 @@ export function useFortressMode(
   }, []);
 
   const resetActions = useCallback(() => {
-    if (setStocks) {
-      setStocks((prev) => prev.filter((s) => !s.__fortress));
-    }
+    // Reset only clears the proposal ledger. Real portfolio mutations
+    // (trims, added hedges) stay — undo them manually from the dashboard.
     setState((s) => ({ ...s, dismissedActionIds: [], appliedActionIds: [] }));
-  }, [setStocks]);
+  }, []);
 
   return {
     active: state.active,

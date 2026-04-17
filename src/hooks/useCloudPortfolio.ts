@@ -88,8 +88,8 @@ export function useCloudPortfolio() {
     if (!userId || savingRef.current) return;
     savingRef.current = true;
     try {
-      // Exclude fortress-injected synthetic positions — they are ephemeral defensive overlays
-      const persistable = updated.filter((s) => !s.__fortress);
+      // All positions persist — including Fortress-added defensive hedges.
+      const persistable = updated;
 
       // Get current DB rows
       const { data: existing } = await supabase.from("user_portfolios").select("id, ticker").eq("user_id", userId);
