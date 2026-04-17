@@ -343,14 +343,13 @@ export function proposeActions(
   totalValue: number,
   signals?: LiveSignals,
 ): DefensiveAction[] {
-  if (!threats.length || !holdings.length) return [];
+  if (!holdings.length) return [];
   const profile = deriveRegimeProfile(signals);
   const actions: DefensiveAction[] = [];
   let cumulativeCostBps = 0;
   let cumulativeUpsideClippedPct = 0;
   const HEDGE_COST_CAP_BPS = profile.hedgeCostCapBps;
   const UPSIDE_FLOOR_PCT = profile.upsideFloorPct;
-  // Maximum cumulative upside we're willing to clip = 100 - floor
   const MAX_TOTAL_UPSIDE_CLIP = 100 - UPSIDE_FLOOR_PCT;
 
   const tryAccept = (a: DefensiveAction): boolean => {
@@ -362,26 +361,31 @@ export function proposeActions(
     return true;
   };
 
+  // ---- 1. Threat-driven, per-position actions ----
+  const coveredTickers = new Set<string>();
   for (const t of threats) {
     if (t.kind === "concentration") {
       const h = holdings.find((x) => x.ticker === t.target);
       if (!h) continue;
-      const baseTrim = t.severity === "CRITICAL" ? 30 : t.severity === "HIGH" ? 22 : 15;
+      const baseTrim = t.severity === "CRITICAL" ? 30 : t.severity === "HIGH" ? 22 : 12;
       const trimPct = Math.round(baseTrim * profile.trimAggressivenessMult);
       const weight = h.value / totalValue;
-      tryAccept({
-        id: `act-trim-${t.id}`,
-        kind: "trim",
-        target: t.target,
-        sizePct: trimPct,
-        rationale: `Trim ${t.target} ${trimPct}% — concentration ${(weight * 100).toFixed(0)}% above ${(profile.concentrationLimit * 100) | 0}% regime cap`,
-        trigger: `weight ${(weight * 100) | 0}% > ${(profile.concentrationLimit * 100) | 0}% threshold`,
-        riskReductionBps: Math.round(trimPct * 4 * (h.beta || 1)),
-        costBps: 4,
-        upsideClippedPct: Math.round(trimPct * weight * 100) / 100, // upside foregone scales with weight
-        confidence: 88,
-        threatId: t.id,
-      });
+      if (
+        tryAccept({
+          id: `act-trim-${t.id}`,
+          kind: "trim",
+          target: t.target,
+          sizePct: trimPct,
+          rationale: `Trim ${t.target} ${trimPct}% — concentration ${(weight * 100).toFixed(0)}% vs ${(profile.concentrationLimit * 100) | 0}% cap`,
+          trigger: `weight ${(weight * 100) | 0}% vs ${(profile.concentrationLimit * 100) | 0}% threshold`,
+          riskReductionBps: Math.round(trimPct * 4 * (h.beta || 1)),
+          costBps: 4,
+          upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
+          confidence: 88,
+          threatId: t.id,
+        })
+      )
+        coveredTickers.add(h.ticker);
     } else if (t.kind === "correlation") {
       const defensive = pickDefensiveCandidate(holdings, t.target);
       const sizePct = t.severity === "CRITICAL" ? 8 : 5;
@@ -395,73 +399,108 @@ export function proposeActions(
         trigger: `sector cluster ${((sectorWeight(holdings, t.target, totalValue) * 100) | 0)}% > ${(profile.sectorClusterLimit * 100) | 0}%`,
         riskReductionBps: Math.round(sizePct * 6),
         costBps: 18,
-        upsideClippedPct: sizePct * 0.45, // overlay clips a fraction of upside
+        upsideClippedPct: sizePct * 0.45,
         confidence: 79,
         threatId: t.id,
       });
     } else if (t.kind === "trajectory") {
       const h = holdings.find((x) => x.ticker === t.target);
       if (!h) continue;
-      const baseTrim = t.severity === "CRITICAL" ? 50 : 30;
+      const pastStop = h.pnlPct <= profile.trajectoryStopPct;
+      const baseTrim = t.severity === "CRITICAL" ? 50 : pastStop ? 30 : 15;
       const trimPct = Math.round(baseTrim * profile.trimAggressivenessMult);
       const weight = h.value / totalValue;
-      tryAccept({
-        id: `act-trim-${t.id}`,
-        kind: "trim",
-        target: t.target,
-        sizePct: trimPct,
-        rationale: `Trim ${t.target} ${trimPct}% — past regime stop (${h.pnlPct.toFixed(1)}%)`,
-        trigger: `unrealized ${h.pnlPct.toFixed(1)}% < regime stop ${profile.trajectoryStopPct}%`,
-        riskReductionBps: Math.round(trimPct * 3),
-        costBps: 4,
-        upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
-        confidence: 82,
-        threatId: t.id,
-      });
+      if (
+        tryAccept({
+          id: `act-trim-${t.id}`,
+          kind: "trim",
+          target: t.target,
+          sizePct: trimPct,
+          rationale: pastStop
+            ? `Trim ${t.target} ${trimPct}% — past regime stop (${h.pnlPct.toFixed(1)}%)`
+            : `Trim ${t.target} ${trimPct}% — drifting toward regime stop`,
+          trigger: `unrealized ${h.pnlPct.toFixed(1)}% vs regime stop ${profile.trajectoryStopPct}%`,
+          riskReductionBps: Math.round(trimPct * 3),
+          costBps: 4,
+          upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
+          confidence: pastStop ? 82 : 72,
+          threatId: t.id,
+        })
+      )
+        coveredTickers.add(h.ticker);
     } else if (t.kind === "volatility") {
       const h = holdings.find((x) => x.ticker === t.target);
       if (!h) continue;
-      tryAccept({
-        id: `act-convert-${t.id}`,
-        kind: "convert",
-        target: t.target,
-        sizePct: 100,
-        instrument: "protective collar",
-        rationale: `Convert ${t.target} into collar — vol-spike risk in current regime`,
-        trigger: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100`,
-        riskReductionBps: Math.round((h.risk / 100) * 25),
-        costBps: 12,
-        upsideClippedPct: 6, // collars cap upside slightly
-        confidence: 74,
-        threatId: t.id,
-      });
+      // Choose collar for high-conviction holds, trim for losers
+      const useCollar = (h.pnlPct ?? 0) >= 0;
+      if (useCollar) {
+        if (
+          tryAccept({
+            id: `act-convert-${t.id}`,
+            kind: "convert",
+            target: t.target,
+            sizePct: 100,
+            instrument: "protective collar",
+            rationale: `Collar ${t.target} — preserve gains, cap vol-spike downside`,
+            trigger: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100`,
+            riskReductionBps: Math.round((h.risk / 100) * 25 + (h.beta - 1) * 12),
+            costBps: 12,
+            upsideClippedPct: 6,
+            confidence: 74,
+            threatId: t.id,
+          })
+        )
+          coveredTickers.add(h.ticker);
+      } else {
+        const trimPct = 18;
+        const weight = h.value / totalValue;
+        if (
+          tryAccept({
+            id: `act-trim-${t.id}`,
+            kind: "trim",
+            target: t.target,
+            sizePct: trimPct,
+            rationale: `Trim ${t.target} ${trimPct}% — high β + unrealized loss compounds vol risk`,
+            trigger: `β=${h.beta.toFixed(2)} · pnl=${h.pnlPct.toFixed(1)}%`,
+            riskReductionBps: Math.round(trimPct * 3.5),
+            costBps: 4,
+            upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
+            confidence: 76,
+            threatId: t.id,
+          })
+        )
+          coveredTickers.add(h.ticker);
+      }
     } else if (t.kind === "geopolitical") {
       const h = holdings.find((x) => x.ticker === t.target);
       if (!h) continue;
       const trimPct = t.severity === "CRITICAL" ? 25 : t.severity === "HIGH" ? 15 : 10;
       const weight = h.value / totalValue;
-      tryAccept({
-        id: `act-trim-${t.id}`,
-        kind: "trim",
-        target: t.target,
-        sizePct: trimPct,
-        rationale: `Reduce ${t.target} ${trimPct}% — live geopolitical exposure detected`,
-        trigger: t.evidence,
-        riskReductionBps: Math.round(trimPct * 3.5),
-        costBps: 4,
-        upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
-        confidence: 76,
-        threatId: t.id,
-      });
+      if (
+        tryAccept({
+          id: `act-trim-${t.id}`,
+          kind: "trim",
+          target: t.target,
+          sizePct: trimPct,
+          rationale: `Reduce ${t.target} ${trimPct}% — live geopolitical exposure detected`,
+          trigger: t.evidence,
+          riskReductionBps: Math.round(trimPct * 3.5),
+          costBps: 4,
+          upsideClippedPct: Math.round(trimPct * weight * 100) / 100,
+          confidence: 76,
+          threatId: t.id,
+        })
+      )
+        coveredTickers.add(h.ticker);
     } else if (t.kind === "macro" || t.kind === "flow") {
-      // Portfolio-wide overlay rather than per-position trim
       const sizePct = t.severity === "HIGH" ? 7 : 4;
       tryAccept({
         id: `act-hedge-${t.id}`,
         kind: "hedge",
         target: "Portfolio β",
         sizePct,
-        instrument: signals?.regime?.vix && signals.regime.vix >= 25 ? "VIX call spread" : "Index put overlay",
+        instrument:
+          signals?.regime?.vix && signals.regime.vix >= 25 ? "VIX call spread" : "Index put overlay",
         rationale: `Top-down hedge — ${t.kind === "macro" ? "macro regime risk" : "smart-money risk-off"}`,
         trigger: t.evidence,
         riskReductionBps: Math.round(sizePct * 5),
@@ -473,7 +512,88 @@ export function proposeActions(
     }
   }
 
-  return actions;
+  // ---- 2. Always-on portfolio-β hedge overlay ----
+  // Even without a hard threat, propose a small index overlay sized to portfolio β.
+  const avgBeta = holdings.reduce((s, h) => s + (h.beta || 1), 0) / holdings.length;
+  const hasMacroOrFlowHedge = actions.some(
+    (a) => a.kind === "hedge" && a.target === "Portfolio β",
+  );
+  if (!hasMacroOrFlowHedge && avgBeta >= 0.95) {
+    const sizePct = avgBeta >= 1.25 ? 5 : avgBeta >= 1.1 ? 3.5 : 2;
+    tryAccept({
+      id: `act-hedge-portfolio-beta`,
+      kind: "hedge",
+      target: "Portfolio β",
+      sizePct,
+      instrument: "Index put overlay (3M, 5% OTM)",
+      rationale: `Baseline β-overlay ${sizePct}% — portfolio β=${avgBeta.toFixed(2)} carries systemic exposure`,
+      trigger: `avg β ${avgBeta.toFixed(2)} · regime ${signals?.regime?.label || "balanced"}`,
+      riskReductionBps: Math.round(sizePct * 5.5),
+      costBps: 10,
+      upsideClippedPct: sizePct * 0.35,
+      confidence: 68,
+    });
+  }
+
+  // ---- 3. Top-2 sector cluster pair-hedge (proactive, even below limit) ----
+  const sectorTotals: Record<string, number> = {};
+  holdings.forEach((h) => {
+    if (h.sector && h.sector !== "Unknown")
+      sectorTotals[h.sector] = (sectorTotals[h.sector] || 0) + h.value;
+  });
+  const sortedSectors = Object.entries(sectorTotals)
+    .map(([s, v]) => ({ sector: s, weight: v / totalValue }))
+    .sort((a, b) => b.weight - a.weight);
+  for (const s of sortedSectors.slice(0, 2)) {
+    if (s.weight < 0.2) continue; // ignore trivial clusters
+    if (actions.some((a) => a.kind === "hedge" && a.target === s.sector)) continue;
+    const defensive = pickDefensiveCandidate(holdings, s.sector);
+    const sizePct = Math.min(6, Math.round(s.weight * 12));
+    tryAccept({
+      id: `act-hedge-sector-${s.sector}`,
+      kind: "hedge",
+      target: s.sector,
+      sizePct,
+      instrument: defensive,
+      rationale: `Pair-hedge ${s.sector} (${(s.weight * 100) | 0}%) with ${defensive}`,
+      trigger: `sector concentration ${(s.weight * 100).toFixed(0)}%`,
+      riskReductionBps: Math.round(sizePct * 5),
+      costBps: 12,
+      upsideClippedPct: sizePct * 0.35,
+      confidence: 72,
+    });
+  }
+
+  // ---- 4. Per-position rebalance suggestions for any holding lacking coverage ----
+  // Ensures the user sees portfolio-WIDE intel, not just 1-2 vague items.
+  for (const h of holdings) {
+    if (coveredTickers.has(h.ticker)) continue;
+    const weight = h.value / totalValue;
+    if (weight < 0.04) continue; // skip dust positions
+    const targetWeight = Math.min(profile.concentrationLimit, 1 / Math.max(holdings.length, 6));
+    const drift = weight - targetWeight;
+    if (Math.abs(drift) < 0.03) continue; // already near target
+    const direction = drift > 0 ? "trim" : "add";
+    const sizePct = Math.min(15, Math.round(Math.abs(drift) * 100));
+    tryAccept({
+      id: `act-rebalance-${h.rawTicker}`,
+      kind: "rebalance",
+      target: h.ticker,
+      sizePct,
+      rationale:
+        direction === "trim"
+          ? `Rebalance ${h.ticker} −${sizePct}% — drift ${(drift * 100).toFixed(1)}% above equal-weight target`
+          : `Rebalance ${h.ticker} +${sizePct}% — under equal-weight target by ${(Math.abs(drift) * 100).toFixed(1)}%`,
+      trigger: `weight ${(weight * 100).toFixed(1)}% vs target ${(targetWeight * 100).toFixed(1)}%`,
+      riskReductionBps: Math.round(sizePct * 1.5),
+      costBps: 3,
+      upsideClippedPct: direction === "trim" ? Math.round(sizePct * weight * 50) / 100 : 0,
+      confidence: 65,
+    });
+  }
+
+  // Sort by impact: highest risk reduction first, then lowest cost
+  return actions.sort((a, b) => b.riskReductionBps - a.riskReductionBps || a.costBps - b.costBps);
 }
 
 function sectorWeight(holdings: FortressHolding[], sector: string, totalValue: number): number {
