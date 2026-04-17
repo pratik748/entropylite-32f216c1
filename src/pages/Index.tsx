@@ -108,6 +108,7 @@ const IndexContent = () => {
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
   const analysis = activeStock?.analysis ?? null;
+  const showMobileDashboardDock = isMobile && activeTab === "dashboard";
 
   // Real-time price subscription
   useEffect(() => {
@@ -326,7 +327,7 @@ const IndexContent = () => {
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
-                  <div className="p-1.5 space-y-1.5 pb-28">
+                  <div className="p-1.5 space-y-1.5 pb-24">
                     <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
                     {isLoading && <LoadingState />}
                     {analysis && !isLoading && (
@@ -382,77 +383,6 @@ const IndexContent = () => {
                       </>
                     )}
 
-                    {/* Mobile Bottom Dock — fixed above the system status bar (24px) */}
-                    <div
-                      className="fixed left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-md grid grid-cols-3 gap-px bg-border"
-                      style={{ bottom: "24px" }}
-                    >
-                      <Sheet>
-                        <SheetTrigger asChild>
-                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
-                            <LayoutDashboard className="h-3.5 w-3.5" />
-                            <span>Portfolio</span>
-                          </button>
-                        </SheetTrigger>
-                        <SheetContent side="left" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
-                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
-                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
-                              <LayoutDashboard className="h-3.5 w-3.5 text-primary" /> Portfolio
-                            </SheetTitle>
-                          </SheetHeader>
-                          <div className="flex-1 min-h-0 overflow-auto">
-                            <PortfolioBlotter
-                              stocks={stocks}
-                              activeStockId={activeStockId}
-                              onSelectStock={(id) => { setActiveStockId(id); }}
-                              onRemoveStock={handleRemoveStock}
-                              onAnalyze={handleAnalyze}
-                              isLoading={isLoading}
-                              priceStatus={priceStatus}
-                              tickerThreats={tickerThreats}
-                            />
-                          </div>
-                        </SheetContent>
-                      </Sheet>
-
-                      <Sheet>
-                        <SheetTrigger asChild>
-                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
-                            <Newspaper className="h-3.5 w-3.5" />
-                            <span>News</span>
-                          </button>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
-                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
-                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
-                              <Newspaper className="h-3.5 w-3.5 text-primary" /> Live Intel
-                            </SheetTitle>
-                          </SheetHeader>
-                          <div className="flex-1 min-h-0 overflow-auto">
-                            <LiveNewsFeed ticker={analysis?.ticker} compact />
-                          </div>
-                        </SheetContent>
-                      </Sheet>
-
-                      <Sheet>
-                        <SheetTrigger asChild>
-                          <button className="flex flex-col items-center justify-center gap-0.5 bg-card py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground active:bg-surface-2 active:text-foreground transition-colors">
-                            <BarChart3 className="h-3.5 w-3.5" />
-                            <span>Flows</span>
-                          </button>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="w-[88vw] max-w-sm p-0 bg-background border-border flex flex-col">
-                          <SheetHeader className="px-3 py-2 border-b border-border shrink-0">
-                            <SheetTitle className="text-xs font-mono uppercase tracking-widest text-foreground flex items-center gap-2">
-                              <BarChart3 className="h-3.5 w-3.5 text-primary" /> Flow Detection
-                            </SheetTitle>
-                          </SheetHeader>
-                          <div className="flex-1 min-h-0 overflow-auto">
-                            <FlowDetectionPanel stocks={stocks} />
-                          </div>
-                        </SheetContent>
-                      </Sheet>
-                    </div>
                   </div>
                 ) : (
                   /* Desktop: Bloomberg-style resizable 3-column layout */
@@ -628,6 +558,80 @@ const IndexContent = () => {
               )}
             </PageTransition>
           </main>
+
+          {showMobileDashboardDock && (
+            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border bg-surface-1/98 backdrop-blur-md shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)]">
+              <div className="grid grid-cols-3 gap-px bg-border">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
+                      <LayoutDashboard className="h-3.5 w-3.5" />
+                      <span>Portfolio</span>
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
+                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
+                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
+                        <LayoutDashboard className="h-3.5 w-3.5 text-primary" /> Portfolio
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1 overflow-auto">
+                      <PortfolioBlotter
+                        stocks={stocks}
+                        activeStockId={activeStockId}
+                        onSelectStock={(id) => {
+                          setActiveStockId(id);
+                        }}
+                        onRemoveStock={handleRemoveStock}
+                        onAnalyze={handleAnalyze}
+                        isLoading={isLoading}
+                        priceStatus={priceStatus}
+                        tickerThreats={tickerThreats}
+                      />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
+                      <Newspaper className="h-3.5 w-3.5" />
+                      <span>News</span>
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
+                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
+                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
+                        <Newspaper className="h-3.5 w-3.5 text-primary" /> Live Intel
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1 overflow-auto">
+                      <LiveNewsFeed ticker={analysis?.ticker} compact />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      <span>Flows</span>
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
+                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
+                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
+                        <BarChart3 className="h-3.5 w-3.5 text-primary" /> Flow Detection
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1 overflow-auto">
+                      <FlowDetectionPanel stocks={stocks} />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </div>
+          )}
 
           {/* System Status Bar */}
           <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
