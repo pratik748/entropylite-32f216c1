@@ -16,7 +16,7 @@
  */
 import { useMemo, useState } from "react";
 import {
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import { ShieldAlert, Brain, AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useStatArbIntelligence, type PairInput, type PairIntel } from "@/hooks/useStatArbIntelligence";
@@ -24,6 +24,12 @@ import OUBandChart from "./OUBandChart";
 import ProbabilityCone from "./ProbabilityCone";
 import LearningLoopPanel from "./LearningLoopPanel";
 import type { RegimeState } from "@/lib/statarb/types";
+
+// Match Price Dynamics palette (PATH_COLORS-style multi-line series)
+const PAIR_COLORS = [
+  "hsl(var(--primary))", "hsl(var(--gain))", "hsl(var(--warning))", "hsl(var(--loss))",
+  "hsl(199 89% 48%)", "hsl(280 65% 60%)", "hsl(45 93% 58%)", "hsl(168 76% 42%)",
+];
 
 interface Props {
   tickers: string[];
