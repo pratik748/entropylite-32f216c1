@@ -18,6 +18,43 @@ import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import { useInstitutionalFlows } from "@/hooks/useInstitutionalFlows";
 import { useToast } from "@/hooks/use-toast";
 
+// ── Hedge instrument map ──────────────────────────────────────────────
+// Translate abstract action.instrument hints into REAL tradable defensive
+// ETFs. These become normal portfolio positions (added to the dashboard
+// and persisted to the cloud just like any user-entered ticker).
+const HEDGE_INSTRUMENTS: Array<{ match: RegExp; symbol: string }> = [
+  { match: /VIX/i, symbol: "VXX" },
+  { match: /index put|β.?overlay|beta overlay|portfolio β/i, symbol: "SH" },
+  { match: /collar/i, symbol: "SH" },
+  { match: /tech|nasdaq|qqq/i, symbol: "PSQ" },
+  { match: /financial|bank/i, symbol: "SEF" },
+  { match: /energy|oil/i, symbol: "DUG" },
+  { match: /gold|metal|safe.?haven/i, symbol: "GLD" },
+  { match: /bond|treasury|rate|duration/i, symbol: "TLT" },
+  { match: /dollar|usd|fx/i, symbol: "UUP" },
+];
+const HEDGE_NOTES: Record<string, string> = {
+  SH: "Inverse S&P 500",
+  VXX: "VIX volatility ETN",
+  PSQ: "Inverse Nasdaq-100",
+  SEF: "Inverse Financials",
+  DUG: "Inverse Oil & Gas",
+  GLD: "Gold (safe-haven)",
+  TLT: "Long Treasuries",
+  UUP: "USD Index",
+};
+// Conservative reference prices used only as initial cost-basis until the
+// real-time price feed updates the new position on next analysis cycle.
+const HEDGE_REF_PRICE: Record<string, number> = {
+  SH: 42, VXX: 55, PSQ: 30, SEF: 32, DUG: 35, GLD: 215, TLT: 90, UUP: 28,
+};
+const FORTRESS_HEDGE_SYMBOLS = new Set(Object.keys(HEDGE_NOTES));
+
+function resolveHedgeSymbol(action: DefensiveAction): string {
+  const hint = `${action.instrument || ""} ${action.target || ""}`;
+  return HEDGE_INSTRUMENTS.find((m) => m.match.test(hint))?.symbol || "SH";
+}
+
 const STORAGE_KEY = "fortress-state-v1";
 
 interface FortressStoredState {
