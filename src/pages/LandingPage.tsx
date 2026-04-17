@@ -96,10 +96,10 @@ export default function LandingPage() {
       {/* Features Grid */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-28">
         <div className="text-center mb-10 sm:mb-16">
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-3">
+          <h2 className="reveal text-xl sm:text-3xl font-bold tracking-tight mb-3">
             Institutional-Grade Capabilities
           </h2>
-          <p className="text-sm sm:text-base text-black/50 max-w-xl mx-auto">
+          <p className="reveal text-sm sm:text-base text-black/50 max-w-xl mx-auto" style={{ transitionDelay: "80ms" }}>
             Market structure analysis, probabilistic scenarios, and quantitative decision intelligence.
             Every module a professional terminal offers, unified in one platform.
           </p>
