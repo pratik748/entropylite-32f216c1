@@ -35,6 +35,7 @@ const HOW_IT_WORKS = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const revealRef = useScrollReveal<HTMLDivElement>();
 
   useEffect(() => {
     document.title = "Entropy Lite | The Operating System of Finance";
@@ -47,40 +48,43 @@ export default function LandingPage() {
   if (checking) return null;
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div ref={revealRef} className="min-h-screen bg-white text-black">
       <PublicNav />
 
-      {/* Hero */}
-      <header className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20 text-center">
+      {/* Hero with animated mesh + grain */}
+      <header className="relative overflow-hidden grain-overlay">
+        <div className="mesh-bg" />
+        <div className="absolute inset-0 grid-texture opacity-[0.35] pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20 text-center">
           <img
             src={entropyLogoFull}
             alt="Entropy Lite"
-            className="h-20 sm:h-36 object-contain mx-auto mb-5 sm:mb-8"
+            className="h-20 sm:h-36 object-contain mx-auto mb-5 sm:mb-8 animate-scale-fade"
             loading="eager"
           />
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6 reveal">
             The Operating System of Finance
           </p>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6 reveal" style={{ transitionDelay: "80ms" }}>
             Market Structure Intelligence
             <br />
             <span className="text-black/60">for Independent Thinkers</span>
           </h1>
-          <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+          <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed reveal" style={{ transitionDelay: "160ms" }}>
             Probabilistic scenario analysis, liquidity flow detection, and real-time intelligence layers.
             An institutional-grade research platform for data-driven market understanding.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 reveal" style={{ transitionDelay: "240ms" }}>
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shine-on-hover lift-on-hover"
               onClick={() => navigate("/access")}
             >
-              Get Access <ChevronRight className="ml-1 h-4 w-4" />
+              Get Access <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto lift-on-hover"
               onClick={() => navigate("/pricing")}
             >
               View Pricing
