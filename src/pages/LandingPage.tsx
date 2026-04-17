@@ -106,13 +106,16 @@ export default function LandingPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {FEATURES.map((f) => (
+          {FEATURES.map((f, i) => (
             <article
               key={f.title}
-              className="group rounded-lg border border-black/5 bg-white p-5 sm:p-6 hover:shadow-md active:bg-black/[0.02] transition-all"
+              className="reveal group glass-tile rounded-lg p-5 sm:p-6 shine-on-hover lift-on-hover"
+              style={{ transitionDelay: `${(i % 3) * 60}ms` }}
             >
-              <f.icon className="h-5 w-5 text-black/40 mb-3 sm:mb-4 group-hover:text-black/70 transition-colors" />
-              <h3 className="font-semibold text-sm mb-1.5 sm:mb-2">{f.title}</h3>
+              <div className="relative inline-flex items-center justify-center h-9 w-9 rounded-md bg-black/[0.04] border border-black/[0.06] mb-3 sm:mb-4 group-hover:bg-black/[0.07] transition-colors">
+                <f.icon className="h-4 w-4 text-black/60 group-hover:text-black transition-colors" />
+              </div>
+              <h3 className="font-semibold text-sm mb-1.5 sm:mb-2 tracking-tight">{f.title}</h3>
               <p className="text-sm text-black/50 leading-relaxed">{f.desc}</p>
             </article>
           ))}
