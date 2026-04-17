@@ -134,7 +134,7 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
     sectorClusterLimit: 0.4,
     trajectoryStopPct: -8,
     volatilityBetaTrigger: 1.4,
-    hedgeCostCapBps: 120,
+    hedgeCostCapBps: 220,
     upsideFloorPct: 30,
     trimAggressivenessMult: 1,
   };
@@ -146,7 +146,7 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
       sectorClusterLimit: 0.32,
       trajectoryStopPct: -5,
       volatilityBetaTrigger: 1.2,
-      hedgeCostCapBps: 160,
+      hedgeCostCapBps: 280,
       upsideFloorPct: 25,
       trimAggressivenessMult: 1.35,
     };
@@ -156,7 +156,7 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
       sectorClusterLimit: 0.36,
       trajectoryStopPct: -6.5,
       volatilityBetaTrigger: 1.3,
-      hedgeCostCapBps: 140,
+      hedgeCostCapBps: 250,
       upsideFloorPct: 28,
       trimAggressivenessMult: 1.15,
     };
@@ -167,7 +167,7 @@ function deriveRegimeProfile(signals: LiveSignals | undefined): RegimeProfile {
       sectorClusterLimit: 0.45,
       trajectoryStopPct: -10,
       volatilityBetaTrigger: 1.55,
-      hedgeCostCapBps: 100,
+      hedgeCostCapBps: 180,
       upsideFloorPct: 35,
       trimAggressivenessMult: 0.85,
     };
