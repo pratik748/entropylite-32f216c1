@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3 } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -27,6 +27,7 @@ import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 
 import RiskDashboard from "@/components/RiskDashboard";
+import FortressMode from "@/components/risk/FortressMode";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import TickerStrip from "@/components/terminal/TickerStrip";
 import SystemStatusBar from "@/components/terminal/SystemStatusBar";
@@ -48,7 +49,7 @@ import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -62,6 +63,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
   { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
   { id: "risk", label: "Risk", shortLabel: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
+  { id: "fortress", label: "Fortress", shortLabel: "Fort", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
 ];
 
 const IndexContent = () => {
@@ -554,6 +556,11 @@ const IndexContent = () => {
               {activeTab === "risk" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <RiskDashboard key={refreshKey} stocks={stocks} />
+                </div>
+              )}
+              {activeTab === "fortress" && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <FortressMode key={refreshKey} stocks={stocks} />
                 </div>
               )}
             </PageTransition>
