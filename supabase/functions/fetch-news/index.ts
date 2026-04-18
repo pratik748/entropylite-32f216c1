@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 import { scrapePremiumNews } from "../_shared/scraper.ts";
+import { fetchMoneycontrolNews, fetchBSEAnnouncements, fetchEDGARFilings } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -284,14 +285,18 @@ serve(async (req) => {
 
     // Scrape premium sources only when a specific ticker is provided (saves credits)
     const shouldScrapePremium = !!cleanTicker && cleanTicker.length <= 5;
+    const isIN = !!indiaMode || effectiveRegion === "India";
 
-    const [rssResult, gdeltArticles, newsdataArticles, premiumResult] = await Promise.all([
+    const [rssResult, gdeltArticles, newsdataArticles, premiumResult, mcNews, bseFilings, edgarFilings] = await Promise.all([
       fetchAllRSS(),
       fetchGDELT(query),
       fetchNewsdata(query),
       shouldScrapePremium
         ? scrapePremiumNews(cleanTicker).catch(e => { console.warn("Premium scrape failed:", e.message); return { articles: [], scrapedSources: [] }; })
         : Promise.resolve({ articles: [], scrapedSources: [] }),
+      cleanTicker && isIN ? fetchMoneycontrolNews(cleanTicker).catch(() => []) : Promise.resolve([]),
+      cleanTicker && isIN ? fetchBSEAnnouncements(cleanTicker).catch(() => []) : Promise.resolve([]),
+      cleanTicker && !isIN ? fetchEDGARFilings(cleanTicker).catch(() => []) : Promise.resolve([]),
     ]);
 
     const rssFeeds = rssResult.successCount;
@@ -310,8 +315,16 @@ serve(async (req) => {
       origin: "scraped",
     }));
 
+    // Convert live-scraped news/filings to standard Article format
+    const liveScraped: Article[] = [
+      ...mcNews.map((n) => ({ title: n.title, description: n.summary || null, link: n.url, source: n.source, pubDate: n.publishedAt || new Date().toISOString(), imageUrl: null, category: "business", sentiment: null, sourceTier: 2, origin: "moneycontrol" })),
+      ...bseFilings.map((n) => ({ title: n.title, description: null, link: n.url, source: n.source, pubDate: n.publishedAt || new Date().toISOString(), imageUrl: null, category: "filing", sentiment: null, sourceTier: 1, origin: "bse" })),
+      ...edgarFilings.map((n) => ({ title: n.title, description: null, link: n.url, source: n.source, pubDate: n.publishedAt || new Date().toISOString(), imageUrl: null, category: "filing", sentiment: null, sourceTier: 1, origin: "edgar" })),
+    ];
+
     const allArticles = [
-      ...premiumArticles, // Premium scraped content first
+      ...liveScraped,        // Filings + Moneycontrol first (highest signal for tickers)
+      ...premiumArticles,    // Premium scraped content next
       ...rssResult.articles,
       ...gdeltArticles,
       ...newsdataArticles,
@@ -341,7 +354,10 @@ serve(async (req) => {
     const sourcesPolled = rssFeeds
       + (gdeltArticles.length > 0 ? 1 : 0)
       + (newsdataArticles.length > 0 ? 1 : 0)
-      + (premiumResult.scrapedSources?.length || 0);
+      + (premiumResult.scrapedSources?.length || 0)
+      + (mcNews.length > 0 ? 1 : 0)
+      + (bseFilings.length > 0 ? 1 : 0)
+      + (edgarFilings.length > 0 ? 1 : 0);
 
     return new Response(
       JSON.stringify({
@@ -353,6 +369,9 @@ serve(async (req) => {
           gdelt: gdeltArticles.length,
           newsdata: newsdataArticles.length,
           scraped: premiumArticles.length,
+          moneycontrol: mcNews.length,
+          bseFilings: bseFilings.length,
+          edgarFilings: edgarFilings.length,
           scrapedSources: premiumResult.scrapedSources || [],
         },
       }),
