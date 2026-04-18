@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 import { scrapePremiumNews } from "../_shared/scraper.ts";
+import { fetchMoneycontrolNews, fetchBSEAnnouncements, fetchEDGARFilings } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
