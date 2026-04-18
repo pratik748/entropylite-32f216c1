@@ -354,7 +354,10 @@ serve(async (req) => {
     const sourcesPolled = rssFeeds
       + (gdeltArticles.length > 0 ? 1 : 0)
       + (newsdataArticles.length > 0 ? 1 : 0)
-      + (premiumResult.scrapedSources?.length || 0);
+      + (premiumResult.scrapedSources?.length || 0)
+      + (mcNews.length > 0 ? 1 : 0)
+      + (bseFilings.length > 0 ? 1 : 0)
+      + (edgarFilings.length > 0 ? 1 : 0);
 
     return new Response(
       JSON.stringify({
@@ -366,6 +369,9 @@ serve(async (req) => {
           gdelt: gdeltArticles.length,
           newsdata: newsdataArticles.length,
           scraped: premiumArticles.length,
+          moneycontrol: mcNews.length,
+          bseFilings: bseFilings.length,
+          edgarFilings: edgarFilings.length,
           scrapedSources: premiumResult.scrapedSources || [],
         },
       }),
