@@ -1,6 +1,7 @@
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
-import { scrapeCompanyData } from "../_shared/scraper.ts";
+import { fetchTickerLiveBundle, bundleToPromptContext } from "../_shared/liveData.ts";
+import { isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 
 const corsH = {
   "Access-Control-Allow-Origin": "*",
@@ -12,23 +13,24 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsH });
 
   try {
-    const { ticker, provider } = await req.json();
-    if (!ticker) throw new Error("ticker required");
+    const { ticker: rawTicker, provider } = await req.json();
+    if (!rawTicker) throw new Error("ticker required");
+    const ticker = normalizeTickerInput(rawTicker);
+    const isIndian = isIndianTicker(ticker);
 
-    // Step 1: Scrape real financial data (free HTML first, ScrapeGraph fallback)
+    // Step 1: Fetch live structured data from Screener / Yahoo / Finviz / Filings / Moneycontrol
     let scrapedContext = "";
     try {
-      scrapedContext = await scrapeCompanyData(ticker);
-      if (scrapedContext) {
-        console.log(`Scraped ${scrapedContext.length} chars of real data for ${ticker}`);
-      }
+      const bundle = await fetchTickerLiveBundle(ticker, isIndian);
+      scrapedContext = bundleToPromptContext(bundle);
+      console.log(`company-intelligence live bundle for ${ticker}: ${scrapedContext.length} chars`);
     } catch (e: any) {
-      console.warn("Scraping failed, proceeding with AI-only:", e.message);
+      console.warn("Live bundle failed, proceeding with AI-only:", e.message);
     }
 
-    const systemPrompt = `You are a Bloomberg-grade corporate intelligence analyst. Return ONLY valid JSON — no markdown, no commentary. The JSON must match the exact structure specified. Use the scraped real-time data provided to ensure maximum accuracy. Where scraped data conflicts with your training data, prefer the scraped data as it is more current.`;
+    const systemPrompt = `You are a Bloomberg-grade corporate intelligence analyst. Return ONLY valid JSON — no markdown, no commentary. The JSON must match the exact structure specified. Use the LIVE SCRAPED DATA provided as your primary source of truth — where it conflicts with your training data, the scraped data wins because it is current.`;
 
-    const userPrompt = `Generate a comprehensive deep intelligence dossier for ${ticker}.${scrapedContext ? `\n\nHere is real-time scraped financial data to ground your analysis — use this as your primary source of truth:\n\n${scrapedContext.slice(0, 6000)}` : ""}\n\nReturn a single JSON object with these keys:
+    const userPrompt = `Generate a comprehensive deep intelligence dossier for ${ticker}.${scrapedContext ? `\n\n${scrapedContext.slice(0, 6000)}` : ""}\n\nReturn a single JSON object with these keys:
 
 {
   "companyName": "string",
