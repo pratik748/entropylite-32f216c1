@@ -21,9 +21,9 @@ const ThemeToggle = () => {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("entropy-theme");
-      if (stored === "light" || stored === "palantir") return stored;
+      if (stored === "light" || stored === "dark" || stored === "palantir") return stored;
     }
-    return "dark";
+    return "palantir";
   });
 
   useEffect(() => {
