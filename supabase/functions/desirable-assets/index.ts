@@ -924,6 +924,16 @@ serve(async (req) => {
     let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
     let candidates: any[] = [];
 
+    // Live macro calendar — high-importance events bias the regime call
+    let macroBlock = "";
+    try {
+      const events = await fetchMacroCalendar();
+      const high = events.filter((e) => e.importance === "high").slice(0, 8);
+      if (high.length > 0) {
+        macroBlock = `\nLIVE MACRO CALENDAR (next high-importance events scraped from Trading Economics):\n${high.map((e) => `- ${e.date} ${e.country} ${e.event}${e.actual ? ` actual=${e.actual}` : ""}${e.forecast ? ` forecast=${e.forecast}` : ""}${e.previous ? ` prev=${e.previous}` : ""}`).join("\n")}\nUse these to bias regime, sector tilt, and catalyst timing.\n`;
+      }
+    } catch (e) { console.warn("Macro calendar fetch failed:", (e as Error).message); }
+
     try {
       const overusedList = indiaMode
         ? Array.from(OVERUSED_TICKERS_INDIA).join(", ")
@@ -943,7 +953,7 @@ Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian e
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${antiRepeatBlock}
+${antiRepeatBlock}${macroBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
