@@ -189,6 +189,23 @@ serve(async (req) => {
 
     console.log(`Price resolution for ${ticker}: ${currentPrice > 0 ? `${currency} ${currentPrice}` : "FAILED — all endpoints returned no data"}`);
 
+    // ─── Live scraped fundamentals (Screener / Yahoo / Finviz / Filings / News) ───
+    let liveContext = "";
+    try {
+      const bundle = await fetchTickerLiveBundle(ticker, isIndian);
+      liveContext = bundleToPromptContext(bundle);
+      const sources = [
+        bundle.screener && "Screener.in",
+        bundle.yahoo && "Yahoo",
+        bundle.finviz && "Finviz",
+        bundle.filings.length && `${bundle.filings.length} filings`,
+        bundle.news.length && `${bundle.news.length} news`,
+      ].filter(Boolean).join(", ");
+      console.log(`Live bundle for ${ticker}: ${sources || "no live sources hit"}`);
+    } catch (e: any) {
+      console.warn("Live bundle fetch failed:", e.message);
+    }
+
     const currencySymbol = currency === "INR" ? "₹" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "JPY" ? "¥" : "$";
     const dayChange = prevClose > 0 ? ((currentPrice - prevClose) / prevClose * 100).toFixed(2) : "N/A";
     const from52High = fiftyTwoWeekHigh > 0 ? ((currentPrice - fiftyTwoWeekHigh) / fiftyTwoWeekHigh * 100).toFixed(1) : "N/A";
@@ -208,7 +225,7 @@ REAL-TIME MARKET DATA:
 - Distance from 52W High: ${from52High}%
 
 Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
-${polymarketContext}
+${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
