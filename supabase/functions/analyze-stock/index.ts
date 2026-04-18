@@ -3,6 +3,7 @@ import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
+import { fetchTickerLiveBundle, bundleToPromptContext } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
