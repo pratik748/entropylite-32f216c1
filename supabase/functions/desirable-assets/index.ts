@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { fetchMacroCalendar } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
