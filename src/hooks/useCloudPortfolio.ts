@@ -41,6 +41,7 @@ export function useCloudPortfolio() {
           quantity: Number(row.quantity),
           analysis: row.analysis ?? undefined,
           isLoading: false,
+          createdAt: row.created_at,
         }));
         setStocksState(mapped);
       }

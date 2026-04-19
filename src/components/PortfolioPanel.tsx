@@ -1,9 +1,11 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
+import ProofCard from "@/components/ProofCard";
 
 /** Tickers that Fortress Mode adds as defensive hedges — used to render a Hedge badge. */
 const FORTRESS_HEDGES = new Set(["SH", "VXX", "PSQ", "SEF", "DUG", "GLD", "TLT", "UUP"]);
@@ -15,6 +17,7 @@ export interface PortfolioStock {
   quantity: number;
   analysis?: any;
   isLoading?: boolean;
+  createdAt?: string;
 }
 
 interface PortfolioPanelProps {
@@ -53,6 +56,8 @@ const FreshnessIndicator = ({ status }: { status?: PriceFreshness }) => {
 
 const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew, priceStatus }: PortfolioPanelProps) => {
   const { baseCurrency, setBaseCurrency, convertToBase } = useFX();
+  const [proofStockId, setProofStockId] = useState<string | null>(null);
+  const proofStock = stocks.find((s) => s.id === proofStockId) || null;
   const analyzed = stocks.filter(s => s.analysis);
   const multi = isMultiCurrency(analyzed);
   const baseSym = getCurrencySymbol(baseCurrency);
@@ -214,6 +219,15 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                       )}
                     </div>
                   )}
+                  {stock.analysis && pnlPct >= 5 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProofStockId(stock.id); }}
+                      className="ml-1 rounded p-1 text-gain/70 hover:bg-gain/10 hover:text-gain transition-colors"
+                      title={`Share this win (+${pnlPct.toFixed(1)}%)`}
+                    >
+                      <Trophy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); onRemoveStock(stock.id); }}
                     className="ml-1 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-loss/10 hover:text-loss"
@@ -257,6 +271,14 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           <p className="text-sm text-muted-foreground">No assets in portfolio</p>
           <p className="text-xs text-muted-foreground/60 mt-1">Add any global asset using the form above</p>
         </div>
+      )}
+
+      {proofStock && (
+        <ProofCard
+          open={!!proofStock}
+          onClose={() => setProofStockId(null)}
+          stock={proofStock}
+        />
       )}
     </div>
   );
