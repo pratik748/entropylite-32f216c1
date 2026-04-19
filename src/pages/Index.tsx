@@ -70,6 +70,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
