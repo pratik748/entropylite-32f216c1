@@ -30,18 +30,23 @@ interface GovernorMetrics {
   requestsInWindow: number;
 }
 
-type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy";
+type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy" | "reflexivity";
 
 const TTL: Record<Tier, number> = {
-  realtime:   8_000,       // 8s — prices
-  frequent:   15_000,      // 15s — market overview, ticker strip
-  slow:       60_000,      // 1 min — news, geopolitical, desirable assets
-  static:     Infinity,    // permanent — historical data
-  ai:         30_000,      // 30s cooldown for AI calls
-  continuous: 60_000,      // 60s — background simulation loops
-  evolution:  120_000,     // 120s — strategy discovery
-  heavy:      1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
+  realtime:    8_000,       // 8s — prices
+  frequent:    15_000,      // 15s — market overview, ticker strip
+  slow:        60_000,      // 1 min — news, geopolitical, desirable assets
+  static:      Infinity,    // permanent — historical data
+  ai:          30_000,      // 30s cooldown for AI calls
+  continuous:  60_000,      // 60s — background simulation loops
+  evolution:   120_000,     // 120s — strategy discovery
+  heavy:       1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
+  reflexivity: 21_600_000,  // 6h — reflexivity belief map (persisted to localStorage)
 };
+
+// Tiers that should survive page reloads (persisted to localStorage)
+const PERSISTENT_TIERS: Set<Tier> = new Set(["reflexivity"]);
+const PERSIST_PREFIX = "entropy-cache-v1::";
 
 const ENDPOINT_TIER: Record<string, Tier> = {
   "price-feed":              "realtime",
@@ -72,20 +77,21 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "data-pipeline-status":    "frequent",
   "derivatives-intelligence":"heavy",
   "historical-prices":        "slow",
-  "reflexivity-engine":      "heavy",
+  "reflexivity-engine":      "reflexivity",
   // company-intelligence removed — uses its own 24h localStorage cache
 };
 
 // Rough cost weights for monitoring (relative units)
 const COST_WEIGHT: Record<Tier, number> = {
-  realtime:   0.1,
-  frequent:   0.2,
-  slow:       0.5,
-  static:     0,
-  ai:         5,
-  continuous: 3,
-  evolution:  4,
-  heavy:      8,
+  realtime:    0.1,
+  frequent:    0.2,
+  slow:        0.5,
+  static:      0,
+  ai:          5,
+  continuous:  3,
+  evolution:   4,
+  heavy:       8,
+  reflexivity: 8,
 };
 
 // --------------- Singleton State ---------------
@@ -116,6 +122,49 @@ function cacheKey(fn: string, body?: any): string {
     return fn;
   }
 }
+
+// --------------- Persistent cache (localStorage) ---------------
+
+function endpointFromKey(key: string): string {
+  return key.split("::")[0];
+}
+
+function isPersistent(key: string): boolean {
+  const tier = ENDPOINT_TIER[endpointFromKey(key)];
+  return tier ? PERSISTENT_TIERS.has(tier) : false;
+}
+
+function persistEntry(key: string, entry: CacheEntry) {
+  if (!isPersistent(key)) return;
+  try {
+    localStorage.setItem(PERSIST_PREFIX + key, JSON.stringify(entry));
+  } catch {}
+}
+
+function loadPersistedEntry(key: string): CacheEntry | null {
+  if (!isPersistent(key)) return null;
+  try {
+    const raw = localStorage.getItem(PERSIST_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CacheEntry;
+    return parsed && typeof parsed.timestamp === "number" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Hydrate persistent cache entries on module load
+(function hydratePersistentCache() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(PERSIST_PREFIX)) continue;
+      const cacheK = k.slice(PERSIST_PREFIX.length);
+      const entry = loadPersistedEntry(cacheK);
+      if (entry) cache.set(cacheK, entry);
+    }
+  } catch {}
+})();
 
 function fastHash(data: any): string {
   const str = typeof data === "string" ? data : JSON.stringify(data);
@@ -216,7 +265,9 @@ export async function governedInvoke<T = any>(
 
     // Update cache
     const hash = fastHash(data);
-    cache.set(key, { data, timestamp: Date.now(), hash });
+    const entry = { data, timestamp: Date.now(), hash };
+    cache.set(key, entry);
+    persistEntry(key, entry);
 
     return data;
   })();
@@ -268,6 +319,7 @@ export function getCached<T = any>(functionName: string, body?: any): T | null {
 export function invalidateCache(functionName: string, body?: any) {
   const key = cacheKey(functionName, body);
   cache.delete(key);
+  try { localStorage.removeItem(PERSIST_PREFIX + key); } catch {}
 }
 
 // --------------- Metrics API ---------------
