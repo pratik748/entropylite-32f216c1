@@ -15,6 +15,7 @@ export interface PortfolioStock {
   quantity: number;
   analysis?: any;
   isLoading?: boolean;
+  createdAt?: string;
 }
 
 interface PortfolioPanelProps {
