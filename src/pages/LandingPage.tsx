@@ -59,9 +59,9 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite | Free Institutional Market Intelligence Terminal";
+    document.title = "Entropy Lite | The Operating System of Finance";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Free Bloomberg-grade market intelligence: 10,000-path Monte Carlo, structural constraint detection, causal effects modeling. Sign in free, no card required.");
+    if (meta) meta.setAttribute("content", "Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence. Free during founding access.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
