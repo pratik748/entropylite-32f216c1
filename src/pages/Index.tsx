@@ -257,6 +257,10 @@ const IndexContent = () => {
         title: "Trade crossed → Profit Gradient",
         description: `${stock.ticker} ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}% ingested into ODGS`,
       });
+      // Auto-pop Proof Card on a winning close
+      if (pnlPct > 0) {
+        setProofStock({ ...stock });
+      }
     }
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
