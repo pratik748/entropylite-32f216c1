@@ -136,60 +136,36 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* PAIN-POINT COMPARISON — loss aversion */}
+      {/* PRINCIPLES — quiet, classy positioning */}
       <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-          <div className="text-center mb-10 sm:mb-12">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The asymmetry</p>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
+          <div className="text-center mb-10 sm:mb-14">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Principles</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              You're playing a different game than the desk.
+              A different way of looking at markets.
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Every retail trader is fighting institutions armed with terminals worth $24,000/yr.
-              Entropy Lite closes that gap. Free.
+              Entropy Lite is built around four ideas. They shape every layer of the system.
             </p>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white overflow-hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-black/5">
-              <div className="p-5 sm:p-7 bg-black/[0.02]">
-                <div className="flex items-center gap-2 mb-4">
-                  <X className="h-4 w-4 text-black/40" />
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-black/40">Without Entropy Lite</span>
-                </div>
-                <ul className="space-y-3.5">
-                  {PAIN_POINTS.map((p) => (
-                    <li key={p.without} className="text-sm text-black/55 leading-relaxed flex gap-2">
-                      <span className="text-black/25 flex-shrink-0">—</span>
-                      <span>{p.without}</span>
-                    </li>
-                  ))}
-                </ul>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
+            {PRINCIPLES.map((p, i) => (
+              <div key={p.title} className="bg-white p-6 sm:p-8">
+                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">— {String(i + 1).padStart(2, "0")}</p>
+                <h3 className="text-base sm:text-lg font-semibold tracking-tight mb-2">{p.title}</h3>
+                <p className="text-sm text-black/55 leading-relaxed">{p.desc}</p>
               </div>
-              <div className="p-5 sm:p-7">
-                <div className="flex items-center gap-2 mb-4">
-                  <Check className="h-4 w-4 text-emerald-600" />
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-700">With Entropy Lite</span>
-                </div>
-                <ul className="space-y-3.5">
-                  {PAIN_POINTS.map((p) => (
-                    <li key={p.with} className="text-sm text-black/75 leading-relaxed flex gap-2 font-medium">
-                      <Check className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <span>{p.with}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div className="text-center mt-8 sm:mt-10">
+          <div className="text-center mt-10 sm:mt-12">
             <Button
               size="lg"
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Close the gap — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Begin — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
