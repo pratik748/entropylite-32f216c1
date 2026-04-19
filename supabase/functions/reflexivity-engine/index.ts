@@ -187,11 +187,7 @@ serve(async (req) => {
     let actionable: { trigger: string; trade: string; risk: string } | null = null;
     let aiError: string | null = null;
     try {
-      // Call Lovable AI Gateway directly — bypasses the Cloudflare quota that
-      // was blocking reflexivity. Uses Gemini 3 Flash (default, fast, reliable).
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
+      // Use the standard shared callAI utility (Cloudflare → Mistral → OpenAI fallback chain).
       const systemPrompt =
         "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON, no markdown, no commentary.";
       const userPrompt = `Belief map:
@@ -204,42 +200,15 @@ serve(async (req) => {
 
 Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
 
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 25000);
-      let aiText = "";
-      try {
-        const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          signal: ctrl.signal,
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.4,
-            max_tokens: 700,
-          }),
-        });
+      const ai = await callAI({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.4,
+        maxTokens: 700,
+        jsonMode: true,
+      });
 
-        if (!aiResp.ok) {
-          const errBody = await aiResp.text().catch(() => "");
-          if (aiResp.status === 429) throw new Error("Lovable AI rate limited (429)");
-          if (aiResp.status === 402) throw new Error("Lovable AI credits exhausted (402)");
-          throw new Error(`Lovable AI ${aiResp.status}: ${errBody.slice(0, 160)}`);
-        }
-        const aiJson = await aiResp.json();
-        aiText = aiJson?.choices?.[0]?.message?.content?.trim() || "";
-      } finally {
-        clearTimeout(timer);
-      }
-
-      if (!aiText) throw new Error("Lovable AI returned empty content");
-      const parsed = safeParseJSON(aiText);
+      const parsed = safeParseJSON(ai.text);
       if (parsed?.thesis && typeof parsed.thesis === "string") {
         thesis = parsed.thesis;
         actionable = parsed.actionable && typeof parsed.actionable === "object"
