@@ -36,6 +36,7 @@ import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
+import EntropyBrief from "@/components/EntropyBrief";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -263,8 +264,12 @@ const IndexContent = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <Header directProfitMode={directProfitMode} onToggleDirectProfit={() => setDirectProfitMode((p) => !p)} />
-
+      <Header
+        directProfitMode={directProfitMode}
+        onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
+        onOpenBrief={() => setBriefOpen(true)}
+      />
+      <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
       {/* Direct Profit Mode — replaces entire UI */}
       {directProfitMode ? (
         <div className="flex-1 min-h-0 overflow-auto">
