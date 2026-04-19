@@ -104,8 +104,8 @@ const IndexContent = () => {
   // Sell notification system — monitors positions for profit drawdowns and sell signals
   useSellNotifications(stocks);
 
-  // Auto-popup Proof Card the first time a position crosses +5% — share-worthy moment
-  const { proofStock, dismiss: dismissProof } = useProofPopup(stocks);
+  // Proof Card auto-pops when a trade is CLOSED (crossed off) with a positive PnL
+  const [proofStock, setProofStock] = useState<PortfolioStock | null>(null);
 
   const stocksRef = useRef(stocks);
   useEffect(() => {
