@@ -988,6 +988,32 @@ Return via the tool call only.`,
       }
       candidates = dedupeCandidates(candidates);
       console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
+
+      // Retry once with a relaxed prompt if the first parallel pass returned nothing usable.
+      if (candidates.length === 0) {
+        console.warn("desirable-assets: zero AI candidates on first pass, retrying with relaxed prompt");
+        try {
+          const retryOpts = {
+            ...aiOpts,
+            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return at least 8 high-quality, deeply liquid large/mega-cap names that any institutional desk would hold today. Favour familiar blue-chip leaders over obscure picks.`,
+            temperature: 0.5,
+          };
+          const retryResults = await callAIParallel(retryOpts);
+          for (const result of retryResults) {
+            const p = safeParseJSON(result.text);
+            const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+            if (!parsed.marketCondition && p?.marketCondition) {
+              parsed.marketCondition = p.marketCondition;
+              parsed.regimeType = p.regimeType || "transition";
+            }
+            candidates.push(...recs);
+          }
+          candidates = dedupeCandidates(candidates);
+          console.log(`desirable-assets retry returned ${candidates.length} candidates`);
+        } catch (retryErr) {
+          console.error("desirable-assets retry failed:", (retryErr as Error).message);
+        }
+      }
     } catch (aiError) {
       console.error("desirable-assets Stage 1 AI generation failed:", aiError);
     }
@@ -1023,8 +1049,11 @@ Return via the tool call only.`,
       console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback padding`);
     }
 
+    // Progressive guard: only throw as the absolute last resort. Deterministic padding above
+    // and the reliability backstop further down should keep the panel populated in nearly all cases.
     if (candidates.length === 0) {
-      throw new Error("No candidates available after deterministic fallback");
+      console.error("desirable-assets: no candidates after AI + retry + deterministic padding");
+      throw new Error("Asset universe is temporarily quiet — refresh in a few minutes.");
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
