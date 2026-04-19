@@ -30,18 +30,23 @@ interface GovernorMetrics {
   requestsInWindow: number;
 }
 
-type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy";
+type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy" | "reflexivity";
 
 const TTL: Record<Tier, number> = {
-  realtime:   8_000,       // 8s — prices
-  frequent:   15_000,      // 15s — market overview, ticker strip
-  slow:       60_000,      // 1 min — news, geopolitical, desirable assets
-  static:     Infinity,    // permanent — historical data
-  ai:         30_000,      // 30s cooldown for AI calls
-  continuous: 60_000,      // 60s — background simulation loops
-  evolution:  120_000,     // 120s — strategy discovery
-  heavy:      1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
+  realtime:    8_000,       // 8s — prices
+  frequent:    15_000,      // 15s — market overview, ticker strip
+  slow:        60_000,      // 1 min — news, geopolitical, desirable assets
+  static:      Infinity,    // permanent — historical data
+  ai:          30_000,      // 30s cooldown for AI calls
+  continuous:  60_000,      // 60s — background simulation loops
+  evolution:   120_000,     // 120s — strategy discovery
+  heavy:       1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
+  reflexivity: 21_600_000,  // 6h — reflexivity belief map (persisted to localStorage)
 };
+
+// Tiers that should survive page reloads (persisted to localStorage)
+const PERSISTENT_TIERS: Set<Tier> = new Set(["reflexivity"]);
+const PERSIST_PREFIX = "entropy-cache-v1::";
 
 const ENDPOINT_TIER: Record<string, Tier> = {
   "price-feed":              "realtime",
