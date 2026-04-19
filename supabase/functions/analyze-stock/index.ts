@@ -77,35 +77,45 @@ serve(async (req) => {
         const grad = gradArr[0];
 
         if (ledger.length > 0) {
-          const tickerTrades = ledger.filter(t => (t.asset || "").toUpperCase() === ticker.toUpperCase());
-          const allWins = ledger.filter(t => Number(t.pnl_pct) > 0).length;
-          const overallWR = ((allWins / ledger.length) * 100).toFixed(0);
-          const avgPnl = (ledger.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / ledger.length).toFixed(2);
+          // ── KEY TAKEAWAYS ONLY (no raw history dump) ──
+          const N = ledger.length;
+          const wins = ledger.filter(t => Number(t.pnl_pct) > 0).length;
+          const wr = Math.round((wins / N) * 100);
+          const avgPnl = ledger.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / N;
 
-          let tickerLine = "";
-          if (tickerTrades.length > 0) {
-            const tWins = tickerTrades.filter(t => Number(t.pnl_pct) > 0).length;
-            const tWR = ((tWins / tickerTrades.length) * 100).toFixed(0);
-            const tAvg = (tickerTrades.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / tickerTrades.length).toFixed(2);
-            const worst = Math.min(...tickerTrades.map(t => Number(t.pnl_pct || 0))).toFixed(2);
-            tickerLine = `\n- This user's ${ticker} history: ${tickerTrades.length} closed trades, ${tWR}% win rate, avg ${tAvg}% P&L, worst ${worst}%.`;
+          // Loss-regime concentration: which regime burns this user most
+          const regimeLoss: Record<string, { n: number; sum: number }> = {};
+          for (const t of ledger) {
+            const r = t.feature_regime || "unknown";
+            const p = Number(t.pnl_pct || 0);
+            if (p < 0) {
+              regimeLoss[r] = regimeLoss[r] || { n: 0, sum: 0 };
+              regimeLoss[r].n++;
+              regimeLoss[r].sum += p;
+            }
           }
-
-          const bias = grad?.asset_biases?.[ticker.toUpperCase()];
-          const biasLine = typeof bias === "number"
-            ? `\n- Learned bias for ${ticker}: ${bias.toFixed(2)}× (1.0 = neutral, >1 favored, <1 disfavored).`
+          const worstRegime = Object.entries(regimeLoss)
+            .sort((a, b) => a[1].sum - b[1].sum)[0];
+          const worstRegimeLine = worstRegime
+            ? ` Weakest in ${worstRegime[0]} regime (${worstRegime[1].n} losses, avg ${(worstRegime[1].sum / worstRegime[1].n).toFixed(1)}%).`
             : "";
 
-          const recentLosses = ledger
-            .filter(t => Number(t.pnl_pct) < -2)
-            .slice(0, 5)
-            .map(t => `${t.asset} ${Number(t.pnl_pct).toFixed(1)}% in ${t.feature_regime || "unknown"} regime`)
-            .join("; ");
-          const lossLine = recentLosses ? `\n- Recent loss patterns to factor into risk assessment: ${recentLosses}.` : "";
+          // This-ticker takeaway only
+          const tT = ledger.filter(t => (t.asset || "").toUpperCase() === ticker.toUpperCase());
+          let tickerLine = "";
+          if (tT.length > 0) {
+            const tWR = Math.round((tT.filter(t => Number(t.pnl_pct) > 0).length / tT.length) * 100);
+            const tAvg = tT.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / tT.length;
+            tickerLine = ` On ${ticker}: ${tT.length} trades, ${tWR}% WR, avg ${tAvg.toFixed(1)}%.`;
+          }
 
-          odgsContext = `\nUSER OUTCOME LEDGER (real per-account trade history — bias toward profitable patterns and away from prior losses):
-- Total closed trades: ${ledger.length} | Overall win rate: ${overallWR}% | Avg P&L: ${avgPnl}%${tickerLine}${biasLine}${lossLine}
-Use this ledger to ground confidence and risk: raise confidence when current setup matches profitable patterns; lower confidence and tighten ranges when it matches prior-loss patterns.`;
+          // Learned bias for this ticker (single number, no array)
+          const bias = grad?.asset_biases?.[ticker.toUpperCase()];
+          const biasLine = typeof bias === "number" && Math.abs(bias - 1) > 0.05
+            ? ` Learned bias ${bias.toFixed(2)}×.`
+            : "";
+
+          odgsContext = `\nUSER TAKEAWAYS: ${N} trades, ${wr}% WR, avg ${avgPnl.toFixed(1)}%.${tickerLine}${worstRegimeLine}${biasLine} Lean into profitable patterns; tighten risk if setup matches weakest regime.`;
         }
       }
     } catch (e: any) { console.warn("ODGS context fetch failed:", e?.message); }
