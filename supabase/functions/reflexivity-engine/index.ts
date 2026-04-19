@@ -180,13 +180,11 @@ serve(async (req) => {
     const shiftETA = deriveShiftETA(conviction, contradictions, input.vix);
 
     // AI narrative layer — interprets the math into a 2-3 sentence reflexivity thesis.
-    let thesis = "";
-    let actionable: { trigger: string; trade: string; risk: string } | null = null;
-    try {
-      const ai = await callAI({
-        systemPrompt:
-          "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON.",
-        userPrompt: `Belief map:
+    // NO FALLBACK: if the AI fails, the whole call fails. We never serve stitched/mock prose.
+    const ai = await callAI({
+      systemPrompt:
+        "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON.",
+      userPrompt: `Belief map:
 - Consensus: ${consensus.label} (${consensus.direction})
 - Components — Flow: ${consensus.components.flow}, Sentiment: ${consensus.components.sentiment}, Causal: ${consensus.components.causal}
 - Conviction: ${conviction.label} (${conviction.score}, spread ${conviction.spread})
@@ -195,16 +193,15 @@ serve(async (req) => {
 - VIX: ${input.vix ?? "n/a"}, Regime: ${input.regime ?? "n/a"}
 
 Return JSON: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`,
-        temperature: 0.4,
-        maxTokens: 700,
-      });
-      const parsed = safeParseJSON(ai.text);
-      if (parsed?.thesis) thesis = parsed.thesis;
-      if (parsed?.actionable) actionable = parsed.actionable;
-    } catch (e) {
-      console.warn("Reflexivity AI narrative failed:", (e as Error).message);
-      thesis = `${consensus.label} consensus with ${conviction.label.toLowerCase()} conviction. ${contradictions.length > 0 ? `Top contradiction: ${contradictions[0].pair}.` : "No major internal contradictions detected."} Shift risk: ${shiftETA.label.toLowerCase()}.`;
+      temperature: 0.4,
+      maxTokens: 700,
+    });
+    const parsed = safeParseJSON(ai.text);
+    if (!parsed?.thesis) {
+      throw new Error("Reflexivity AI returned no thesis");
     }
+    const thesis: string = parsed.thesis;
+    const actionable: { trigger: string; trade: string; risk: string } | null = parsed.actionable || null;
 
     return new Response(
       JSON.stringify({
