@@ -275,6 +275,16 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
           preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
         },
+        // Stable cache key — exclude live-drifting fields (portfolioWeights/Value vary
+        // every poll because currentPrice ticks). Keying on structural identity only.
+        cacheKey: [
+          "v1",
+          baseCurrency,
+          existingTickers.slice().sort().join(","),
+          budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
+          selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
+          selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
+        ].join("|"),
       });
 
       if (fnError) {
