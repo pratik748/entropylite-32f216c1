@@ -18,12 +18,11 @@ const STATS = [
   { value: "24/7", label: "Continuous market scan" },
 ];
 
-const PAIN_POINTS = [
-  { without: "You react to news after the price has already moved", with: "Pre-emptive alerts when structural constraints approach activation" },
-  { without: "You guess position size from gut feel", with: "Risk-adjusted sizing calibrated to portfolio VaR and CVaR" },
-  { without: "You see only the headline, not the cascade", with: "Causal Effects Engine maps 1st, 2nd, and 3rd-order market impact" },
-  { without: "You hold through drawdowns hoping for a bounce", with: "Probabilistic exit zones with mathematical max-profit notifications" },
-  { without: "You compete with institutions using a 1990s broker UI", with: "Bloomberg-grade terminal with 12-layer intelligence stack" },
+const PRINCIPLES = [
+  { title: "Probability over prediction", desc: "Every scenario is expressed as a distribution, not a forecast. You see the range of outcomes and the confidence behind them." },
+  { title: "Structure over noise", desc: "We model the constraints, liquidity, and flows that move markets — not the headlines that follow." },
+  { title: "Calibration over conviction", desc: "The system continuously refines itself against your outcomes. It learns the patterns that work for you." },
+  { title: "Clarity over complexity", desc: "Twelve intelligence layers, one composed view. Decisions stay yours; the math stays out of the way." },
 ];
 
 const FEATURES = [
