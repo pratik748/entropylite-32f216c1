@@ -210,7 +210,13 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
           </div>
           <div className="flex-1">
             <div className="text-[10px] font-mono uppercase tracking-widest text-primary mb-1.5">Reflexivity Thesis</div>
-            <p className="text-sm text-foreground leading-relaxed font-light italic">"{thesis}"</p>
+            {thesis ? (
+              <p className="text-sm text-foreground leading-relaxed font-light italic">"{thesis}"</p>
+            ) : (
+              <p className="text-xs text-muted-foreground font-mono">
+                Narrative layer temporarily unavailable. Math signals above are live and unaffected.
+              </p>
+            )}
           </div>
         </div>
       </Card>
