@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
+import FeatureGallery from "@/components/landing/FeatureGallery";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
@@ -227,6 +228,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* TABBED GALLERY — real screen captures of every core surface */}
+      <FeatureGallery />
 
       {/* FEATURES GRID */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
