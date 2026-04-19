@@ -277,7 +277,7 @@ REAL-TIME MARKET DATA:
 - Distance from 52W High: ${from52High}%
 
 Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
-${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}
+${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}${odgsContext}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
