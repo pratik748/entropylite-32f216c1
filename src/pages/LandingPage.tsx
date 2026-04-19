@@ -69,7 +69,8 @@ export default function LandingPage() {
     });
   }, [navigate]);
 
-  if (checking) return null;
+  // Note: we intentionally render the page even while checking auth so SEO crawlers
+  // and slow connections always see the full content. Authed users are redirected via the effect.
 
   const goSignup = () => navigate("/dashboard");
 
