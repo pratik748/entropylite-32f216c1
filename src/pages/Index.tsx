@@ -38,6 +38,8 @@ import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
+import ProofCard from "@/components/ProofCard";
+import { useProofPopup } from "@/hooks/useProofPopup";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,6 +104,9 @@ const IndexContent = () => {
 
   // Sell notification system — monitors positions for profit drawdowns and sell signals
   useSellNotifications(stocks);
+
+  // Auto-popup Proof Card the first time a position crosses +5% — share-worthy moment
+  const { proofStock, dismiss: dismissProof } = useProofPopup(stocks);
 
   const stocksRef = useRef(stocks);
   useEffect(() => {
@@ -273,6 +278,9 @@ const IndexContent = () => {
         onOpenBrief={() => setBriefOpen(true)}
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
+      {proofStock && (
+        <ProofCard open={!!proofStock} onClose={dismissProof} stock={proofStock} />
+      )}
       {/* Direct Profit Mode — replaces entire UI */}
       {directProfitMode ? (
         <div className="flex-1 min-h-0 overflow-auto">
