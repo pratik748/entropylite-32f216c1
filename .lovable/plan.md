@@ -1,4 +1,4 @@
 
-The user wants the **Outcome-Driven Gradient System (ODGS)** — currently localStorage-only via `useOutcomeGradient` — to become a **persistent, per-account trade ledger** that actually feeds back into the AI/decision models for profit bias and risk mitigation.
+This is a research question, not an implementation request. Let me give a direct explanation rather than a plan.
 
-Let me check the current implementation.
+Reading the existing memory and files to ground the answer.
