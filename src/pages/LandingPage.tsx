@@ -270,7 +270,7 @@ export default function LandingPage() {
 
           <div className="text-center">
             <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3">
-              Every day without it is a day institutions price you out of.
+              The terminal sharpens with every decision you make.
             </h3>
             <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
               The platform gets sharper the longer you use it. Your trade history biases the AI toward your profitable patterns.
@@ -314,7 +314,7 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-black text-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            The terminal institutions don't want you to have.
+            Quietly capable. Always on.
           </h2>
           <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
             Free during founding access. No card. No trial timer. Sign in and start running scenarios in under a minute.
