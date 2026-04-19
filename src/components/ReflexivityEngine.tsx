@@ -72,7 +72,7 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
     portfolio: stocks.map((s) => ({ ticker: s.ticker })),
   }), [flowsData, sentiment, causal, vix, regime, stocks]);
 
-  const { data, loading, refresh } = useReflexivity(reflexInput, refreshKey);
+  const { data, loading, error, refresh } = useReflexivity(reflexInput, refreshKey);
 
   if (tickers.length === 0) {
     return (
@@ -83,6 +83,23 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
           <p className="text-xs text-muted-foreground max-w-sm">
             Add positions to map belief about belief. The engine fuses institutional flows, narrative sentiment, and causal cascades into a real-time contradiction map.
           </p>
+        </div>
+      </Card>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <Card className="p-6 bg-card border-border">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-foreground mb-1">Reflexivity Engine — Unavailable</h3>
+            <p className="text-[11px] text-muted-foreground mb-3">{error}</p>
+            <Button variant="outline" size="sm" onClick={refresh} className="h-7 text-[10px] font-mono uppercase tracking-wider">
+              <RefreshCw className="h-3 w-3 mr-1.5" /> Retry
+            </Button>
+          </div>
         </div>
       </Card>
     );
