@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
+import FeatureGallery from "@/components/landing/FeatureGallery";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
