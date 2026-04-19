@@ -39,7 +39,6 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import { useProofPopup } from "@/hooks/useProofPopup";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -279,7 +278,7 @@ const IndexContent = () => {
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
       {proofStock && (
-        <ProofCard open={!!proofStock} onClose={dismissProof} stock={proofStock} />
+        <ProofCard open={!!proofStock} onClose={() => setProofStock(null)} stock={proofStock} />
       )}
       {/* Direct Profit Mode — replaces entire UI */}
       {directProfitMode ? (
