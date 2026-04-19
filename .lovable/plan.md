@@ -1,4 +1,4 @@
 
-The user wants Fortress Mode promoted from a sub-tab inside the Risk Module to its own **top-level tab** in the main dashboard navigation, marked with a fortress/shield icon.
+The user wants the **Outcome-Driven Gradient System (ODGS)** — currently localStorage-only via `useOutcomeGradient` — to become a **persistent, per-account trade ledger** that actually feeds back into the AI/decision models for profit bias and risk mitigation.
 
-Let me check the current top tabs structure.
+Let me check the current implementation.
