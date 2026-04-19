@@ -236,14 +236,14 @@ export function useOutcomeGradient() {
   // ─── Persist gradient state to cloud ───────────────
   const persistGradient = useCallback(async (g: GradientVector) => {
     if (!userId) return;
-    const { error } = await supabase.from("odgs_gradient_state").upsert({
+    const { error } = await supabase.from("odgs_gradient_state").upsert([{
       user_id: userId,
-      asset_biases: g.assetBiases,
-      feature_weights: g.featureWeights,
-      allocation_scales: g.allocationScales,
+      asset_biases: g.assetBiases as any,
+      feature_weights: g.featureWeights as any,
+      allocation_scales: g.allocationScales as any,
       generation: g.generation,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+    }], { onConflict: "user_id" });
     if (error) console.warn("ODGS gradient persist failed:", error.message);
   }, [userId]);
 
