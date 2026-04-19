@@ -77,7 +77,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "data-pipeline-status":    "frequent",
   "derivatives-intelligence":"heavy",
   "historical-prices":        "slow",
-  "reflexivity-engine":      "heavy",
+  "reflexivity-engine":      "reflexivity",
   // company-intelligence removed — uses its own 24h localStorage cache
 };
 
