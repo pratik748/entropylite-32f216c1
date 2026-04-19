@@ -228,6 +228,7 @@ Return JSON: { "thesis": "<2-3 sentences in Soros voice — what the market beli
         shiftETA,
         thesis,
         actionable,
+        aiError,
         signalCount: [
           input.flows?.length ? 1 : 0,
           input.sentiment ? 1 : 0,
