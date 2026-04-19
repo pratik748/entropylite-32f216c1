@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocalStorage } from "./useLocalStorage";
+import { supabase } from "@/integrations/supabase/client";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -8,15 +9,16 @@ export interface ProfitFieldEntry {
   asset: string;
   assetClass: "equity" | "options" | "futures" | "etf" | "crypto" | "fx" | "unknown";
   features: {
-    momentum: number;   // -100 to 100
-    vol: number;        // annualized vol %
-    sentiment: number;  // -100 to 100
-    regime: string;     // "trending" | "volatile" | "range" | "crisis"
+    momentum: number;
+    vol: number;
+    sentiment: number;
+    regime: string;
   };
   pnlPct: number;
   returnAbs: number;
   duration: number; // hours
   timestamp: number;
+  source?: string;
 }
 
 export interface AssetScore {
@@ -30,7 +32,7 @@ export interface AssetScore {
 }
 
 export interface PairScore {
-  pair: string; // "AAPL+MSFT"
+  pair: string;
   synergyScore: number;
   jointWinRate: number;
   jointAvgPnl: number;
@@ -40,7 +42,7 @@ export interface PairScore {
 export interface FeatureWeight {
   feature: string;
   weight: number;
-  delta: number; // change from last update
+  delta: number;
 }
 
 export interface DesirableZone {
@@ -49,14 +51,14 @@ export interface DesirableZone {
   regime: string;
   avgPnlPct: number;
   tradeCount: number;
-  density: number; // profit per trade in this zone
+  density: number;
   featureSignature: { momentum: number; vol: number; sentiment: number };
 }
 
 export interface GradientVector {
-  assetBiases: Record<string, number>; // asset → selection probability multiplier (0.5–2.0)
+  assetBiases: Record<string, number>;
   featureWeights: FeatureWeight[];
-  allocationScales: Record<string, number>; // asset → allocation multiplier (0.7–1.5)
+  allocationScales: Record<string, number>;
   timestamp: number;
   generation: number;
 }
@@ -68,7 +70,7 @@ export interface IntelligenceSignal {
   title: string;
   reasoning: string;
   assets: string[];
-  confidence: number; // 0-100
+  confidence: number;
 }
 
 export interface ShadowState {
@@ -80,94 +82,186 @@ export interface ShadowState {
 }
 
 export interface SafetyStatus {
-  maxAllocCap: number;       // 25%
-  learningRate: number;      // current α
-  decayFactor: number;       // 0.97
+  maxAllocCap: number;
+  learningRate: number;
+  decayFactor: number;
   rollbackTriggered: boolean;
-  diversificationCount: number; // distinct assets in hot zones
-  rollingPnl5: number;       // 5-trade rolling PnL
+  diversificationCount: number;
+  rollingPnl5: number;
 }
 
 // ─── Constants ───────────────────────────────────────
 
-const LAMBDA = 0.03;           // exponential decay rate
+const LAMBDA = 0.03;
 const MAX_ALLOC_PER_ASSET = 0.25;
 const ALPHA_MIN = 0.05;
 const ALPHA_MAX = 0.15;
 const DAILY_DECAY = 0.97;
-const DRAWDOWN_LIMIT = -15;    // % per zone
-const DIVERSIFICATION_FLOOR = 5;
-const ROLLBACK_THRESHOLD = -8; // 5-trade rolling PnL %
-const TOP_PERCENTILE = 0.20;   // top 20% = winners
-const MAX_ENTRIES = 200;
+const ROLLBACK_THRESHOLD = -8;
+const TOP_PERCENTILE = 0.20;
+const MAX_ENTRIES = 500;
 const UPDATE_EVERY_N = 25;
 const MAX_BIAS = 2.0;
 const MIN_BIAS = 0.5;
 const MAX_ALLOC_SCALE = 1.5;
 const MIN_ALLOC_SCALE = 0.7;
 
+const DEFAULT_GRADIENT: GradientVector = {
+  assetBiases: {},
+  featureWeights: [
+    { feature: "momentum", weight: 1.0, delta: 0 },
+    { feature: "vol", weight: 1.0, delta: 0 },
+    { feature: "sentiment", weight: 1.0, delta: 0 },
+  ],
+  allocationScales: {},
+  timestamp: Date.now(),
+  generation: 0,
+};
+
 // ─── Helpers ─────────────────────────────────────────
 
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
-
 function daysSince(ts: number) { return Math.max(0, (Date.now() - ts) / 86_400_000); }
-
 function expWeight(ts: number) { return Math.exp(-LAMBDA * daysSince(ts)); }
-
 function mean(arr: number[]) { return arr.length === 0 ? 0 : arr.reduce((s, v) => s + v, 0) / arr.length; }
+
+function rowToEntry(r: any): ProfitFieldEntry {
+  return {
+    id: r.id,
+    asset: r.asset,
+    assetClass: r.asset_class || "equity",
+    features: {
+      momentum: Number(r.feature_momentum) || 0,
+      vol: Number(r.feature_vol) || 0,
+      sentiment: Number(r.feature_sentiment) || 0,
+      regime: r.feature_regime || "unknown",
+    },
+    pnlPct: Number(r.pnl_pct) || 0,
+    returnAbs: Number(r.return_abs) || 0,
+    duration: Number(r.duration_hours) || 0,
+    timestamp: Number(r.trade_timestamp) || Date.now(),
+    source: r.source || "manual",
+  };
+}
 
 // ─── Core Hook ───────────────────────────────────────
 
 export function useOutcomeGradient() {
+  // localStorage cache for instant render + offline/anon fallback
   const [entries, setEntries] = useLocalStorage<ProfitFieldEntry[]>("odgs-entries", []);
-  const [gradient, setGradient] = useLocalStorage<GradientVector>("odgs-gradient", {
-    assetBiases: {},
-    featureWeights: [
-      { feature: "momentum", weight: 1.0, delta: 0 },
-      { feature: "vol", weight: 1.0, delta: 0 },
-      { feature: "sentiment", weight: 1.0, delta: 0 },
-    ],
-    allocationScales: {},
-    timestamp: Date.now(),
-    generation: 0,
-  });
+  const [gradient, setGradient] = useLocalStorage<GradientVector>("odgs-gradient", DEFAULT_GRADIENT);
   const [rollbackTriggered, setRollbackTriggered] = useState(false);
   const [updateCounter, setUpdateCounter] = useLocalStorage<number>("odgs-update-counter", 0);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const recentLocalIds = useRef<Set<string>>(new Set());
 
-  // ─── Ingest Trade ──────────────────────────────────
+  // ─── Auth + Cloud Hydration ────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id ?? null;
+      if (cancelled) return;
+      setUserId(uid);
+      if (!uid) { setHydrated(true); return; }
 
-  const ingestTrade = useCallback((trade: Omit<ProfitFieldEntry, "id">) => {
-    const entry: ProfitFieldEntry = { ...trade, id: crypto.randomUUID() };
-    setEntries(prev => {
-      const updated = [entry, ...prev].slice(0, MAX_ENTRIES);
-      return updated;
+      // Pull ledger
+      const { data: ledger } = await supabase
+        .from("odgs_trade_ledger")
+        .select("*")
+        .order("trade_timestamp", { ascending: false })
+        .limit(MAX_ENTRIES);
+      if (!cancelled && ledger) {
+        setEntries(ledger.map(rowToEntry));
+      }
+
+      // Pull gradient state
+      const { data: g } = await supabase
+        .from("odgs_gradient_state")
+        .select("*")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (!cancelled && g) {
+        setGradient({
+          assetBiases: (g.asset_biases as any) || {},
+          featureWeights: ((g.feature_weights as any) && (g.feature_weights as any).length)
+            ? (g.feature_weights as any) as FeatureWeight[]
+            : DEFAULT_GRADIENT.featureWeights,
+          allocationScales: (g.allocation_scales as any) || {},
+          timestamp: new Date(g.updated_at).getTime(),
+          generation: g.generation || 0,
+        });
+      }
+      if (!cancelled) setHydrated(true);
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
     });
-    setUpdateCounter(prev => {
-      const next = prev + 1;
-      return next;
-    });
-  }, [setEntries, setUpdateCounter]);
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Ingest Trade (cloud + local) ──────────────────
+
+  const ingestTrade = useCallback(async (trade: Omit<ProfitFieldEntry, "id">) => {
+    const id = crypto.randomUUID();
+    const entry: ProfitFieldEntry = { ...trade, id };
+    recentLocalIds.current.add(id);
+
+    setEntries(prev => [entry, ...prev].slice(0, MAX_ENTRIES));
+    setUpdateCounter(prev => prev + 1);
+
+    if (userId) {
+      const { error } = await supabase.from("odgs_trade_ledger").insert({
+        id,
+        user_id: userId,
+        asset: trade.asset,
+        asset_class: trade.assetClass,
+        pnl_pct: trade.pnlPct,
+        return_abs: trade.returnAbs,
+        duration_hours: trade.duration,
+        feature_momentum: trade.features.momentum,
+        feature_vol: trade.features.vol,
+        feature_sentiment: trade.features.sentiment,
+        feature_regime: trade.features.regime,
+        source: trade.source || "manual",
+        trade_timestamp: trade.timestamp,
+      });
+      if (error) console.warn("ODGS ledger persist failed:", error.message);
+    }
+  }, [userId, setEntries, setUpdateCounter]);
+
+  // ─── Persist gradient state to cloud ───────────────
+  const persistGradient = useCallback(async (g: GradientVector) => {
+    if (!userId) return;
+    const { error } = await supabase.from("odgs_gradient_state").upsert({
+      user_id: userId,
+      asset_biases: g.assetBiases,
+      feature_weights: g.featureWeights,
+      allocation_scales: g.allocationScales,
+      generation: g.generation,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    if (error) console.warn("ODGS gradient persist failed:", error.message);
+  }, [userId]);
 
   // ─── Compute Profit Field ─────────────────────────
 
   const profitField = useMemo((): AssetScore[] => {
     const assetMap: Record<string, { scores: number[]; wins: number; count: number; recentScores: number[] }> = {};
-
     for (const e of entries) {
       const w = expWeight(e.timestamp);
-      // Amplify top performers
       const pnlRank = [...entries].sort((a, b) => b.pnlPct - a.pnlPct);
       const topCutoff = pnlRank[Math.floor(pnlRank.length * TOP_PERCENTILE)]?.pnlPct ?? 0;
       const amplifier = e.pnlPct >= topCutoff && e.pnlPct > 0 ? 2.0 : 1.0;
-
       if (!assetMap[e.asset]) assetMap[e.asset] = { scores: [], wins: 0, count: 0, recentScores: [] };
-      const weighted = e.pnlPct * w * amplifier;
-      assetMap[e.asset].scores.push(weighted);
+      assetMap[e.asset].scores.push(e.pnlPct * w * amplifier);
       if (e.pnlPct > 0) assetMap[e.asset].wins++;
       assetMap[e.asset].count++;
       if (daysSince(e.timestamp) < 7) assetMap[e.asset].recentScores.push(e.pnlPct);
     }
-
     return Object.entries(assetMap).map(([asset, data]) => {
       const wps = data.scores.reduce((s, v) => s + v, 0);
       const recentAvg = mean(data.recentScores);
@@ -175,7 +269,6 @@ export function useOutcomeGradient() {
       const trend = data.recentScores.length < 2 ? "stable" as const :
         recentAvg > overallAvg * 1.1 ? "rising" as const :
         recentAvg < overallAvg * 0.9 ? "falling" as const : "stable" as const;
-
       const wr = data.count > 0 ? (data.wins / data.count) * 100 : 0;
       return {
         asset,
@@ -193,30 +286,20 @@ export function useOutcomeGradient() {
 
   const desirableZones = useMemo((): DesirableZone[] => {
     if (entries.length < 5) return [];
-
-    // Group by regime
     const regimeGroups: Record<string, ProfitFieldEntry[]> = {};
     for (const e of entries) {
       const regime = e.features.regime || "unknown";
       if (!regimeGroups[regime]) regimeGroups[regime] = [];
       regimeGroups[regime].push(e);
     }
-
     const zones: DesirableZone[] = [];
     for (const [regime, group] of Object.entries(regimeGroups)) {
-      // Find top percentile within regime
       const sorted = [...group].sort((a, b) => b.pnlPct - a.pnlPct);
       const topN = Math.max(1, Math.floor(sorted.length * TOP_PERCENTILE));
       const topTrades = sorted.slice(0, topN).filter(t => t.pnlPct > 0);
-
       if (topTrades.length === 0) continue;
-
       const assets = [...new Set(topTrades.map(t => t.asset))];
       const avgPnl = mean(topTrades.map(t => t.pnlPct));
-      const avgMomentum = mean(topTrades.map(t => t.features.momentum));
-      const avgVol = mean(topTrades.map(t => t.features.vol));
-      const avgSent = mean(topTrades.map(t => t.features.sentiment));
-
       zones.push({
         id: `zone-${regime}-${assets.slice(0, 3).join("-")}`,
         assets,
@@ -224,10 +307,13 @@ export function useOutcomeGradient() {
         avgPnlPct: avgPnl,
         tradeCount: topTrades.length,
         density: avgPnl / Math.max(1, topTrades.length),
-        featureSignature: { momentum: avgMomentum, vol: avgVol, sentiment: avgSent },
+        featureSignature: {
+          momentum: mean(topTrades.map(t => t.features.momentum)),
+          vol: mean(topTrades.map(t => t.features.vol)),
+          sentiment: mean(topTrades.map(t => t.features.sentiment)),
+        },
       });
     }
-
     return zones.sort((a, b) => b.avgPnlPct - a.avgPnlPct);
   }, [entries]);
 
@@ -235,15 +321,12 @@ export function useOutcomeGradient() {
 
   const combinationScores = useMemo((): PairScore[] => {
     if (entries.length < 10) return [];
-
-    // Group entries by a time window (same day) to find co-occurring trades
     const dayBuckets: Record<string, ProfitFieldEntry[]> = {};
     for (const e of entries) {
       const day = new Date(e.timestamp).toISOString().split("T")[0];
       if (!dayBuckets[day]) dayBuckets[day] = [];
       dayBuckets[day].push(e);
     }
-
     const pairMap: Record<string, { pnls: number[]; wins: number }> = {};
     for (const bucket of Object.values(dayBuckets)) {
       if (bucket.length < 2) continue;
@@ -258,7 +341,6 @@ export function useOutcomeGradient() {
         }
       }
     }
-
     return Object.entries(pairMap)
       .filter(([, v]) => v.pnls.length >= 2)
       .map(([pair, data]) => ({
@@ -276,56 +358,43 @@ export function useOutcomeGradient() {
 
   const computeAndApplyGradient = useCallback(() => {
     if (entries.length < 5) return;
-
-    // Compute current α based on recent volatility
     const recentPnls = entries.slice(0, 20).map(e => e.pnlPct);
     const pnlStd = Math.sqrt(mean(recentPnls.map(p => p * p)) - mean(recentPnls) ** 2) || 1;
     const alpha = clamp(ALPHA_MAX / (1 + pnlStd * 0.05), ALPHA_MIN, ALPHA_MAX);
-
-    // Safety: 5-trade rolling PnL check
     const rolling5 = mean(entries.slice(0, 5).map(e => e.pnlPct));
+
     if (rolling5 < ROLLBACK_THRESHOLD) {
       setRollbackTriggered(true);
-      // Decay all biases toward neutral
-      setGradient(prev => ({
-        ...prev,
+      const next: GradientVector = {
+        ...gradient,
         assetBiases: Object.fromEntries(
-          Object.entries(prev.assetBiases).map(([k, v]) => [k, clamp(v * 0.8 + 0.2, MIN_BIAS, MAX_BIAS)])
+          Object.entries(gradient.assetBiases).map(([k, v]) => [k, clamp(v * 0.8 + 0.2, MIN_BIAS, MAX_BIAS)])
         ),
         allocationScales: Object.fromEntries(
-          Object.entries(prev.allocationScales).map(([k, v]) => [k, clamp(v * 0.8 + 0.2, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE)])
+          Object.entries(gradient.allocationScales).map(([k, v]) => [k, clamp(v * 0.8 + 0.2, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE)])
         ),
         timestamp: Date.now(),
-        generation: prev.generation + 1,
-      }));
+        generation: gradient.generation + 1,
+      };
+      setGradient(next);
+      void persistGradient(next);
       return;
     }
     setRollbackTriggered(false);
 
-    // Compute asset biases from profit field
     const hotAssets = profitField.filter(a => a.isHotZone);
     const coldAssets = profitField.filter(a => !a.isHotZone && a.weightedProfitScore < 0);
-
     const newAssetBiases: Record<string, number> = { ...gradient.assetBiases };
     for (const hot of hotAssets) {
-      const current = newAssetBiases[hot.asset] || 1.0;
-      newAssetBiases[hot.asset] = clamp(current + alpha * 0.3, MIN_BIAS, MAX_BIAS);
+      newAssetBiases[hot.asset] = clamp((newAssetBiases[hot.asset] || 1.0) + alpha * 0.3, MIN_BIAS, MAX_BIAS);
     }
     for (const cold of coldAssets) {
-      const current = newAssetBiases[cold.asset] || 1.0;
-      newAssetBiases[cold.asset] = clamp(current - alpha * 0.2, MIN_BIAS, MAX_BIAS);
+      newAssetBiases[cold.asset] = clamp((newAssetBiases[cold.asset] || 1.0) - alpha * 0.2, MIN_BIAS, MAX_BIAS);
     }
-
-    // Apply daily decay to all biases
     for (const key of Object.keys(newAssetBiases)) {
-      newAssetBiases[key] = clamp(
-        1.0 + (newAssetBiases[key] - 1.0) * DAILY_DECAY,
-        MIN_BIAS,
-        MAX_BIAS
-      );
+      newAssetBiases[key] = clamp(1.0 + (newAssetBiases[key] - 1.0) * DAILY_DECAY, MIN_BIAS, MAX_BIAS);
     }
 
-    // Compute feature weights from winning trades
     const winners = entries.filter(e => e.pnlPct > 0);
     const losers = entries.filter(e => e.pnlPct <= 0);
     const winMomentum = mean(winners.map(e => Math.abs(e.features.momentum)));
@@ -346,27 +415,33 @@ export function useOutcomeGradient() {
       fw.delta = prev ? fw.weight - prev.weight : 0;
     }
 
-    // Allocation scales
     const newAllocScales: Record<string, number> = { ...gradient.allocationScales };
     for (const hot of hotAssets) {
-      const current = newAllocScales[hot.asset] || 1.0;
-      newAllocScales[hot.asset] = clamp(current + alpha * 0.15, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
+      newAllocScales[hot.asset] = clamp((newAllocScales[hot.asset] || 1.0) + alpha * 0.15, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
     }
     for (const cold of coldAssets) {
-      const current = newAllocScales[cold.asset] || 1.0;
-      newAllocScales[cold.asset] = clamp(current - alpha * 0.1, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
+      newAllocScales[cold.asset] = clamp((newAllocScales[cold.asset] || 1.0) - alpha * 0.1, MIN_ALLOC_SCALE, MAX_ALLOC_SCALE);
     }
 
-    setGradient({
+    const next: GradientVector = {
       assetBiases: newAssetBiases,
       featureWeights: newFeatureWeights,
       allocationScales: newAllocScales,
       timestamp: Date.now(),
       generation: gradient.generation + 1,
-    });
-  }, [entries, profitField, gradient, setGradient]);
+    };
+    setGradient(next);
+    void persistGradient(next);
+  }, [entries, profitField, gradient, setGradient, persistGradient]);
 
-  // ─── Auto-trigger on N trades ──────────────────────
+  // Auto-update gradient + persist after every UPDATE_EVERY_N trades
+  useEffect(() => {
+    if (!hydrated) return;
+    if (updateCounter > 0 && updateCounter % UPDATE_EVERY_N === 0) {
+      computeAndApplyGradient();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateCounter, hydrated]);
 
   const shouldAutoUpdate = updateCounter > 0 && updateCounter % UPDATE_EVERY_N === 0;
 
@@ -391,7 +466,6 @@ export function useOutcomeGradient() {
     const alpha = clamp(ALPHA_MAX / (1 + pnlStd * 0.05), ALPHA_MIN, ALPHA_MAX);
     const rolling5 = mean(entries.slice(0, 5).map(e => e.pnlPct));
     const hotCount = profitField.filter(a => a.isHotZone).length;
-
     return {
       maxAllocCap: MAX_ALLOC_PER_ASSET * 100,
       learningRate: alpha,
@@ -405,34 +479,16 @@ export function useOutcomeGradient() {
   // ─── Shadow Evolution ──────────────────────────────
 
   const shadowComparison = useMemo((): ShadowState => {
-    const neutral: GradientVector = {
-      assetBiases: {},
-      featureWeights: [
-        { feature: "momentum", weight: 1.0, delta: 0 },
-        { feature: "vol", weight: 1.0, delta: 0 },
-        { feature: "sentiment", weight: 1.0, delta: 0 },
-      ],
-      allocationScales: {},
-      timestamp: Date.now(),
-      generation: 0,
-    };
-
-    // Simulate both: neutral (active) vs biased (evolved)
+    const neutral: GradientVector = { ...DEFAULT_GRADIENT };
     const recentTrades = entries.slice(0, 50);
     const activePnl = mean(recentTrades.map(e => e.pnlPct));
-
-    // Evolved: weight by gradient biases
-    const evolvedPnl = mean(recentTrades.map(e => {
-      const bias = gradient.assetBiases[e.asset] || 1.0;
-      return e.pnlPct * bias;
-    }));
-
+    const evolvedPnl = mean(recentTrades.map(e => (gradient.assetBiases[e.asset] || 1.0) * e.pnlPct));
     return {
       activeParams: neutral,
       evolvedParams: gradient,
       activePnlRolling: activePnl,
       evolvedPnlRolling: evolvedPnl,
-      promoted: evolvedPnl > activePnl * 1.05, // 5% improvement threshold
+      promoted: evolvedPnl > activePnl * 1.05,
     };
   }, [entries, gradient]);
 
@@ -458,11 +514,9 @@ export function useOutcomeGradient() {
   const intelligenceSignals = useMemo((): IntelligenceSignal[] => {
     if (entries.length === 0) return [];
     const signals: IntelligenceSignal[] = [];
-
     const topAssets = profitField.slice(0, 5);
     const lastTrade = entries[0];
 
-    // 0. Immediate signal from latest crossed trade (works from first trade)
     if (lastTrade) {
       signals.push({
         id: `last-${lastTrade.id}`,
@@ -472,14 +526,13 @@ export function useOutcomeGradient() {
           ? `Invest bias toward ${lastTrade.asset} after +${lastTrade.pnlPct.toFixed(2)}% outcome`
           : `Hedge ${lastTrade.asset} after ${lastTrade.pnlPct.toFixed(2)}% adverse outcome`,
         reasoning: lastTrade.pnlPct >= 0
-          ? `${lastTrade.asset} just closed positive; ODGS is pulling exposure toward this zone. Re-entry can use lighter threshold with capped allocation.`
-          : `${lastTrade.asset} closed negative; ODGS suggests tighter entry and protective hedge until recovery evidence appears.`,
+          ? `${lastTrade.asset} just closed positive; ODGS is pulling exposure toward this zone.`
+          : `${lastTrade.asset} closed negative; ODGS suggests tighter entry and protective hedge.`,
         assets: [lastTrade.asset],
         confidence: Math.min(85, Math.max(55, Math.round(55 + Math.abs(lastTrade.pnlPct) * 4))),
       });
     }
 
-    // 1. INVEST signals from profitable assets (relaxed threshold)
     for (const asset of topAssets.filter(a => a.weightedProfitScore > 0 && a.tradeCount >= 1)) {
       const allocScale = gradient.allocationScales[asset.asset] || 1.0;
       const zone = desirableZones.find(z => z.assets.includes(asset.asset));
@@ -488,15 +541,12 @@ export function useOutcomeGradient() {
         type: "invest",
         urgency: asset.avgPnlPct > 4 ? "high" : "medium",
         title: `Invest more in ${asset.asset} (${asset.winRate.toFixed(0)}% win rate)`,
-        reasoning: `${asset.asset} shows positive profit density with avg ${asset.avgPnlPct >= 0 ? "+" : ""}${asset.avgPnlPct.toFixed(1)}% across ${asset.tradeCount} trades. ` +
-          `Allocation bias is ${allocScale.toFixed(2)}×.` +
-          (zone ? ` Correlated success appears in ${zone.regime} regime.` : ""),
+        reasoning: `${asset.asset} shows positive profit density with avg ${asset.avgPnlPct >= 0 ? "+" : ""}${asset.avgPnlPct.toFixed(1)}% across ${asset.tradeCount} trades. Allocation bias is ${allocScale.toFixed(2)}×.${zone ? ` Correlated success in ${zone.regime} regime.` : ""}`,
         assets: [asset.asset],
         confidence: Math.min(92, Math.round(asset.winRate * 0.75 + asset.tradeCount * 4)),
       });
     }
 
-    // 2. PAIR/CORRELATION signals (relaxed threshold)
     for (const pair of combinationScores.filter(p => p.synergyScore > 0 && p.tradeCount >= 1).slice(0, 3)) {
       const [a, b] = pair.pair.split("+");
       signals.push({
@@ -504,14 +554,12 @@ export function useOutcomeGradient() {
         type: "pair",
         urgency: pair.jointAvgPnl > 2 ? "high" : "medium",
         title: `Correlation opportunity: ${a} + ${b}`,
-        reasoning: `${a}/${b} shows positive joint edge (synergy ${pair.synergyScore.toFixed(2)}, win ${pair.jointWinRate.toFixed(0)}%). ` +
-          `Use paired entries to reinforce outcomes vs single-name trades.`,
+        reasoning: `${a}/${b} shows positive joint edge (synergy ${pair.synergyScore.toFixed(2)}, win ${pair.jointWinRate.toFixed(0)}%).`,
         assets: [a, b],
         confidence: Math.min(88, Math.round(pair.jointWinRate * 0.8 + pair.tradeCount * 5)),
       });
     }
 
-    // 3. HEDGE signals from weak/falling assets
     const volWeight = gradient.featureWeights.find(f => f.feature === "vol")?.weight || 1;
     const weakAssets = profitField.filter(a => (a.avgPnlPct < 0 || a.recentTrend === "falling") && a.tradeCount >= 1).slice(0, 2);
     for (const asset of weakAssets) {
@@ -522,55 +570,44 @@ export function useOutcomeGradient() {
         type: "hedge",
         urgency: asset.avgPnlPct < -3 || volWeight > 1.2 ? "high" : "medium",
         title: `Hedge ${asset.asset}${hedgeTarget ? ` with ${hedgeTarget}` : ""}`,
-        reasoning: `${asset.asset} shows weaker edge (${asset.avgPnlPct.toFixed(1)}% avg). ` +
-          (hedgeTarget
-            ? `Use correlation hedge via ${hedgeTarget} where joint behavior is more stable.`
-            : `Use protective structure (smaller size / options hedge) until trend improves.`),
+        reasoning: `${asset.asset} shows weaker edge (${asset.avgPnlPct.toFixed(1)}% avg). ${hedgeTarget ? `Use correlation hedge via ${hedgeTarget}.` : `Use protective structure (smaller size / options hedge) until trend improves.`}`,
         assets: hedgeTarget ? [asset.asset, hedgeTarget] : [asset.asset],
         confidence: Math.min(84, Math.round(58 + Math.max(0, -asset.avgPnlPct) * 4 + (volWeight - 1) * 20)),
       });
     }
 
-    // 4. AVOID signals
     for (const asset of profitField.filter(a => a.winRate < 35 && a.tradeCount >= 2).slice(0, 3)) {
       signals.push({
         id: `avoid-${asset.asset}`,
         type: "avoid",
         urgency: "medium",
         title: `Caution: ${asset.asset} underperforming`,
-        reasoning: `${asset.asset} shows weak edge with ${asset.winRate.toFixed(0)}% win rate and ${asset.avgPnlPct.toFixed(1)}% avg PnL. ODGS is reducing selection probability — but monitoring for recovery.`,
+        reasoning: `${asset.asset} shows weak edge with ${asset.winRate.toFixed(0)}% win rate. ODGS is reducing selection probability.`,
         assets: [asset.asset],
         confidence: Math.min(90, Math.round(65 + Math.max(0, 50 - asset.winRate) * 0.6)),
       });
     }
 
-    // 5. SCALE_UP / ROTATE signals from regime zones
     for (const zone of desirableZones.filter(z => z.avgPnlPct > 0 && z.tradeCount >= 1).slice(0, 2)) {
       signals.push({
         id: `rotate-${zone.id}`,
         type: shadowComparison.promoted ? "scale_up" : "rotate",
         urgency: zone.avgPnlPct > 4 ? "high" : "low",
-        title: shadowComparison.promoted
-          ? `Scale up ${zone.regime} zone`
-          : `Rotate into ${zone.regime} zone`,
-        reasoning: `${zone.regime} zone is producing +${zone.avgPnlPct.toFixed(1)}% avg outcomes across ${zone.tradeCount} trades. ` +
-          `Focus on ${zone.assets.slice(0, 3).join(", ")} while maintaining diversification floor.`,
+        title: shadowComparison.promoted ? `Scale up ${zone.regime} zone` : `Rotate into ${zone.regime} zone`,
+        reasoning: `${zone.regime} zone is producing +${zone.avgPnlPct.toFixed(1)}% avg outcomes across ${zone.tradeCount} trades.`,
         assets: zone.assets.slice(0, 5),
         confidence: Math.min(86, Math.round(zone.avgPnlPct * 7 + zone.tradeCount * 4)),
       });
     }
 
-    // Safety fallback: always provide at least one actionable recommendation
     if (signals.length === 0 && topAssets.length > 0) {
       const fallback = topAssets[0];
       signals.push({
         id: `fallback-${fallback.asset}`,
         type: fallback.weightedProfitScore >= 0 ? "invest" : "hedge",
         urgency: "medium",
-        title: fallback.weightedProfitScore >= 0
-          ? `Starter signal: build exposure in ${fallback.asset}`
-          : `Starter signal: hedge ${fallback.asset}`,
-        reasoning: `ODGS has limited history but ${fallback.asset} is currently the strongest observed node in the Profit Field. This updates automatically as more crosses are recorded.`,
+        title: fallback.weightedProfitScore >= 0 ? `Starter signal: build exposure in ${fallback.asset}` : `Starter signal: hedge ${fallback.asset}`,
+        reasoning: `ODGS has limited history but ${fallback.asset} is currently the strongest observed node.`,
         assets: [fallback.asset],
         confidence: 58,
       });
@@ -584,24 +621,17 @@ export function useOutcomeGradient() {
 
   // ─── Clear ─────────────────────────────────────────
 
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
     setEntries([]);
-    setGradient({
-      assetBiases: {},
-      featureWeights: [
-        { feature: "momentum", weight: 1.0, delta: 0 },
-        { feature: "vol", weight: 1.0, delta: 0 },
-        { feature: "sentiment", weight: 1.0, delta: 0 },
-      ],
-      allocationScales: {},
-      timestamp: Date.now(),
-      generation: 0,
-    });
+    setGradient(DEFAULT_GRADIENT);
     setUpdateCounter(0);
-  }, [setEntries, setGradient, setUpdateCounter]);
+    if (userId) {
+      await supabase.from("odgs_trade_ledger").delete().eq("user_id", userId);
+      await supabase.from("odgs_gradient_state").delete().eq("user_id", userId);
+    }
+  }, [setEntries, setGradient, setUpdateCounter, userId]);
 
   return {
-    // Data
     entries,
     profitField,
     desirableZones,
@@ -611,14 +641,14 @@ export function useOutcomeGradient() {
     shadowComparison,
     allocationHistory,
     intelligenceSignals,
-    // Actions
     ingestTrade,
     computeAndApplyGradient,
     getAssetBoost,
     clearAll,
     shouldAutoUpdate,
-    // Meta
     totalTrades: entries.length,
     generation: gradient.generation,
+    isCloudPersisted: !!userId,
+    isHydrated: hydrated,
   };
 }
