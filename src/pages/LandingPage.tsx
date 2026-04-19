@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
+import dashboardPreview from "@/assets/dashboard-preview.png";
 
 const STATS = [
   { value: "10,000", label: "Monte Carlo paths / asset" },
@@ -69,7 +70,8 @@ export default function LandingPage() {
     });
   }, [navigate]);
 
-  if (checking) return null;
+  // Note: we intentionally render the page even while checking auth so SEO crawlers
+  // and slow connections always see the full content. Authed users are redirected via the effect.
 
   const goSignup = () => navigate("/dashboard");
 
@@ -171,9 +173,65 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PRODUCT PREVIEW — real terminal screenshot */}
+      <section className="border-t border-black/5 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="text-center mb-8 sm:mb-12">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The terminal</p>
+            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
+              See what you sign in to.
+            </h2>
+            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
+              Live portfolio, 10,000-path Monte Carlo, VaR/CVaR, multi-source intel feed, and structural flow detection — composed on a single screen.
+            </p>
+          </div>
+
+          <figure className="rounded-xl overflow-hidden border border-black/10 shadow-2xl shadow-black/15 bg-black">
+            <img
+              src={dashboardPreview}
+              alt="Entropy Lite terminal: live portfolio with SMH analysis, Monte Carlo Engine 10,000 paths, VaR 95% -17.1%, CVaR 99% -28.1%, Sharpe 0.36, multi-source intel feed, institutional flow detection radar"
+              loading="lazy"
+              width={1920}
+              height={1290}
+              className="w-full h-auto block"
+            />
+          </figure>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-10 pt-8 border-t border-black/5">
+            <div>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Live portfolio</p>
+              <p className="text-sm text-black/70 leading-snug">Multi-currency, multi-exchange, normalized to your base currency.</p>
+            </div>
+            <div>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Monte Carlo</p>
+              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252-day horizon, profit probability and tail risk.</p>
+            </div>
+            <div>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Risk metrics</p>
+              <p className="text-sm text-black/70 leading-snug">VaR and CVaR at 95% and 99% confidence, computed live per asset.</p>
+            </div>
+            <div>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Flow detection</p>
+              <p className="text-sm text-black/70 leading-snug">Institutional flow radar across ETF rebalancing, gamma, dark pools.</p>
+            </div>
+          </div>
+
+          <div className="text-center mt-10 sm:mt-12">
+            <Button
+              size="lg"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
+              onClick={goSignup}
+            >
+              Open the terminal — Free <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES GRID */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
         <div className="text-center mb-10 sm:mb-14">
+
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The stack</p>
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
             Twelve intelligence layers. One terminal.
