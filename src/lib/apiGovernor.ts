@@ -319,6 +319,7 @@ export function getCached<T = any>(functionName: string, body?: any): T | null {
 export function invalidateCache(functionName: string, body?: any) {
   const key = cacheKey(functionName, body);
   cache.delete(key);
+  try { localStorage.removeItem(PERSIST_PREFIX + key); } catch {}
 }
 
 // --------------- Metrics API ---------------
