@@ -97,9 +97,9 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-5 sm:mb-6">
-            A quieter way
+            A research-grade way
             <br />
-            <span className="text-black/55">to read the market.</span>
+            <span className="text-black/55">to observe the markets.</span>
           </h1>
 
           <p className="text-base sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
