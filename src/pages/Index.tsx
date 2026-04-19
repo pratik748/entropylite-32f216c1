@@ -278,6 +278,9 @@ const IndexContent = () => {
         onOpenBrief={() => setBriefOpen(true)}
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
+      {proofStock && (
+        <ProofCard open={!!proofStock} onClose={dismissProof} stock={proofStock} />
+      )}
       {/* Direct Profit Mode — replaces entire UI */}
       {directProfitMode ? (
         <div className="flex-1 min-h-0 overflow-auto">
