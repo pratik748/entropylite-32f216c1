@@ -1,9 +1,11 @@
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
+import ProofCard from "@/components/ProofCard";
 
 /** Tickers that Fortress Mode adds as defensive hedges — used to render a Hedge badge. */
 const FORTRESS_HEDGES = new Set(["SH", "VXX", "PSQ", "SEF", "DUG", "GLD", "TLT", "UUP"]);
@@ -54,6 +56,8 @@ const FreshnessIndicator = ({ status }: { status?: PriceFreshness }) => {
 
 const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew, priceStatus }: PortfolioPanelProps) => {
   const { baseCurrency, setBaseCurrency, convertToBase } = useFX();
+  const [proofStockId, setProofStockId] = useState<string | null>(null);
+  const proofStock = stocks.find((s) => s.id === proofStockId) || null;
   const analyzed = stocks.filter(s => s.analysis);
   const multi = isMultiCurrency(analyzed);
   const baseSym = getCurrencySymbol(baseCurrency);
