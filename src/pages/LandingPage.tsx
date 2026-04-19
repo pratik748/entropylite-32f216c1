@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
+import dashboardPreview from "@/assets/dashboard-preview.png";
 
 const STATS = [
   { value: "10,000", label: "Monte Carlo paths / asset" },
