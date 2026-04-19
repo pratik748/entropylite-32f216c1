@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Globe, Map, Sparkles, ScatterChart, Zap, Shield } from "lucide-react";
-import marketsImg from "@/assets/preview-markets.png";
-import geopoliticsImg from "@/assets/preview-geopolitics.png";
-import desirableImg from "@/assets/preview-desirable.png";
-import statarbImg from "@/assets/preview-statarb.png";
-import sandboxImg from "@/assets/preview-sandbox.png";
-import riskImg from "@/assets/preview-risk.png";
+import marketsImg from "@/assets/preview-markets.webp";
+import geopoliticsImg from "@/assets/preview-geopolitics.webp";
+import desirableImg from "@/assets/preview-desirable.webp";
+import statarbImg from "@/assets/preview-statarb.webp";
+import sandboxImg from "@/assets/preview-sandbox.webp";
+import riskImg from "@/assets/preview-risk.webp";
 
 type Tab = {
   id: string;
@@ -115,6 +115,21 @@ export default function FeatureGallery() {
   const [active, setActive] = useState(TABS[0].id);
   const tab = TABS.find((t) => t.id === active) ?? TABS[0];
 
+  // Prefetch the rest after first paint so tab-switch feels instant
+  useEffect(() => {
+    const idle = (cb: () => void) =>
+      ("requestIdleCallback" in window
+        ? (window as any).requestIdleCallback(cb, { timeout: 1500 })
+        : setTimeout(cb, 600));
+    idle(() => {
+      TABS.forEach((t) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = t.img;
+      });
+    });
+  }, []);
+
   return (
     <section className="border-t border-black/5 bg-black/[0.015]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
@@ -158,9 +173,11 @@ export default function FeatureGallery() {
               key={tab.id}
               src={tab.img}
               alt={tab.alt}
-              loading="lazy"
-              width={1536}
-              height={864}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              width={1600}
+              height={900}
               className="w-full h-auto block animate-fade-in"
             />
           </figure>
