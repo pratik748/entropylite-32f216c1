@@ -123,6 +123,49 @@ function cacheKey(fn: string, body?: any): string {
   }
 }
 
+// --------------- Persistent cache (localStorage) ---------------
+
+function endpointFromKey(key: string): string {
+  return key.split("::")[0];
+}
+
+function isPersistent(key: string): boolean {
+  const tier = ENDPOINT_TIER[endpointFromKey(key)];
+  return tier ? PERSISTENT_TIERS.has(tier) : false;
+}
+
+function persistEntry(key: string, entry: CacheEntry) {
+  if (!isPersistent(key)) return;
+  try {
+    localStorage.setItem(PERSIST_PREFIX + key, JSON.stringify(entry));
+  } catch {}
+}
+
+function loadPersistedEntry(key: string): CacheEntry | null {
+  if (!isPersistent(key)) return null;
+  try {
+    const raw = localStorage.getItem(PERSIST_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CacheEntry;
+    return parsed && typeof parsed.timestamp === "number" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Hydrate persistent cache entries on module load
+(function hydratePersistentCache() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(PERSIST_PREFIX)) continue;
+      const cacheK = k.slice(PERSIST_PREFIX.length);
+      const entry = loadPersistedEntry(cacheK);
+      if (entry) cache.set(cacheK, entry);
+    }
+  } catch {}
+})();
+
 function fastHash(data: any): string {
   const str = typeof data === "string" ? data : JSON.stringify(data);
   let h = 0;
