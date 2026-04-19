@@ -4,31 +4,55 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Activity, Shield, Globe, Sparkles, Target, BarChart3,
   TrendingUp, Layers, Zap, ArrowRight, ChevronRight,
-  Brain, LineChart, Cpu, Eye, GitBranch, Workflow
+  Brain, LineChart, Cpu, Eye, GitBranch, Workflow,
+  Check, X, Lock, Clock, Infinity as InfinityIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 
+const STATS = [
+  { value: "10,000", label: "Monte Carlo paths / asset" },
+  { value: "12", label: "Intelligence layers" },
+  { value: "<2s", label: "Median scenario latency" },
+  { value: "24/7", label: "Continuous market scan" },
+];
+
+const PAIN_POINTS = [
+  { without: "You react to news after the price has already moved", with: "Pre-emptive alerts when structural constraints approach activation" },
+  { without: "You guess position size from gut feel", with: "Risk-adjusted sizing calibrated to portfolio VaR and CVaR" },
+  { without: "You see only the headline, not the cascade", with: "Causal Effects Engine maps 1st, 2nd, and 3rd-order market impact" },
+  { without: "You hold through drawdowns hoping for a bounce", with: "Probabilistic exit zones with mathematical max-profit notifications" },
+  { without: "You compete with institutions using a 1990s broker UI", with: "Bloomberg-grade terminal with 12-layer intelligence stack" },
+];
+
 const FEATURES = [
-  { icon: Activity, title: "Quantitative Risk Engine", desc: "Value at Risk, CVaR, and liquidity-adjusted risk metrics at 95% and 99% confidence intervals for institutional-grade portfolio analysis." },
-  { icon: Shield, title: "CLANK Constraint Detection", desc: "Structural constraint engine that identifies institutional risk boundaries and liquidity thresholds before they manifest." },
-  { icon: Globe, title: "Geopolitical Intelligence", desc: "Real-time global event monitoring with market impact scoring, regime-aware recalibration, and scenario probability analysis." },
-  { icon: TrendingUp, title: "Monte Carlo Simulations", desc: "10,000-path Geometric Brownian Motion simulations for probabilistic outcome modeling and projected range estimation." },
-  { icon: Layers, title: "Statistical Arbitrage", desc: "Portfolio-wide quantitative engine with mean-reversion detection, co-integration analysis, and structural Z-score tracking." },
-  { icon: Target, title: "Desirable Asset Discovery", desc: "Multi-stage intelligence funnel surfacing high-conviction scenarios using momentum, value, and quality factor analysis." },
-  { icon: BarChart3, title: "Deep Company Intelligence", desc: "Institutional dossiers mapping 12 corporate dimensions including management DNA, capital flows, and structural risk assessment." },
-  { icon: Sparkles, title: "Strategy Factory", desc: "Autonomous scenario generation with backtesting, regime-aware calibration, and paper simulation for hypothesis validation." },
-  { icon: Zap, title: "Probabilistic Scenario Engine", desc: "Institutional-grade positioning insights with aftermath simulation and causal effects modeling across portfolios." },
+  { icon: Activity, title: "Quantitative Risk Engine", desc: "VaR, CVaR, and liquidity-adjusted risk at 95% and 99% confidence — institutional-grade exposure analysis on every position." },
+  { icon: Shield, title: "CLANK Constraint Detection", desc: "Identifies structural risk boundaries and liquidity thresholds before they manifest in price." },
+  { icon: Globe, title: "Geopolitical Intelligence", desc: "Real-time global event monitoring with market-impact scoring and regime-aware recalibration." },
+  { icon: TrendingUp, title: "10,000-Path Monte Carlo", desc: "Geometric Brownian Motion simulations for probabilistic outcome modeling on every holding." },
+  { icon: Layers, title: "Statistical Arbitrage", desc: "Mean-reversion detection, co-integration, and structural Z-score tracking across your full book." },
+  { icon: Target, title: "Desirable Asset Discovery", desc: "Multi-stage funnel surfacing high-conviction setups via momentum, value, and quality factors." },
+  { icon: BarChart3, title: "Deep Company Dossiers", desc: "12-dimension institutional intelligence: management DNA, capital flows, structural risk." },
+  { icon: Sparkles, title: "Strategy Factory", desc: "Autonomous scenario generation, regime calibration, and paper simulation for hypothesis validation." },
+  { icon: Zap, title: "Causal Effects Simulator", desc: "Pre-trade aftermath modeling: see the cascade before you commit capital." },
 ];
 
 const HOW_IT_WORKS = [
-  { icon: Eye, step: "01", title: "Data Ingestion", desc: "EntropyLite continuously ingests real-time price feeds, macro indicators, news sentiment, geopolitical events, and institutional flow data from multiple sources. Every data point is timestamped, normalized, and fed into the intelligence pipeline." },
-  { icon: Cpu, step: "02", title: "Intelligence Processing", desc: "Raw data passes through layered AI engines, including CLANK constraint detection, Monte Carlo simulations, statistical arbitrage models, and regime classification. Each engine operates independently, then results are fused into a unified intelligence view." },
-  { icon: Brain, step: "03", title: "Scenario Generation", desc: "The system generates probabilistic scenarios: risk alerts when portfolio VaR breaches thresholds, structural constraints approaching activation, and high-confidence positioning insights calibrated to the current market regime." },
-  { icon: GitBranch, step: "04", title: "Causal Modeling", desc: "The Causal Effects Engine simulates cascading market impacts across correlated sectors, currencies, and asset classes. It models 1st-order price effects, 2nd-order sector contagion, and 3rd-order systemic ripple effects." },
-  { icon: LineChart, step: "05", title: "Scenario Mapping", desc: "The Strategy Factory generates scenario-based positioning insights with key levels, projected ranges, invalidation zones, and aftermath simulation showing expected market structure reactions." },
-  { icon: Workflow, step: "06", title: "Continuous Learning", desc: "Every market outcome feeds back into the Scar Memory system and Outcome Gradient engine, continuously refining the platform's confidence calibration and scenario quality." },
+  { icon: Eye, step: "01", title: "Data Ingestion", desc: "Real-time price feeds, macro indicators, news sentiment, geopolitical events, and institutional flow data — timestamped and normalized." },
+  { icon: Cpu, step: "02", title: "Intelligence Processing", desc: "CLANK constraint detection, Monte Carlo, statistical arbitrage, and regime classification run in parallel and fuse into one view." },
+  { icon: Brain, step: "03", title: "Scenario Generation", desc: "Probabilistic alerts the moment portfolio VaR breaches thresholds or structural constraints approach activation." },
+  { icon: GitBranch, step: "04", title: "Causal Modeling", desc: "Cascading market impacts across correlated sectors, currencies, and asset classes — 1st, 2nd, and 3rd order." },
+  { icon: LineChart, step: "05", title: "Scenario Mapping", desc: "Strategy Factory produces positioning insights with key levels, projected ranges, and invalidation zones." },
+  { icon: Workflow, step: "06", title: "Continuous Learning", desc: "Every outcome feeds Scar Memory and the Outcome Gradient — the system gets sharper with every trade you log." },
+];
+
+const FAQS = [
+  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full intelligence terminal is available immediately. No card, no trial countdown, no friction." },
+  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario-modeling platform. All outputs are observations and probabilities — you make every decision." },
+  { q: "What markets does it cover?", a: "US equities and ETFs, NSE/BSE Indian equities, FX, crypto, and commodities. India-Only mode locks the entire stack to NSE/BSE." },
+  { q: "How is this different from Bloomberg or a broker app?", a: "Brokers show you prices. Bloomberg shows you data. Entropy Lite shows you the probability distribution, the structural constraints, and the cascade — built for the independent thinker, not the institutional desk." },
+  { q: "Will my data be used to train models?", a: "Your portfolio and trade history bias only your own AI context (Outcome Gradient). It never leaves your account." },
 ];
 
 export default function LandingPage() {
@@ -36,7 +60,10 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite | The Operating System of Finance";
+    document.title = "Entropy Lite | Free Institutional Market Intelligence Terminal";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", "Free Bloomberg-grade market intelligence: 10,000-path Monte Carlo, structural constraint detection, causal effects modeling. Sign in free, no card required.");
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
       setChecking(false);
@@ -45,85 +72,167 @@ export default function LandingPage() {
 
   if (checking) return null;
 
+  const goSignup = () => navigate("/dashboard");
+
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-white text-black pb-20 sm:pb-0">
       <PublicNav />
 
-      {/* Hero */}
+      {/* HERO */}
       <header className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20 text-center">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-10 sm:pb-14 text-center">
           <img
             src={entropyLogoFull}
             alt="Entropy Lite"
-            className="h-20 sm:h-36 object-contain mx-auto mb-5 sm:mb-8"
+            className="h-16 sm:h-28 object-contain mx-auto mb-5 sm:mb-7"
             loading="eager"
           />
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-4 sm:mb-6">
-            The Operating System of Finance
-          </p>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6">
-            Market Structure Intelligence
+
+          {/* Trust badge */}
+          <div className="inline-flex items-center gap-2 mb-5 sm:mb-6 px-3 py-1.5 rounded-full border border-black/10 bg-black/[0.02]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access · No credit card</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-5 sm:mb-6">
+            Bloomberg-grade intelligence.
             <br />
-            <span className="text-black/60">for Independent Thinkers</span>
+            <span className="text-black/55">Built for you, not the desk.</span>
           </h1>
-          <p className="text-base sm:text-xl text-black/55 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            Probabilistic scenario analysis, liquidity flow detection, and real-time intelligence layers.
-            An institutional-grade research platform for data-driven market understanding.
+
+          <p className="text-base sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+            10,000-path Monte Carlo on every holding. Structural constraint detection.
+            Real-time geopolitical impact scoring. The full institutional stack —
+            <span className="text-black font-semibold"> free to start</span>.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3 mb-4">
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
-              onClick={() => navigate("/access")}
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-lg shadow-black/20"
+              onClick={goSignup}
             >
-              Get Access <ChevronRight className="ml-1 h-4 w-4" />
+              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
               className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
-              onClick={() => navigate("/pricing")}
+              onClick={() => navigate("/about")}
             >
-              View Pricing
+              See What's Inside
             </button>
+          </div>
+
+          <p className="font-mono text-[10px] text-black/35 tracking-wide">
+            Google sign-in · 30-second setup · Cancel anytime (it's free)
+          </p>
+
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 mt-12 sm:mt-16 pt-8 sm:pt-10 border-t border-black/5">
+            {STATS.map((s) => (
+              <div key={s.label} className="text-center">
+                <div className="text-xl sm:text-3xl font-bold tracking-tight">{s.value}</div>
+                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-wider text-black/40 mt-1">{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </header>
 
-      {/* Features Grid */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-28">
-        <div className="text-center mb-10 sm:mb-16">
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-3">
-            Institutional-Grade Capabilities
+      {/* PAIN-POINT COMPARISON — loss aversion */}
+      <section className="border-t border-black/5 bg-black/[0.015]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="text-center mb-10 sm:mb-12">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The asymmetry</p>
+            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
+              You're playing a different game than the desk.
+            </h2>
+            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
+              Every retail trader is fighting institutions armed with terminals worth $24,000/yr.
+              Entropy Lite closes that gap. Free.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-black/10 bg-white overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-black/5">
+              <div className="p-5 sm:p-7 bg-black/[0.02]">
+                <div className="flex items-center gap-2 mb-4">
+                  <X className="h-4 w-4 text-black/40" />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-black/40">Without Entropy Lite</span>
+                </div>
+                <ul className="space-y-3.5">
+                  {PAIN_POINTS.map((p) => (
+                    <li key={p.without} className="text-sm text-black/55 leading-relaxed flex gap-2">
+                      <span className="text-black/25 flex-shrink-0">—</span>
+                      <span>{p.without}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="p-5 sm:p-7">
+                <div className="flex items-center gap-2 mb-4">
+                  <Check className="h-4 w-4 text-emerald-600" />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-700">With Entropy Lite</span>
+                </div>
+                <ul className="space-y-3.5">
+                  {PAIN_POINTS.map((p) => (
+                    <li key={p.with} className="text-sm text-black/75 leading-relaxed flex gap-2 font-medium">
+                      <Check className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <span>{p.with}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-8 sm:mt-10">
+            <Button
+              size="lg"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
+              onClick={goSignup}
+            >
+              Close the gap — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES GRID */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="text-center mb-10 sm:mb-14">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The stack</p>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
+            Twelve intelligence layers. One terminal.
           </h2>
-          <p className="text-sm sm:text-base text-black/50 max-w-xl mx-auto">
-            Market structure analysis, probabilistic scenarios, and quantitative decision intelligence.
-            Every module a professional terminal offers, unified in one platform.
+          <p className="text-sm sm:text-base text-black/55 max-w-xl mx-auto">
+            Every module a professional desk runs — unified, AI-fused, and live.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {FEATURES.map((f) => (
             <article
               key={f.title}
-              className="group rounded-lg border border-black/5 bg-white p-5 sm:p-6 hover:shadow-md active:bg-black/[0.02] transition-all"
+              className="group rounded-lg border border-black/5 bg-white p-5 sm:p-6 hover:shadow-md hover:border-black/15 active:bg-black/[0.02] transition-all"
             >
-              <f.icon className="h-5 w-5 text-black/40 mb-3 sm:mb-4 group-hover:text-black/70 transition-colors" />
+              <f.icon className="h-5 w-5 text-black/40 mb-3 sm:mb-4 group-hover:text-black/80 transition-colors" />
               <h3 className="font-semibold text-sm mb-1.5 sm:mb-2">{f.title}</h3>
-              <p className="text-sm text-black/50 leading-relaxed">{f.desc}</p>
+              <p className="text-sm text-black/55 leading-relaxed">{f.desc}</p>
             </article>
           ))}
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* HOW IT WORKS */}
       <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
-          <div className="text-center mb-10 sm:mb-16">
-            <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-3">
-              How Entropy Lite Works
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="text-center mb-10 sm:mb-14">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The pipeline</p>
+            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
+              From raw data to probabilistic intelligence
             </h2>
-            <p className="text-sm sm:text-base text-black/50 max-w-2xl mx-auto">
-              From raw market data to probabilistic intelligence: a six-stage pipeline that continuously processes, 
-              analyzes, and models global financial markets in real time.
+            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
+              A six-stage pipeline that continuously processes global financial markets in real time.
             </p>
           </div>
 
@@ -131,8 +240,8 @@ export default function LandingPage() {
             {HOW_IT_WORKS.map((step) => (
               <div key={step.step} className="flex gap-4 sm:gap-5">
                 <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center">
-                    <span className="font-mono text-[10px] font-bold text-black/40">{step.step}</span>
+                  <div className="w-10 h-10 rounded-full border border-black/10 bg-white flex items-center justify-center">
+                    <span className="font-mono text-[10px] font-bold text-black/50">{step.step}</span>
                   </div>
                 </div>
                 <div className="min-w-0">
@@ -140,132 +249,120 @@ export default function LandingPage() {
                     <step.icon className="h-4 w-4 text-black/40 flex-shrink-0" />
                     <h3 className="font-semibold text-sm">{step.title}</h3>
                   </div>
-                  <p className="text-sm text-black/50 leading-relaxed">{step.desc}</p>
+                  <p className="text-sm text-black/55 leading-relaxed">{step.desc}</p>
                 </div>
               </div>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Button
+              size="lg"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
+              onClick={goSignup}
+            >
+              Run it on your portfolio <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* WHY NOW — risk reversal */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="rounded-2xl border border-black/10 bg-gradient-to-br from-black/[0.02] to-transparent p-6 sm:p-10">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
+                <Lock className="h-4 w-4 text-black/60" />
+              </div>
+              <p className="font-semibold text-sm mb-1">No credit card</p>
+              <p className="text-xs text-black/50 leading-relaxed">Sign in with Google or email. Full terminal unlocked instantly.</p>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
+                <Clock className="h-4 w-4 text-black/60" />
+              </div>
+              <p className="font-semibold text-sm mb-1">30-second setup</p>
+              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set your base currency, and you're running.</p>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
+                <InfinityIcon className="h-4 w-4 text-black/60" />
+              </div>
+              <p className="font-semibold text-sm mb-1">Free during founding</p>
+              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing forever when paid tiers launch.</p>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3">
+              Every day without it is a day institutions price you out of.
+            </h3>
+            <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
+              The platform gets sharper the longer you use it. Your trade history biases the AI toward your profitable patterns.
+            </p>
+            <Button
+              size="lg"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 shadow-lg shadow-black/20"
+              onClick={goSignup}
+            >
+              Start free now <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ — kill objections */}
+      <section className="border-t border-black/5">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <div className="text-center mb-10 sm:mb-12">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Last questions</p>
+            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight">
+              Before you sign in
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {FAQS.map((f) => (
+              <details key={f.q} className="group rounded-lg border border-black/5 bg-white p-4 sm:p-5 open:border-black/15 transition-colors">
+                <summary className="flex items-center justify-between cursor-pointer list-none">
+                  <span className="font-semibold text-sm pr-4">{f.q}</span>
+                  <ChevronRight className="h-4 w-4 text-black/40 flex-shrink-0 group-open:rotate-90 transition-transform" />
+                </summary>
+                <p className="text-sm text-black/55 leading-relaxed mt-3">{f.a}</p>
+              </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Deep Dive: Key Modules */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
-        <div className="text-center mb-10 sm:mb-16">
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-3">
-            Inside the Intelligence Engine
+      {/* FINAL CTA */}
+      <section className="border-t border-black/5 bg-black text-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
+            The terminal institutions don't want you to have.
           </h2>
-          <p className="text-sm sm:text-base text-black/50 max-w-2xl mx-auto">
-            Each module in Entropy Lite is purpose-built to solve a specific intelligence gap 
-            that retail investors face when competing with institutional desks.
+          <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
+            Free during founding access. No card. No trial timer. Sign in and start running scenarios in under a minute.
           </p>
-        </div>
-
-        <div className="space-y-10 sm:space-y-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">CLANK Structural Constraint Engine</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-                CLANK stands for Constraint, Liquidity, Accumulation, Narrative, and Kinetic: five structural forces 
-                that define how markets behave at critical inflection points.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-              When a structural constraint approaches its activation threshold, such as a liquidity cliff, 
-                institutional positioning limit, or regulatory boundary, CLANK generates pre-emptive alerts
-                with probability scores and expected impact magnitude.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Monte Carlo Probability Engine</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The system runs 10,000-path Geometric Brownian Motion (GBM) simulations for every asset in your 
-                portfolio. Each simulation path models price evolution using calibrated volatility, drift, and 
-                correlation parameters derived from real market data.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-                Results are presented as probability distributions showing the likelihood of reaching specific 
-                price targets, maximum drawdown estimates, and time-weighted expected returns across multiple 
-                confidence intervals.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Statistical Arbitrage & Co-Integration</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The StatArb engine analyzes your portfolio for mean-reversion scenarios by computing 
-                co-integration relationships between asset pairs using the Augmented Dickey-Fuller test.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-                Z-scores track how far each spread has deviated from its historical mean, highlighting 
-                reaction zones when spreads reach statistically significant levels.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Geopolitical & Regime Intelligence</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-            A continuous monitoring system tracks global geopolitical events: sanctions, conflicts, 
-                policy changes, central bank decisions, and scores their expected market impact.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-                The Regime Detection engine classifies current market conditions and automatically recalibrates 
-                all intelligence modules to match the prevailing regime.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Causal Effects Simulator</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The Causal Effects Engine models cascading impacts across three orders: 
-                direct price and volatility effects, correlated sector contagion, and systemic ripple effects.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-                This maps how a single event propagates through the financial system 
-                and affects portfolio exposure.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">Strategy Factory & Backtesting</h3>
-              <p className="text-sm text-black/55 leading-relaxed mb-3">
-                The Strategy Factory autonomously generates scenario-based positioning insights based on current 
-                market conditions, portfolio composition, and identified structural patterns.
-              </p>
-              <p className="text-sm text-black/55 leading-relaxed">
-                Scenarios are validated against historical data through paper simulation. 
-                The Aftermath Matrix previews expected market structure reaction.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="border-t border-black/5 bg-black/[0.02]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-4">
-            Intelligence that was previously institutional-only
-          </h2>
-          <p className="text-sm sm:text-base text-black/50 mb-8 max-w-lg mx-auto">
-            Full market intelligence terminal with structural analysis, probabilistic modeling, 
-            and real-time liquidity scenario mapping, available during founding access.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto"
-              onClick={() => navigate("/access")}
+              className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-xl"
+              onClick={goSignup}
             >
-              Get Founding Access <ArrowRight className="ml-1 h-4 w-4" />
+              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
-              onClick={() => navigate("/about")}
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-white/20 text-white hover:bg-white/5 transition-colors w-full sm:w-auto"
+              onClick={() => navigate("/pricing")}
             >
-              Learn More
+              View Pricing
             </button>
           </div>
+          <p className="font-mono text-[10px] text-white/35 tracking-wide">
+            Founding members lock in founding pricing forever
+          </p>
         </div>
       </section>
 
@@ -287,6 +384,16 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* STICKY MOBILE CTA — always one tap from signup */}
+      <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-black/10 px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <Button
+          className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-11"
+          onClick={goSignup}
+        >
+          Sign In Free — No Card Required <ArrowRight className="ml-1 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
