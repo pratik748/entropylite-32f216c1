@@ -18,7 +18,9 @@ interface Props {
 export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
   const tickers = useMemo(() => stocks.filter((s) => s.analysis).map((s) => s.ticker), [stocks]);
   const { data: flowsData } = useInstitutionalFlows(tickers);
-  const { regime, vix } = useMarketRegime();
+  const marketRegime = useMarketRegime();
+  const regime = marketRegime?.regime;
+  const vix = marketRegime?.vix;
 
   const [sentiment, setSentiment] = useState<any>(null);
   const [causal, setCausal] = useState<any>(null);
