@@ -94,15 +94,14 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-5 sm:mb-6">
-            Bloomberg-grade intelligence.
+            Market structure intelligence,
             <br />
-            <span className="text-black/55">Built for you, not the desk.</span>
+            <span className="text-black/55">refined for the independent thinker.</span>
           </h1>
 
           <p className="text-base sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            10,000-path Monte Carlo on every holding. Structural constraint detection.
-            Real-time geopolitical impact scoring. The full institutional stack —
-            <span className="text-black font-semibold"> free to start</span>.
+            Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence —
+            <span className="text-black font-semibold"> composed into a single, quiet terminal</span>.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3 mb-4">
