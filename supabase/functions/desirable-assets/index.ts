@@ -935,21 +935,13 @@ serve(async (req) => {
     } catch (e) { console.warn("Macro calendar fetch failed:", (e as Error).message); }
 
     try {
-      const overusedList = indiaMode
-        ? Array.from(OVERUSED_TICKERS_INDIA).join(", ")
-        : Array.from(OVERUSED_TICKERS_GLOBAL).join(", ");
-      const userExplicitlyWantsObvious =
-        (preferredSectors || []).some((s) => /tech|index/i.test(s)) ||
-        (preferredAssetTypes || []).some((t) => /etf/i.test(t));
-
       const aiOpts = {
-        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and no fluff.
-Reject low-quality names, random microcaps, and weak momentum setups.
+        systemPrompt: `You are an institutional quant PM. Output only liquid, large/mega-cap, highly tradeable assets with strict risk controls and no fluff.
+QUALITY MANDATE: Bias HARD toward proven blue-chip leaders and category-dominant compounders with high expected forward growth. Use household-name mega/large-caps freely when fundamentals and price action support it — do NOT avoid them for the sake of being contrarian. Obscure, low-coverage, or unfamiliar names are forbidden unless they are clearly institutional-grade (>$10B mkt cap, deep liquidity, analyst coverage).
 Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
-Prefer durable mid-caps, recently-derisked large-caps, special situations, and quality compounders that are NOT yet consensus longs.
-ORIGINALITY MANDATE: Avoid the household-name mega-caps everyone already pitches (${overusedList}) UNLESS there is a specific, fresh catalyst this week. ${userExplicitlyWantsObvious ? "(User explicitly chose tech/index — obvious names allowed if there is a real edge.)" : "Lean into less-covered names with structural alpha."}
+Reject microcaps, low-float names, story stocks, and anything not actively held by major institutions.
 Use exact tickers supported by Yahoo Finance.
-Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : ""}`,
+Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Bias toward Nifty50 / BSE Sensex constituents and top-tier Nifty Next 50 names. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nBias toward S&P 500 / Nasdaq-100 constituents and global mega-caps. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -960,17 +952,18 @@ ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
 
 Create 8-10 recommendations that prioritize:
-1) Positive earnings momentum + institutional participation
-2) Price trend confirmation (above key averages)
-3) Catalyst-driven upside in 1-6 months
-4) Sentiment-aware setups (avoid structural breakdowns)
-5) Liquidity and execution quality
+1) Blue-chip / index-constituent quality with proven multi-year compounding
+2) Positive earnings momentum + heavy institutional participation
+3) Price trend confirmation (above 50/200-day averages)
+4) Catalyst-driven upside in 1-6 months with high expected forward growth
+5) Deep liquidity and tight bid/ask — must be easily executable in size
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
-- No penny stocks / meme stocks / niche illiquid names
-- No deteriorating fundamentals
-- Provide strategy diversity across at least 4 strategy types
+- ABSOLUTELY NO obscure, unheard-of, microcap, penny, meme, or low-liquidity names
+- ABSOLUTELY NO deteriorating fundamentals or broken charts
+- Prefer names with >$10B market cap (or Nifty50/Sensex/Nifty Next 50 in India mode)
+- Provide strategy diversity across at least 3 strategy types
 
 Return via the tool call only.`,
         tools: candidateTools,
