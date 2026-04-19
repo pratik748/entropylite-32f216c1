@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck, Trophy } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, BarChart3, Wifi, WifiOff, Clock, Target, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, resolveAssetCurrency } from "@/lib/currency";
@@ -56,8 +56,6 @@ const FreshnessIndicator = ({ status }: { status?: PriceFreshness }) => {
 
 const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAddNew, priceStatus }: PortfolioPanelProps) => {
   const { baseCurrency, setBaseCurrency, convertToBase } = useFX();
-  const [proofStockId, setProofStockId] = useState<string | null>(null);
-  const proofStock = stocks.find((s) => s.id === proofStockId) || null;
   const analyzed = stocks.filter(s => s.analysis);
   const multi = isMultiCurrency(analyzed);
   const baseSym = getCurrencySymbol(baseCurrency);
@@ -219,15 +217,7 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                       )}
                     </div>
                   )}
-                  {stock.analysis && pnlPct >= 5 && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setProofStockId(stock.id); }}
-                      className="ml-1 rounded p-1 text-gain/70 hover:bg-gain/10 hover:text-gain transition-colors"
-                      title={`Share this win (+${pnlPct.toFixed(1)}%)`}
-                    >
-                      <Trophy className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                  {/* Proof Card now auto-pops when trade is closed (crossed off) */}
                   <button
                     onClick={(e) => { e.stopPropagation(); onRemoveStock(stock.id); }}
                     className="ml-1 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-loss/10 hover:text-loss"
@@ -273,13 +263,6 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
         </div>
       )}
 
-      {proofStock && (
-        <ProofCard
-          open={!!proofStock}
-          onClose={() => setProofStockId(null)}
-          stock={proofStock}
-        />
-      )}
     </div>
   );
 };
