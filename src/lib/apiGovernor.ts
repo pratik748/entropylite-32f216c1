@@ -193,6 +193,14 @@ export interface InvokeOptions {
   force?: boolean;
   /** Skip this call entirely if true (for conditional fetches) */
   skip?: boolean;
+  /**
+   * Stable cache key override. Use this when the request body contains noisy
+   * live fields (live prices, VIX, intensities) that would otherwise change
+   * the auto-generated key on every render and defeat caching. Pass a key
+   * derived only from the structural identity of the request (e.g. ticker
+   * list, region, mode) so cache hits work as intended.
+   */
+  cacheKey?: string;
 }
 
 /**
@@ -208,7 +216,9 @@ export async function governedInvoke<T = any>(
 
   const tier = opts.tier || ENDPOINT_TIER[functionName] || "frequent";
   const ttl = TTL[tier];
-  const key = cacheKey(functionName, opts.body);
+  const key = opts.cacheKey
+    ? `${functionName}::${opts.cacheKey}`
+    : cacheKey(functionName, opts.body);
 
   resetWindowIfNeeded();
 
