@@ -221,7 +221,13 @@ Return JSON: { "thesis": "<2-3 sentences in Soros voice — what the market beli
         ].reduce((a, b) => a + b, 0),
         timestamp: new Date().toISOString(),
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=21600, s-maxage=21600"
+        } 
+      },
     );
   } catch (error: any) {
     if (error instanceof Response) return error;
