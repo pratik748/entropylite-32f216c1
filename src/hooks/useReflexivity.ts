@@ -43,8 +43,9 @@ export interface ReflexivityData {
   conviction: ReflexivityConviction;
   contradictions: ReflexivityContradiction[];
   shiftETA: ReflexivityShiftETA;
-  thesis: string;
+  thesis: string | null;
   actionable: ReflexivityActionable | null;
+  aiError?: string | null;
   signalCount: number;
   timestamp: string;
 }
