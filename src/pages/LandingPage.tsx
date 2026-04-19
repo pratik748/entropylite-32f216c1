@@ -5,7 +5,7 @@ import {
   Activity, Shield, Globe, Sparkles, Target, BarChart3,
   TrendingUp, Layers, Zap, ArrowRight, ChevronRight,
   Brain, LineChart, Cpu, Eye, GitBranch, Workflow,
-  Check, X, Lock, Clock, Infinity as InfinityIcon
+  Lock, Clock, Infinity as InfinityIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
@@ -50,7 +50,7 @@ const FAQS = [
   { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full intelligence terminal is available immediately. No card, no trial countdown, no friction." },
   { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario-modeling platform. All outputs are observations and probabilities — you make every decision." },
   { q: "What markets does it cover?", a: "US equities and ETFs, NSE/BSE Indian equities, FX, crypto, and commodities. India-Only mode locks the entire stack to NSE/BSE." },
-  { q: "How is this different from Bloomberg or a broker app?", a: "Brokers show you prices. Bloomberg shows you data. Entropy Lite shows you the probability distribution, the structural constraints, and the cascade — built for the independent thinker, not the institutional desk." },
+  { q: "How is this different from a broker app?", a: "Brokers show you prices and orders. Entropy Lite shows you the probability distribution behind those prices, the structural constraints shaping them, and the cascade that follows an event — composed for the independent thinker." },
   { q: "Will my data be used to train models?", a: "Your portfolio and trade history bias only your own AI context (Outcome Gradient). It never leaves your account." },
 ];
 
