@@ -193,6 +193,14 @@ export interface InvokeOptions {
   force?: boolean;
   /** Skip this call entirely if true (for conditional fetches) */
   skip?: boolean;
+  /**
+   * Stable cache key override. Use this when the request body contains noisy
+   * live fields (live prices, VIX, intensities) that would otherwise change
+   * the auto-generated key on every render and defeat caching. Pass a key
+   * derived only from the structural identity of the request (e.g. ticker
+   * list, region, mode) so cache hits work as intended.
+   */
+  cacheKey?: string;
 }
 
 /**
@@ -208,7 +216,9 @@ export async function governedInvoke<T = any>(
 
   const tier = opts.tier || ENDPOINT_TIER[functionName] || "frequent";
   const ttl = TTL[tier];
-  const key = cacheKey(functionName, opts.body);
+  const key = opts.cacheKey
+    ? `${functionName}::${opts.cacheKey}`
+    : cacheKey(functionName, opts.body);
 
   resetWindowIfNeeded();
 
@@ -363,6 +373,12 @@ export function getThrottleMultiplier(): number {
 export function flushAllCaches() {
   cache.clear();
   metrics.lastAiCall = 0;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PERSIST_PREFIX)) localStorage.removeItem(k);
+    }
+  } catch {}
 }
 
 /**
@@ -372,6 +388,7 @@ export function flushAnalyticalCaches() {
   for (const key of Array.from(cache.keys())) {
     if (!key.startsWith("price-feed")) {
       cache.delete(key);
+      try { localStorage.removeItem(PERSIST_PREFIX + key); } catch {}
     }
   }
   metrics.lastAiCall = 0;
@@ -381,13 +398,13 @@ export function flushAnalyticalCaches() {
  * Flush AI-tier caches only — called when provider is switched.
  */
 export function flushAICaches() {
-  const aiTiers: Tier[] = ["ai", "continuous", "evolution", "heavy"];
+  const aiTiers: Tier[] = ["ai", "continuous", "evolution", "heavy", "reflexivity"];
   for (const key of Array.from(cache.keys())) {
-    // Check if the endpoint is AI-tier
     const fn = key.split("::")[0];
     const tier = ENDPOINT_TIER[fn];
     if (tier && aiTiers.includes(tier)) {
       cache.delete(key);
+      try { localStorage.removeItem(PERSIST_PREFIX + key); } catch {}
     }
   }
   metrics.lastAiCall = 0;
