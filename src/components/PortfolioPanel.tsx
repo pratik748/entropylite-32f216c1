@@ -219,6 +219,15 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
                       )}
                     </div>
                   )}
+                  {stock.analysis && pnlPct >= 5 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProofStockId(stock.id); }}
+                      className="ml-1 rounded p-1 text-gain/70 hover:bg-gain/10 hover:text-gain transition-colors"
+                      title={`Share this win (+${pnlPct.toFixed(1)}%)`}
+                    >
+                      <Trophy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); onRemoveStock(stock.id); }}
                     className="ml-1 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-loss/10 hover:text-loss"
@@ -262,6 +271,14 @@ const PortfolioPanel = ({ stocks, activeStockId, onSelectStock, onRemoveStock, o
           <p className="text-sm text-muted-foreground">No assets in portfolio</p>
           <p className="text-xs text-muted-foreground/60 mt-1">Add any global asset using the form above</p>
         </div>
+      )}
+
+      {proofStock && (
+        <ProofCard
+          open={!!proofStock}
+          onClose={() => setProofStockId(null)}
+          stock={proofStock}
+        />
       )}
     </div>
   );
