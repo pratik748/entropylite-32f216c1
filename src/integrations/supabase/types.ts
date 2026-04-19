@@ -83,6 +83,84 @@ export type Database = {
         }
         Relationships: []
       }
+      odgs_gradient_state: {
+        Row: {
+          allocation_scales: Json
+          asset_biases: Json
+          feature_weights: Json
+          generation: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allocation_scales?: Json
+          asset_biases?: Json
+          feature_weights?: Json
+          generation?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allocation_scales?: Json
+          asset_biases?: Json
+          feature_weights?: Json
+          generation?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      odgs_trade_ledger: {
+        Row: {
+          asset: string
+          asset_class: string
+          created_at: string
+          duration_hours: number
+          feature_momentum: number
+          feature_regime: string
+          feature_sentiment: number
+          feature_vol: number
+          id: string
+          pnl_pct: number
+          return_abs: number
+          source: string
+          trade_timestamp: number
+          user_id: string
+        }
+        Insert: {
+          asset: string
+          asset_class?: string
+          created_at?: string
+          duration_hours?: number
+          feature_momentum?: number
+          feature_regime?: string
+          feature_sentiment?: number
+          feature_vol?: number
+          id?: string
+          pnl_pct?: number
+          return_abs?: number
+          source?: string
+          trade_timestamp: number
+          user_id: string
+        }
+        Update: {
+          asset?: string
+          asset_class?: string
+          created_at?: string
+          duration_hours?: number
+          feature_momentum?: number
+          feature_regime?: string
+          feature_sentiment?: number
+          feature_vol?: number
+          id?: string
+          pnl_pct?: number
+          return_abs?: number
+          source?: string
+          trade_timestamp?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       statarb_outcomes: {
         Row: {
           actual_outcome: string

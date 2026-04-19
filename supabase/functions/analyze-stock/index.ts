@@ -47,7 +47,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    await requireAuth(req, corsHeaders);
+    const auth = await requireAuth(req, corsHeaders);
+    const userId = auth.user.id;
     const rawBody = await req.json();
     const provider = rawBody.provider;
     const indiaMode = rawBody.indiaMode === true;
@@ -58,6 +59,57 @@ serve(async (req) => {
     if (!ticker || !buyPrice || !quantity) {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    // ─── ODGS Ledger Context: per-user historical outcomes for profit/risk bias ───
+    let odgsContext = "";
+    try {
+      const supaUrl = Deno.env.get("SUPABASE_URL");
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supaUrl && serviceKey) {
+        const ledgerRes = await fetch(`${supaUrl}/rest/v1/odgs_trade_ledger?user_id=eq.${userId}&order=trade_timestamp.desc&limit=200`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        });
+        const gradRes = await fetch(`${supaUrl}/rest/v1/odgs_gradient_state?user_id=eq.${userId}&select=*`, {
+          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        });
+        const ledger: any[] = ledgerRes.ok ? await ledgerRes.json() : [];
+        const gradArr: any[] = gradRes.ok ? await gradRes.json() : [];
+        const grad = gradArr[0];
+
+        if (ledger.length > 0) {
+          const tickerTrades = ledger.filter(t => (t.asset || "").toUpperCase() === ticker.toUpperCase());
+          const allWins = ledger.filter(t => Number(t.pnl_pct) > 0).length;
+          const overallWR = ((allWins / ledger.length) * 100).toFixed(0);
+          const avgPnl = (ledger.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / ledger.length).toFixed(2);
+
+          let tickerLine = "";
+          if (tickerTrades.length > 0) {
+            const tWins = tickerTrades.filter(t => Number(t.pnl_pct) > 0).length;
+            const tWR = ((tWins / tickerTrades.length) * 100).toFixed(0);
+            const tAvg = (tickerTrades.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / tickerTrades.length).toFixed(2);
+            const worst = Math.min(...tickerTrades.map(t => Number(t.pnl_pct || 0))).toFixed(2);
+            tickerLine = `\n- This user's ${ticker} history: ${tickerTrades.length} closed trades, ${tWR}% win rate, avg ${tAvg}% P&L, worst ${worst}%.`;
+          }
+
+          const bias = grad?.asset_biases?.[ticker.toUpperCase()];
+          const biasLine = typeof bias === "number"
+            ? `\n- Learned bias for ${ticker}: ${bias.toFixed(2)}× (1.0 = neutral, >1 favored, <1 disfavored).`
+            : "";
+
+          const recentLosses = ledger
+            .filter(t => Number(t.pnl_pct) < -2)
+            .slice(0, 5)
+            .map(t => `${t.asset} ${Number(t.pnl_pct).toFixed(1)}% in ${t.feature_regime || "unknown"} regime`)
+            .join("; ");
+          const lossLine = recentLosses ? `\n- Recent loss patterns to factor into risk assessment: ${recentLosses}.` : "";
+
+          odgsContext = `\nUSER OUTCOME LEDGER (real per-account trade history — bias toward profitable patterns and away from prior losses):
+- Total closed trades: ${ledger.length} | Overall win rate: ${overallWR}% | Avg P&L: ${avgPnl}%${tickerLine}${biasLine}${lossLine}
+Use this ledger to ground confidence and risk: raise confidence when current setup matches profitable patterns; lower confidence and tighten ranges when it matches prior-loss patterns.`;
+        }
+      }
+    } catch (e: any) { console.warn("ODGS context fetch failed:", e?.message); }
+
 
     // Fetch Polymarket prediction signals for price skewing
     let polymarketContext = "";
@@ -225,7 +277,7 @@ REAL-TIME MARKET DATA:
 - Distance from 52W High: ${from52High}%
 
 Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
-${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}
+${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}${odgsContext}
 
 Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
 {
