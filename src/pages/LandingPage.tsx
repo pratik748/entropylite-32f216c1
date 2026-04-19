@@ -5,7 +5,7 @@ import {
   Activity, Shield, Globe, Sparkles, Target, BarChart3,
   TrendingUp, Layers, Zap, ArrowRight, ChevronRight,
   Brain, LineChart, Cpu, Eye, GitBranch, Workflow,
-  Check, X, Lock, Clock, Infinity as InfinityIcon
+  Lock, Clock, Infinity as InfinityIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
@@ -18,12 +18,11 @@ const STATS = [
   { value: "24/7", label: "Continuous market scan" },
 ];
 
-const PAIN_POINTS = [
-  { without: "You react to news after the price has already moved", with: "Pre-emptive alerts when structural constraints approach activation" },
-  { without: "You guess position size from gut feel", with: "Risk-adjusted sizing calibrated to portfolio VaR and CVaR" },
-  { without: "You see only the headline, not the cascade", with: "Causal Effects Engine maps 1st, 2nd, and 3rd-order market impact" },
-  { without: "You hold through drawdowns hoping for a bounce", with: "Probabilistic exit zones with mathematical max-profit notifications" },
-  { without: "You compete with institutions using a 1990s broker UI", with: "Bloomberg-grade terminal with 12-layer intelligence stack" },
+const PRINCIPLES = [
+  { title: "Probability over prediction", desc: "Every scenario is expressed as a distribution, not a forecast. You see the range of outcomes and the confidence behind them." },
+  { title: "Structure over noise", desc: "We model the constraints, liquidity, and flows that move markets — not the headlines that follow." },
+  { title: "Calibration over conviction", desc: "The system continuously refines itself against your outcomes. It learns the patterns that work for you." },
+  { title: "Clarity over complexity", desc: "Twelve intelligence layers, one composed view. Decisions stay yours; the math stays out of the way." },
 ];
 
 const FEATURES = [
@@ -51,7 +50,7 @@ const FAQS = [
   { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full intelligence terminal is available immediately. No card, no trial countdown, no friction." },
   { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario-modeling platform. All outputs are observations and probabilities — you make every decision." },
   { q: "What markets does it cover?", a: "US equities and ETFs, NSE/BSE Indian equities, FX, crypto, and commodities. India-Only mode locks the entire stack to NSE/BSE." },
-  { q: "How is this different from Bloomberg or a broker app?", a: "Brokers show you prices. Bloomberg shows you data. Entropy Lite shows you the probability distribution, the structural constraints, and the cascade — built for the independent thinker, not the institutional desk." },
+  { q: "How is this different from a broker app?", a: "Brokers show you prices and orders. Entropy Lite shows you the probability distribution behind those prices, the structural constraints shaping them, and the cascade that follows an event — composed for the independent thinker." },
   { q: "Will my data be used to train models?", a: "Your portfolio and trade history bias only your own AI context (Outcome Gradient). It never leaves your account." },
 ];
 
@@ -60,9 +59,9 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite | Free Institutional Market Intelligence Terminal";
+    document.title = "Entropy Lite | The Operating System of Finance";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Free Bloomberg-grade market intelligence: 10,000-path Monte Carlo, structural constraint detection, causal effects modeling. Sign in free, no card required.");
+    if (meta) meta.setAttribute("content", "Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence. Free during founding access.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
@@ -95,15 +94,14 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-5 sm:mb-6">
-            Bloomberg-grade intelligence.
+            Market structure intelligence,
             <br />
-            <span className="text-black/55">Built for you, not the desk.</span>
+            <span className="text-black/55">refined for the independent thinker.</span>
           </h1>
 
           <p className="text-base sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            10,000-path Monte Carlo on every holding. Structural constraint detection.
-            Real-time geopolitical impact scoring. The full institutional stack —
-            <span className="text-black font-semibold"> free to start</span>.
+            Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence —
+            <span className="text-black font-semibold"> composed into a single, quiet terminal</span>.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-3 mb-4">
@@ -138,60 +136,36 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* PAIN-POINT COMPARISON — loss aversion */}
+      {/* PRINCIPLES — quiet, classy positioning */}
       <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-          <div className="text-center mb-10 sm:mb-12">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The asymmetry</p>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
+          <div className="text-center mb-10 sm:mb-14">
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Principles</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              You're playing a different game than the desk.
+              A different way of looking at markets.
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Every retail trader is fighting institutions armed with terminals worth $24,000/yr.
-              Entropy Lite closes that gap. Free.
+              Entropy Lite is built around four ideas. They shape every layer of the system.
             </p>
           </div>
 
-          <div className="rounded-xl border border-black/10 bg-white overflow-hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-black/5">
-              <div className="p-5 sm:p-7 bg-black/[0.02]">
-                <div className="flex items-center gap-2 mb-4">
-                  <X className="h-4 w-4 text-black/40" />
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-black/40">Without Entropy Lite</span>
-                </div>
-                <ul className="space-y-3.5">
-                  {PAIN_POINTS.map((p) => (
-                    <li key={p.without} className="text-sm text-black/55 leading-relaxed flex gap-2">
-                      <span className="text-black/25 flex-shrink-0">—</span>
-                      <span>{p.without}</span>
-                    </li>
-                  ))}
-                </ul>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
+            {PRINCIPLES.map((p, i) => (
+              <div key={p.title} className="bg-white p-6 sm:p-8">
+                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">— {String(i + 1).padStart(2, "0")}</p>
+                <h3 className="text-base sm:text-lg font-semibold tracking-tight mb-2">{p.title}</h3>
+                <p className="text-sm text-black/55 leading-relaxed">{p.desc}</p>
               </div>
-              <div className="p-5 sm:p-7">
-                <div className="flex items-center gap-2 mb-4">
-                  <Check className="h-4 w-4 text-emerald-600" />
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-700">With Entropy Lite</span>
-                </div>
-                <ul className="space-y-3.5">
-                  {PAIN_POINTS.map((p) => (
-                    <li key={p.with} className="text-sm text-black/75 leading-relaxed flex gap-2 font-medium">
-                      <Check className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <span>{p.with}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            ))}
           </div>
 
-          <div className="text-center mt-8 sm:mt-10">
+          <div className="text-center mt-10 sm:mt-12">
             <Button
               size="lg"
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Close the gap — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Begin — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -296,7 +270,7 @@ export default function LandingPage() {
 
           <div className="text-center">
             <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3">
-              Every day without it is a day institutions price you out of.
+              The terminal sharpens with every decision you make.
             </h3>
             <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
               The platform gets sharper the longer you use it. Your trade history biases the AI toward your profitable patterns.
@@ -340,7 +314,7 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-black text-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            The terminal institutions don't want you to have.
+            Quietly capable. Always on.
           </h2>
           <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
             Free during founding access. No card. No trial timer. Sign in and start running scenarios in under a minute.
