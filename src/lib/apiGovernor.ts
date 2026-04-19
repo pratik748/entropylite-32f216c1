@@ -265,7 +265,9 @@ export async function governedInvoke<T = any>(
 
     // Update cache
     const hash = fastHash(data);
-    cache.set(key, { data, timestamp: Date.now(), hash });
+    const entry = { data, timestamp: Date.now(), hash };
+    cache.set(key, entry);
+    persistEntry(key, entry);
 
     return data;
   })();
