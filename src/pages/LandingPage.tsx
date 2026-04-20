@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import FeatureGallery from "@/components/landing/FeatureGallery";
+import MathResearch from "@/components/landing/MathResearch";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
@@ -231,6 +232,9 @@ export default function LandingPage() {
 
       {/* TABBED GALLERY — real screen captures of every core surface */}
       <FeatureGallery />
+
+      {/* MATH & RESEARCH — flaunt the real quant under the hood */}
+      <MathResearch />
 
       {/* FEATURES GRID */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
