@@ -369,21 +369,24 @@ const RETRY_DELAYS = [0, 1500];
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const provider = opts.provider || "cloudflare";
 
+  // Default chain: Claude (via Cloudflare AI Gateway) → Cloudflare Workers AI → Mistral → OpenAI
   if (provider === "cloudflare") {
     let lastError: any;
     for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
       if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
       try {
-        return await callCloudflare(opts);
+        return await callClaude(opts);
       } catch (err: any) {
         lastError = err;
-        if (err.status === 429 || err.status === 401 || err.status === 403 || err.name === "AbortError") break;
+        if (err.status === 401 || err.status === 403 || err.name === "AbortError") break;
+        if (err.status === 429) break;
         if (err.status >= 500 && err.status < 600) continue;
         break;
       }
     }
-    try { return await callMistral(opts); } catch {}
-    try { return await callOpenAI(opts); } catch {}
+    try { return await callCloudflare(opts); } catch (e) { lastError = e; }
+    try { return await callMistral(opts); } catch (e) { lastError = e; }
+    try { return await callOpenAI(opts); } catch (e) { lastError = e; }
     throw lastError;
   }
 
@@ -398,8 +401,8 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   console.log("callAIParallel → firing Cloudflare + Mistral + OpenAI simultaneously");
 
   const promises = [
-    callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
-      console.warn("callAIParallel → Cloudflare failed:", err.message || err);
+    callClaude(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
+      console.warn("callAIParallel → Claude failed:", err.message || err);
       return null;
     }),
     callMistral({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).then(r => ({ ...r, provider: "mistral" as const })).catch((err) => {
@@ -424,8 +427,8 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    // Sequential final attempts
-    for (const fn of [callCloudflare, callMistral, callOpenAI]) {
+    // Sequential final attempts: Claude → Cloudflare → Mistral → OpenAI
+    for (const fn of [callClaude, callCloudflare, callMistral, callOpenAI]) {
       try {
         const result = await fn(opts);
         return [result];
