@@ -263,7 +263,7 @@ export async function governedInvoke<T = any>(
     // Inject provider and indiaMode for all calls
     {
       try {
-        const provider = localStorage.getItem("entropy-ai-provider") || "cloudflare";
+        const provider = localStorage.getItem("entropy-ai-provider") || "mistral";
         const indiaMode = localStorage.getItem("entropy-india-mode") === "true";
         body = { ...body, provider, ...(indiaMode ? { indiaMode: true } : {}) };
       } catch {}

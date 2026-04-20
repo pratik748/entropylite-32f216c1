@@ -87,7 +87,7 @@ serve(async (req) => {
   try {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
-    const provider = body.provider || "cloudflare";
+    const provider = body.provider || "mistral";
     const indiaMode = body.indiaMode === true;
     const region = indiaMode ? "India" : (body.region || "All");
     const allIndices = [

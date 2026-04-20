@@ -8,8 +8,8 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { callAI } from "../_shared/callAI.ts";
+import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,10 +187,10 @@ serve(async (req) => {
     let actionable: { trigger: string; trade: string; risk: string } | null = null;
     let aiError: string | null = null;
     try {
-      // Use the standard shared callAI utility (Cloudflare → Mistral → OpenAI fallback chain).
-      const systemPrompt =
-        "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON, no markdown, no commentary.";
-      const userPrompt = `Belief map:
+      const ai = await callAI({
+        systemPrompt:
+          "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON.",
+        userPrompt: `Belief map:
 - Consensus: ${consensus.label} (${consensus.direction})
 - Components — Flow: ${consensus.components.flow}, Sentiment: ${consensus.components.sentiment}, Causal: ${consensus.components.causal}
 - Conviction: ${conviction.label} (${conviction.score}, spread ${conviction.spread})
@@ -198,15 +198,10 @@ serve(async (req) => {
 - Shift ETA: ${shiftETA.label} (${shiftETA.probability}% in ${shiftETA.window})
 - VIX: ${input.vix ?? "n/a"}, Regime: ${input.regime ?? "n/a"}
 
-Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
-
-      const ai = await callAI({
-        systemPrompt,
-        userPrompt,
+Return JSON: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`,
         temperature: 0.4,
         maxTokens: 700,
       });
-
       const parsed = safeParseJSON(ai.text);
       if (parsed?.thesis && typeof parsed.thesis === "string") {
         thesis = parsed.thesis;

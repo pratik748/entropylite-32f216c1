@@ -106,7 +106,7 @@ export function useCompanyIntelligence(ticker: string | null) {
     const timeout = setTimeout(() => controller.abort(), 90_000);
 
     const provider = (() => {
-      try { return localStorage.getItem("entropy-ai-provider") || "cloudflare"; } catch { return "cloudflare"; }
+      try { return localStorage.getItem("entropy-ai-provider") || "mistral"; } catch { return "mistral"; }
     })();
 
     supabase.functions.invoke("company-intelligence", {

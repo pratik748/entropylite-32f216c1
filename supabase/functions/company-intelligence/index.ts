@@ -89,7 +89,7 @@ All number fields for signals should be 0-100. Revenue percentages should sum to
           userPrompt,
           maxTokens: 8192,
           temperature: 0.4,
-          provider: provider || "cloudflare",
+          provider: provider || "mistral",
         });
 
         const parsed = safeParseJSON(result.text);
