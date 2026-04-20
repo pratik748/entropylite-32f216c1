@@ -9,48 +9,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
-
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-const CLAUDE_MODEL = "claude-3-5-haiku-20241022";
-
-/**
- * Call Anthropic Claude routed through Cloudflare AI Gateway.
- * Gateway URL pattern: https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/anthropic/v1/messages
- * If no gateway slug exists, we fall back to direct Anthropic API.
- */
-async function callClaude(systemPrompt: string, userPrompt: string) {
-  if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
-
-  const url = CLOUDFLARE_ACCOUNT_ID
-    ? `https://gateway.ai.cloudflare.com/v1/${CLOUDFLARE_ACCOUNT_ID}/entropy-ai/anthropic/v1/messages`
-    : "https://api.anthropic.com/v1/messages";
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: 700,
-      temperature: 0.4,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Claude ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await resp.json();
-  const text = data?.content?.[0]?.text || "";
-  return { text };
-}
+import { callAI } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -241,7 +200,12 @@ serve(async (req) => {
 
 Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
 
-      const ai = await callClaude(systemPrompt, userPrompt);
+      const ai = await callAI({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.4,
+        maxTokens: 700,
+      });
 
       const parsed = safeParseJSON(ai.text);
       if (parsed?.thesis && typeof parsed.thesis === "string") {
