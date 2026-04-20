@@ -233,6 +233,9 @@ export default function LandingPage() {
       {/* TABBED GALLERY — real screen captures of every core surface */}
       <FeatureGallery />
 
+      {/* MATH & RESEARCH — flaunt the real quant under the hood */}
+      <MathResearch />
+
       {/* FEATURES GRID */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
         <div className="text-center mb-10 sm:mb-14">
