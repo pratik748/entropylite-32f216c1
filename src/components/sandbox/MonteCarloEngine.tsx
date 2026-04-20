@@ -291,7 +291,30 @@ const MonteCarloEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-5">
-      {/* AI indicator */}
+      {/* Calibration source strip */}
+      <div className="flex items-center justify-between rounded-lg border border-primary/15 bg-primary/5 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+            {calibrated.source === "historical" ? "Historical Calibration" : "Proxy Calibration"}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {calibrated.source === "historical"
+              ? `μ=${(calibrated.drift * 252 * 100).toFixed(1)}%/yr · σ=${(calibrated.sigmaDaily * Math.sqrt(252) * 100).toFixed(1)}%/yr · jumps=${(calibrated.jumpProb * 100).toFixed(2)}%/day · ${calibrated.lookbackDays}d`
+              : "Insufficient history — using risk-score proxy"}
+          </span>
+        </div>
+        <MethodologyTooltip
+          title="Monte Carlo Methodology"
+          methods={[
+            { label: "Path generation", formula: "S(t+1) = S(t) · exp(μ − σ²/2 + σ·Z + J)", source: "Geometric Brownian Motion + Merton jump-diffusion", notes: "10,000 paths × 252 days" },
+            { label: "Drift μ", formula: "Weighted mean of log-returns", source: "Yahoo / Alpha Vantage 1y daily closes", lookback: `${calibrated.lookbackDays || "—"} days` },
+            { label: "Volatility σ", formula: "√(wᵀΣw) — full covariance, not weighted average", source: "Real correlation × stdev matrix" },
+            { label: "Jump intensity λ", formula: "Empirical fraction of |r| > 3σ events", source: "Historical tail observations" },
+            { label: "VaR / CVaR (sim)", formula: "5th percentile / mean of tail across 10k final values", source: "Simulated distribution" },
+            { label: "Scenario stress", formula: "σ_eff = σ · volMult,  jumpProb_eff = max(empirical, scenario)", source: "Layered on real calibration" },
+          ]}
+        />
+      </div>
       {aiLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
           <Brain className="h-4 w-4 text-primary animate-pulse" />
@@ -301,7 +324,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       {aiCalibration && !aiLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-1.5">
           <Brain className="h-3.5 w-3.5 text-gain" />
-          <span className="text-[10px] text-gain">AI-Calibrated Monte Carlo</span>
+          <span className="text-[10px] text-gain">AI overlay active</span>
         </div>
       )}
       <div className="rounded-xl border border-border bg-card p-4">
