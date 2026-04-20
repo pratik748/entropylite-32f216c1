@@ -241,13 +241,7 @@ serve(async (req) => {
 
 Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
 
-      const ai = await callAI({
-        systemPrompt,
-        userPrompt,
-        temperature: 0.4,
-        maxTokens: 700,
-        jsonMode: true,
-      });
+      const ai = await callClaude(systemPrompt, userPrompt);
 
       const parsed = safeParseJSON(ai.text);
       if (parsed?.thesis && typeof parsed.thesis === "string") {
