@@ -95,18 +95,12 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  *   https://gateway.ai.cloudflare.com/v1/{account}/entropy-ai/anthropic/v1/messages
  * Falls back to direct Anthropic API if CLOUDFLARE_ACCOUNT_ID is missing.
  */
-/** Build ordered list of Cloudflare AI Gateway URLs to try (primary, _2, _3) then direct Anthropic. */
+/** Build ordered list of endpoints: single Cloudflare AI Gateway then direct Anthropic. */
 function getClaudeEndpoints(): Array<{ url: string; label: string; cfToken?: string; isGateway: boolean }> {
   const endpoints: Array<{ url: string; label: string; cfToken?: string; isGateway: boolean }> = [];
-  const acct1 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-  const acct2 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_2");
-  const acct3 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_3");
-  const token1 = Deno.env.get("CLOUDFLARE_API_TOKEN");
-  const token2 = Deno.env.get("CLOUDFLARE_API_TOKEN_2");
-  const token3 = Deno.env.get("CLOUDFLARE_API_TOKEN_3");
-  if (acct1) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct1}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-1", cfToken: token1, isGateway: true });
-  if (acct2) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct2}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-2", cfToken: token2, isGateway: true });
-  if (acct3) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct3}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-3", cfToken: token3, isGateway: true });
+  const acct = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const token = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  if (acct) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct}/entropy-ai/anthropic/v1/messages`, label: "cloudflare", cfToken: token, isGateway: true });
   endpoints.push({ url: "https://api.anthropic.com/v1/messages", label: "anthropic-direct", isGateway: false });
   return endpoints;
 }
