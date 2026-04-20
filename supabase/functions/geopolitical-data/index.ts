@@ -144,7 +144,7 @@ serve(async (req) => {
   try {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
-    const provider = body.provider || "mistral";
+    const provider = body.provider || "cloudflare";
     const indiaMode = body.indiaMode === true;
 
     // 1. Fetch real forex volatility + market context + headlines in parallel
