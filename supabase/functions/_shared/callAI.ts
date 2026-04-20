@@ -95,15 +95,24 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  *   https://gateway.ai.cloudflare.com/v1/{account}/entropy-ai/anthropic/v1/messages
  * Falls back to direct Anthropic API if CLOUDFLARE_ACCOUNT_ID is missing.
  */
+/** Build ordered list of Cloudflare AI Gateway URLs to try (primary, _2, _3) then direct Anthropic. */
+function getClaudeEndpoints(): Array<{ url: string; label: string }> {
+  const endpoints: Array<{ url: string; label: string }> = [];
+  const acct1 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const acct2 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_2");
+  const acct3 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_3");
+  if (acct1) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct1}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-1" });
+  if (acct2) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct2}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-2" });
+  if (acct3) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct3}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-3" });
+  endpoints.push({ url: "https://api.anthropic.com/v1/messages", label: "anthropic-direct" });
+  return endpoints;
+}
+
 async function callClaude(opts: CallAIOptions): Promise<AIResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
 
-  const url = accountId
-    ? `https://gateway.ai.cloudflare.com/v1/${accountId}/entropy-ai/anthropic/v1/messages`
-    : "https://api.anthropic.com/v1/messages";
-
+  const endpoints = getClaudeEndpoints();
   const model = opts.model || "claude-3-5-haiku-20241022";
 
   const body: any = {
