@@ -140,40 +140,54 @@ async function callClaude(opts: CallAIOptions): Promise<AIResult> {
   }
 
   const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 30000;
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Claude error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Claude ${res.status}: ${errBody.slice(0, 200)}` };
+  let lastErr: any;
+  for (const ep of endpoints) {
+    try {
+      const res = await fetchWithTimeout(ep.url, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }, timeout);
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error(`Claude error via ${ep.label} ${res.status}:`, errBody.slice(0, 200));
+        lastErr = { status: res.status, message: `Claude ${ep.label} ${res.status}: ${errBody.slice(0, 200)}` };
+        if (res.status === 400) throw lastErr;
+        continue;
+      }
+
+      const data = await res.json();
+      console.log(`Claude succeeded via ${ep.label}`);
+
+      const toolUse = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "tool_use") : null;
+      if (toolUse) {
+        return {
+          text: JSON.stringify(toolUse.input || {}),
+          provider: "cloudflare",
+          toolCall: { function: { name: toolUse.name, arguments: JSON.stringify(toolUse.input || {}) } },
+        };
+      }
+
+      const textBlock = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "text") : null;
+      const raw = (textBlock?.text || "").trim();
+      if (!raw) { lastErr = new Error("Empty Claude response content"); continue; }
+      const text = stripThinkingBlocks(raw);
+      return { text, provider: "cloudflare" };
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`Claude endpoint ${ep.label} threw:`, err?.message || err);
+      if (err?.status === 400) throw err;
+      continue;
+    }
   }
 
-  const data = await res.json();
-
-  // Tool use response
-  const toolUse = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "tool_use") : null;
-  if (toolUse) {
-    return {
-      text: JSON.stringify(toolUse.input || {}),
-      provider: "cloudflare",
-      toolCall: { function: { name: toolUse.name, arguments: JSON.stringify(toolUse.input || {}) } },
-    };
-  }
-
-  // Text response
-  const textBlock = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "text") : null;
-  const raw = (textBlock?.text || "").trim();
-  if (!raw) throw new Error("Empty Claude response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "cloudflare" };
+  throw lastErr ?? new Error("All Claude endpoints failed");
 }
 
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
