@@ -96,16 +96,26 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  * Falls back to direct Anthropic API if CLOUDFLARE_ACCOUNT_ID is missing.
  */
 /** Build ordered list of Cloudflare AI Gateway URLs to try (primary, _2, _3) then direct Anthropic. */
-function getClaudeEndpoints(): Array<{ url: string; label: string }> {
-  const endpoints: Array<{ url: string; label: string }> = [];
+function getClaudeEndpoints(): Array<{ url: string; label: string; cfToken?: string; isGateway: boolean }> {
+  const endpoints: Array<{ url: string; label: string; cfToken?: string; isGateway: boolean }> = [];
   const acct1 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const acct2 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_2");
   const acct3 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_3");
-  if (acct1) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct1}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-1" });
-  if (acct2) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct2}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-2" });
-  if (acct3) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct3}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-3" });
-  endpoints.push({ url: "https://api.anthropic.com/v1/messages", label: "anthropic-direct" });
+  const token1 = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  const token2 = Deno.env.get("CLOUDFLARE_API_TOKEN_2");
+  const token3 = Deno.env.get("CLOUDFLARE_API_TOKEN_3");
+  if (acct1) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct1}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-1", cfToken: token1, isGateway: true });
+  if (acct2) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct2}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-2", cfToken: token2, isGateway: true });
+  if (acct3) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct3}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-3", cfToken: token3, isGateway: true });
+  endpoints.push({ url: "https://api.anthropic.com/v1/messages", label: "anthropic-direct", isGateway: false });
   return endpoints;
+}
+
+function isRecoverableClaudeGatewayError(status: number, body: string): boolean {
+  if ([400, 401, 403, 408, 409, 429].includes(status)) return true;
+  if (status >= 500 && status < 600) return true;
+  const normalized = body.toLowerCase();
+  return normalized.includes("unauthorized") || normalized.includes("configure ai gateway") || normalized.includes("daily free allocation");
 }
 
 async function callClaude(opts: CallAIOptions): Promise<AIResult> {
@@ -147,6 +157,7 @@ async function callClaude(opts: CallAIOptions): Promise<AIResult> {
       const res = await fetchWithTimeout(ep.url, {
         method: "POST",
         headers: {
+          ...(ep.cfToken ? { "Authorization": `Bearer ${ep.cfToken}` } : {}),
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
@@ -158,7 +169,8 @@ async function callClaude(opts: CallAIOptions): Promise<AIResult> {
         const errBody = await res.text();
         console.error(`Claude error via ${ep.label} ${res.status}:`, errBody.slice(0, 200));
         lastErr = { status: res.status, message: `Claude ${ep.label} ${res.status}: ${errBody.slice(0, 200)}` };
-        if (res.status === 400) throw lastErr;
+        if (ep.isGateway && isRecoverableClaudeGatewayError(res.status, errBody)) continue;
+        if (!ep.isGateway && res.status === 400) throw lastErr;
         continue;
       }
 
@@ -182,7 +194,7 @@ async function callClaude(opts: CallAIOptions): Promise<AIResult> {
     } catch (err: any) {
       lastErr = err;
       console.warn(`Claude endpoint ${ep.label} threw:`, err?.message || err);
-      if (err?.status === 400) throw err;
+      if (!ep.isGateway && err?.status === 400) throw err;
       continue;
     }
   }

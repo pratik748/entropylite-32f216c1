@@ -820,7 +820,7 @@ serve(async (req) => {
     const portfolioSectors: Record<string, string> = body.portfolioSectors || {};
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
-    const provider = String(body.provider || "mistral").toLowerCase();
+    const provider = String(body.provider || "cloudflare").toLowerCase();
     const indiaMode = body.indiaMode === true;
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
     const userBudget: number | undefined = body.userBudget;
@@ -830,8 +830,7 @@ serve(async (req) => {
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
-    // Reliability-first: avoid Cloudflare free-tier neuron exhaustion loops.
-    const effectiveProvider = provider === "cloudflare" ? "cloudflare" : "mistral";
+    const effectiveProvider = provider === "mistral" ? "mistral" : "cloudflare";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
