@@ -119,12 +119,17 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const effectiveJumpProb = Math.max(calibrated.jumpProb, params.jumpProb);
   const effectiveJumpSize = params.jumpSize !== 0 ? params.jumpSize : calibrated.jumpSize;
 
+  const results = useMemo(() => {
+    const finalValues: number[] = [];
+    const sampleEvery = Math.max(1, Math.floor(NUM_DAYS / SAMPLE_POINTS));
+    const stepsCount = Math.ceil(NUM_DAYS / sampleEvery) + 1;
+
     // Store individual paths for rendering
     const originalPaths: number[][] = [];
     const resamplePaths: number[][] = [];
     const randomPaths: number[][] = [];
 
-    // Generate original paths
+    // Generate original paths — uses REAL calibrated drift, σ, jump params
     for (let p = 0; p < NUM_PATHS; p++) {
       let value = totalValue;
       const storePath = p < VISIBLE_PATHS;
@@ -132,8 +137,8 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       for (let d = 1; d <= NUM_DAYS; d++) {
         const z = gaussianRandom();
         let jump = 0;
-        if (Math.random() < params.jumpProb) jump = params.jumpSize * (0.5 + Math.random());
-        value = value * Math.exp(params.drift - 0.5 * dailyVol * dailyVol + dailyVol * z + jump);
+        if (Math.random() < effectiveJumpProb) jump = effectiveJumpSize * (0.5 + Math.random());
+        value = value * Math.exp(effectiveDrift - 0.5 * dailyVol * dailyVol + dailyVol * z + jump);
         value = Math.max(value, 0.01);
         if (storePath && d % sampleEvery === 0) path.push(value);
       }
