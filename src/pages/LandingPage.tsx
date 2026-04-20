@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import FeatureGallery from "@/components/landing/FeatureGallery";
+import MathResearch from "@/components/landing/MathResearch";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
