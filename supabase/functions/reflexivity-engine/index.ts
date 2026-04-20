@@ -8,8 +8,49 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
+
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+const CLOUDFLARE_ACCOUNT_ID = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+const CLAUDE_MODEL = "claude-3-5-haiku-20241022";
+
+/**
+ * Call Anthropic Claude routed through Cloudflare AI Gateway.
+ * Gateway URL pattern: https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/anthropic/v1/messages
+ * If no gateway slug exists, we fall back to direct Anthropic API.
+ */
+async function callClaude(systemPrompt: string, userPrompt: string) {
+  if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+
+  const url = CLOUDFLARE_ACCOUNT_ID
+    ? `https://gateway.ai.cloudflare.com/v1/${CLOUDFLARE_ACCOUNT_ID}/entropy-ai/anthropic/v1/messages`
+    : "https://api.anthropic.com/v1/messages";
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 700,
+      temperature: 0.4,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Claude ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const text = data?.content?.[0]?.text || "";
+  return { text };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,10 +228,10 @@ serve(async (req) => {
     let actionable: { trigger: string; trade: string; risk: string } | null = null;
     let aiError: string | null = null;
     try {
-      const ai = await callAI({
-        systemPrompt:
-          "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON.",
-        userPrompt: `Belief map:
+      // Use the standard shared callAI utility (Cloudflare → Mistral → OpenAI fallback chain).
+      const systemPrompt =
+        "You are a reflexivity strategist in the Soros tradition. You analyze belief about belief. You never predict price. You identify where market consensus is internally contradicted and when belief is about to break. Return ONLY valid JSON, no markdown, no commentary.";
+      const userPrompt = `Belief map:
 - Consensus: ${consensus.label} (${consensus.direction})
 - Components — Flow: ${consensus.components.flow}, Sentiment: ${consensus.components.sentiment}, Causal: ${consensus.components.causal}
 - Conviction: ${conviction.label} (${conviction.score}, spread ${conviction.spread})
@@ -198,10 +239,10 @@ serve(async (req) => {
 - Shift ETA: ${shiftETA.label} (${shiftETA.probability}% in ${shiftETA.window})
 - VIX: ${input.vix ?? "n/a"}, Regime: ${input.regime ?? "n/a"}
 
-Return JSON: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`,
-        temperature: 0.4,
-        maxTokens: 700,
-      });
+Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
+
+      const ai = await callClaude(systemPrompt, userPrompt);
+
       const parsed = safeParseJSON(ai.text);
       if (parsed?.thesis && typeof parsed.thesis === "string") {
         thesis = parsed.thesis;
