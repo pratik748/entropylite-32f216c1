@@ -3,6 +3,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Activity, Lightbulb, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
+import { MethodologyTooltip } from "@/components/quant/MethodologyTooltip";
 import { governedInvoke } from "@/lib/apiGovernor";
 
 interface Props { stocks: PortfolioStock[]; }
@@ -55,6 +57,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const [scenario, setScenario] = useState<string>("base");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
+  const snap = useQuantSnapshot(stocks);
   const [aiCalibration, setAiCalibration] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -75,7 +78,46 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   // Use AI-calibrated params if available, otherwise static
   const activeScenarioParams = aiCalibration?.scenarios || scenarioParams;
   const params = activeScenarioParams[scenario] || scenarioParams[scenario];
-  const dailyVol = (avgRisk / 100) * 0.018 * params.volMult;
+
+  // ── REAL CALIBRATION FROM HISTORY ──────────────────────────────
+  // Aggregate per-asset μ, σ, jump params using market-value weights.
+  // Falls back to risk-score proxy ONLY when history is unavailable.
+  const calibrated = useMemo(() => {
+    if (snap.ready && snap.lookbackDays >= 30) {
+      const tickers = Object.keys(snap.assetStats);
+      let drift = 0, jumpProb = 0, jumpSize = 0;
+      for (const t of tickers) {
+        const w = snap.weights[t] ?? 0;
+        const s = snap.assetStats[t];
+        drift += w * s.mu;
+        jumpProb += w * s.jumpProb;
+        jumpSize += w * s.jumpSize;
+      }
+      // Portfolio σ is the TRUE covariance-based σ (not weighted average)
+      return {
+        source: "historical" as const,
+        drift,
+        sigmaDaily: snap.portfolio.sigmaDaily,
+        jumpProb,
+        jumpSize: jumpSize || -0.04,
+        lookbackDays: snap.lookbackDays,
+      };
+    }
+    return {
+      source: "proxy" as const,
+      drift: 0.0003,
+      sigmaDaily: (avgRisk / 100) * 0.018,
+      jumpProb: 0,
+      jumpSize: -0.04,
+      lookbackDays: 0,
+    };
+  }, [snap, avgRisk]);
+
+  // Apply scenario stress on top of base calibration
+  const dailyVol = calibrated.sigmaDaily * params.volMult;
+  const effectiveDrift = calibrated.drift + (params.drift - 0.0003); // shift relative to scenario "base"
+  const effectiveJumpProb = Math.max(calibrated.jumpProb, params.jumpProb);
+  const effectiveJumpSize = params.jumpSize !== 0 ? params.jumpSize : calibrated.jumpSize;
 
   const results = useMemo(() => {
     const finalValues: number[] = [];
@@ -87,7 +129,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
     const resamplePaths: number[][] = [];
     const randomPaths: number[][] = [];
 
-    // Generate original paths
+    // Generate original paths — uses REAL calibrated drift, σ, jump params
     for (let p = 0; p < NUM_PATHS; p++) {
       let value = totalValue;
       const storePath = p < VISIBLE_PATHS;
@@ -95,8 +137,8 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       for (let d = 1; d <= NUM_DAYS; d++) {
         const z = gaussianRandom();
         let jump = 0;
-        if (Math.random() < params.jumpProb) jump = params.jumpSize * (0.5 + Math.random());
-        value = value * Math.exp(params.drift - 0.5 * dailyVol * dailyVol + dailyVol * z + jump);
+        if (Math.random() < effectiveJumpProb) jump = effectiveJumpSize * (0.5 + Math.random());
+        value = value * Math.exp(effectiveDrift - 0.5 * dailyVol * dailyVol + dailyVol * z + jump);
         value = Math.max(value, 0.01);
         if (storePath && d % sampleEvery === 0) path.push(value);
       }
@@ -249,7 +291,30 @@ const MonteCarloEngine = ({ stocks }: Props) => {
 
   return (
     <div className="space-y-5">
-      {/* AI indicator */}
+      {/* Calibration source strip */}
+      <div className="flex items-center justify-between rounded-lg border border-primary/15 bg-primary/5 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+            {calibrated.source === "historical" ? "Historical Calibration" : "Proxy Calibration"}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {calibrated.source === "historical"
+              ? `μ=${(calibrated.drift * 252 * 100).toFixed(1)}%/yr · σ=${(calibrated.sigmaDaily * Math.sqrt(252) * 100).toFixed(1)}%/yr · jumps=${(calibrated.jumpProb * 100).toFixed(2)}%/day · ${calibrated.lookbackDays}d`
+              : "Insufficient history — using risk-score proxy"}
+          </span>
+        </div>
+        <MethodologyTooltip
+          title="Monte Carlo Methodology"
+          methods={[
+            { label: "Path generation", formula: "S(t+1) = S(t) · exp(μ − σ²/2 + σ·Z + J)", source: "Geometric Brownian Motion + Merton jump-diffusion", notes: "10,000 paths × 252 days" },
+            { label: "Drift μ", formula: "Weighted mean of log-returns", source: "Yahoo / Alpha Vantage 1y daily closes", lookback: `${calibrated.lookbackDays || "—"} days` },
+            { label: "Volatility σ", formula: "√(wᵀΣw) — full covariance, not weighted average", source: "Real correlation × stdev matrix" },
+            { label: "Jump intensity λ", formula: "Empirical fraction of |r| > 3σ events", source: "Historical tail observations" },
+            { label: "VaR / CVaR (sim)", formula: "5th percentile / mean of tail across 10k final values", source: "Simulated distribution" },
+            { label: "Scenario stress", formula: "σ_eff = σ · volMult,  jumpProb_eff = max(empirical, scenario)", source: "Layered on real calibration" },
+          ]}
+        />
+      </div>
       {aiLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
           <Brain className="h-4 w-4 text-primary animate-pulse" />
@@ -259,7 +324,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       {aiCalibration && !aiLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-1.5">
           <Brain className="h-3.5 w-3.5 text-gain" />
-          <span className="text-[10px] text-gain">AI-Calibrated Monte Carlo</span>
+          <span className="text-[10px] text-gain">AI overlay active</span>
         </div>
       )}
       <div className="rounded-xl border border-border bg-card p-4">
