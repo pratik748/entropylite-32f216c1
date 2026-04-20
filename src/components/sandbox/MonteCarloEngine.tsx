@@ -57,6 +57,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const [scenario, setScenario] = useState<string>("base");
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
+  const snap = useQuantSnapshot(stocks);
   const [aiCalibration, setAiCalibration] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -77,12 +78,46 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   // Use AI-calibrated params if available, otherwise static
   const activeScenarioParams = aiCalibration?.scenarios || scenarioParams;
   const params = activeScenarioParams[scenario] || scenarioParams[scenario];
-  const dailyVol = (avgRisk / 100) * 0.018 * params.volMult;
 
-  const results = useMemo(() => {
-    const finalValues: number[] = [];
-    const sampleEvery = Math.max(1, Math.floor(NUM_DAYS / SAMPLE_POINTS));
-    const stepsCount = Math.ceil(NUM_DAYS / sampleEvery) + 1;
+  // ── REAL CALIBRATION FROM HISTORY ──────────────────────────────
+  // Aggregate per-asset μ, σ, jump params using market-value weights.
+  // Falls back to risk-score proxy ONLY when history is unavailable.
+  const calibrated = useMemo(() => {
+    if (snap.ready && snap.lookbackDays >= 30) {
+      const tickers = Object.keys(snap.assetStats);
+      let drift = 0, jumpProb = 0, jumpSize = 0;
+      for (const t of tickers) {
+        const w = snap.weights[t] ?? 0;
+        const s = snap.assetStats[t];
+        drift += w * s.mu;
+        jumpProb += w * s.jumpProb;
+        jumpSize += w * s.jumpSize;
+      }
+      // Portfolio σ is the TRUE covariance-based σ (not weighted average)
+      return {
+        source: "historical" as const,
+        drift,
+        sigmaDaily: snap.portfolio.sigmaDaily,
+        jumpProb,
+        jumpSize: jumpSize || -0.04,
+        lookbackDays: snap.lookbackDays,
+      };
+    }
+    return {
+      source: "proxy" as const,
+      drift: 0.0003,
+      sigmaDaily: (avgRisk / 100) * 0.018,
+      jumpProb: 0,
+      jumpSize: -0.04,
+      lookbackDays: 0,
+    };
+  }, [snap, avgRisk]);
+
+  // Apply scenario stress on top of base calibration
+  const dailyVol = calibrated.sigmaDaily * params.volMult;
+  const effectiveDrift = calibrated.drift + (params.drift - 0.0003); // shift relative to scenario "base"
+  const effectiveJumpProb = Math.max(calibrated.jumpProb, params.jumpProb);
+  const effectiveJumpSize = params.jumpSize !== 0 ? params.jumpSize : calibrated.jumpSize;
 
     // Store individual paths for rendering
     const originalPaths: number[][] = [];
