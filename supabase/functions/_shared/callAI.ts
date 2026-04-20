@@ -95,15 +95,24 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  *   https://gateway.ai.cloudflare.com/v1/{account}/entropy-ai/anthropic/v1/messages
  * Falls back to direct Anthropic API if CLOUDFLARE_ACCOUNT_ID is missing.
  */
+/** Build ordered list of Cloudflare AI Gateway URLs to try (primary, _2, _3) then direct Anthropic. */
+function getClaudeEndpoints(): Array<{ url: string; label: string }> {
+  const endpoints: Array<{ url: string; label: string }> = [];
+  const acct1 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const acct2 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_2");
+  const acct3 = Deno.env.get("CLOUDFLARE_ACCOUNT_ID_3");
+  if (acct1) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct1}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-1" });
+  if (acct2) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct2}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-2" });
+  if (acct3) endpoints.push({ url: `https://gateway.ai.cloudflare.com/v1/${acct3}/entropy-ai/anthropic/v1/messages`, label: "cloudflare-3" });
+  endpoints.push({ url: "https://api.anthropic.com/v1/messages", label: "anthropic-direct" });
+  return endpoints;
+}
+
 async function callClaude(opts: CallAIOptions): Promise<AIResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
 
-  const url = accountId
-    ? `https://gateway.ai.cloudflare.com/v1/${accountId}/entropy-ai/anthropic/v1/messages`
-    : "https://api.anthropic.com/v1/messages";
-
+  const endpoints = getClaudeEndpoints();
   const model = opts.model || "claude-3-5-haiku-20241022";
 
   const body: any = {
@@ -131,40 +140,54 @@ async function callClaude(opts: CallAIOptions): Promise<AIResult> {
   }
 
   const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 30000;
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Claude error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Claude ${res.status}: ${errBody.slice(0, 200)}` };
+  let lastErr: any;
+  for (const ep of endpoints) {
+    try {
+      const res = await fetchWithTimeout(ep.url, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }, timeout);
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.error(`Claude error via ${ep.label} ${res.status}:`, errBody.slice(0, 200));
+        lastErr = { status: res.status, message: `Claude ${ep.label} ${res.status}: ${errBody.slice(0, 200)}` };
+        if (res.status === 400) throw lastErr;
+        continue;
+      }
+
+      const data = await res.json();
+      console.log(`Claude succeeded via ${ep.label}`);
+
+      const toolUse = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "tool_use") : null;
+      if (toolUse) {
+        return {
+          text: JSON.stringify(toolUse.input || {}),
+          provider: "cloudflare",
+          toolCall: { function: { name: toolUse.name, arguments: JSON.stringify(toolUse.input || {}) } },
+        };
+      }
+
+      const textBlock = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "text") : null;
+      const raw = (textBlock?.text || "").trim();
+      if (!raw) { lastErr = new Error("Empty Claude response content"); continue; }
+      const text = stripThinkingBlocks(raw);
+      return { text, provider: "cloudflare" };
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`Claude endpoint ${ep.label} threw:`, err?.message || err);
+      if (err?.status === 400) throw err;
+      continue;
+    }
   }
 
-  const data = await res.json();
-
-  // Tool use response
-  const toolUse = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "tool_use") : null;
-  if (toolUse) {
-    return {
-      text: JSON.stringify(toolUse.input || {}),
-      provider: "cloudflare",
-      toolCall: { function: { name: toolUse.name, arguments: JSON.stringify(toolUse.input || {}) } },
-    };
-  }
-
-  // Text response
-  const textBlock = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "text") : null;
-  const raw = (textBlock?.text || "").trim();
-  if (!raw) throw new Error("Empty Claude response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "cloudflare" };
+  throw lastErr ?? new Error("All Claude endpoints failed");
 }
 
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
