@@ -89,6 +89,84 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+/**
+ * Anthropic Claude routed through Cloudflare AI Gateway.
+ * Gateway URL pattern:
+ *   https://gateway.ai.cloudflare.com/v1/{account}/entropy-ai/anthropic/v1/messages
+ * Falls back to direct Anthropic API if CLOUDFLARE_ACCOUNT_ID is missing.
+ */
+async function callClaude(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+
+  const url = accountId
+    ? `https://gateway.ai.cloudflare.com/v1/${accountId}/entropy-ai/anthropic/v1/messages`
+    : "https://api.anthropic.com/v1/messages";
+
+  const model = opts.model || "claude-3-5-haiku-20241022";
+
+  const body: any = {
+    model,
+    max_tokens: opts.maxTokens ?? 4096,
+    temperature: opts.temperature ?? 0.6,
+    system: opts.systemPrompt,
+    messages: [{ role: "user", content: opts.userPrompt }],
+  };
+
+  if (opts.tools) {
+    // Anthropic tools have a different shape than OpenAI tools.
+    body.tools = opts.tools.map((t: any) =>
+      t.function
+        ? {
+            name: t.function.name,
+            description: t.function.description,
+            input_schema: t.function.parameters,
+          }
+        : t,
+    );
+    if (opts.toolChoice?.function?.name) {
+      body.tool_choice = { type: "tool", name: opts.toolChoice.function.name };
+    }
+  }
+
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 30000;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`Claude error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Claude ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+
+  // Tool use response
+  const toolUse = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "tool_use") : null;
+  if (toolUse) {
+    return {
+      text: JSON.stringify(toolUse.input || {}),
+      provider: "cloudflare",
+      toolCall: { function: { name: toolUse.name, arguments: JSON.stringify(toolUse.input || {}) } },
+    };
+  }
+
+  // Text response
+  const textBlock = Array.isArray(data?.content) ? data.content.find((c: any) => c.type === "text") : null;
+  const raw = (textBlock?.text || "").trim();
+  if (!raw) throw new Error("Empty Claude response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "cloudflare" };
+}
+
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
