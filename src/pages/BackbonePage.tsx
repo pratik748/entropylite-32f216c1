@@ -209,46 +209,6 @@ export default function BackbonePage() {
         </div>
       </section>
 
-      {/* Data sources */}
-      <section className="border-b border-black/5 bg-black/[0.015]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">
-            Data sources
-          </p>
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-8">
-            The wires going into the system.
-          </h2>
-          <div className="rounded-xl border border-black/10 bg-white overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-black/[0.03]">
-                <tr>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Tier
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Source
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Use
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {SOURCES.map((s, i) => (
-                  <tr key={s.name} className={i !== SOURCES.length - 1 ? "border-b border-black/5" : ""}>
-                    <td className="px-4 py-3 font-mono text-[10px] text-black/45">{s.tier}</td>
-                    <td className="px-4 py-3 text-[12px] sm:text-[13px] font-semibold text-black/85">
-                      {s.name}
-                    </td>
-                    <td className="px-4 py-3 text-[12px] text-black/60">{s.use}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
       {/* Math + research (reuse landing component with full graphs + embedded PDF) */}
       <MathResearch />
 
