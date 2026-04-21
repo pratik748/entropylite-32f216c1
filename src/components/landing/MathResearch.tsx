@@ -537,7 +537,7 @@ export default function MathResearch() {
             </div>
 
             <div className="mt-6 rounded-lg overflow-hidden border border-black/10 bg-white">
-              <div className="flex items-center justify-between gap-3 border-b border-black/10 px-4 py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-black/10 px-4 py-3">
                 <div>
                   <p className="font-semibold text-sm">Read the paper inside the page</p>
                   <p className="font-mono text-[10px] text-black/40">Embedded PDF viewer</p>
@@ -551,11 +551,18 @@ export default function MathResearch() {
                   Open full screen
                 </a>
               </div>
-              <iframe
-                title="CLANK research paper"
-                src="/research/clank-theory-sehwag-2026.pdf#view=FitH"
-                className="w-full h-[420px] sm:h-[680px]"
-              />
+              <object
+                data="/research/clank-theory-sehwag-2026.pdf#view=FitH"
+                type="application/pdf"
+                className="w-full h-[520px] sm:h-[720px]"
+                aria-label="Embedded research PDF viewer"
+              >
+                <iframe
+                  title="CLANK research paper"
+                  src="/research/clank-theory-sehwag-2026.pdf#view=FitH"
+                  className="w-full h-[520px] sm:h-[720px]"
+                />
+              </object>
             </div>
 
             <p className="font-mono text-[10px] text-black/35 mt-5 leading-relaxed">
