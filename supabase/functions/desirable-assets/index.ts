@@ -812,6 +812,16 @@ function buildDeterministicCandidates(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Auto-Repair Department: tracks every self-healing step the pipeline takes.
+  // When something fails or yields too few results, we don't throw — we log the
+  // repair action, fall forward to the next recovery stage, and keep going so
+  // the panel always renders real content.
+  const repairTrail: string[] = [];
+  const repairLog = (step: string) => {
+    repairTrail.push(step);
+    console.log(`[desirable-assets auto-repair] ${step}`);
+  };
+
   try {
     await requireAuth(req, corsHeaders);
     const body = await req.json().catch(() => ({}));
