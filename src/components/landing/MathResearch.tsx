@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Sigma, FunctionSquare, BookOpen, Activity, GitCompareArrows, ShieldAlert } from "lucide-react";
+import { Sigma, FunctionSquare, BookOpen, Activity, GitCompareArrows, ShieldAlert, FileText, Download, Quote } from "lucide-react";
 
 /* -------------------- Deterministic PRNG so the page renders identically every load -------------------- */
 function mulberry32(a: number) {
@@ -453,6 +453,94 @@ export default function MathResearch() {
           <p className="font-mono text-[10px] text-black/35 text-center mt-8 max-w-2xl mx-auto leading-relaxed">
             All formulas above are implemented in <span className="text-black/60">src/lib/quant-engine.ts</span> and surfaced through the Methodology panel on every metric in the terminal.
           </p>
+        </div>
+
+        {/* Original Research — CLANK Theory whitepaper */}
+        <div className="mt-12 sm:mt-16 pt-10 border-t border-black/10">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <FileText className="h-4 w-4 text-black/45" />
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/45">Original research</p>
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-center mb-2">
+            We didn't just borrow the math. We wrote some of it.
+          </h3>
+          <p className="text-sm text-black/55 max-w-2xl mx-auto text-center mb-8">
+            The CLANK engine inside the terminal is built on a structural theory of deterministic
+            opportunity in complex systems — formalised in a peer-distributed manuscript on SSRN.
+          </p>
+
+          <article className="rounded-xl border border-black/10 bg-gradient-to-br from-white to-black/[0.02] p-6 sm:p-8 max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-black/40 px-2 py-0.5 border border-black/10 rounded">Working Paper · 2026</span>
+              <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-black/40">SSRN · 6464440</span>
+            </div>
+            <h4 className="text-lg sm:text-2xl font-bold tracking-tight mb-2 leading-tight">
+              CLANK: A Structural Theory of Deterministic Opportunity in Complex Systems
+            </h4>
+            <p className="font-mono text-[11px] text-black/55 mb-5">Pratik Sehwag · March 2026 · 30 pages</p>
+
+            <div className="border-l-2 border-black/15 pl-4 mb-5">
+              <Quote className="h-3.5 w-3.5 text-black/30 mb-1.5" />
+              <p className="text-xs sm:text-sm text-black/65 leading-relaxed italic">
+                "Within many complex systems there exist fleeting intervals during which probabilistic rules
+                are suspended in favour of rigid structural determinism. The system 'clanks' into a state of
+                temporary, absolute certainty — a deterministic opportunity where the future state is no
+                longer a matter of probability, but of structural necessity."
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-black/5 rounded-lg overflow-hidden border border-black/10 mb-5">
+              {[
+                { k: "Latent Asymmetry α", v: "the gradient of the possible" },
+                { k: "Internal Pressure Π", v: "interaction density / throughput" },
+                { k: "Boundary Constraints B", v: "the structural walls" },
+              ].map((x) => (
+                <div key={x.k} className="bg-white p-3 sm:p-4">
+                  <p className="font-mono text-[9px] tracking-[0.15em] uppercase text-black/40 mb-1">{x.k}</p>
+                  <p className="text-[11px] sm:text-xs text-black/70 leading-snug">{x.v}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {[
+                "Structural lock manifold",
+                "Reflexivity paradox",
+                "Latency & yield strength",
+                "Failure modes catalogue",
+              ].map((t) => (
+                <div key={t} className="text-[11px] text-black/60 leading-snug">
+                  <span className="text-black/30 mr-1">§</span>{t}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <a
+                href="/research/clank-theory-sehwag-2026.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white text-xs font-semibold tracking-wide rounded-md hover:bg-black/85 transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Read the manuscript (PDF)
+              </a>
+              <a
+                href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6464440"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-black/15 text-black/75 text-xs font-semibold tracking-wide rounded-md hover:border-black/40 hover:text-black transition-colors"
+              >
+                View on SSRN
+              </a>
+            </div>
+
+            <p className="font-mono text-[10px] text-black/35 mt-5 leading-relaxed">
+              Wired into the terminal as the <span className="text-black/60">CLANK Structural Constraint Engine</span> —
+              identifying institutional pressure points, structural locks and deterministic windows
+              before the rest of the market sees them.
+            </p>
+          </article>
         </div>
       </div>
     </section>
