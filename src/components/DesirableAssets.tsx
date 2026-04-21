@@ -201,6 +201,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [stats, setStats] = useState({ generated: 0, passed: 0 });
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState("");
+  const [autoRepaired, setAutoRepaired] = useState(false);
+  const [repairNote, setRepairNote] = useState<string | null>(null);
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
