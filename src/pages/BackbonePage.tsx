@@ -23,7 +23,7 @@ const STACK = [
     title: "Intelligence Layer",
     items: [
       "Triple-provider parallel AI (callAIParallel) with race-to-first-valid",
-      "Cloudflare Workers AI · Mistral · OpenAI gateway",
+      "Our proprietary foundation models · Cloudflare Workers AI · Mistral gateway",
       "Hardened JSON resilience (safeParseJSON) for malformed model output",
       "Dossier path uses single-provider streaming for high-token reliability",
     ],
