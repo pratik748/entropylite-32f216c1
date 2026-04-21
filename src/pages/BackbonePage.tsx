@@ -78,16 +78,6 @@ const STACK = [
   },
 ];
 
-const SOURCES = [
-  { tier: "Primary", name: "Yahoo Finance", use: "OHLC, fundamentals, options chains" },
-  { tier: "Fallback", name: "Alpha Vantage", use: "OHLC backup, FX, intraday" },
-  { tier: "News", name: "Yahoo · Google · WSJ · Barron's · Seeking Alpha", use: "multi-source aggregation" },
-  { tier: "Macro", name: "FRED", use: "rates, inflation, GDP, regime signals" },
-  { tier: "Geopolitics", name: "GDELT", use: "global event sentiment streams" },
-  { tier: "Sentiment", name: "HuggingFace · Google Trends", use: "crowd & narrative proxies" },
-  { tier: "Execution", name: "Alpaca (paper)", use: "pre-live order simulation" },
-];
-
 const PIPELINE = [
   { step: "01", label: "Ingest", body: "Real-time prices, fundamentals, news, geopolitics, FX." },
   { step: "02", label: "Normalize", body: "Tickers resolved · currency converted · log-returns computed." },
