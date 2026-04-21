@@ -15,6 +15,7 @@ import PricingPage from "./pages/PricingPage";
 import AboutPage from "./pages/AboutPage";
 import AccessPage from "./pages/AccessPage";
 import DisclaimerPage from "./pages/DisclaimerPage";
+import BackbonePage from "./pages/BackbonePage";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
           <Route path="/" element={<LandingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/backbone" element={<BackbonePage />} />
           <Route path="/access" element={<AccessPage />} />
           <Route path="/disclaimer" element={<DisclaimerPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
