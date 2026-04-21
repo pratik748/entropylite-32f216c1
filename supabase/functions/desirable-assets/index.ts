@@ -1059,11 +1059,28 @@ Return via the tool call only.`,
       console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback padding`);
     }
 
-    // Progressive guard: only throw as the absolute last resort. Deterministic padding above
-    // and the reliability backstop further down should keep the panel populated in nearly all cases.
+    // Auto-Repair: AI totally failed AND fallback universe is also empty.
+    // Force-inject deterministic universe unconditionally rather than throw.
     if (candidates.length === 0) {
-      console.error("desirable-assets: no candidates after AI + retry + deterministic padding");
-      throw new Error("Asset universe is temporarily quiet — refresh in a few minutes.");
+      repairLog("AI + retry both returned zero — force-injecting deterministic institutional universe");
+      candidates = dedupeCandidates([...deterministicCandidates]).slice(0, 18);
+    }
+    if (candidates.length === 0) {
+      // This should be practically impossible (fallback universe is static).
+      // Emit a structured soft-failure so client can keep cached last-good response.
+      repairLog("CRITICAL: deterministic universe produced zero candidates");
+      return new Response(JSON.stringify({
+        recommendations: [],
+        marketCondition: "",
+        regimeType: "transition",
+        candidatesGenerated: 0,
+        candidatesPassed: 0,
+        autoRepaired: true,
+        softFailure: true,
+        repairTrail,
+        repairMessage: "Asset universe is temporarily unavailable. Retrying automatically…",
+        timestamp: Date.now(),
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
