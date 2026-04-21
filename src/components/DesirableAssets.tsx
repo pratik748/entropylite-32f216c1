@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { runWithRepair } from "@/lib/selfRepair";
 import { Button } from "@/components/ui/button";
 import { getCurrencySymbol } from "@/lib/currency";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -120,6 +121,18 @@ function getCachedDA() {
   } catch { return null; }
 }
 
+/**
+ * Stale cache — ignores TTL. Used by the self-repair layer as a last resort
+ * so the panel never renders empty when the backend is hiccuping.
+ */
+function getStaleCachedDA() {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
 function setCachedDA(data: any) {
   try {
     localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
@@ -188,6 +201,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [stats, setStats] = useState({ generated: 0, passed: 0 });
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState("");
+  const [autoRepaired, setAutoRepaired] = useState(false);
+  const [repairNote, setRepairNote] = useState<string | null>(null);
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
@@ -262,45 +277,61 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
       }
 
-      const { data, error: fnError } = await governedInvoke("desirable-assets", {
-        body: {
-          portfolioTickers: existingTickers,
-          portfolioWeights,
-          portfolioSectors,
-          portfolioValue: totalValue || 100000,
-          baseCurrency,
-          indiaMode: baseCurrency === "INR",
-          previousTickers: getPreviousTickers(),
-          userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
-          preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
-          preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+      // Self-Repair Department: always attempts recovery before showing an error.
+      const result = await runWithRepair<any>({
+        label: "desirable-assets",
+        maxRetries: 2,
+        baseBackoffMs: 2000,
+        isUsable: (d) => Array.isArray(d?.recommendations) && d.recommendations.length > 0,
+        staleCache: () => {
+          const stale = getStaleCachedDA();
+          return stale && Array.isArray(stale.recommendations) && stale.recommendations.length > 0 ? stale : null;
         },
-        // Stable cache key — exclude live-drifting fields (portfolioWeights/Value vary
-        // every poll because currentPrice ticks). Keying on structural identity only.
-        cacheKey: [
-          "v1",
-          baseCurrency,
-          existingTickers.slice().sort().join(","),
-          budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
-          selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
-          selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
-        ].join("|"),
+        run: () => governedInvoke("desirable-assets", {
+          body: {
+            portfolioTickers: existingTickers,
+            portfolioWeights,
+            portfolioSectors,
+            portfolioValue: totalValue || 100000,
+            baseCurrency,
+            indiaMode: baseCurrency === "INR",
+            previousTickers: getPreviousTickers(),
+            userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
+            preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
+            preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+          },
+          // Stable cache key — exclude live-drifting fields (portfolioWeights/Value vary
+          // every poll because currentPrice ticks). Keying on structural identity only.
+          cacheKey: [
+            "v1",
+            baseCurrency,
+            existingTickers.slice().sort().join(","),
+            budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
+            selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
+            selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
+          ].join("|"),
+        }),
       });
 
-      if (fnError) {
-        const errMsg = fnError.message || "";
-        if (errMsg.includes("429") || errMsg.includes("rate limit")) throw new Error("Rate limited. Retrying in 15s...");
-        if (errMsg.includes("402") || errMsg.includes("credits")) throw new Error("AI credits exhausted. Please try again later.");
-        throw fnError;
+      const data = result.data;
+      setAutoRepaired(result.autoRepaired);
+      if (result.autoRepaired) {
+        setRepairNote(
+          result.servedFromStaleCache
+            ? "Served last-good intelligence while live feed recovers."
+            : "Live feed hiccupped — auto-repaired and retrying.",
+        );
+        console.log("[DesirableAssets] auto-repair trail:", result.repairTrail);
+      } else {
+        setRepairNote(null);
       }
 
-      if (!data?.recommendations || data.recommendations.length === 0) {
-        if (retryCount.current < MAX_RETRIES) {
-          retryCount.current++;
-          setTimeout(() => fetchRecommendations(false), 5000);
-          return;
-        }
-        throw new Error("No recommendations survived quant filters. Try refreshing.");
+      if (!data || !Array.isArray(data.recommendations) || data.recommendations.length === 0) {
+        // Absolutely nothing usable — even stale cache was empty.
+        throw new Error(
+          result.error ||
+            "No recommendations available right now. The auto-repair layer will retry on next refresh.",
+        );
       }
 
       const payload = {
@@ -502,6 +533,24 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
           </div>
           <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">Retry</Button>
+        </div>
+      )}
+
+      {/* Auto-Repair Badge — shown only when backend self-healed or we served stale cache */}
+      {autoRepaired && recommendations.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            <Wrench className="h-3.5 w-3.5 text-primary animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Auto-Repair Department</span>
+              <span className="text-[9px] font-mono text-muted-foreground">SELF-HEALED</span>
+            </div>
+            <p className="text-xs text-foreground mt-0.5">
+              {repairNote || "Live feed recovered automatically — results are valid."}
+            </p>
+          </div>
         </div>
       )}
 
