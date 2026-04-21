@@ -78,16 +78,6 @@ const STACK = [
   },
 ];
 
-const SOURCES = [
-  { tier: "Primary", name: "Yahoo Finance", use: "OHLC, fundamentals, options chains" },
-  { tier: "Fallback", name: "Alpha Vantage", use: "OHLC backup, FX, intraday" },
-  { tier: "News", name: "Yahoo · Google · WSJ · Barron's · Seeking Alpha", use: "multi-source aggregation" },
-  { tier: "Macro", name: "FRED", use: "rates, inflation, GDP, regime signals" },
-  { tier: "Geopolitics", name: "GDELT", use: "global event sentiment streams" },
-  { tier: "Sentiment", name: "HuggingFace · Google Trends", use: "crowd & narrative proxies" },
-  { tier: "Execution", name: "Alpaca (paper)", use: "pre-live order simulation" },
-];
-
 const PIPELINE = [
   { step: "01", label: "Ingest", body: "Real-time prices, fundamentals, news, geopolitics, FX." },
   { step: "02", label: "Normalize", body: "Tickers resolved · currency converted · log-returns computed." },
@@ -205,46 +195,6 @@ export default function BackbonePage() {
                 </p>
               </article>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Data sources */}
-      <section className="border-b border-black/5 bg-black/[0.015]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">
-            Data sources
-          </p>
-          <h2 className="text-xl sm:text-3xl font-bold tracking-tight mb-8">
-            The wires going into the system.
-          </h2>
-          <div className="rounded-xl border border-black/10 bg-white overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-black/[0.03]">
-                <tr>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Tier
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Source
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] tracking-[0.18em] uppercase text-black/45 font-medium">
-                    Use
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {SOURCES.map((s, i) => (
-                  <tr key={s.name} className={i !== SOURCES.length - 1 ? "border-b border-black/5" : ""}>
-                    <td className="px-4 py-3 font-mono text-[10px] text-black/45">{s.tier}</td>
-                    <td className="px-4 py-3 text-[12px] sm:text-[13px] font-semibold text-black/85">
-                      {s.name}
-                    </td>
-                    <td className="px-4 py-3 text-[12px] text-black/60">{s.use}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </section>
