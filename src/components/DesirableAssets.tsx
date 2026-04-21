@@ -121,6 +121,18 @@ function getCachedDA() {
   } catch { return null; }
 }
 
+/**
+ * Stale cache — ignores TTL. Used by the self-repair layer as a last resort
+ * so the panel never renders empty when the backend is hiccuping.
+ */
+function getStaleCachedDA() {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
 function setCachedDA(data: any) {
   try {
     localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
