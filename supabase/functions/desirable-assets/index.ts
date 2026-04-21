@@ -1111,6 +1111,29 @@ Return via the tool call only.`,
       }
     }
 
+    // Auto-Repair: if Yahoo returned no price data at all, retry once with smaller batches
+    // (4 per batch) and a 3s cold-start delay — usually fixes transient rate-limit bursts.
+    if (Object.keys(tickerData).length === 0) {
+      repairLog(`Yahoo returned 0 price rows for ${uniqueTickers.length} tickers — retrying in smaller batches`);
+      await new Promise((r) => setTimeout(r, 1500));
+      const RETRY_BATCH = 4;
+      for (let i = 0; i < uniqueTickers.length; i += RETRY_BATCH) {
+        const batch = uniqueTickers.slice(i, i + RETRY_BATCH);
+        const batchResults = await Promise.allSettled(
+          batch.map(async (ticker) => {
+            const data = await fetchYahooChart(ticker);
+            return { ticker, data };
+          }),
+        );
+        for (const r of batchResults) {
+          if (r.status === "fulfilled" && r.value.data) {
+            tickerData[r.value.ticker] = r.value.data;
+          }
+        }
+      }
+      repairLog(`Yahoo retry recovered ${Object.keys(tickerData).length} / ${uniqueTickers.length} tickers`);
+    }
+
     // Build portfolio return series for correlation
     const portfolioCloses: Record<string, number[]> = {};
     for (const t of portfolioTickers) {
