@@ -1429,6 +1429,7 @@ Return via the tool call only.`,
     }
 
     if (scored.length === 0) {
+      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — activating hard rescue`);
       const hardRescue = deterministicCandidates
         .map((fallbackRec) => buildDeterministicScoredRec(fallbackRec, 38))
         .filter((value): value is ScoredRec => value !== null)
@@ -1437,6 +1438,9 @@ Return via the tool call only.`,
       if (hardRescue.length > 0) {
         scored.push(...hardRescue);
         console.log(`desirable-assets: hard rescue appended ${hardRescue.length} deterministic candidates after zero-score pass`);
+        repairLog(`hard rescue appended ${hardRescue.length} deterministic survivors`);
+      } else {
+        repairLog(`hard rescue also produced 0 survivors — Yahoo pricing may be down`);
       }
     }
 
@@ -1527,6 +1531,7 @@ Return via the tool call only.`,
     }
 
     // Reliability backstop: ensure at least 8 output candidates when market filters are too harsh.
+    const preBackstopCount = selected.length;
     if (selected.length < 8) {
       for (const fallbackRec of deterministicCandidates) {
         if (selected.length >= 8) break;
@@ -1537,6 +1542,9 @@ Return via the tool call only.`,
 
         selected.push(fallbackScored);
         selectedTickers.add(fallbackRec.ticker);
+      }
+      if (selected.length > preBackstopCount) {
+        repairLog(`reliability backstop padded ${selected.length - preBackstopCount} deterministic picks (pre=${preBackstopCount})`);
       }
     }
 
