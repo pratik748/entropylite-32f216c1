@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Clock, Share2, Check, Twitter, Linkedin, Link2 } from "lucide-react";
+import { ArrowLeft, Clock, Share2, Check, Twitter, Linkedin, Link2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getEntryBySlug } from "@/data/cadence";
+import { fetchEntryBySlug, formatPublishDate, type CadenceEntry } from "@/data/cadence";
 
 export default function CadenceEntryPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const entry = slug ? getEntryBySlug(slug) : undefined;
+  const [entry, setEntry] = useState<CadenceEntry | null>(null);
+  const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    fetchEntryBySlug(slug)
+      .then((e) => setEntry(e))
+      .finally(() => setLoading(false));
+  }, [slug]);
 
   useEffect(() => {
     if (!entry) return;
@@ -17,7 +26,6 @@ export default function CadenceEntryPage() {
     const desc = `${entry.tagline} A research note from Entropy Lite.`;
     if (meta) meta.setAttribute("content", desc);
 
-    // Open Graph for shareability
     const setOG = (property: string, content: string) => {
       let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
       if (!el) {
@@ -31,7 +39,20 @@ export default function CadenceEntryPage() {
     setOG("og:description", desc);
     setOG("og:type", "article");
     setOG("og:url", window.location.href);
+    if (entry.insideTheSystem.image && !entry.insideTheSystem.image.startsWith("data:")) {
+      setOG("og:image", entry.insideTheSystem.image);
+    }
   }, [entry]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white text-black flex items-center justify-center">
+        <div className="flex items-center gap-2 text-black/40 font-mono text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading entry…
+        </div>
+      </div>
+    );
+  }
 
   if (!entry) {
     return (
@@ -62,7 +83,6 @@ export default function CadenceEntryPage() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* Minimal standalone header — no PublicNav. Optimized for distribution. */}
       <header className="border-b border-black/5 sticky top-0 z-40 bg-white/85 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <button
@@ -72,29 +92,13 @@ export default function CadenceEntryPage() {
             <ArrowLeft className="h-3.5 w-3.5" /> Cadence
           </button>
           <div className="flex items-center gap-1">
-            <a
-              href={xUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-black/50 hover:text-black transition-colors"
-              aria-label="Share on X"
-            >
+            <a href={xUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-black/50 hover:text-black transition-colors" aria-label="Share on X">
               <Twitter className="h-3.5 w-3.5" />
             </a>
-            <a
-              href={liUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-black/50 hover:text-black transition-colors"
-              aria-label="Share on LinkedIn"
-            >
+            <a href={liUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-black/50 hover:text-black transition-colors" aria-label="Share on LinkedIn">
               <Linkedin className="h-3.5 w-3.5" />
             </a>
-            <button
-              onClick={onCopy}
-              className="p-2 text-black/50 hover:text-black transition-colors"
-              aria-label="Copy link"
-            >
+            <button onClick={onCopy} className="p-2 text-black/50 hover:text-black transition-colors" aria-label="Copy link">
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
             </button>
           </div>
@@ -102,10 +106,9 @@ export default function CadenceEntryPage() {
       </header>
 
       <article className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        {/* Visual header */}
         <div className="mb-12 pb-10 border-b border-black/10">
           <p className="font-mono text-[10px] tracking-[0.2em] text-black/40 uppercase mb-3">
-            Cadence Entry · {entry.discipline}
+            Cadence · {formatPublishDate(entry.publishDate)} · {entry.discipline}
           </p>
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-4 leading-[1.1]">
             {entry.concept}
@@ -113,45 +116,56 @@ export default function CadenceEntryPage() {
           <p className="text-lg sm:text-xl text-black/55 leading-snug mb-6 max-w-2xl">
             {entry.tagline}
           </p>
-          <div className="flex items-center gap-4 font-mono text-[11px] text-black/40">
+          <div className="flex items-center gap-4 font-mono text-[11px] text-black/40 flex-wrap">
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-3 w-3" /> {entry.readMinutes} min read
             </span>
-            <span>·</span>
-            <span>Role inside Entropy Lite: live in production</span>
+            {entry.providersUsed.length > 0 && (
+              <>
+                <span>·</span>
+                <span>Synthesized via {entry.providersUsed.filter((p) => p !== "critic").join(" + ")} + critic pass</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Why it matters */}
         <Section label="01" title="Why it matters">
-          <p className="text-base sm:text-[17px] leading-[1.7] text-black/75">{entry.whyItMatters}</p>
+          <p className="text-base sm:text-[17px] leading-[1.7] text-black/75 whitespace-pre-line">
+            {entry.whyItMatters}
+          </p>
         </Section>
 
-        {/* Inside the system */}
         <Section label="02" title="Inside the system">
-          <figure className="border border-black/10 bg-black/[0.015] overflow-hidden mb-4">
-            <img
-              src={entry.insideTheSystem.image}
-              alt={entry.insideTheSystem.caption}
-              className="w-full h-auto block"
-              loading="lazy"
-            />
-            <figcaption className="px-4 py-2.5 border-t border-black/10 font-mono text-[10px] text-black/45 uppercase tracking-wider">
-              Fig. — {entry.insideTheSystem.caption}
-            </figcaption>
-          </figure>
-          <p className="text-base leading-[1.7] text-black/70">
+          {entry.insideTheSystem.image ? (
+            <figure className="border border-black/10 bg-black/[0.015] overflow-hidden mb-4">
+              <img
+                src={entry.insideTheSystem.image}
+                alt={entry.insideTheSystem.caption}
+                className="w-full h-auto block"
+                loading="lazy"
+              />
+              <figcaption className="px-4 py-2.5 border-t border-black/10 font-mono text-[10px] text-black/45 uppercase tracking-wider">
+                Fig. — {entry.insideTheSystem.caption}
+              </figcaption>
+            </figure>
+          ) : (
+            <div className="border border-black/10 bg-black/[0.015] p-6 mb-4">
+              <p className="font-mono text-[10px] text-black/40 uppercase tracking-wider">
+                Fig. — {entry.insideTheSystem.caption}
+              </p>
+            </div>
+          )}
+          <p className="text-base leading-[1.7] text-black/70 whitespace-pre-line">
             {entry.insideTheSystem.annotation}
           </p>
         </Section>
 
-        {/* Mathematical core */}
         <Section label="03" title="Mathematical core">
           <div className="space-y-7">
             {entry.mathematicalCore.map((s, i) => (
               <div key={i}>
                 <h4 className="text-sm font-semibold tracking-tight text-black mb-2">{s.heading}</h4>
-                <p className="text-base leading-[1.7] text-black/70 mb-3">{s.body}</p>
+                <p className="text-base leading-[1.7] text-black/70 mb-3 whitespace-pre-line">{s.body}</p>
                 {s.equation && (
                   <pre className="bg-black text-white font-mono text-[13px] leading-[1.7] px-5 py-4 overflow-x-auto whitespace-pre">
 {s.equation}
@@ -162,23 +176,21 @@ export default function CadenceEntryPage() {
           </div>
         </Section>
 
-        {/* Failure modes */}
         <Section label="04" title="Failure modes & limits">
           <ul className="space-y-3">
             {entry.failureModes.map((f, i) => (
               <li key={i} className="flex gap-3 text-base leading-[1.65] text-black/70">
-                <span className="font-mono text-[11px] text-black/30 mt-1.5 shrink-0">{String(i + 1).padStart(2, "0")}</span>
-                <span>{f}</span>
+                <span className="font-mono text-[11px] text-black/30 mt-1.5 shrink-0">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="whitespace-pre-line">{f}</span>
               </li>
             ))}
           </ul>
         </Section>
 
-        {/* Share footer */}
         <div className="mt-16 pt-10 border-t border-black/10">
-          <p className="font-mono text-[11px] tracking-[0.2em] text-black/40 uppercase mb-4">
-            Share this entry
-          </p>
+          <p className="font-mono text-[11px] tracking-[0.2em] text-black/40 uppercase mb-4">Share this entry</p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm" className="font-mono text-xs">
               <a href={xUrl} target="_blank" rel="noopener noreferrer">
@@ -207,15 +219,7 @@ export default function CadenceEntryPage() {
   );
 }
 
-function Section({
-  label,
-  title,
-  children,
-}: {
-  label: string;
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
   return (
     <section className="mb-12">
       <div className="flex items-baseline gap-3 mb-5">
