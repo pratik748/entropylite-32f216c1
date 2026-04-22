@@ -136,7 +136,27 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const tickers: string[] = body.tickers || ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"];
+    const tickers: string[] = Array.isArray(body.tickers)
+      ? body.tickers.filter((t: unknown): t is string => typeof t === "string" && t.length > 0)
+      : [];
+
+    // No system-wide fallback universe. Signals must be reasoned from the caller's
+    // own portfolio/watchlist — never injected from arbitrary mega-caps.
+    if (tickers.length === 0) {
+      return new Response(JSON.stringify({
+        optionsFlow: [],
+        etfFlows: [],
+        aggregate: {
+          smartMoneyDirection: "NEUTRAL",
+          optionsSentiment: { bullish: 0, bearish: 0, neutral: 0 },
+          etfSentiment: { inflows: 0, outflows: 0, neutral: 0 },
+          unusualActivityCount: 0,
+        },
+        empty: true,
+        reason: "NO_TICKERS_PROVIDED",
+        timestamp: Date.now(),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const [optionsFlow, etfFlows] = await Promise.all([
       fetchOptionsFlow(tickers),
