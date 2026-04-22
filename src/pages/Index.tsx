@@ -86,7 +86,10 @@ const IndexContent = () => {
   const { intradayMode } = useIntradayMode();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const visibleTabs = useMemo(
-    () => (intradayMode ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id)) : ALL_TABS),
+    () =>
+      intradayMode
+        ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id))
+        : ALL_TABS.filter((t) => t.id !== "catalysts" && t.id !== "lessons"),
     [intradayMode],
   );
   const [directProfitMode, setDirectProfitMode] = useState(false);
