@@ -832,6 +832,7 @@ serve(async (req) => {
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
     const indiaMode = body.indiaMode === true;
+    const intradayMode = body.intradayMode === true;
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
     const userBudget: number | undefined = body.userBudget;
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
