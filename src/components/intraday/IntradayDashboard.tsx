@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Activity, Target, Newspaper, BookOpen, Gauge, Zap } from "lucide-react";
+import { Activity, Target, BookOpen, Gauge, Zap } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StockInput from "@/components/StockInput";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
@@ -51,48 +51,59 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
   );
 
   const SessionStrip = (
-    <div className="border border-border bg-card rounded-sm">
-      <div className="px-2.5 py-1 border-b border-border/40 flex items-center gap-1.5">
-        <Gauge className="h-3 w-3 text-primary" />
-        <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
-          Session · Intraday
+    <div className="rounded-md border border-border bg-card">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/40">
+        <Gauge className="h-3.5 w-3.5 text-primary" />
+        <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          Session
         </span>
-        <Badge variant="outline" className="ml-auto h-3.5 px-1 text-[8px] font-mono">
-          {today.trades.length} trades today
+        <Badge variant="outline" className="ml-auto h-5 px-2 text-[9px] font-mono">
+          {today.trades.length} {today.trades.length === 1 ? "trade" : "trades"} today
         </Badge>
       </div>
-      <div className="grid grid-cols-4 divide-x divide-border/40">
-        <div className="px-2.5 py-1.5">
-          <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground">Session P&L</div>
+      <div className="grid grid-cols-4">
+        {[
+          {
+            label: "Session P&L",
+            value: `${today.totalPnL > 0 ? "+" : ""}${today.totalPnL.toFixed(2)}%`,
+            cls:
+              today.totalPnL > 0
+                ? "text-gain"
+                : today.totalPnL < 0
+                  ? "text-loss"
+                  : "text-foreground",
+          },
+          {
+            label: "Win Rate",
+            value:
+              today.trades.length > 0
+                ? `${Math.round((today.wins / today.trades.length) * 100)}%`
+                : "—",
+            cls: "text-foreground",
+          },
+          {
+            label: "Avg Hold",
+            value: today.avgHold > 0 ? `${today.avgHold.toFixed(0)}m` : "—",
+            cls: "text-foreground",
+          },
+          {
+            label: "Sharpe₃₀",
+            value: lodgers.sharpe.toFixed(2),
+            cls: "text-foreground",
+          },
+        ].map((m, i) => (
           <div
-            className={`text-sm font-mono font-bold tabular-nums ${
-              today.totalPnL > 0 ? "text-gain" : today.totalPnL < 0 ? "text-loss" : "text-foreground"
-            }`}
+            key={m.label}
+            className={`px-4 py-3 ${i > 0 ? "border-l border-border/40" : ""}`}
           >
-            {today.totalPnL > 0 ? "+" : ""}
-            {today.totalPnL.toFixed(2)}%
+            <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-muted-foreground mb-1">
+              {m.label}
+            </div>
+            <div className={`text-base font-mono font-semibold tabular-nums ${m.cls}`}>
+              {m.value}
+            </div>
           </div>
-        </div>
-        <div className="px-2.5 py-1.5">
-          <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground">Win Rate</div>
-          <div className="text-sm font-mono font-bold tabular-nums text-foreground">
-            {today.trades.length > 0
-              ? `${Math.round((today.wins / today.trades.length) * 100)}%`
-              : "—"}
-          </div>
-        </div>
-        <div className="px-2.5 py-1.5">
-          <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground">Avg Hold</div>
-          <div className="text-sm font-mono font-bold tabular-nums text-foreground">
-            {today.avgHold > 0 ? `${today.avgHold.toFixed(0)}m` : "—"}
-          </div>
-        </div>
-        <div className="px-2.5 py-1.5">
-          <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground">Sharpe<sub>30</sub></div>
-          <div className="text-sm font-mono font-bold tabular-nums text-foreground">
-            {lodgers.sharpe.toFixed(2)}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -101,16 +112,16 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
     <PanelWrapper title="Recent Lessons" icon={<BookOpen className="h-3 w-3" />} noPad>
       <div className="divide-y divide-border/30">
         {recentLessons.length === 0 ? (
-          <div className="px-3 py-6 text-center text-[10px] font-mono text-muted-foreground">
+          <div className="px-4 py-8 text-center text-[10px] font-mono text-muted-foreground leading-relaxed">
             No closed lodges yet. Each trade collapses into one distilled lesson.
           </div>
         ) : (
           recentLessons.map((t) => (
-            <div key={t.id} className="px-2.5 py-1.5">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[10px] font-mono font-bold text-foreground">{t.ticker}</span>
+            <div key={t.id} className="px-3 py-2.5">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-mono font-bold text-foreground">{t.ticker}</span>
                 <span
-                  className={`text-[10px] font-mono font-bold tabular-nums ${
+                  className={`text-[11px] font-mono font-bold tabular-nums ${
                     t.pnl_pct >= 0 ? "text-gain" : "text-loss"
                   }`}
                 >
@@ -122,7 +133,7 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
                 </span>
               </div>
               {t.lesson ? (
-                <p className="text-[10px] font-mono text-foreground/85 italic leading-snug line-clamp-2">
+                <p className="text-[10px] font-mono text-foreground/80 italic leading-relaxed line-clamp-2">
                   "{t.lesson}"
                 </p>
               ) : (
@@ -137,19 +148,27 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
 
   if (isMobile) {
     return (
-      <div className="p-1.5 space-y-1.5 pb-24">
+      <div className="p-3 space-y-3 pb-24">
         {SessionStrip}
-        <div className="border border-border bg-card rounded-sm p-2">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Zap className="h-3 w-3 text-primary" />
-            <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
               Quick Lookup
             </span>
           </div>
           <StockInput onAnalyze={onAnalyze} isLoading={isLoading} />
         </div>
-        <DesirableAssets stocks={stocks} onAddToPortfolio={onAnalyze} />
-        <PanelWrapper title="Live Catalysts" icon={<Newspaper className="h-3 w-3" />} noPad>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Target className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              Intraday Picks · ≤6h
+            </span>
+          </div>
+          <DesirableAssets stocks={stocks} onAddToPortfolio={onAnalyze} />
+        </div>
+        <PanelWrapper title="Live Catalysts" icon={<Activity className="h-3 w-3" />} noPad>
           <LiveNewsFeed compact />
         </PanelWrapper>
         {RecentLessons}
@@ -159,47 +178,56 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
 
   // Desktop: dedicated 3-column layout focused on intraday flow
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-3 py-2 border-b border-border/40">{SessionStrip}</div>
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-        {/* Left: Quick Lookup + Recent Lessons */}
-        <ResizablePanel defaultSize={26} minSize={18} maxSize={36}>
-          <div className="h-full flex flex-col">
-            <div className="border-b border-border bg-card p-2 shrink-0">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <Zap className="h-3 w-3 text-primary" />
-                <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground">
+    <div className="h-full flex flex-col bg-background">
+      <div className="px-4 pt-4 pb-3">{SessionStrip}</div>
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0 px-4 pb-4 gap-3">
+        {/* Left column: Quick Lookup (top) + Recent Lessons (bottom) — separated */}
+        <ResizablePanel defaultSize={26} minSize={20} maxSize={34}>
+          <div className="h-full flex flex-col gap-3">
+            <div className="rounded-md border border-border bg-card p-3 shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                   Quick Lookup
                 </span>
               </div>
               <StockInput onAnalyze={onAnalyze} isLoading={isLoading} />
             </div>
-            <div className="flex-1 min-h-0 overflow-auto">{RecentLessons}</div>
+            <div className="flex-1 min-h-0 rounded-md border border-border bg-card overflow-hidden">
+              <div className="h-full overflow-auto">{RecentLessons}</div>
+            </div>
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle withHandle className="bg-transparent" />
 
-        {/* Center: Intraday Desirable Picks (already mode-aware) */}
-        <ResizablePanel defaultSize={50} minSize={30}>
-          <div className="h-full overflow-auto p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Target className="h-3 w-3 text-primary" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Intraday Picks · ≤6h horizon
+        {/* Center: Intraday Picks — its own card with breathing room */}
+        <ResizablePanel defaultSize={50} minSize={32}>
+          <div className="h-full rounded-md border border-border bg-card overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 shrink-0">
+              <Target className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                Intraday Picks
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground/70 ml-auto">
+                ≤6h horizon
               </span>
             </div>
-            <DesirableAssets stocks={stocks} onAddToPortfolio={onAnalyze} />
+            <div className="flex-1 min-h-0 overflow-auto p-4">
+              <DesirableAssets stocks={stocks} onAddToPortfolio={onAnalyze} />
+            </div>
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle withHandle className="bg-transparent" />
 
-        {/* Right: Live Catalysts */}
-        <ResizablePanel defaultSize={24} minSize={16} maxSize={36}>
-          <PanelWrapper title="Live Catalysts" icon={<Activity className="h-3 w-3" />} noPad>
-            <LiveNewsFeed compact />
-          </PanelWrapper>
+        {/* Right: Live Catalysts — isolated card */}
+        <ResizablePanel defaultSize={24} minSize={18} maxSize={36}>
+          <div className="h-full rounded-md border border-border bg-card overflow-hidden">
+            <PanelWrapper title="Live Catalysts" icon={<Activity className="h-3 w-3" />} noPad>
+              <LiveNewsFeed compact />
+            </PanelWrapper>
+          </div>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
