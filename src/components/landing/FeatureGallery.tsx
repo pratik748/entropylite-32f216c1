@@ -139,7 +139,7 @@ export default function FeatureGallery() {
             Six core surfaces. Real screens. Real data.
           </h2>
           <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-            Each tab is a live capture from the running terminal — no mockups, no marketing renders.
+            Each tab is a live capture from the running terminal. No mockups, no marketing renders.
           </p>
         </div>
 
@@ -189,7 +189,7 @@ export default function FeatureGallery() {
             <ul className="space-y-2.5">
               {tab.bullets.map((b, i) => (
                 <li key={i} className="flex gap-3 text-sm text-black/70 leading-snug">
-                  <span className="font-mono text-[10px] text-black/30 mt-1 flex-shrink-0">— {String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[10px] text-black/30 mt-1 flex-shrink-0">{String(i + 1).padStart(2, "0")}</span>
                   <span>{b}</span>
                 </li>
               ))}
