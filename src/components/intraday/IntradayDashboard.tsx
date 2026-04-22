@@ -1,13 +1,9 @@
 import { useMemo } from "react";
-import { Activity, Target, BookOpen, Gauge, Zap } from "lucide-react";
+import { Gauge, Zap } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import StockInput from "@/components/StockInput";
-import LiveNewsFeed from "@/components/LiveNewsFeed";
-import DesirableAssets from "@/components/DesirableAssets";
 import { useLodgers } from "@/hooks/useLodgers";
-import PanelWrapper from "@/components/terminal/PanelWrapper";
 import { Badge } from "@/components/ui/badge";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -17,9 +13,9 @@ interface Props {
 }
 
 /**
- * Intraday Dashboard — same-session money surface.
- * No long-horizon blotter, no full-position deep analysis sprawl.
- * Surfaces: Session P&L strip, Intraday Picks, Live Catalysts, Recent Lessons.
+ * Intraday Dashboard — same-session money cockpit.
+ * Slim by design: only Session P&L strip + Quick Lookup.
+ * Picks → "Desirable" tab. Catalysts → "Catalysts" tab. Lessons → "Lessons" tab.
  */
 const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) => {
   const lodgers = useLodgers();
@@ -41,14 +37,6 @@ const IntradayDashboard = ({ stocks, onAnalyze, isLoading, isMobile }: Props) =>
         : 0;
     return { trades: todayTrades, wins, losses, totalPnL, avgHold };
   }, [lodgers.trades]);
-
-  const recentLessons = useMemo(
-    () =>
-      [...lodgers.trades]
-        .sort((a, b) => (b.exit_ts || b.entry_ts) - (a.exit_ts || a.entry_ts))
-        .slice(0, 6),
-    [lodgers.trades],
-  );
 
   const SessionStrip = (
     <div className="rounded-md border border-border bg-card">
