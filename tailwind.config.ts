@@ -14,8 +14,11 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        sans: ["'Source Serif 4'", "Georgia", "Cambria", "'Times New Roman'", "serif"],
+        serif: ["'Source Serif 4'", "Georgia", "Cambria", "'Times New Roman'", "serif"],
+        display: ["'Source Serif 4 Display'", "'Source Serif 4'", "Georgia", "serif"],
+        mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        num: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
