@@ -325,10 +325,10 @@ const IndexContent = () => {
             <div className="border-b border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-1 flex items-center gap-2 shrink-0">
               <Gauge className="h-3 w-3 text-primary" />
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary font-semibold">
-                Intraday Compounding Mode · System-wide
+                Intraday Mode · System-wide skew
               </span>
               <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
-                Validator + Lodgers + Discipline Governor active. Long-term portfolio view preserved.
+                Desirable / News / Analysis / Risk re-tuned for same-session profit. Lodger Ledger persists in dock + Risk tab.
               </span>
             </div>
           )}
