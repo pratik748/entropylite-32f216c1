@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600;8..60,700;8..60,800;8..60,900&family=Source+Serif+4+Display:opsz,wght@60..72,400;60..72,600;60..72,700;60..72,800;60..72,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
 
 @tailwind base;
@@ -220,28 +220,8 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    letter-spacing: -0.005em;
-    font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "onum" 0, "tnum" 1;
+    letter-spacing: -0.01em;
     overflow-x: hidden;
-  }
-
-  /* WSJ-style typography stack: Escrow (headlines) + Exchange (body) emulated via Source Serif 4 */
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Source Serif 4 Display', 'Source Serif 4', Georgia, serif;
-    font-feature-settings: "kern" 1, "liga" 1, "tnum" 1;
-    letter-spacing: -0.015em;
-  }
-
-  /* Retina-style tabular numerals: every number across the app gets monospaced lining figures */
-  .tabular-nums,
-  [class*="tabular-nums"],
-  td, th,
-  input[type="number"],
-  output,
-  time,
-  data {
-    font-variant-numeric: tabular-nums lining-nums;
-    font-feature-settings: "tnum" 1, "lnum" 1, "kern" 1;
   }
 
   /* GPU-accelerate scrollable panels */
