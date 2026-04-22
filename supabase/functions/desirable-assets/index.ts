@@ -1303,6 +1303,20 @@ Return via the tool call only.`,
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
 
+      // F1b: Cross-module veto — never contradict Stock Analysis & Risk verdicts.
+      // Reject any candidate whose ticker is on the Sell/high-risk list or whose
+      // sector matches a flagged-sector. This is a hard reject, not a score penalty.
+      const recTickerUpper = String(rec.ticker || "").toUpperCase();
+      if (sellTickers.includes(recTickerUpper) || highRiskTickers.includes(recTickerUpper)) {
+        filtered++;
+        continue;
+      }
+      const recSectorLower = String(rec.sector || "").toLowerCase().trim();
+      if (recSectorLower && avoidSectorsLower.some((s) => recSectorLower.includes(s) || s.includes(recSectorLower))) {
+        filtered++;
+        continue;
+      }
+
       // F2: Target must be above current price
       if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
 
