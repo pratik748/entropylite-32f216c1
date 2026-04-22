@@ -183,7 +183,7 @@ export default function LandingPage() {
               This is what you sign in to
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Live portfolio, 10,000-path Monte Carlo, VaR and CVaR, a multi-source intel feed, and a structural flow read — all on one screen.
+              Live portfolio, 10,000 path Monte Carlo, VaR and CVaR, a multi source intel feed and a structural flow read. All on one screen.
             </p>
           </div>
 
@@ -201,11 +201,11 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-10 pt-8 border-t border-black/5">
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Live portfolio</p>
-              <p className="text-sm text-black/70 leading-snug">Multi-currency and multi-exchange, normalised to your base currency.</p>
+              <p className="text-sm text-black/70 leading-snug">Multi currency and multi exchange, normalised to your base currency.</p>
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Monte Carlo</p>
-              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252-day horizon, with profit probability and tail risk.</p>
+              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252 day horizon, with profit probability and tail risk.</p>
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Risk metrics</p>
@@ -213,7 +213,7 @@ export default function LandingPage() {
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Flow detection</p>
-              <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma, and dark pools.</p>
+              <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma and dark pools.</p>
             </div>
           </div>
 
@@ -223,7 +223,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Open the terminal — Free <ArrowRight className="ml-1 h-4 w-4" />
+              Open the terminal. Free. <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
