@@ -338,6 +338,32 @@
     display: none;
   }
 
+  /* ───────── Global softness kill-switch ─────────
+   * Override Tailwind's loud rounded utilities so the entire app
+   * (Sandbox, Augment, Cadence, Risk) snaps to a 1px control-system
+   * radius without editing 250+ component sites.
+   */
+  .rounded-xl,
+  .rounded-2xl,
+  .rounded-3xl,
+  .rounded-full:not(.preserve-round) {
+    border-radius: 1px;
+  }
+  .rounded-lg { border-radius: 1px; }
+  .rounded-md { border-radius: 1px; }
+  /* Allow loading dots / status pings to keep their circle */
+  .h-1.w-1.rounded-full,
+  .h-1\.5.w-1\.5.rounded-full,
+  .h-2.w-2.rounded-full,
+  [class*="animate-ping"].rounded-full,
+  [class*="animate-pulse"].rounded-full {
+    border-radius: 9999px;
+  }
+  /* Kill background gradients globally — control system has flat surfaces */
+  [class*="bg-gradient-to-"] {
+    background-image: none !important;
+  }
+
   /* Alive pulse for critical indicators */
   @keyframes liquid-pulse {
     0%, 100% { opacity: 0.6; transform: scale(1); }
