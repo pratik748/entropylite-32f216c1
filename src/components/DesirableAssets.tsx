@@ -375,6 +375,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
   // No auto-fetch on mount — user must set constraints and click "Find Assets"
 
+  // Hydrate from cache on mount so returning users see their last results instantly
+  // without having to re-run the funnel. Cache TTL is 2h.
+  useEffect(() => {
+    const cached = getCachedDA();
+    if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
+      setRecommendations(cached.recommendations);
+      setMarketCondition(cached.marketCondition || "");
+      setRegimeType(cached.regimeType || "");
+      setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
+      setLastFetch(cached.timestamp);
+      setHasSearched(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
     onAddToPortfolio(rec.ticker, price, rec.suggestedQty || 1);
