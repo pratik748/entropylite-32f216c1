@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { ExternalLink, RefreshCw, Radio } from "lucide-react";
+import { ExternalLink, RefreshCw, Radio, Zap } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 interface NewsArticle {
   title: string;
@@ -49,6 +50,7 @@ function useTimeAgo(date: Date | null) {
 }
 
 const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFeedProps) => {
+  const { intradayMode } = useIntradayMode();
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
@@ -81,7 +83,7 @@ const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFee
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [ticker, region]);
+  }, [ticker, region, intradayMode]);
 
   const getSentimentDot = (sentiment: string | null) => {
     if (!sentiment) return "bg-muted-foreground/30";
@@ -98,6 +100,11 @@ const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFee
             <Radio className="h-3 w-3 text-primary" />
             <span className="text-[7px] font-bold text-primary tracking-widest">MULTI-SRC</span>
             <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+            {intradayMode && (
+              <span className="inline-flex items-center gap-0.5 rounded-sm bg-primary/10 border border-primary/20 px-1 text-[7px] font-bold text-primary tracking-widest">
+                <Zap className="h-2 w-2" /> INTRA 6h
+              </span>
+            )}
             {sourcesPolled > 0 && (
               <span className="text-[7px] text-muted-foreground">{sourcesPolled} feeds</span>
             )}
@@ -142,6 +149,11 @@ const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFee
         <div className="flex items-center gap-2">
           <Radio className="h-5 w-5 text-primary" />
           <h2 className="text-base font-semibold text-foreground">Multi-Source Intelligence</h2>
+          {intradayMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-widest text-primary">
+              <Zap className="h-2.5 w-2.5" /> Intraday filter · 6h
+            </span>
+          )}
           {ticker && (
             <span className="rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
               {ticker}
