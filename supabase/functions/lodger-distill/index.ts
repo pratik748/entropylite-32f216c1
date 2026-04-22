@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
+import { callAIParallel } from "../_shared/callAI.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,14 +16,6 @@ serve(async (req) => {
     if (!trade) {
       return new Response(JSON.stringify({ error: "Missing trade payload" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY missing" }), {
-        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -71,62 +64,43 @@ Return strictly via the distill_lesson tool.`;
       },
     };
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "distill_lesson" } },
-      }),
-    });
-
-    if (aiResp.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limited", lesson: null }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiResp.status === 402) {
-      return new Response(JSON.stringify({ error: "Credits required", lesson: null }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!aiResp.ok) {
-      const t = await aiResp.text();
-      console.error("[lodger-distill] gateway error", aiResp.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error", lesson: null }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const json = await aiResp.json();
-    const choice = json?.choices?.[0];
-    const toolCall = choice?.message?.tool_calls?.[0];
     let lesson: string | null = null;
     let tags: string[] = [];
     let pattern_id: string | null = null;
-    if (toolCall?.function?.arguments) {
-      try {
-        const parsed = safeParseJSON(toolCall.function.arguments);
-        lesson = typeof parsed.lesson === "string" ? parsed.lesson.slice(0, 200) : null;
-        tags = Array.isArray(parsed.tags) ? parsed.tags.slice(0, 6).map((s: any) => String(s).slice(0, 30)) : [];
-        pattern_id = typeof parsed.pattern_id === "string" ? parsed.pattern_id.slice(0, 80) : null;
-      } catch (e) {
-        console.warn("[lodger-distill] parse failed", e);
+
+    try {
+      const results = await callAIParallel({
+        systemPrompt,
+        userPrompt,
+        tools: [tool],
+        toolChoice: { type: "function", function: { name: "distill_lesson" } },
+        temperature: 0.4,
+        maxTokens: 400,
+      });
+
+      // Pick first successful result with tool call or parseable text
+      for (const r of results) {
+        const raw = r.toolCall?.function?.arguments || r.text;
+        if (!raw) continue;
+        try {
+          const parsed = safeParseJSON(typeof raw === "string" ? raw : JSON.stringify(raw));
+          if (parsed && typeof parsed.lesson === "string") {
+            lesson = parsed.lesson.slice(0, 200);
+            tags = Array.isArray(parsed.tags) ? parsed.tags.slice(0, 6).map((s: any) => String(s).slice(0, 30)) : [];
+            pattern_id = typeof parsed.pattern_id === "string" ? parsed.pattern_id.slice(0, 80) : null;
+            break;
+          }
+        } catch (e) {
+          console.warn("[lodger-distill] parse attempt failed", e);
+        }
       }
-    } else if (typeof choice?.message?.content === "string") {
-      // Fallback: take first 140 chars as the lesson
-      lesson = choice.message.content.split("\n")[0].slice(0, 200);
+
+      // Last-resort: use first response as text lesson
+      if (!lesson && results.length > 0 && typeof results[0].text === "string") {
+        lesson = results[0].text.split("\n").find(l => l.trim().length > 10)?.slice(0, 200) || null;
+      }
+    } catch (e) {
+      console.error("[lodger-distill] all providers failed", e);
     }
 
     return new Response(JSON.stringify({ lesson, tags, pattern_id }), {
