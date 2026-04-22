@@ -39,7 +39,6 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import LodgersRail from "@/components/spine/LodgersRail";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -291,10 +290,7 @@ const IndexContent = () => {
           <DirectProfitMode />
         </div>
       ) : (
-        <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* Persistent Lodgers spine — visible across every authenticated screen */}
-          <LodgersRail />
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <>
           {/* Refresh Banner */}
           {isRefreshing && (
             <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
@@ -309,31 +305,36 @@ const IndexContent = () => {
           )}
 
           {/* Tab Navigation */}
-          <nav className="border-b border-border bg-sidebar shrink-0">
+          <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
             <div
-              className="px-2 flex items-stretch overflow-x-auto scrollbar-hide relative"
+              className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
-              {tabs.map((tab, idx) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabSwitch(tab.id)}
                   style={{ scrollSnapAlign: "start" }}
-                  className={`relative flex items-center gap-1.5 px-3 h-8 text-[10px] font-mono font-semibold transition-colors whitespace-nowrap flex-shrink-0 uppercase tracking-[0.14em] border-r border-border ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 ${
                     activeTab === tab.id
-                      ? "text-primary bg-background accent-bar-b"
-                      : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                  } ${idx === 0 ? "border-l border-border" : ""}`}
+                      ? "border-primary text-primary bg-surface-2"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                  }`}
                 >
-                  <span className="font-mono text-[8px] text-muted-foreground/50 mr-0.5">{String(idx + 1).padStart(2, "0")}</span>
-                  {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <span className="sm:hidden">
+                    {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}
+                  </span>
+                  <span className="hidden sm:block">{tab.icon}</span>
+                  <span className="hidden sm:inline uppercase tracking-wider">{tab.label}</span>
+                  <span className="sm:hidden uppercase tracking-wider">{tab.shortLabel}</span>
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-1.5 pl-3 pr-2 border-l border-border">
-                <span className="h-1 w-1 bg-gain animate-pulse" />
-                <span className="text-[8px] font-mono text-gain uppercase tracking-[0.18em]">LIVE</span>
+              <div className="ml-auto flex items-center gap-1 pl-1 pr-2 flex-shrink-0">
+                <span className="relative flex h-1 w-1">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
+                  <span className="relative inline-flex h-1 w-1 rounded-full bg-gain" />
+                </span>
+                <span className="text-[7px] font-mono text-gain/70 uppercase tracking-widest">Live</span>
               </div>
             </div>
           </nav>
@@ -432,42 +433,15 @@ const IndexContent = () => {
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
                             {!isLoading && !analysis && (
-                              <div className="border border-border bg-surface-1 animate-fade-in">
-                                <div className="border-b border-border px-3 py-1.5 flex items-center justify-between bg-sidebar">
-                                  <div className="flex items-center gap-2">
-                                    <span className="h-1 w-1 bg-primary" />
-                                    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/80 font-semibold">SYSTEM·IDLE</span>
-                                  </div>
-                                  <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">AWAITING INPUT</span>
+                              <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
+                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
+                                  <Activity className="h-7 w-7 text-primary" />
                                 </div>
-                                <div className="px-4 py-10">
-                                  <div className="flex items-start gap-3">
-                                    <div className="h-7 w-7 border border-primary/40 flex items-center justify-center accent-bar-l">
-                                      <Activity className="h-3.5 w-3.5 text-primary" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground font-semibold mb-1">No active position selected</h2>
-                                      <p className="font-mono text-[10px] text-muted-foreground leading-relaxed max-w-xl">
-                                        Submit a ticker — equity (AAPL · TCS.NS), crypto (BTC-USD), FX (EURUSD=X) or commodity (GC=F).
-                                        The engine will compute price, fundamentals, sentiment, regime, risk and a recommendation under live capital posture.
-                                      </p>
-                                      <div className="mt-3 grid grid-cols-3 gap-px bg-border max-w-md">
-                                        <div className="bg-surface-2 px-2 py-1.5">
-                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">CHANNELS</div>
-                                          <div className="font-mono text-[10px] text-foreground tabular-nums">12</div>
-                                        </div>
-                                        <div className="bg-surface-2 px-2 py-1.5">
-                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">PROVIDERS</div>
-                                          <div className="font-mono text-[10px] text-foreground tabular-nums">3</div>
-                                        </div>
-                                        <div className="bg-surface-2 px-2 py-1.5">
-                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">POSTURE</div>
-                                          <div className="font-mono text-[10px] text-gain">READY</div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                                <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
+                                <p className="max-w-md text-center text-xs text-muted-foreground px-4">
+                                  Enter any global asset: stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or
+                                  commodities (GC=F) for deep analysis with real-time pricing.
+                                </p>
                               </div>
                             )}
                             {isLoading && <LoadingState />}
@@ -693,8 +667,7 @@ const IndexContent = () => {
           {/* System Status Bar */}
           <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
           <ThemeToggle />
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
