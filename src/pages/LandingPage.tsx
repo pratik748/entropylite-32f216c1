@@ -321,15 +321,15 @@ export default function LandingPage() {
               <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
                 <Clock className="h-4 w-4 text-black/60" />
               </div>
-              <p className="font-semibold text-sm mb-1">Thirty-second setup</p>
-              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set a base currency, and you're running.</p>
+              <p className="font-semibold text-sm mb-1">Thirty second setup</p>
+              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set a base currency, and you are running.</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
                 <InfinityIcon className="h-4 w-4 text-black/60" />
               </div>
               <p className="font-semibold text-sm mb-1">Free during founding</p>
-              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing forever when paid tiers launch.</p>
+              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing for life once paid tiers launch.</p>
             </div>
           </div>
 
@@ -338,7 +338,7 @@ export default function LandingPage() {
               The terminal sharpens with every decision you make
             </h3>
             <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
-              Your trade history quietly biases the AI toward the patterns that worked for you, and away from the ones that didn't.
+              Your trade history quietly biases the AI toward the patterns that worked, and away from the ones that did not.
             </p>
             <Button
               size="lg"
