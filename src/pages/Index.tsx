@@ -61,7 +61,7 @@ type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopoli
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
-const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+const ALL_TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
@@ -74,9 +74,17 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "fortress", label: "Fortress", shortLabel: "Fort", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
 ];
 
+// In Intraday Mode, only money-method surfaces are shown.
+// Removed: Geopolitics, Reflexivity, Sandbox, Stat Arb, Augment, Fortress (long-horizon / research-only).
+const INTRADAY_TAB_IDS: Tab[] = ["dashboard", "market", "desirable", "risk"];
+
 const IndexContent = () => {
   const { intradayMode } = useIntradayMode();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const visibleTabs = useMemo(
+    () => (intradayMode ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id)) : ALL_TABS),
+    [intradayMode],
+  );
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -98,6 +106,13 @@ const IndexContent = () => {
       lastIntradayRef.current = intradayMode;
     }
   }, [intradayMode]);
+
+  // If user is on a tab that's hidden by intraday mode, bounce to Dashboard.
+  useEffect(() => {
+    if (intradayMode && !INTRADAY_TAB_IDS.includes(activeTab)) {
+      setActiveTab("dashboard");
+    }
+  }, [intradayMode, activeTab]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
