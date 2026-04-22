@@ -1204,6 +1204,10 @@ Return via the tool call only.`,
 
     const buildDeterministicScoredRec = (fallbackRec: any, forcedQuantScore = 42): ScoredRec | null => {
       if (portfolioTickers.includes(fallbackRec.ticker)) return null;
+      const fbTickerUpper = String(fallbackRec.ticker || "").toUpperCase();
+      if (sellTickers.includes(fbTickerUpper) || highRiskTickers.includes(fbTickerUpper)) return null;
+      const fbSectorLower = String(fallbackRec.sector || "").toLowerCase().trim();
+      if (fbSectorLower && avoidSectorsLower.some((s) => fbSectorLower.includes(s) || s.includes(fbSectorLower))) return null;
 
       const td = tickerData[fallbackRec.ticker];
       if (!td || td.closes.length < 20 || td.price <= 0) return null;
