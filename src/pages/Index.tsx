@@ -39,7 +39,7 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import CompoundingMode from "@/components/compounding/CompoundingMode";
+import IntradayDashboard from "@/components/intraday/IntradayDashboard";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +54,7 @@ import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useIntradayMode } from "@/hooks/useIntradayMode";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "compounding";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -65,7 +65,6 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
   { id: "reflexivity", label: "Reflexivity", shortLabel: "Reflex", icon: <Brain className="h-3.5 w-3.5" /> },
-  { id: "compounding", label: "Compounding", shortLabel: "Comp", icon: <Gauge className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
   { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
