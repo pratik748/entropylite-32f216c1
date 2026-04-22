@@ -570,11 +570,6 @@ const IndexContent = () => {
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
-              {activeTab === "reflexivity" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <ReflexivityEngine key={refreshKey} stocks={stocks} refreshKey={refreshKey} />
-                </div>
-              )}
               {activeTab === "risk" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <RiskDashboard key={refreshKey} stocks={stocks} />
