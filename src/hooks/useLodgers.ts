@@ -116,7 +116,7 @@ export function useLodgers() {
       divergence_pct: provisional.divergence_pct,
       drawdown_elasticity: provisional.drawdown_elasticity,
     };
-    const { data: inserted, error } = await supabase.from("lodger_trades").insert(insertRow).select().single();
+    const { data: inserted, error } = await supabase.from("lodger_trades").insert(insertRow as any).select().single();
     if (error || !inserted) {
       console.error("[lodger] insert failed", error);
       return null;
