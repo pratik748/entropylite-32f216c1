@@ -828,6 +828,16 @@ serve(async (req) => {
     const portfolioTickers: string[] = body.portfolioTickers || [];
     const portfolioWeights: Record<string, number> = body.portfolioWeights || {};
     const portfolioSectors: Record<string, string> = body.portfolioSectors || {};
+    const portfolioSignals: {
+      sellTickers?: string[];
+      highRiskTickers?: string[];
+      avoidSectors?: string[];
+    } = body.portfolioSignals || {};
+    const sellTickers: string[] = (portfolioSignals.sellTickers || []).map((t) => String(t).toUpperCase());
+    const highRiskTickers: string[] = (portfolioSignals.highRiskTickers || []).map((t) => String(t).toUpperCase());
+    const avoidSectorsLower: string[] = (portfolioSignals.avoidSectors || [])
+      .map((s) => String(s).toLowerCase().trim())
+      .filter(Boolean);
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
@@ -847,6 +857,13 @@ serve(async (req) => {
     const portfolioContext = portfolioTickers.length > 0
       ? `Existing portfolio: ${portfolioTickers.map(t => `${t} (${portfolioSectors[t] || "unknown"}, weight: ${((portfolioWeights[t] || 0) * 100).toFixed(1)}%)`).join(", ")}. Sectors already held: ${existingSectors.join(", ") || "none"}.`
       : "Empty portfolio — recommend foundational positions.";
+
+    // Cross-module consistency: the Analysis & Risk modules already gave a verdict on each
+    // holding. Desirable Assets MUST honour those verdicts, not contradict them.
+    const crossModuleBlock = (sellTickers.length || highRiskTickers.length || avoidSectorsLower.length)
+      ? `\n## CROSS-MODULE PORTFOLIO VERDICTS (HARD CONSTRAINT — DO NOT CONTRADICT):
+${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${sellTickers.join(", ")}. The user is being told to reduce exposure here. Do NOT recommend these tickers, close substitutes, direct competitors, or other names with the same business model.\n` : ""}${highRiskTickers.length ? `- Risk module flagged these holdings as HIGH RISK (riskScore ≥ 70): ${highRiskTickers.join(", ")}. Do NOT add more risk on top of this — avoid recommending high-volatility / high-beta names that would correlate with these.\n` : ""}${avoidSectorsLower.length ? `- AVOID these sectors entirely (already over-weighted with flagged-Sell or high-risk positions): ${avoidSectorsLower.join(", ")}. Zero recommendations from these sectors.\n` : ""}If a candidate would clearly contradict the user's existing Sell or risk warnings, REJECT it and pick something else. Recommendations must be additive to the portfolio's risk-adjusted profile, never additive to its problems.\n`
+      : "";
 
     const homeMarketRule = indiaMode
       ? "ALL recommendations must be Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs (e.g. NIFTYBEES.NS, GOLDBEES.NS), or Indian F&O instruments. No foreign stocks whatsoever."
@@ -955,7 +972,7 @@ Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian e
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${antiRepeatBlock}${macroBlock}
+${crossModuleBlock}${antiRepeatBlock}${macroBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
@@ -1187,6 +1204,10 @@ Return via the tool call only.`,
 
     const buildDeterministicScoredRec = (fallbackRec: any, forcedQuantScore = 42): ScoredRec | null => {
       if (portfolioTickers.includes(fallbackRec.ticker)) return null;
+      const fbTickerUpper = String(fallbackRec.ticker || "").toUpperCase();
+      if (sellTickers.includes(fbTickerUpper) || highRiskTickers.includes(fbTickerUpper)) return null;
+      const fbSectorLower = String(fallbackRec.sector || "").toLowerCase().trim();
+      if (fbSectorLower && avoidSectorsLower.some((s) => fbSectorLower.includes(s) || s.includes(fbSectorLower))) return null;
 
       const td = tickerData[fallbackRec.ticker];
       if (!td || td.closes.length < 20 || td.price <= 0) return null;
@@ -1285,6 +1306,20 @@ Return via the tool call only.`,
 
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
+
+      // F1b: Cross-module veto — never contradict Stock Analysis & Risk verdicts.
+      // Reject any candidate whose ticker is on the Sell/high-risk list or whose
+      // sector matches a flagged-sector. This is a hard reject, not a score penalty.
+      const recTickerUpper = String(rec.ticker || "").toUpperCase();
+      if (sellTickers.includes(recTickerUpper) || highRiskTickers.includes(recTickerUpper)) {
+        filtered++;
+        continue;
+      }
+      const recSectorLower = String(rec.sector || "").toLowerCase().trim();
+      if (recSectorLower && avoidSectorsLower.some((s) => recSectorLower.includes(s) || s.includes(recSectorLower))) {
+        filtered++;
+        continue;
+      }
 
       // F2: Target must be above current price
       if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }

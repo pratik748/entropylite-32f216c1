@@ -277,6 +277,31 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
       }
 
+      // Cross-module signals: respect what Analysis & Risk are already telling the user.
+      // Don't recommend the same sector / similar profile for stocks the AI says to Sell/Exit
+      // or that carry high risk. This stops Desirable Assets from contradicting other modules.
+      const sellTickers: string[] = [];
+      const highRiskTickers: string[] = [];
+      const avoidSectors = new Set<string>();
+      for (const st of stocks) {
+        const sug = String((st.analysis as any)?.suggestion || "").toLowerCase();
+        const risk = Number((st.analysis as any)?.riskScore || 0);
+        const sector = String((st.analysis as any)?.sector || "").trim();
+        if (sug === "sell" || sug === "exit" || sug === "downside") {
+          sellTickers.push(st.ticker);
+          if (sector) avoidSectors.add(sector);
+        }
+        if (risk >= 70) {
+          highRiskTickers.push(st.ticker);
+          if (sector) avoidSectors.add(sector);
+        }
+      }
+      const portfolioSignals = {
+        sellTickers,
+        highRiskTickers,
+        avoidSectors: Array.from(avoidSectors),
+      };
+
       // Self-Repair Department: always attempts recovery before showing an error.
       const result = await runWithRepair<any>({
         label: "desirable-assets",
@@ -292,6 +317,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             portfolioTickers: existingTickers,
             portfolioWeights,
             portfolioSectors,
+            portfolioSignals,
             portfolioValue: totalValue || 100000,
             baseCurrency,
             indiaMode: baseCurrency === "INR",
@@ -306,6 +332,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             "v1",
             baseCurrency,
             existingTickers.slice().sort().join(","),
+            sellTickers.slice().sort().join(",") || "ns",
+            highRiskTickers.slice().sort().join(",") || "nr",
             budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
             selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
             selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
