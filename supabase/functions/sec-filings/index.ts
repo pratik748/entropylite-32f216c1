@@ -139,23 +139,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const tickers: string[] = Array.isArray(body.tickers)
-      ? body.tickers.filter((t: unknown): t is string => typeof t === "string" && t.length > 0)
-      : [];
-
-    // No system-wide fallback universe. SEC + insider intelligence must be
-    // grounded in the caller's actual tickers — no arbitrary mega-cap backstop.
-    if (tickers.length === 0) {
-      return new Response(JSON.stringify({
-        filings: [],
-        insiderTrades: [],
-        insiderSentiment: 0,
-        summary: { totalFilings: 0, totalInsiderTrades: 0, highSignificance: 0, netInsiderBuying: false },
-        empty: true,
-        reason: "NO_TICKERS_PROVIDED",
-        timestamp: Date.now(),
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const tickers: string[] = body.tickers || ["AAPL", "MSFT", "GOOGL"];
 
     const [filings, insiderTrades] = await Promise.all([
       searchFilings(tickers),

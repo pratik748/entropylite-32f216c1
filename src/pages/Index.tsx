@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Gauge, BookOpen, Zap } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -39,11 +39,6 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import LodgerLedgerDock from "@/components/intraday/LodgerLedgerDock";
-import DeepTradeLedger from "@/components/intraday/DeepTradeLedger";
-import IntradayDashboard from "@/components/intraday/IntradayDashboard";
-import RecentLessonsPanel from "@/components/intraday/RecentLessonsPanel";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,20 +51,17 @@ import { FXProvider } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
-import { useIntradayMode } from "@/hooks/useIntradayMode";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "catalysts" | "lessons";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
-const ALL_TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "catalysts", label: "Catalysts", shortLabel: "News", icon: <Zap className="h-3.5 w-3.5" /> },
-  { id: "lessons", label: "Lessons", shortLabel: "Less", icon: <BookOpen className="h-3.5 w-3.5" /> },
   { id: "reflexivity", label: "Reflexivity", shortLabel: "Reflex", icon: <Brain className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
@@ -78,20 +70,8 @@ const ALL_TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactN
   { id: "fortress", label: "Fortress", shortLabel: "Fort", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
 ];
 
-// In Intraday Mode, only money-method surfaces are shown — each on its own tab.
-// Removed: Geopolitics, Reflexivity, Sandbox, Stat Arb, Augment, Fortress (long-horizon / research-only).
-const INTRADAY_TAB_IDS: Tab[] = ["dashboard", "market", "desirable", "catalysts", "lessons", "risk"];
-
 const IndexContent = () => {
-  const { intradayMode } = useIntradayMode();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
-  const visibleTabs = useMemo(
-    () =>
-      intradayMode
-        ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id))
-        : ALL_TABS.filter((t) => t.id !== "catalysts" && t.id !== "lessons"),
-    [intradayMode],
-  );
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -102,24 +82,6 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
-
-  // When user toggles Intraday Mode on, refresh the dashboard view (it swaps to the intraday surface).
-  const lastIntradayRef = useRef(intradayMode);
-  useEffect(() => {
-    if (intradayMode !== lastIntradayRef.current) {
-      setActiveTab("dashboard");
-      flushAllCaches();
-      triggerRefresh();
-      lastIntradayRef.current = intradayMode;
-    }
-  }, [intradayMode]);
-
-  // If user is on a tab that's hidden by intraday mode, bounce to Dashboard.
-  useEffect(() => {
-    if (intradayMode && !INTRADAY_TAB_IDS.includes(activeTab)) {
-      setActiveTab("dashboard");
-    }
-  }, [intradayMode, activeTab]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
@@ -342,26 +304,13 @@ const IndexContent = () => {
             </div>
           )}
 
-          {/* Intraday Mode banner */}
-          {intradayMode && (
-            <div className="border-b border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-1 flex items-center gap-2 shrink-0">
-              <Gauge className="h-3 w-3 text-primary" />
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary font-semibold">
-                Intraday Mode · System-wide skew
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
-                Desirable / News / Analysis / Risk re-tuned for same-session profit. Lodger Ledger persists in dock + Risk tab.
-              </span>
-            </div>
-          )}
-
           {/* Tab Navigation */}
           <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
             <div
               className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
-              {visibleTabs.map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabSwitch(tab.id)}
@@ -396,15 +345,7 @@ const IndexContent = () => {
           {/* Main Content — fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
-              {activeTab === "dashboard" && intradayMode && (
-                <IntradayDashboard
-                  stocks={stocks}
-                  onAnalyze={handleAnalyze}
-                  isLoading={isLoading}
-                  isMobile={isMobile}
-                />
-              )}
-              {activeTab === "dashboard" && !intradayMode &&
+              {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
@@ -575,22 +516,19 @@ const IndexContent = () => {
                     {/* Right: News + Flow Detection */}
                     <ResizablePanel defaultSize={23} minSize={15} maxSize={35}>
                       <ResizablePanelGroup direction="vertical">
-                        <ResizablePanel defaultSize={intradayMode ? 100 : 30} minSize={15}>
+                        <ResizablePanel defaultSize={30} minSize={15}>
                           <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
                             <LiveNewsFeed ticker={analysis?.ticker} compact />
                           </PanelWrapper>
                         </ResizablePanel>
 
-                        {!intradayMode && (
-                          <>
-                            <ResizableHandle withHandle />
-                            <ResizablePanel defaultSize={45} minSize={20}>
-                              <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad>
-                                <FlowDetectionPanel stocks={stocks} />
-                              </PanelWrapper>
-                            </ResizablePanel>
-                          </>
-                        )}
+                        <ResizableHandle withHandle />
+
+                        <ResizablePanel defaultSize={45} minSize={20}>
+                          <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad>
+                            <FlowDetectionPanel stocks={stocks} />
+                          </PanelWrapper>
+                        </ResizablePanel>
                       </ResizablePanelGroup>
                     </ResizablePanel>
                   </ResizablePanelGroup>
@@ -601,22 +539,22 @@ const IndexContent = () => {
                   <MarketOverview key={refreshKey} />
                 </div>
               )}
-              {activeTab === "augment" && !intradayMode && (
+              {activeTab === "augment" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <AugmentDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "sandbox" && !intradayMode && (
+              {activeTab === "sandbox" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <EntropySandbox key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "statarb" && !intradayMode && (
+              {activeTab === "statarb" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <StatArbEngine key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "geopolitical" && !intradayMode && (
+              {activeTab === "geopolitical" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <GeopoliticalGlobe
                     key={refreshKey}
@@ -634,46 +572,17 @@ const IndexContent = () => {
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
-              {activeTab === "catalysts" && intradayMode && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <div className="rounded-md border border-border bg-card overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
-                      <Zap className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                        Live Catalysts · Intraday
-                      </span>
-                    </div>
-                    <LiveNewsFeed key={refreshKey} compact />
-                  </div>
-                </div>
-              )}
-              {activeTab === "lessons" && intradayMode && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <RecentLessonsPanel key={refreshKey} />
-                </div>
-              )}
-              {activeTab === "reflexivity" && !intradayMode && (
+              {activeTab === "reflexivity" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <ReflexivityEngine key={refreshKey} stocks={stocks} refreshKey={refreshKey} />
                 </div>
               )}
               {activeTab === "risk" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <Tabs defaultValue="risk" className="w-full">
-                    <TabsList className="h-8 mb-2">
-                      <TabsTrigger value="risk" className="text-[10px] font-mono uppercase">Risk</TabsTrigger>
-                      <TabsTrigger value="ledger" className="text-[10px] font-mono uppercase">Trade Ledger</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="risk">
-                      <RiskDashboard key={refreshKey} stocks={stocks} />
-                    </TabsContent>
-                    <TabsContent value="ledger">
-                      <DeepTradeLedger />
-                    </TabsContent>
-                  </Tabs>
+                  <RiskDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "fortress" && !intradayMode && (
+              {activeTab === "fortress" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
@@ -733,7 +642,6 @@ const IndexContent = () => {
                   </SheetContent>
                 </Sheet>
 
-                {!intradayMode && (
                 <Sheet>
                   <SheetTrigger asChild>
                     <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
@@ -752,7 +660,6 @@ const IndexContent = () => {
                     </div>
                   </SheetContent>
                 </Sheet>
-                )}
               </div>
             </div>
           )}
@@ -760,7 +667,6 @@ const IndexContent = () => {
           {/* System Status Bar */}
           <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
           <ThemeToggle />
-          {activeTab === "dashboard" && <LodgerLedgerDock />}
         </>
       )}
     </div>

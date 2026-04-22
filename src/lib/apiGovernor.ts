@@ -265,13 +265,7 @@ export async function governedInvoke<T = any>(
       try {
         const provider = localStorage.getItem("entropy-ai-provider") || "mistral";
         const indiaMode = localStorage.getItem("entropy-india-mode") === "true";
-        const intradayMode = localStorage.getItem("entropy-intraday-mode") === "true";
-        body = {
-          ...body,
-          provider,
-          ...(indiaMode ? { indiaMode: true } : {}),
-          ...(intradayMode ? { intradayMode: true } : {}),
-        };
+        body = { ...body, provider, ...(indiaMode ? { indiaMode: true } : {}) };
       } catch {}
     }
     const { data, error } = await supabase.functions.invoke(functionName, {

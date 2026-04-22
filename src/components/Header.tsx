@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Zap, Share2, Gauge } from "lucide-react";
+import { LogOut, Zap, Share2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 interface HeaderProps {
   directProfitMode?: boolean;
@@ -15,7 +14,6 @@ interface HeaderProps {
 const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, indiaMode, setIndiaMode } = useFX();
-  const { intradayMode, setIntradayMode } = useIntradayMode();
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -89,17 +87,6 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
               className="h-4 w-8 data-[state=checked]:bg-primary"
             />
             <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">India</span>
-          </div>
-
-          {/* Intraday Mode Toggle — system-wide */}
-          <div className="flex items-center gap-1.5" title="Intraday Compounding Mode — switches the entire system to closed-loop intraday discipline">
-            <Gauge className={`h-3 w-3 ${intradayMode ? "text-primary" : "text-muted-foreground/60"}`} />
-            <Switch
-              checked={intradayMode}
-              onCheckedChange={setIntradayMode}
-              className="h-4 w-8 data-[state=checked]:bg-primary"
-            />
-            <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">Intraday</span>
           </div>
 
           {/* Base Currency Selector */}

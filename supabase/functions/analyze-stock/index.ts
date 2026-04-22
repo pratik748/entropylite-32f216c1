@@ -52,7 +52,6 @@ serve(async (req) => {
     const rawBody = await req.json();
     const provider = rawBody.provider;
     const indiaMode = rawBody.indiaMode === true;
-    const intradayMode = rawBody.intradayMode === true;
     const requestedTicker = (rawBody.ticker || "").toString();
     const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = rawBody.buyPrice;
@@ -337,7 +336,7 @@ Every data point must reflect current market reality.`;
     let jsonStr: string;
     try {
       const aiOpts = {
-        systemPrompt: `You are an institutional-grade market research analyst. You provide probabilistic scenario assessments — NOT investment advice. Use observational, data-driven language. Never use directive words like "buy", "sell", "enter", "exit". Instead use "market structure indicates", "high-probability scenario", "projected range", "liquidity zone forming", "volatility expansion likely". Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}${intradayMode ? "\n\n## INTRADAY OVERRIDE\nFrame this entirely as a same-session intraday opportunity. Do NOT discuss multi-quarter fundamentals, long-term thesis, or holding through earnings cycles. Replace any long-horizon framing with: 'Entry window forming HH:MM–HH:MM local; expected hold ~N minutes; invalidation level at <price>; immediate catalyst is <today's event>'. The 'verdict' field must read like an intraday session call (e.g. 'Liquidity zone forming around 1820, projected probe toward 1845 within 30–60 min if VWAP holds; invalidation below 1815'). The 'summary' must focus on momentum, flow, opening drive, gap fill, VWAP behavior, and today's catalyst — NOT on annual revenue or sector trends. The 'hedgeStrategy' must read 'N/A — intraday' or a same-session stop quote. Confidence is keyed off momentum + flow, not fundamentals. bullRange/bearRange/neutralRange must reflect a single trading session (typically ±0.5–2%)." : ""}`,
+        systemPrompt: `You are an institutional-grade market research analyst. You provide probabilistic scenario assessments — NOT investment advice. Use observational, data-driven language. Never use directive words like "buy", "sell", "enter", "exit". Instead use "market structure indicates", "high-probability scenario", "projected range", "liquidity zone forming", "volatility expansion likely". Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
         userPrompt: prompt,
         maxTokens: 8192,
       };

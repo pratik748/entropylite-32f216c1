@@ -12,7 +12,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { portfolio, vix, marketRegime, provider, intradayMode } = await req.json();
+    const { portfolio, vix, marketRegime, provider } = await req.json();
 
     if (!portfolio || portfolio.length === 0) {
       return new Response(JSON.stringify({ error: "No portfolio data" }), {
@@ -36,7 +36,7 @@ serve(async (req) => {
 
     const result = await callAI({
       provider,
-      systemPrompt: `You are an institutional risk intelligence engine. Analyze the portfolio and produce a comprehensive risk assessment.${intradayMode ? "\nINTRADAY MODE: VaR/CVaR horizon is ONE TRADING SESSION (1 day), NOT multi-day. Scale all VaR figures to a single-session horizon (use 1-day vol, do NOT multiply by sqrt(N) for multi-day). Stress scenarios must be intraday shocks (opening gap, halt, FOMC tape bomb, sector flush). Recovery field should describe minutes-to-hours, not weeks. Hedging recommendations must be same-session compatible (no calendar spreads, no swing hedges)." : ""}
+      systemPrompt: `You are an institutional risk intelligence engine. Analyze the portfolio and produce a comprehensive risk assessment.
 Return ONLY valid JSON matching this exact schema:
 {
   "var95": number (dollar value at risk 95%),

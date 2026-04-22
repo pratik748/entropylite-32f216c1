@@ -262,7 +262,7 @@ serve(async (req) => {
   }
 
   try {
-    const { ticker, region, indiaMode, intradayMode } = await req.json();
+    const { ticker, region, indiaMode } = await req.json();
     const cleanTicker = (ticker || "").replace(/\.(NS|BO|BSE)$/i, "").trim();
 
     const regionKeywords: Record<string, string> = {
@@ -349,42 +349,7 @@ serve(async (req) => {
 
     const filtered = withTimestamps.map(({ _ts, _rel, ...article }) => article);
     const deduplicated = deduplicateArticles(filtered);
-    let top = deduplicated.slice(0, 40);
-
-    // ─── Intraday-mode filter: last 6h, trade-relevance ranking ───
-    if (intradayMode) {
-      const SIX_HOURS = 6 * 3600 * 1000;
-      const now = Date.now();
-      const TRADE_HIGH = /\b(earnings|guidance|halt|halted|upgrade|downgrade|merger|acquisition|buyback|dividend hike|fda|recall|investigat|probe|fed|fomc|cpi|payroll|jobs report|rate (cut|hike)|war|sanction|tariff|gap (up|down)|surge|plunge|crash)\b/i;
-      const TRADE_MED  = /\b(beat|miss|revenue|outlook|forecast|raises|cuts|warning|launch|approval|deal|partnership|insider)\b/i;
-      const OPINION_OUT = /\b(opinion|analysis:|commentary|column|why .* should|here.?s why|what to know|outlook for the week)\b/i;
-
-      const scored = deduplicated
-        .map(a => {
-          const ts = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-          const text = `${a.title || ""} ${a.description || ""}`;
-          let rel: "high" | "med" | "low" = "low";
-          if (TRADE_HIGH.test(text)) rel = "high";
-          else if (TRADE_MED.test(text)) rel = "med";
-          if (OPINION_OUT.test(text)) rel = "low";
-          return { ...a, _ts: ts, tradeRelevance: rel };
-        })
-        .filter(a => !a._ts || (now - a._ts) <= SIX_HOURS);
-
-      const tradeRanked = scored
-        .filter(a => a.tradeRelevance !== "low")
-        .sort((a, b) => (b._ts || 0) - (a._ts || 0));
-
-      // Fallback to "show all" if fewer than 5 high-signal articles
-      if (tradeRanked.length >= 5) {
-        top = tradeRanked.slice(0, 40).map(({ _ts, ...rest }) => rest as any);
-      } else {
-        top = scored
-          .sort((a, b) => (b._ts || 0) - (a._ts || 0))
-          .slice(0, 40)
-          .map(({ _ts, ...rest }) => rest as any);
-      }
-    }
+    const top = deduplicated.slice(0, 40);
 
     const sourcesPolled = rssFeeds
       + (gdeltArticles.length > 0 ? 1 : 0)

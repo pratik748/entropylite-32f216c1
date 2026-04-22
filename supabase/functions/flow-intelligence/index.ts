@@ -30,11 +30,9 @@ serve(async (req) => {
       ? `\nPrediction Market Signals (Polymarket):\n${polymarketSignals.map((s: any) => `- "${s.market}": ${(s.probability * 100).toFixed(0)}% prob, ${s.direction}, $${(s.volume24h / 1000).toFixed(0)}K vol`).join("\n")}`
       : "";
 
-    let result;
-    try {
-      result = await callAI({
-        provider,
-        systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure, market context, and prediction market signals to detect flow signals.
+    const result = await callAI({
+      provider,
+      systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure, market context, and prediction market signals to detect flow signals.
 Return ONLY valid JSON array of flow signals:
 [{
   "name": string (signal name like "ETF Rebalancing", "Vol Targeting", "CTA Momentum", "Polymarket Macro Skew", etc.),
@@ -45,31 +43,21 @@ Return ONLY valid JSON array of flow signals:
   "reasoning": string (1 sentence explanation)
 }]
 Generate 6-12 signals covering: ETF Rebalancing, Vol Targeting, Liquidity Stress, CTA Momentum, Gamma Exposure, Dark Pool Activity, Risk Parity, Pension Rebalance. If prediction market data is available, include 2-3 "PRED" category signals based on Polymarket probabilities. Base signals on the actual portfolio composition, market conditions, and prediction market odds.`,
-        userPrompt: `Portfolio holdings: ${JSON.stringify(summary)}
+      userPrompt: `Portfolio holdings: ${JSON.stringify(summary)}
 VIX: ${vix || "N/A"}, Regime: ${marketRegime || "Unknown"}${polyContext}
 Detect institutional flow patterns and prediction market-informed signals based on the portfolio's beta exposure, sector concentration, and risk profile.`,
-        temperature: 0.5,
-        maxTokens: 2048,
-      });
-    } catch (aiErr: any) {
-      const msg = String(aiErr?.message || aiErr);
-      const isCapacity = /429|capacity|rate.?limit|service_tier/i.test(msg);
-      console.warn("flow-intelligence AI failed, returning empty signals:", msg);
-      return new Response(
-        JSON.stringify({ signals: [], fallback: true, reason: isCapacity ? "AI_CAPACITY" : "AI_FAILED" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      temperature: 0.5,
+      maxTokens: 2048,
+    });
 
-    const signals = safeParseJSON(result.text) || [];
+    const signals = safeParseJSON(result.text);
     return new Response(JSON.stringify(signals), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("flow-intelligence error:", err);
-    return new Response(
-      JSON.stringify({ signals: [], fallback: true, reason: "FUNCTION_ERROR", error: err.message }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message || "Flow intelligence failed" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

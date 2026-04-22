@@ -1,7 +1,6 @@
-import { Brain, Shield, Target, Globe, Zap } from "lucide-react";
+import { Brain, Shield, Target, Globe } from "lucide-react";
 import { cleanAIText } from "@/lib/utils";
 import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
-import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 interface RecommendationProps {
   summary: string;
@@ -14,21 +13,13 @@ interface RecommendationProps {
 }
 
 const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, macroFactors, verdict, hedgeStrategy }: RecommendationProps) => {
-  const { intradayMode } = useIntradayMode();
   const config = getScenarioConfig(suggestion);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
       <div className="mb-5 flex items-center gap-2">
         <Brain className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold text-foreground">
-          {intradayMode ? "Intraday Scenario Assessment" : "Scenario Assessment"}
-        </h2>
-        {intradayMode && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-widest text-primary">
-            <Zap className="h-2.5 w-2.5" /> Same-session framing
-          </span>
-        )}
+        <h2 className="text-base font-semibold text-foreground">Scenario Assessment</h2>
       </div>
 
       {/* Scenario Banner — top prominence */}
