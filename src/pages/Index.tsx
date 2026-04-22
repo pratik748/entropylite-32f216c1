@@ -52,6 +52,7 @@ import { FXProvider } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "compounding";
 
@@ -73,7 +74,8 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 ];
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const { intradayMode } = useIntradayMode();
+  const [activeTab, setActiveTab] = useState<Tab>(intradayMode ? "compounding" : "dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -84,6 +86,19 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
+
+  // When user toggles Intraday Mode on, jump to Compounding immediately.
+  const lastIntradayRef = useRef(intradayMode);
+  useEffect(() => {
+    if (intradayMode && !lastIntradayRef.current) {
+      setActiveTab("compounding");
+      flushAllCaches();
+      triggerRefresh();
+    } else if (!intradayMode && lastIntradayRef.current && activeTab === "compounding") {
+      setActiveTab("dashboard");
+    }
+    lastIntradayRef.current = intradayMode;
+  }, [intradayMode]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
