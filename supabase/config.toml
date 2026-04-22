@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.polymarket-signals]
 verify_jwt = false
+
+[functions.cadence-generate]
+verify_jwt = false
