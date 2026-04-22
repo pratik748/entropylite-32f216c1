@@ -66,7 +66,7 @@ const CompoundingMode = ({ stocks = [] }: Props) => {
   const handleAcceptLodge = useCallback((r: ValidatorResult, _shares: number) => {
     const live = livePrices[r.ticker];
     const entryPx = live && live > 0 ? live : 100; // fallback notional if no live
-    const qty = Math.max(1, Math.floor((capital * r.sizePct) / Math.max(0.01, entryPx)));
+    const qty = Math.max(1, Math.floor((effectiveCapital * r.sizePct) / Math.max(0.01, entryPx)));
     const lodge: OpenLodge = {
       id: crypto.randomUUID(),
       ticker: r.ticker,
@@ -81,7 +81,7 @@ const CompoundingMode = ({ stocks = [] }: Props) => {
     };
     setOpenLodges(prev => [...prev, lodge]);
     toast({ title: "Lodge opened", description: `${r.ticker} · ${qty} units · ${(r.sizePct * 100).toFixed(2)}% of capital` });
-  }, [capital, livePrices, setOpenLodges]);
+  }, [effectiveCapital, livePrices, setOpenLodges]);
 
   const handleCloseLodge = useCallback(async (id: string, exitPx: number, latencyMs: number) => {
     const l = openLodges.find(x => x.id === id);
