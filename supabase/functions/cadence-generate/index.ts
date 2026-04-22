@@ -258,7 +258,21 @@ async function generateResearch(topic: string, discipline: string): Promise<{ en
 
   const validDrafts: Array<{ provider: string; data: any }> = [];
   for (const r of draftResults) {
-    const parsed = safeParseJSON(r.text);
+    let parsed: any = null;
+    try {
+      parsed = safeParseJSON(r.text);
+    } catch (parseErr) {
+      // safeParseJSON can throw on bad escape sequences (LaTeX backslashes etc.)
+      // Try a more aggressive cleanup: escape stray backslashes inside strings.
+      try {
+        const cleaned = r.text
+          .replace(/\\(?!["\\/bfnrtu])/g, "\\\\") // escape lone backslashes
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, " ");
+        parsed = JSON.parse(cleaned);
+      } catch (retryErr) {
+        console.warn(`[research] Parse failed for ${r.provider}: ${(parseErr as Error).message}`);
+      }
+    }
     if (parsed && parsed.tagline && Array.isArray(parsed.mathematical_core) && parsed.mathematical_core.length >= 2) {
       validDrafts.push({ provider: r.provider, data: parsed });
     } else {
