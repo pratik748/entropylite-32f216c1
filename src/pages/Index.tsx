@@ -74,7 +74,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const { intradayMode } = useIntradayMode();
-  const [activeTab, setActiveTab] = useState<Tab>(intradayMode ? "compounding" : "dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -86,17 +86,15 @@ const IndexContent = () => {
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
 
-  // When user toggles Intraday Mode on, jump to Compounding immediately.
+  // When user toggles Intraday Mode on, refresh the dashboard view (it swaps to the intraday surface).
   const lastIntradayRef = useRef(intradayMode);
   useEffect(() => {
-    if (intradayMode && !lastIntradayRef.current) {
-      setActiveTab("compounding");
+    if (intradayMode !== lastIntradayRef.current) {
+      setActiveTab("dashboard");
       flushAllCaches();
       triggerRefresh();
-    } else if (!intradayMode && lastIntradayRef.current && activeTab === "compounding") {
-      setActiveTab("dashboard");
+      lastIntradayRef.current = intradayMode;
     }
-    lastIntradayRef.current = intradayMode;
   }, [intradayMode]);
 
   // Force refresh when user switches tabs
