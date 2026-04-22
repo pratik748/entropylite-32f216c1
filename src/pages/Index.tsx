@@ -39,6 +39,7 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
+import LodgersRail from "@/components/spine/LodgersRail";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -290,7 +291,10 @@ const IndexContent = () => {
           <DirectProfitMode />
         </div>
       ) : (
-        <>
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          {/* Persistent Lodgers spine — visible across every authenticated screen */}
+          <LodgersRail />
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Refresh Banner */}
           {isRefreshing && (
             <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
@@ -667,7 +671,8 @@ const IndexContent = () => {
           {/* System Status Bar */}
           <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
           <ThemeToggle />
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
