@@ -168,11 +168,14 @@ const CompoundingMode = ({ stocks = [] }: Props) => {
           </div>
         )}
         <div className="ml-auto flex items-center gap-1.5">
-          <label className="text-[9px] font-mono uppercase text-muted-foreground">Capital</label>
+          <label className="text-[9px] font-mono uppercase text-muted-foreground">
+            {intradayMode && totalValue > 0 ? "Capital (portfolio)" : "Capital"}
+          </label>
           <input
             type="number"
-            value={capital}
+            value={Math.round(effectiveCapital)}
             onChange={e => setCapital(Math.max(100, parseFloat(e.target.value) || DEFAULT_CAPITAL))}
+            disabled={intradayMode && totalValue > 0}
             className="h-6 w-24 rounded-sm border border-border bg-background px-2 text-[10px] font-mono"
           />
         </div>
