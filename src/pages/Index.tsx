@@ -39,7 +39,9 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import IntradayDashboard from "@/components/intraday/IntradayDashboard";
+import LodgerLedgerDock from "@/components/intraday/LodgerLedgerDock";
+import DeepTradeLedger from "@/components/intraday/DeepTradeLedger";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
