@@ -145,7 +145,21 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const tickers: string[] = body.tickers || ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"];
+    const tickers: string[] = Array.isArray(body.tickers)
+      ? body.tickers.filter((t: unknown): t is string => typeof t === "string" && t.length > 0)
+      : [];
+
+    // No system-wide fallback universe. Alt-data signals must be tied to the
+    // caller's actual holdings — no arbitrary mega-cap backstop.
+    if (tickers.length === 0) {
+      return new Response(JSON.stringify({
+        signals: [],
+        aggregate: { totalSignals: 0, bullish: 0, bearish: 0, neutral: 0, netSentiment: "0" },
+        empty: true,
+        reason: "NO_TICKERS_PROVIDED",
+        timestamp: Date.now(),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const [attention, innovation, tradeFlows] = await Promise.all([
       fetchWikipediaAttention(tickers),
