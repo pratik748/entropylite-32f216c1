@@ -321,6 +321,19 @@ const IndexContent = () => {
             </div>
           )}
 
+          {/* Intraday Mode banner */}
+          {intradayMode && (
+            <div className="border-b border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-1 flex items-center gap-2 shrink-0">
+              <Gauge className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary font-semibold">
+                Intraday Compounding Mode · System-wide
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
+                Validator + Lodgers + Discipline Governor active. Long-term portfolio view preserved.
+              </span>
+            </div>
+          )}
+
           {/* Tab Navigation */}
           <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
             <div
@@ -606,7 +619,7 @@ const IndexContent = () => {
               )}
               {activeTab === "compounding" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <CompoundingMode key={refreshKey} />
+                  <CompoundingMode key={refreshKey} stocks={stocks} />
                 </div>
               )}
             </PageTransition>
