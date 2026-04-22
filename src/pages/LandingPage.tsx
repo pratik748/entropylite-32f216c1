@@ -94,7 +94,7 @@ export default function LandingPage() {
           {/* Trust badge */}
           <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 py-1.5 rounded-full border border-black/10 bg-black/[0.02]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access · No credit card</span>
+            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access. No credit card.</span>
           </div>
 
           <h1 className="text-[2.35rem] sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.98] sm:leading-[1.05] mb-4 sm:mb-6">
@@ -104,8 +104,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-[15px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-6 sm:mb-10 leading-relaxed">
-            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints, and a live read on flows —
-            <span className="text-black font-semibold"> on one calm screen</span>.
+            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints and a live read on institutional flows. <span className="text-black font-semibold">On one screen.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 mb-3">
@@ -120,12 +119,12 @@ export default function LandingPage() {
               className="font-mono text-xs tracking-wide px-8 h-11 sm:h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
-              See What's Inside
+              See what is inside
             </button>
           </div>
 
           <p className="font-mono text-[10px] text-black/35 tracking-wide">
-            Google sign-in · 30-second setup · Cancel anytime (it's free)
+            Google sign in. 30 second setup. Cancel anytime, it is free.
           </p>
 
           {/* Stats strip */}
