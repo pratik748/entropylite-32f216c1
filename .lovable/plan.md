@@ -1,42 +1,50 @@
 
 
-User wants:
-1. Keep landing page layout/structure intact — only polish copy (human voice, consistent punctuation), no section restructuring.
-2. In `desirable-assets`, soften the "throw if nothing passes filters" rule so the panel doesn't go permanently empty.
+# Fix Cadence — make it actually publish
 
-## Plan
+The page is empty because `cadence_entries` has zero rows. The pg_cron job is scheduled at 06:00 UTC daily but `cadence-generate` has **no edge function logs at all**, so either it's never fired successfully or it's crashing on cold start. There's also no way to manually seed the first entry.
 
-### Part 1 — Landing page: copy polish only (no layout changes)
+## What I'll do
 
-Keep every section, grid, component, and asset import exactly as-is in `src/pages/LandingPage.tsx`. Only edit text strings:
+### 1. Make the generator runnable on demand
 
-- **Punctuation consistency**: pick one style and apply throughout — sentence case for headings, single em-dash spacing (` — `), no trailing periods on short labels/CTAs, periods on full-sentence body copy, Oxford commas on, no double spaces.
-- **De-AI-ify phrasing**: replace generic marketing phrases ("institutional-grade", "powered by", "leverage", "harness", "unlock", "next-generation", "seamlessly", "cutting-edge") with concrete, human, slightly opinionated lines.
-- **Hero subline**: rewrite once to sound like a person wrote it, not a pitch deck.
-- **Stats strip numbers**: keep the strip and layout, but swap fabricated-sounding figures for honest, defensible ones (or rephrase as qualitative).
-- **Principles block**: keep 4-bullet layout, rewrite each bullet in plain language (no consultant abstractions).
-- **How-it-works steps**: keep 6-step layout, rewrite each step's title + description in concrete terms (name the actual engine where relevant).
-- **Features grid**: keep all cards, rewrite each card's copy in user-voice ("You see…" / "You get…").
-- **Final CTA**: rewrite tagline + button text to sound human.
+Update `supabase/functions/cadence-generate/index.ts`:
+- Add a proper HTTP entry that accepts both the cron payload and a manual `?force=true` (or POST with `{ admin_key }`) to generate immediately, including overwriting today's entry.
+- Wrap the whole pipeline in a top-level try/catch that **always** writes a log line and returns a clean JSON error (currently a thrown error in `callAIParallel` or the image step likely kills the function before any log flushes).
+- Add `console.log` checkpoints at every stage (topic picked → research done → critic done → image done → row inserted) so the next failure is diagnosable from `edge_function_logs`.
+- Make the diagram step **non-fatal**: if `gemini-2.5-flash-image` fails or times out, save the entry with `image_url = null` instead of aborting the whole run. The page already handles `image: null`.
+- Tighten the `callAIParallel` usage: race only 2 fast providers (Cloudflare + Mistral) for research, then a single critic pass via Gemini Flash for synthesis. Current 3-provider race + critic is ~45–60s and likely hitting the 60s edge timeout.
 
-No JSX structure, no className, no imports, no asset swaps. Pure string edits.
+### 2. Seed the database immediately (manual one-shot)
 
-### Part 2 — Desirable Assets: don't go empty
+After the generator is hardened, manually invoke `cadence-generate` once via the curl edge-function tool to publish today's entry. The page stops being empty within ~30s.
 
-In `supabase/functions/desirable-assets/index.ts`, the previous pass added hard `throw` when AI returns 0 candidates or when 0 survive scoring. Risk: panel becomes permanently blank during quiet windows or if scoring is too strict.
+### 3. Verify cron actually fires
 
-Fix:
-- Keep the "no fabricated tickers" rule (no `ELITE_FALLBACK_UNIVERSE` re-introduction).
-- **Relax scoring filters progressively** if too few survive — instead of failing, lower the quality threshold in steps until at least N candidates pass (still using only AI-generated tickers, still real prices).
-- If the AI itself returns 0 candidates → re-prompt once with a relaxed instruction ("return at least 8 high-quality large-cap names") before throwing.
-- Only throw as the absolute last resort, with a clear, user-facing message the panel can display.
+- Check `cron.job_run_details` for the `cadence-daily` job to see if past runs fired and what they returned (right now we don't know — could be auth failure, network, or the function crashing).
+- If the cron call returns a non-2xx, switch the cron command to use the **service-role key** instead of the anon key so it bypasses any future RLS / rate-limit surprises, and add a `?force=true` query param so each daily run overwrites if today already exists.
+- Schedule a second safety run at 06:15 UTC that retries only if no entry exists for today.
 
-This keeps integrity (no mock tickers, no fabricated prices, no template prose) while ensuring the panel almost always renders real content.
+### 4. Frontend: add an "auto-recover" path
 
-### Files touched
+Update `src/pages/CadencePage.tsx`:
+- If `fetchAllEntries()` returns 0 rows AND the user is on the page, fire a one-time `supabase.functions.invoke('cadence-generate')` from the client and re-fetch on success. This means the very first visitor self-heals the page even if cron has never fired. Guarded by sessionStorage so it only attempts once per session.
+- Replace the static "First entry inbound" block with a live "Generating today's entry…" state during that self-heal call.
 
-- `src/pages/LandingPage.tsx` — copy-only edits (no layout/structure changes)
-- `supabase/functions/desirable-assets/index.ts` — progressive filter relaxation + AI retry, no fallback universe
+### 5. Add a tiny status footer
 
-Deploy: `desirable-assets`.
+On the index page, show the timestamp of the most recent entry + the next scheduled run time, so the failure mode is visible if it ever happens again.
+
+## Files affected
+
+- **Edited**: `supabase/functions/cadence-generate/index.ts` (hardening + non-fatal image + force flag + checkpoints)
+- **Edited**: `src/pages/CadencePage.tsx` (self-heal invoke + status footer)
+- **Migration**: replace the `cadence-daily` cron job → use service-role key, add `force=true`, add 06:15 UTC retry job
+- **Manual op (no file change)**: invoke `cadence-generate` once after deploy to seed today's entry
+
+## Out of scope
+
+- No schema changes (tables are already correct).
+- No change to the Cadence index/entry page visual design.
+- No change to any other module — pure repair of the Cadence generator + page bootstrap.
 
