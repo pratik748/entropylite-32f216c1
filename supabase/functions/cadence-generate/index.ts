@@ -377,6 +377,8 @@ function todayISO(): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  console.log(`[cadence] === invoked === method=${req.method} url=${req.url}`);
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -387,7 +389,9 @@ Deno.serve(async (req) => {
 
     // Idempotency: skip if today's entry already exists (unless ?force=1)
     const url = new URL(req.url);
-    const force = url.searchParams.get("force") === "1";
+    const forceParam = url.searchParams.get("force");
+    const force = forceParam === "1" || forceParam === "true";
+    console.log(`[cadence] today=${today} force=${force}`);
 
     if (!force) {
       const { data: existing } = await supabase
@@ -396,6 +400,7 @@ Deno.serve(async (req) => {
         .eq("publish_date", today)
         .maybeSingle();
       if (existing) {
+        console.log(`[cadence] entry already exists for ${today}: ${existing.slug}`);
         return new Response(JSON.stringify({ ok: true, skipped: true, slug: existing.slug }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -407,8 +412,16 @@ Deno.serve(async (req) => {
     console.log(`[cadence] Picked topic: ${topic} (${discipline}) — fromBank=${isFromBank}`);
 
     const { entry, providersUsed } = await generateResearch(topic, discipline);
+    console.log(`[cadence] Research complete (${providersUsed.join(", ")}) in ${Date.now() - startedAt}ms`);
 
-    const diagram = await generateDiagram(topic, entry.inside_caption ?? topic);
+    let diagram: string | null = null;
+    try {
+      diagram = await generateDiagram(topic, entry.inside_caption ?? topic);
+      console.log(`[cadence] Diagram step done — image=${diagram ? "yes" : "null"}`);
+    } catch (e) {
+      console.warn("[cadence] Diagram threw — continuing without image:", (e as Error).message);
+      diagram = null;
+    }
 
     const slug = `${slugify(topic)}-${today}`.slice(0, 90);
 
