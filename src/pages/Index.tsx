@@ -374,12 +374,7 @@ const IndexContent = () => {
           {/* Main Content — fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
-              {activeTab === "dashboard" && intradayMode && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <IntradayDashboard key={refreshKey} stocks={stocks} />
-                </div>
-              )}
-              {activeTab === "dashboard" && !intradayMode &&
+              {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
