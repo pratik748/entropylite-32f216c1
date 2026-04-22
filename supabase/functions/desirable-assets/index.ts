@@ -832,6 +832,7 @@ serve(async (req) => {
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
     const indiaMode = body.indiaMode === true;
+    const intradayMode = body.intradayMode === true;
     const previousTickers: string[] = body.previousTickers || []; // anti-repeat
     const userBudget: number | undefined = body.userBudget;
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
@@ -951,7 +952,7 @@ QUALITY MANDATE: Bias HARD toward proven blue-chip leaders and category-dominant
 Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
 Reject microcaps, low-float names, story stocks, and anything not actively held by major institutions.
 Use exact tickers supported by Yahoo Finance.
-Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Bias toward Nifty50 / BSE Sensex constituents and top-tier Nifty Next 50 names. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nBias toward S&P 500 / Nasdaq-100 constituents and global mega-caps. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Bias toward Nifty50 / BSE Sensex constituents and top-tier Nifty Next 50 names. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nBias toward S&P 500 / Nasdaq-100 constituents and global mega-caps. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}${intradayMode ? "\nINTRADAY MODE: Recommend ONLY same-session tradeable instruments. Universe is restricted to high-ADV liquid names (>$50M USD daily turnover, or >₹500cr in India): mega-caps, top index constituents, and the most liquid sector ETFs (SPY, QQQ, XLF, XLE, NIFTYBEES.NS, BANKBEES.NS). Every pick MUST have a present-day catalyst (today's earnings, news, gap, halt, macro print, sector flow). timeHorizon must be 'intraday' or 'minutes-hours' (NEVER 'months' or 'quarters'). entryZone, targetPrice, stopLoss must be tuned for ≤1-day moves (typically ±0.5–2%). Set hedgingStrategy to 'N/A — intraday' for all picks. Reject anything thesis-driven or multi-week. Catalyst must be a TODAY event." : ""}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -960,8 +961,8 @@ Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
-
-Create 8-10 recommendations that prioritize:
+${intradayMode ? "\n## INTRADAY OVERRIDE\nReturn 6-10 same-session opportunities ONLY. Each must have a TODAY catalyst (earnings just released, gap >2%, news halt, sector flow, FOMC/CPI print). entryZone within 0.5% of last price; targetPrice +0.5–2%; stopLoss −0.4–1%. timeHorizon = 'intraday'. hedgingStrategy = 'N/A — intraday' (we do not hedge same-session positions).\n" : ""}
+Create ${intradayMode ? "6-10 INTRADAY" : "8-10"} recommendations that prioritize:
 1) Blue-chip / index-constituent quality with proven multi-year compounding
 2) Positive earnings momentum + heavy institutional participation
 3) Price trend confirmation (above 50/200-day averages)

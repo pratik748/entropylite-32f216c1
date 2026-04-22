@@ -39,7 +39,9 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import IntradayDashboard from "@/components/intraday/IntradayDashboard";
+import LodgerLedgerDock from "@/components/intraday/LodgerLedgerDock";
+import DeepTradeLedger from "@/components/intraday/DeepTradeLedger";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -323,10 +325,10 @@ const IndexContent = () => {
             <div className="border-b border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-1 flex items-center gap-2 shrink-0">
               <Gauge className="h-3 w-3 text-primary" />
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary font-semibold">
-                Intraday Compounding Mode · System-wide
+                Intraday Mode · System-wide skew
               </span>
               <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
-                Validator + Lodgers + Discipline Governor active. Long-term portfolio view preserved.
+                Desirable / News / Analysis / Risk re-tuned for same-session profit. Lodger Ledger persists in dock + Risk tab.
               </span>
             </div>
           )}
@@ -372,12 +374,7 @@ const IndexContent = () => {
           {/* Main Content — fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
-              {activeTab === "dashboard" && intradayMode && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <IntradayDashboard key={refreshKey} stocks={stocks} />
-                </div>
-              )}
-              {activeTab === "dashboard" && !intradayMode &&
+              {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
@@ -611,7 +608,18 @@ const IndexContent = () => {
               )}
               {activeTab === "risk" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <RiskDashboard key={refreshKey} stocks={stocks} />
+                  <Tabs defaultValue="risk" className="w-full">
+                    <TabsList className="h-8 mb-2">
+                      <TabsTrigger value="risk" className="text-[10px] font-mono uppercase">Risk</TabsTrigger>
+                      <TabsTrigger value="ledger" className="text-[10px] font-mono uppercase">Trade Ledger</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="risk">
+                      <RiskDashboard key={refreshKey} stocks={stocks} />
+                    </TabsContent>
+                    <TabsContent value="ledger">
+                      <DeepTradeLedger />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               )}
               {activeTab === "fortress" && (
@@ -699,6 +707,7 @@ const IndexContent = () => {
           {/* System Status Bar */}
           <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
           <ThemeToggle />
+          {activeTab === "dashboard" && <LodgerLedgerDock />}
         </>
       )}
     </div>
