@@ -828,6 +828,16 @@ serve(async (req) => {
     const portfolioTickers: string[] = body.portfolioTickers || [];
     const portfolioWeights: Record<string, number> = body.portfolioWeights || {};
     const portfolioSectors: Record<string, string> = body.portfolioSectors || {};
+    const portfolioSignals: {
+      sellTickers?: string[];
+      highRiskTickers?: string[];
+      avoidSectors?: string[];
+    } = body.portfolioSignals || {};
+    const sellTickers: string[] = (portfolioSignals.sellTickers || []).map((t) => String(t).toUpperCase());
+    const highRiskTickers: string[] = (portfolioSignals.highRiskTickers || []).map((t) => String(t).toUpperCase());
+    const avoidSectorsLower: string[] = (portfolioSignals.avoidSectors || [])
+      .map((s) => String(s).toLowerCase().trim())
+      .filter(Boolean);
     const portfolioValue = body.portfolioValue || 100000;
     const baseCurrency = (body.baseCurrency || "USD").toUpperCase();
     const provider = String(body.provider || "mistral").toLowerCase();
