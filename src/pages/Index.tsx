@@ -39,7 +39,7 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
-import CompoundingMode from "@/components/compounding/CompoundingMode";
+import IntradayDashboard from "@/components/intraday/IntradayDashboard";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +54,7 @@ import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useIntradayMode } from "@/hooks/useIntradayMode";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "compounding";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -65,7 +65,6 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
   { id: "reflexivity", label: "Reflexivity", shortLabel: "Reflex", icon: <Brain className="h-3.5 w-3.5" /> },
-  { id: "compounding", label: "Compounding", shortLabel: "Comp", icon: <Gauge className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
   { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
@@ -75,7 +74,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 
 const IndexContent = () => {
   const { intradayMode } = useIntradayMode();
-  const [activeTab, setActiveTab] = useState<Tab>(intradayMode ? "compounding" : "dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -87,17 +86,15 @@ const IndexContent = () => {
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
 
-  // When user toggles Intraday Mode on, jump to Compounding immediately.
+  // When user toggles Intraday Mode on, refresh the dashboard view (it swaps to the intraday surface).
   const lastIntradayRef = useRef(intradayMode);
   useEffect(() => {
-    if (intradayMode && !lastIntradayRef.current) {
-      setActiveTab("compounding");
+    if (intradayMode !== lastIntradayRef.current) {
+      setActiveTab("dashboard");
       flushAllCaches();
       triggerRefresh();
-    } else if (!intradayMode && lastIntradayRef.current && activeTab === "compounding") {
-      setActiveTab("dashboard");
+      lastIntradayRef.current = intradayMode;
     }
-    lastIntradayRef.current = intradayMode;
   }, [intradayMode]);
 
   // Force refresh when user switches tabs
@@ -375,7 +372,12 @@ const IndexContent = () => {
           {/* Main Content — fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
-              {activeTab === "dashboard" &&
+              {activeTab === "dashboard" && intradayMode && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <IntradayDashboard key={refreshKey} stocks={stocks} />
+                </div>
+              )}
+              {activeTab === "dashboard" && !intradayMode &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
@@ -615,11 +617,6 @@ const IndexContent = () => {
               {activeTab === "fortress" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
-                </div>
-              )}
-              {activeTab === "compounding" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <CompoundingMode key={refreshKey} stocks={stocks} />
                 </div>
               )}
             </PageTransition>

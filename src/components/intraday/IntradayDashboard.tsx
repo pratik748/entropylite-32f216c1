@@ -21,7 +21,7 @@ interface Props {
   stocks?: PortfolioStock[];
 }
 
-const CompoundingMode = ({ stocks = [] }: Props) => {
+const IntradayDashboard = ({ stocks = [] }: Props) => {
   const lodgers = useLodgers();
   const { intradayMode } = useIntradayMode();
   const { totalValue, holdings } = useNormalizedPortfolio(stocks);
@@ -239,4 +239,4 @@ const BandStat = ({ label, value, accent }: { label: string; value: string; acce
   </div>
 );
 
-export default CompoundingMode;
+export default IntradayDashboard;
