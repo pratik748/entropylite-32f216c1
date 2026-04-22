@@ -858,6 +858,13 @@ serve(async (req) => {
       ? `Existing portfolio: ${portfolioTickers.map(t => `${t} (${portfolioSectors[t] || "unknown"}, weight: ${((portfolioWeights[t] || 0) * 100).toFixed(1)}%)`).join(", ")}. Sectors already held: ${existingSectors.join(", ") || "none"}.`
       : "Empty portfolio — recommend foundational positions.";
 
+    // Cross-module consistency: the Analysis & Risk modules already gave a verdict on each
+    // holding. Desirable Assets MUST honour those verdicts, not contradict them.
+    const crossModuleBlock = (sellTickers.length || highRiskTickers.length || avoidSectorsLower.length)
+      ? `\n## CROSS-MODULE PORTFOLIO VERDICTS (HARD CONSTRAINT — DO NOT CONTRADICT):
+${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${sellTickers.join(", ")}. The user is being told to reduce exposure here. Do NOT recommend these tickers, close substitutes, direct competitors, or other names with the same business model.\n` : ""}${highRiskTickers.length ? `- Risk module flagged these holdings as HIGH RISK (riskScore ≥ 70): ${highRiskTickers.join(", ")}. Do NOT add more risk on top of this — avoid recommending high-volatility / high-beta names that would correlate with these.\n` : ""}${avoidSectorsLower.length ? `- AVOID these sectors entirely (already over-weighted with flagged-Sell or high-risk positions): ${avoidSectorsLower.join(", ")}. Zero recommendations from these sectors.\n` : ""}If a candidate would clearly contradict the user's existing Sell or risk warnings, REJECT it and pick something else. Recommendations must be additive to the portfolio's risk-adjusted profile, never additive to its problems.\n`
+      : "";
+
     const homeMarketRule = indiaMode
       ? "ALL recommendations must be Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs (e.g. NIFTYBEES.NS, GOLDBEES.NS), or Indian F&O instruments. No foreign stocks whatsoever."
       : isUSUser
