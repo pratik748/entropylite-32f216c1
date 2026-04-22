@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench, Gauge } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -10,6 +10,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 interface Recommendation {
   ticker: string;
@@ -190,6 +191,7 @@ function earningsSignalColor(signal?: "bullish" | "neutral" | "bearish"): string
 }
 
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
+  const { intradayMode } = useIntradayMode();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
   const [regimeType, setRegimeType] = useState("");
@@ -425,6 +427,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
+          {intradayMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-1 text-[9px] font-mono uppercase tracking-widest text-primary">
+              <Gauge className="h-3 w-3" /> Intraday picks · ≤6h horizon
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
