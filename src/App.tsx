@@ -16,6 +16,8 @@ import AboutPage from "./pages/AboutPage";
 import AccessPage from "./pages/AccessPage";
 import DisclaimerPage from "./pages/DisclaimerPage";
 import BackbonePage from "./pages/BackbonePage";
+import CadencePage from "./pages/CadencePage";
+import CadenceEntryPage from "./pages/CadenceEntryPage";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +69,8 @@ const App = () => (
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/backbone" element={<BackbonePage />} />
+          <Route path="/cadence" element={<CadencePage />} />
+          <Route path="/cadence/:slug" element={<CadenceEntryPage />} />
           <Route path="/access" element={<AccessPage />} />
           <Route path="/disclaimer" element={<DisclaimerPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
