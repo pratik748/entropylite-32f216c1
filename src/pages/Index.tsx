@@ -41,6 +41,7 @@ import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
 import LodgerLedgerDock from "@/components/intraday/LodgerLedgerDock";
 import DeepTradeLedger from "@/components/intraday/DeepTradeLedger";
+import IntradayDashboard from "@/components/intraday/IntradayDashboard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
