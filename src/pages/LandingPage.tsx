@@ -148,14 +148,14 @@ export default function LandingPage() {
               A different way of reading markets
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Four ideas shape every layer of the system. They're the reason the terminal looks and feels the way it does.
+              Four ideas shape every layer. They are the reason the terminal looks and feels the way it does.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
             {PRINCIPLES.map((p, i) => (
               <div key={p.title} className="bg-white p-6 sm:p-8">
-                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">— {String(i + 1).padStart(2, "0")}</p>
+                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">{String(i + 1).padStart(2, "0")}</p>
                 <h3 className="text-base sm:text-lg font-semibold tracking-tight mb-2">{p.title}</h3>
                 <p className="text-sm text-black/55 leading-relaxed">{p.desc}</p>
               </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Begin — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Begin. Sign in free. <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
