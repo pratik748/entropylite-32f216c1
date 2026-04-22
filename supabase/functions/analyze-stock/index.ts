@@ -52,6 +52,7 @@ serve(async (req) => {
     const rawBody = await req.json();
     const provider = rawBody.provider;
     const indiaMode = rawBody.indiaMode === true;
+    const intradayMode = rawBody.intradayMode === true;
     const requestedTicker = (rawBody.ticker || "").toString();
     const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = rawBody.buyPrice;
