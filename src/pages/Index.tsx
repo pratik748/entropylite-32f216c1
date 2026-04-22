@@ -589,6 +589,11 @@ const IndexContent = () => {
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
               )}
+              {activeTab === "compounding" && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <CompoundingMode key={refreshKey} />
+                </div>
+              )}
             </PageTransition>
           </main>
 
