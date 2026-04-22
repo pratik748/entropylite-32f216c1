@@ -7,6 +7,7 @@ import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 const NAV_LINKS = [
   { label: "About", path: "/about" },
   { label: "Backbone", path: "/backbone" },
+  { label: "Cadence", path: "/cadence" },
   { label: "Pricing", path: "/pricing" },
   { label: "Access", path: "/access" },
 ];
