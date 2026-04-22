@@ -700,6 +700,7 @@ const IndexContent = () => {
                   </SheetContent>
                 </Sheet>
 
+                {!intradayMode && (
                 <Sheet>
                   <SheetTrigger asChild>
                     <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
@@ -718,6 +719,7 @@ const IndexContent = () => {
                     </div>
                   </SheetContent>
                 </Sheet>
+                )}
               </div>
             </div>
           )}
