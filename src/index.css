@@ -87,7 +87,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 8%;
 
-    --primary: 0 0% 12%;
+    --primary: 188 78% 38%;
     --primary-foreground: 0 0% 98%;
 
     --secondary: 0 0% 92%;
@@ -104,7 +104,7 @@
 
     --border: 0 0% 85%;
     --input: 0 0% 88%;
-    --ring: 0 0% 30%;
+    --ring: 188 78% 38%;
 
     --gain: 152 70% 35%;
     --loss: 0 75% 48%;
@@ -134,12 +134,12 @@
 
     --sidebar-background: 0 0% 97%;
     --sidebar-foreground: 0 0% 45%;
-    --sidebar-primary: 0 0% 12%;
+    --sidebar-primary: 188 78% 38%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 0 0% 92%;
     --sidebar-accent-foreground: 0 0% 8%;
     --sidebar-border: 0 0% 85%;
-    --sidebar-ring: 0 0% 30%;
+    --sidebar-ring: 188 78% 38%;
   }
 
   .palantir {
@@ -152,7 +152,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 8%;
 
-    --primary: 0 0% 5%;
+    --primary: 188 82% 32%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 96%;
@@ -169,7 +169,7 @@
 
     --border: 0 0% 88%;
     --input: 0 0% 92%;
-    --ring: 0 0% 20%;
+    --ring: 188 82% 32%;
 
     --radius: 0rem;
 
@@ -201,12 +201,12 @@
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 0 0% 45%;
-    --sidebar-primary: 0 0% 5%;
+    --sidebar-primary: 188 82% 32%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 96%;
     --sidebar-accent-foreground: 0 0% 8%;
     --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 0 0% 20%;
+    --sidebar-ring: 188 82% 32%;
   }
 }
 
@@ -222,7 +222,8 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
+    font-feature-settings: "ss01", "cv11";
     overflow-x: hidden;
   }
 
@@ -290,69 +291,45 @@
     box-shadow: var(--glow-loss);
   }
   .font-mono-num {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
   }
 
-  /* Liquid Glass System */
+  /* ───────── Control-system surfaces (no blur, no bloom) ───────── */
   .glass-panel {
-    background: hsl(var(--glass-bg));
-    backdrop-filter: blur(16px) saturate(1.2);
-    -webkit-backdrop-filter: blur(16px) saturate(1.2);
-    border: 1px solid hsl(var(--glass-border));
-    box-shadow: var(--glow-glass);
+    background: hsl(var(--surface-1));
+    border: 1px solid hsl(var(--border));
     position: relative;
-    overflow: hidden;
-  }
-  .glass-panel::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--glass-highlight)) 30%, hsl(var(--glass-highlight)) 70%, transparent 100%);
-    pointer-events: none;
-  }
-  .glass-panel::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, hsl(var(--glass-refraction)) 0%, transparent 40%, hsl(var(--glass-refraction)) 100%);
-    pointer-events: none;
   }
 
   .glass-card {
-    background: hsl(var(--glass-bg));
-    backdrop-filter: blur(16px) saturate(1.2);
-    -webkit-backdrop-filter: blur(16px) saturate(1.2);
-    border: 1px solid hsl(var(--glass-border));
-    box-shadow: var(--glow-glass);
+    background: hsl(var(--surface-1));
+    border: 1px solid hsl(var(--border));
   }
 
   .glass-subtle {
     background: hsl(var(--surface-2));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--glass-border));
+    border: 1px solid hsl(var(--border));
   }
 
-  .glass-glow-primary {
-    box-shadow: var(--glow-glass-primary);
+  /* Active accent rule used in place of glow — surgical underline / left bar */
+  .accent-bar-l {
+    box-shadow: inset 2px 0 0 hsl(var(--primary));
   }
-  .glass-glow-loss {
-    box-shadow: var(--glow-glass-loss);
-  }
-  .glass-glow-gain {
-    box-shadow: var(--glow-glass-gain);
+  .accent-bar-b {
+    box-shadow: inset 0 -1px 0 hsl(var(--primary));
   }
 
-  .gradient-border {
-    border-image: linear-gradient(135deg, hsl(210 100% 60% / 0.3), hsl(220 12% 13%)) 1;
-  }
+  /* Legacy glow class names kept as no-ops so existing markup compiles cleanly */
+  .glass-glow-primary,
+  .glass-glow-loss,
+  .glass-glow-gain,
+  .glow-primary,
+  .glow-gain,
+  .glow-loss { box-shadow: none; }
+
+  .gradient-border { border-color: hsl(var(--border)); }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -463,8 +440,8 @@
 
 /* Leaflet dark theme overrides */
 .leaflet-container {
-  background: hsl(0, 0%, 2%) !important;
-  font-family: 'JetBrains Mono', monospace;
+  background: hsl(220 18% 6%) !important;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
 .leaflet-control-zoom a {
   background: hsl(0, 0%, 8%) !important;
@@ -476,14 +453,14 @@
   color: hsl(0, 0%, 96%) !important;
 }
 .entropy-tooltip {
-  background: hsl(0, 0%, 5%) !important;
-  border: 1px solid hsl(0, 0%, 18%) !important;
-  color: hsl(0, 0%, 85%) !important;
-  font-family: 'JetBrains Mono', monospace !important;
+  background: hsl(220 16% 8%) !important;
+  border: 1px solid hsl(220 14% 14%) !important;
+  color: hsl(210 16% 88%) !important;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
   font-size: 9px !important;
   padding: 2px 6px !important;
-  border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
+  border-radius: 1px !important;
+  box-shadow: none !important;
 }
 .entropy-tooltip::before {
   border-right-color: hsl(0, 0%, 18%) !important;
