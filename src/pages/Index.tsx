@@ -37,7 +37,6 @@ import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
-import ReflexivityEngine from "@/components/ReflexivityEngine";
 import ProofCard from "@/components/ProofCard";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -52,7 +51,7 @@ import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -62,7 +61,6 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "reflexivity", label: "Reflexivity", shortLabel: "Reflex", icon: <Brain className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
   { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
@@ -570,11 +568,6 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
-                </div>
-              )}
-              {activeTab === "reflexivity" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <ReflexivityEngine key={refreshKey} stocks={stocks} refreshKey={refreshKey} />
                 </div>
               )}
               {activeTab === "risk" && (
