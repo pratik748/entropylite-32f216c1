@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      cadence_entries: {
+        Row: {
+          concept: string
+          created_at: string
+          discipline: string
+          failure_modes: Json
+          generation_meta: Json
+          id: string
+          image_url: string | null
+          inside_annotation: string
+          inside_caption: string
+          mathematical_core: Json
+          providers_used: Json
+          publish_date: string
+          read_minutes: number
+          slug: string
+          tagline: string
+          why_it_matters: string
+        }
+        Insert: {
+          concept: string
+          created_at?: string
+          discipline: string
+          failure_modes?: Json
+          generation_meta?: Json
+          id?: string
+          image_url?: string | null
+          inside_annotation: string
+          inside_caption: string
+          mathematical_core?: Json
+          providers_used?: Json
+          publish_date: string
+          read_minutes?: number
+          slug: string
+          tagline: string
+          why_it_matters: string
+        }
+        Update: {
+          concept?: string
+          created_at?: string
+          discipline?: string
+          failure_modes?: Json
+          generation_meta?: Json
+          id?: string
+          image_url?: string | null
+          inside_annotation?: string
+          inside_caption?: string
+          mathematical_core?: Json
+          providers_used?: Json
+          publish_date?: string
+          read_minutes?: number
+          slug?: string
+          tagline?: string
+          why_it_matters?: string
+        }
+        Relationships: []
+      }
+      cadence_topics_used: {
+        Row: {
+          entry_id: string | null
+          topic: string
+          used_at: string
+        }
+        Insert: {
+          entry_id?: string | null
+          topic: string
+          used_at?: string
+        }
+        Update: {
+          entry_id?: string | null
+          topic?: string
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadence_topics_used_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "cadence_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clank_activation_events: {
         Row: {
           activated_at: string
