@@ -29,48 +29,53 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   const savingsColor = apiMetrics.savingsPercent > 50 ? "text-gain" : apiMetrics.savingsPercent > 20 ? "text-warning" : "text-muted-foreground";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 px-2 sm:px-4 flex items-center justify-between font-mono text-[8px]" style={{ height: '24px' }}>
-      <div className="flex items-center gap-2 sm:gap-3">
-        <span className="h-1.5 w-1.5 rounded-full bg-gain flex-shrink-0" />
-        <div className="flex items-center gap-1">
-          <Zap className="h-2 w-2 text-gain" />
-          <span className={`font-semibold tabular-nums ${latencyColor}`}>{latencyMs}ms</span>
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-sidebar px-3 flex items-stretch font-mono text-[9px] uppercase tracking-[0.12em]" style={{ height: '22px' }}>
+      <div className="flex items-stretch divide-x divide-border">
+        <div className="flex items-center gap-1.5 pr-3">
+          <span className="h-1 w-1 bg-gain" />
+          <span className="text-gain font-semibold">SYS·OK</span>
         </div>
-        <div className="flex items-center gap-1">
-          <Wifi className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-gain" />
-          <span className="text-gain font-semibold">LIVE</span>
+        <div className="flex items-center gap-1.5 px-3">
+          <Zap className="h-2.5 w-2.5 text-muted-foreground" />
+          <span className="text-muted-foreground">LAT</span>
+          <span className={`font-semibold tabular-nums ${latencyColor}`}>{latencyMs}<span className="text-muted-foreground/60">ms</span></span>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5">
-          <Activity className="h-2.5 w-2.5 text-primary" />
-          <span className="text-muted-foreground">SIMS</span>
+        <div className="hidden sm:flex items-center gap-1.5 px-3">
+          <Wifi className="h-2.5 w-2.5 text-gain" />
+          <span className="text-gain font-semibold">FEED·LIVE</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5 px-3">
+          <Activity className="h-2.5 w-2.5 text-muted-foreground" />
+          <span className="text-muted-foreground">SIM</span>
           <span className="text-foreground font-semibold tabular-nums">{stockCount > 0 ? simCount + stockCount : 0}</span>
         </div>
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden md:flex items-center gap-1.5 px-3">
           <BarChart3 className="h-2.5 w-2.5 text-muted-foreground" />
-          <span className="text-muted-foreground">API/HR</span>
+          <span className="text-muted-foreground">API·HR</span>
           <span className="text-foreground font-semibold tabular-nums">{apiMetrics.requestsPerHour}</span>
         </div>
-        <div className="hidden md:flex items-center gap-1.5">
-          <ShieldCheck className="h-2.5 w-2.5 text-gain" />
+        <div className="hidden md:flex items-center gap-1.5 px-3">
+          <ShieldCheck className="h-2.5 w-2.5 text-muted-foreground" />
           <span className="text-muted-foreground">SAVED</span>
           <span className={`font-semibold tabular-nums ${savingsColor}`}>{apiMetrics.savingsPercent}%</span>
         </div>
       </div>
-      <div className="flex items-center gap-2 sm:gap-4">
-        <div className="flex items-center gap-1">
-          <span className="text-muted-foreground">ASSETS</span>
+      <div className="flex-1" />
+      <div className="flex items-stretch divide-x divide-border">
+        <div className="flex items-center gap-1.5 px-3">
+          <span className="text-muted-foreground">POS</span>
           <span className="text-foreground font-semibold tabular-nums">{stockCount}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5">
+        <div className="hidden sm:flex items-center gap-1.5 px-3">
           <Cpu className="h-2.5 w-2.5 text-muted-foreground" />
           <span className="text-foreground font-semibold tabular-nums">{cpuLoad}%</span>
-          <div className="w-12 h-1 bg-surface-3 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${cpuLoad}%` }} />
+          <div className="w-10 h-[3px] bg-surface-3 overflow-hidden">
+            <div className="h-full bg-primary" style={{ width: `${cpuLoad}%` }} />
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-muted-foreground" />
-          <span className="text-foreground font-semibold tabular-nums">{utc}</span>
+        <div className="flex items-center gap-1.5 pl-3">
+          <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+          <span className="text-foreground font-semibold tabular-nums normal-case">{utc}<span className="text-muted-foreground/60 ml-1">UTC</span></span>
         </div>
       </div>
     </div>
