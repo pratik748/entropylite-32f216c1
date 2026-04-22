@@ -427,6 +427,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
+          {intradayMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-1 text-[9px] font-mono uppercase tracking-widest text-primary">
+              <Gauge className="h-3 w-3" /> Intraday picks · ≤6h horizon
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
