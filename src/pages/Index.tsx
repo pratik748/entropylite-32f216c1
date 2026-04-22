@@ -634,6 +634,24 @@ const IndexContent = () => {
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
+              {activeTab === "catalysts" && intradayMode && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <div className="rounded-md border border-border bg-card overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
+                      <Zap className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                        Live Catalysts · Intraday
+                      </span>
+                    </div>
+                    <LiveNewsFeed key={refreshKey} compact />
+                  </div>
+                </div>
+              )}
+              {activeTab === "lessons" && intradayMode && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <RecentLessonsPanel key={refreshKey} />
+                </div>
+              )}
               {activeTab === "reflexivity" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <ReflexivityEngine key={refreshKey} stocks={stocks} refreshKey={refreshKey} />
