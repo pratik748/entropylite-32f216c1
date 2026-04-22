@@ -309,36 +309,31 @@ const IndexContent = () => {
           )}
 
           {/* Tab Navigation */}
-          <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
+          <nav className="border-b border-border bg-sidebar shrink-0">
             <div
-              className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
+              className="px-2 flex items-stretch overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
-              {tabs.map((tab) => (
+              {tabs.map((tab, idx) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabSwitch(tab.id)}
                   style={{ scrollSnapAlign: "start" }}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 ${
+                  className={`relative flex items-center gap-1.5 px-3 h-8 text-[10px] font-mono font-semibold transition-colors whitespace-nowrap flex-shrink-0 uppercase tracking-[0.14em] border-r border-border ${
                     activeTab === tab.id
-                      ? "border-primary text-primary bg-surface-2"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-                  }`}
+                      ? "text-primary bg-background accent-bar-b"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                  } ${idx === 0 ? "border-l border-border" : ""}`}
                 >
-                  <span className="sm:hidden">
-                    {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}
-                  </span>
-                  <span className="hidden sm:block">{tab.icon}</span>
-                  <span className="hidden sm:inline uppercase tracking-wider">{tab.label}</span>
-                  <span className="sm:hidden uppercase tracking-wider">{tab.shortLabel}</span>
+                  <span className="font-mono text-[8px] text-muted-foreground/50 mr-0.5">{String(idx + 1).padStart(2, "0")}</span>
+                  {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-1 pl-1 pr-2 flex-shrink-0">
-                <span className="relative flex h-1 w-1">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
-                  <span className="relative inline-flex h-1 w-1 rounded-full bg-gain" />
-                </span>
-                <span className="text-[7px] font-mono text-gain/70 uppercase tracking-widest">Live</span>
+              <div className="ml-auto flex items-center gap-1.5 pl-3 pr-2 border-l border-border">
+                <span className="h-1 w-1 bg-gain animate-pulse" />
+                <span className="text-[8px] font-mono text-gain uppercase tracking-[0.18em]">LIVE</span>
               </div>
             </div>
           </nav>
