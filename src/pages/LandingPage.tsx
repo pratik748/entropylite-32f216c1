@@ -244,7 +244,7 @@ export default function LandingPage() {
             Twelve intelligence layers, one terminal
           </h2>
           <p className="text-sm sm:text-base text-black/55 max-w-xl mx-auto">
-            The same engines a professional desk runs, fused into one view and live by default.
+            The same engines a professional desk runs. Fused into one view. Live by default.
           </p>
         </div>
 
@@ -271,7 +271,7 @@ export default function LandingPage() {
               From raw data to a decision you can act on
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Six stages, running in the background while you're looking at something else.
+              Six stages, running in the background while you are looking at something else.
             </p>
           </div>
 
