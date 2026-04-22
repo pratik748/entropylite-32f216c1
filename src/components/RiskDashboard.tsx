@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { Shield, AlertTriangle, Zap, Brain } from "lucide-react";
+import { Shield, AlertTriangle, Zap, Brain, Gauge } from "lucide-react";
 import ClankEngine from "@/components/risk/ClankEngine";
 import { useAIProvider } from "@/hooks/useAIProvider";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
@@ -30,6 +31,7 @@ function computeVaRCVaR(stocks: PortfolioStock[]) {
 }
 
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
+  const { intradayMode } = useIntradayMode();
   const analyzed = stocks.filter((s) => s.analysis);
   const staticVars = computeVaRCVaR(stocks);
 
@@ -51,7 +53,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       .then(({ data }) => { if (data && !data.error) setAiData(data); })
       .catch(() => {})
       .finally(() => setAiLoading(false));
-  }, [analyzed.map(s => s.ticker).join(",")]);
+  }, [analyzed.map(s => s.ticker).join(","), intradayMode]);
 
   const totalValue = useMemo(() => 
     analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0),
@@ -202,6 +204,11 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-2">
           <Brain className="h-4 w-4 text-gain" />
           <span className="text-xs text-gain">AI-Driven Risk Analysis</span>
+          {intradayMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-widest text-primary">
+              <Gauge className="h-2.5 w-2.5" /> 1-Session horizon
+            </span>
+          )}
           {volatilityRegime && <span className="ml-auto text-xs font-mono text-foreground">Regime: {volatilityRegime}</span>}
         </div>
       )}
@@ -242,10 +249,10 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {/* VaR Stats */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {[
-          { label: "VaR (95%)", value: vars.var95 },
-          { label: "VaR (99%)", value: vars.var99 },
-          { label: "CVaR (95%)", value: vars.cvar95 },
-          { label: "CVaR (99%)", value: vars.cvar99 },
+          { label: intradayMode ? "1-Sess VaR (95%)" : "VaR (95%)", value: vars.var95 },
+          { label: intradayMode ? "1-Sess VaR (99%)" : "VaR (99%)", value: vars.var99 },
+          { label: intradayMode ? "1-Sess CVaR (95%)" : "CVaR (95%)", value: vars.cvar95 },
+          { label: intradayMode ? "1-Sess CVaR (99%)" : "CVaR (99%)", value: vars.cvar99 },
           { label: "Liquidity VaR", value: vars.liquidityVar },
         ].map(s => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
@@ -253,7 +260,9 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
             <p className="mt-1 font-mono text-lg font-bold text-loss">
               {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
             </p>
-            <p className="text-[9px] text-muted-foreground">1-day parametric</p>
+            <p className="text-[9px] text-muted-foreground">
+              {intradayMode ? "single-session parametric" : "1-day parametric"}
+            </p>
           </div>
         ))}
       </div>

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin, Landmark } from "lucide-react";
+import { TrendingUp, TrendingDown, Globe, BarChart3, Fuel, DollarSign, Activity, Loader2, RefreshCw, Bitcoin, Landmark, Zap } from "lucide-react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { Button } from "@/components/ui/button";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 import VixGauge from "@/components/charts/VixGauge";
 import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import { useFX } from "@/hooks/useFX";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -53,6 +54,7 @@ type Region = typeof regions[number];
 const MarketOverview = () => {
   const { data: macroIntel } = useMacroIntelligence();
   const { indiaMode } = useFX();
+  const { intradayMode } = useIntradayMode();
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -140,6 +142,11 @@ const MarketOverview = () => {
             LIVE · 15s refresh
             {lastUpdate && ` · ${lastUpdate.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
           </span>
+          {intradayMode && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-widest text-primary">
+              <Zap className="h-2.5 w-2.5" /> Intraday focus · today's movers
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {regions.map(r => (
