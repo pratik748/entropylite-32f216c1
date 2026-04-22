@@ -11,14 +11,34 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ValidatorResult } from "@/hooks/useIntradayValidator";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 
 const DEFAULT_CAPITAL = 10000;
 
-const CompoundingMode = () => {
+interface Props {
+  stocks?: PortfolioStock[];
+}
+
+const CompoundingMode = ({ stocks = [] }: Props) => {
   const lodgers = useLodgers();
+  const { intradayMode } = useIntradayMode();
+  const { totalValue, holdings } = useNormalizedPortfolio(stocks);
   const [capital, setCapital] = useLocalStorage<number>("compounding-capital", DEFAULT_CAPITAL);
   const [openLodges, setOpenLodges] = useLocalStorage<OpenLodge[]>("compounding-open-lodges", []);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+
+  // When intraday mode is ON and the user has a live portfolio, default capital to portfolio value
+  const effectiveCapital = useMemo(() => {
+    if (intradayMode && totalValue > 0) return totalValue;
+    return capital;
+  }, [intradayMode, totalValue, capital]);
+
+  const tickerSuggestions = useMemo(
+    () => holdings.map(h => h.ticker).slice(0, 12),
+    [holdings]
+  );
 
   // Live price polling for active lodges
   useEffect(() => {
@@ -46,7 +66,7 @@ const CompoundingMode = () => {
   const handleAcceptLodge = useCallback((r: ValidatorResult, _shares: number) => {
     const live = livePrices[r.ticker];
     const entryPx = live && live > 0 ? live : 100; // fallback notional if no live
-    const qty = Math.max(1, Math.floor((capital * r.sizePct) / Math.max(0.01, entryPx)));
+    const qty = Math.max(1, Math.floor((effectiveCapital * r.sizePct) / Math.max(0.01, entryPx)));
     const lodge: OpenLodge = {
       id: crypto.randomUUID(),
       ticker: r.ticker,
@@ -61,7 +81,7 @@ const CompoundingMode = () => {
     };
     setOpenLodges(prev => [...prev, lodge]);
     toast({ title: "Lodge opened", description: `${r.ticker} · ${qty} units · ${(r.sizePct * 100).toFixed(2)}% of capital` });
-  }, [capital, livePrices, setOpenLodges]);
+  }, [effectiveCapital, livePrices, setOpenLodges]);
 
   const handleCloseLodge = useCallback(async (id: string, exitPx: number, latencyMs: number) => {
     const l = openLodges.find(x => x.id === id);
@@ -148,11 +168,14 @@ const CompoundingMode = () => {
           </div>
         )}
         <div className="ml-auto flex items-center gap-1.5">
-          <label className="text-[9px] font-mono uppercase text-muted-foreground">Capital</label>
+          <label className="text-[9px] font-mono uppercase text-muted-foreground">
+            {intradayMode && totalValue > 0 ? "Capital (portfolio)" : "Capital"}
+          </label>
           <input
             type="number"
-            value={capital}
+            value={Math.round(effectiveCapital)}
             onChange={e => setCapital(Math.max(100, parseFloat(e.target.value) || DEFAULT_CAPITAL))}
+            disabled={intradayMode && totalValue > 0}
             className="h-6 w-24 rounded-sm border border-border bg-background px-2 text-[10px] font-mono"
           />
         </div>
@@ -160,11 +183,13 @@ const CompoundingMode = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <PreTradeValidator
-          capital={capital}
+          capital={effectiveCapital}
           residualBudgetPct={discipline.residualBudgetPct}
           blocked={discipline.blocked}
           blockReasons={discipline.reasons}
           onAccept={handleAcceptLodge}
+          intradayMode={intradayMode}
+          tickerSuggestions={tickerSuggestions}
         />
         <div className="rounded-sm border border-border bg-card p-3">
           <div className="flex items-center gap-2 mb-2">

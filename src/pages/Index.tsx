@@ -52,6 +52,7 @@ import { FXProvider } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "compounding";
 
@@ -73,7 +74,8 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 ];
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const { intradayMode } = useIntradayMode();
+  const [activeTab, setActiveTab] = useState<Tab>(intradayMode ? "compounding" : "dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
@@ -84,6 +86,19 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
+
+  // When user toggles Intraday Mode on, jump to Compounding immediately.
+  const lastIntradayRef = useRef(intradayMode);
+  useEffect(() => {
+    if (intradayMode && !lastIntradayRef.current) {
+      setActiveTab("compounding");
+      flushAllCaches();
+      triggerRefresh();
+    } else if (!intradayMode && lastIntradayRef.current && activeTab === "compounding") {
+      setActiveTab("dashboard");
+    }
+    lastIntradayRef.current = intradayMode;
+  }, [intradayMode]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
@@ -303,6 +318,19 @@ const IndexContent = () => {
               <div className="ml-auto h-1 w-24 rounded-full bg-primary/20 overflow-hidden">
                 <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
               </div>
+            </div>
+          )}
+
+          {/* Intraday Mode banner */}
+          {intradayMode && (
+            <div className="border-b border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-1 flex items-center gap-2 shrink-0">
+              <Gauge className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary font-semibold">
+                Intraday Compounding Mode · System-wide
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
+                Validator + Lodgers + Discipline Governor active. Long-term portfolio view preserved.
+              </span>
             </div>
           )}
 
@@ -591,7 +619,7 @@ const IndexContent = () => {
               )}
               {activeTab === "compounding" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <CompoundingMode key={refreshKey} />
+                  <CompoundingMode key={refreshKey} stocks={stocks} />
                 </div>
               )}
             </PageTransition>
