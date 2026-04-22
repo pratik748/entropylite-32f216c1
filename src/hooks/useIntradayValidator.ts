@@ -63,15 +63,20 @@ export function useIntradayValidator() {
     setError(null);
     setResult(null);
     try {
-      await fetchHistorical([opts.ticker], "1y");
-      const series = prices[opts.ticker];
-      if (!series || series.closes.length < 30) {
-        // Re-fetch path may have updated state; one micro-delay then retry once
-        await new Promise(r => setTimeout(r, 500));
-      }
-      const s = (prices[opts.ticker] || series);
+      // fetchHistorical now returns the data directly (avoids React state lag)
+      let fetched = await fetchHistorical([opts.ticker], "1y");
+      let s = fetched[opts.ticker] || prices[opts.ticker];
+      // Retry with shorter range if 1y missing
       if (!s || s.closes.length < 30) {
-        throw new Error("Insufficient historical data for micro-sim. Try a more liquid ticker.");
+        fetched = await fetchHistorical([opts.ticker], "6mo");
+        s = fetched[opts.ticker] || prices[opts.ticker];
+      }
+      if (!s || s.closes.length < 30) {
+        fetched = await fetchHistorical([opts.ticker], "3mo");
+        s = fetched[opts.ticker] || prices[opts.ticker];
+      }
+      if (!s || s.closes.length < 20) {
+        throw new Error(`Insufficient historical data for ${opts.ticker}. Try a more liquid ticker (e.g. AAPL, NVDA, RELIANCE.NS).`);
       }
       const stats = computeAssetStats(opts.ticker, s);
       if (!stats) throw new Error("Could not compute base stats.");
