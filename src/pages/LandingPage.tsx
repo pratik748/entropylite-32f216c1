@@ -382,7 +382,7 @@ export default function LandingPage() {
             Quietly capable, always on
           </h2>
           <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
-            Free while we're under our first ten thousand users. Founding members keep founding pricing after that. No card, no trial timer.
+            Free while we are under our first ten thousand users. Founding members keep founding pricing after that. No card. No trial timer.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
@@ -400,7 +400,7 @@ export default function LandingPage() {
             </button>
           </div>
           <p className="font-mono text-[10px] text-white/35 tracking-wide">
-            Founding members lock in founding pricing forever
+            Founding members lock in founding pricing for life
           </p>
         </div>
       </section>
@@ -430,7 +430,7 @@ export default function LandingPage() {
           className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-11"
           onClick={goSignup}
         >
-          Sign In Free — No Card Required <ArrowRight className="ml-1 h-4 w-4" />
+          Sign In Free. No Card Required. <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
     </div>
