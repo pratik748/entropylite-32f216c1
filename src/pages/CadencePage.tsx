@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Clock, Loader2 } from "lucide-react";
 import PublicNav from "@/components/PublicNav";
 import { fetchAllEntries, formatPublishDate, type CadenceEntry } from "@/data/cadence";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CadencePage() {
   const navigate = useNavigate();
   const [entries, setEntries] = useState<CadenceEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     document.title = "Cadence | Entropy Lite — Daily research on the math behind the system";
@@ -19,10 +21,36 @@ export default function CadencePage() {
         "A daily research stream from Entropy Lite. One concept per 24 hours — unpacked with intuition, mathematics, and live system traces.",
       );
 
-    fetchAllEntries()
-      .then(setEntries)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load Cadence"))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchAllEntries();
+        if (cancelled) return;
+        setEntries(list);
+        setLoading(false);
+
+        // Self-heal: if no entries exist, trigger a one-shot generation (once per session)
+        if (list.length === 0 && !sessionStorage.getItem("cadence_self_heal_attempted")) {
+          sessionStorage.setItem("cadence_self_heal_attempted", "1");
+          setGenerating(true);
+          try {
+            await supabase.functions.invoke("cadence-generate", { body: { force: true } });
+            const refreshed = await fetchAllEntries();
+            if (!cancelled) setEntries(refreshed);
+          } catch (genErr) {
+            console.warn("Cadence self-heal failed:", genErr);
+          } finally {
+            if (!cancelled) setGenerating(false);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load Cadence");
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const today = entries[0];
@@ -61,11 +89,18 @@ export default function CadencePage() {
         {!loading && !error && entries.length === 0 && (
           <div className="border border-black/10 p-8 bg-black/[0.015]">
             <p className="font-mono text-[11px] tracking-[0.2em] text-black/40 uppercase mb-3">
-              First entry inbound
+              {generating ? "Generating today's entry…" : "First entry inbound"}
             </p>
-            <p className="text-base text-black/65 leading-relaxed">
-              The daily research generator is warming up. The first Cadence entry will publish within 24 hours, and a new one every day after that — automatically curated, multi-provider researched, peer-critiqued, and illustrated.
-            </p>
+            {generating ? (
+              <div className="flex items-center gap-2 text-black/60 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Multi-provider research in progress. This usually takes 30–60 seconds — refresh in a moment.
+              </div>
+            ) : (
+              <p className="text-base text-black/65 leading-relaxed">
+                The daily research generator is warming up. The first Cadence entry will publish within 24 hours, and a new one every day after that — automatically curated, multi-provider researched, peer-critiqued, and illustrated.
+              </p>
+            )}
           </div>
         )}
 
@@ -134,6 +169,11 @@ export default function CadencePage() {
           <p className="font-mono text-[11px] text-black/40 leading-relaxed">
             Cadence is generated daily by Entropy Lite. Each entry is researched in parallel by multiple AI providers, synthesized through a critic pass, and illustrated with a custom diagram. Free to read, free to share, no login required.
           </p>
+          {entries.length > 0 && (
+            <p className="font-mono text-[10px] text-black/30 mt-3">
+              Latest entry: {formatPublishDate(entries[0].publishDate)} · Next scheduled: 06:00 UTC daily
+            </p>
+          )}
         </footer>
       </main>
     </div>

@@ -209,18 +209,70 @@ Output ONLY the JSON. No markdown fences, no commentary.`;
 }
 
 async function generateResearch(topic: string, discipline: string): Promise<{ entry: any; providersUsed: string[] }> {
-  console.log(`[research] Firing parallel providers for: ${topic}`);
-  const draftResults = await callAIParallel({
-    systemPrompt: RESEARCH_SYSTEM,
-    userPrompt: researchPrompt(topic, discipline),
-    jsonMode: true,
-    temperature: 0.45,
-    maxTokens: 4000,
-  });
+  console.log(`[research] Firing 2 fast providers (Cloudflare + Mistral) for: ${topic}`);
+  // Race only Cloudflare + Mistral to stay well under the 60s edge timeout.
+  // OpenAI is reserved as a single-shot fallback if both fail.
+  const racePromises = [
+    callAI({
+      systemPrompt: RESEARCH_SYSTEM,
+      userPrompt: researchPrompt(topic, discipline),
+      jsonMode: true,
+      temperature: 0.45,
+      maxTokens: 4000,
+      provider: "cloudflare",
+    }).then(r => ({ ...r, provider: "cloudflare" as const })).catch(e => {
+      console.warn("[research] Cloudflare failed:", (e as Error).message);
+      return null;
+    }),
+    callAI({
+      systemPrompt: RESEARCH_SYSTEM,
+      userPrompt: researchPrompt(topic, discipline),
+      jsonMode: true,
+      temperature: 0.5,
+      maxTokens: 4000,
+      provider: "mistral",
+    }).then(r => ({ ...r, provider: "mistral" as const })).catch(e => {
+      console.warn("[research] Mistral failed:", (e as Error).message);
+      return null;
+    }),
+  ];
+  const settled = await Promise.all(racePromises);
+  let draftResults = settled.filter((r): r is NonNullable<typeof r> => r !== null);
+
+  if (draftResults.length === 0) {
+    console.warn("[research] Both fast providers failed — falling back to OpenAI single-shot");
+    try {
+      const fallback = await callAI({
+        systemPrompt: RESEARCH_SYSTEM,
+        userPrompt: researchPrompt(topic, discipline),
+        jsonMode: true,
+        temperature: 0.45,
+        maxTokens: 4000,
+        provider: "openai",
+      });
+      draftResults = [{ ...fallback, provider: "openai" as const }];
+    } catch (e) {
+      console.error("[research] OpenAI fallback also failed:", (e as Error).message);
+    }
+  }
 
   const validDrafts: Array<{ provider: string; data: any }> = [];
   for (const r of draftResults) {
-    const parsed = safeParseJSON(r.text);
+    let parsed: any = null;
+    try {
+      parsed = safeParseJSON(r.text);
+    } catch (parseErr) {
+      // safeParseJSON can throw on bad escape sequences (LaTeX backslashes etc.)
+      // Try a more aggressive cleanup: escape stray backslashes inside strings.
+      try {
+        const cleaned = r.text
+          .replace(/\\(?!["\\/bfnrtu])/g, "\\\\") // escape lone backslashes
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, " ");
+        parsed = JSON.parse(cleaned);
+      } catch (retryErr) {
+        console.warn(`[research] Parse failed for ${r.provider}: ${(parseErr as Error).message}`);
+      }
+    }
     if (parsed && parsed.tagline && Array.isArray(parsed.mathematical_core) && parsed.mathematical_core.length >= 2) {
       validDrafts.push({ provider: r.provider, data: parsed });
     } else {
@@ -339,6 +391,8 @@ function todayISO(): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  console.log(`[cadence] === invoked === method=${req.method} url=${req.url}`);
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -349,7 +403,9 @@ Deno.serve(async (req) => {
 
     // Idempotency: skip if today's entry already exists (unless ?force=1)
     const url = new URL(req.url);
-    const force = url.searchParams.get("force") === "1";
+    const forceParam = url.searchParams.get("force");
+    const force = forceParam === "1" || forceParam === "true";
+    console.log(`[cadence] today=${today} force=${force}`);
 
     if (!force) {
       const { data: existing } = await supabase
@@ -358,6 +414,7 @@ Deno.serve(async (req) => {
         .eq("publish_date", today)
         .maybeSingle();
       if (existing) {
+        console.log(`[cadence] entry already exists for ${today}: ${existing.slug}`);
         return new Response(JSON.stringify({ ok: true, skipped: true, slug: existing.slug }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -369,8 +426,16 @@ Deno.serve(async (req) => {
     console.log(`[cadence] Picked topic: ${topic} (${discipline}) — fromBank=${isFromBank}`);
 
     const { entry, providersUsed } = await generateResearch(topic, discipline);
+    console.log(`[cadence] Research complete (${providersUsed.join(", ")}) in ${Date.now() - startedAt}ms`);
 
-    const diagram = await generateDiagram(topic, entry.inside_caption ?? topic);
+    let diagram: string | null = null;
+    try {
+      diagram = await generateDiagram(topic, entry.inside_caption ?? topic);
+      console.log(`[cadence] Diagram step done — image=${diagram ? "yes" : "null"}`);
+    } catch (e) {
+      console.warn("[cadence] Diagram threw — continuing without image:", (e as Error).message);
+      diagram = null;
+    }
 
     const slug = `${slugify(topic)}-${today}`.slice(0, 90);
 
