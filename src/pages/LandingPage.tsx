@@ -17,43 +17,43 @@ import dashboardPreview from "@/assets/dashboard-preview.png";
 const STATS = [
   { value: "10,000", label: "Monte Carlo paths per asset" },
   { value: "12", label: "Intelligence layers" },
-  { value: "Real-time", label: "Price and news feeds" },
+  { value: "Real time", label: "Price and news feeds" },
   { value: "Always on", label: "Background scenario scan" },
 ];
 
 const PRINCIPLES = [
-  { title: "Distributions, not forecasts", desc: "We don't tell you what will happen. We show you the range of what could, and how likely each path is." },
-  { title: "Structure beats narrative", desc: "Liquidity, positioning, and constraint thresholds move markets. Headlines are the echo. We model the cause." },
-  { title: "Your trades teach the system", desc: "Every outcome you log nudges the AI toward the patterns that work for you and away from the ones that didn't." },
-  { title: "Quiet by default", desc: "Twelve layers running underneath, one calm surface on top. The math stays out of your way until you ask for it." },
+  { title: "Distributions, not forecasts", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
+  { title: "Structure beats narrative", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
+  { title: "Your trades teach the system", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
+  { title: "Quiet by default", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
 ];
 
 const FEATURES = [
-  { icon: Activity, title: "Quantitative risk engine", desc: "You see VaR and CVaR at 95% and 99%, liquidity-adjusted, recomputed live for every position you hold." },
-  { icon: Shield, title: "CLANK constraint detection", desc: "You're warned when structural limits — liquidity, positioning, derivatives gamma — start to bend before price reacts." },
-  { icon: Globe, title: "Geopolitical intelligence", desc: "You get a live read on global events with a market-impact score and a regime label that adjusts the rest of the stack." },
-  { icon: TrendingUp, title: "10,000-path Monte Carlo", desc: "You get a probabilistic outcome distribution on every holding, run on real volatility, with profit and tail-risk percentages." },
-  { icon: Layers, title: "Statistical arbitrage", desc: "You see mean-reversion candidates, co-integrated pairs, and Z-score drift across your whole book — not just one ticker." },
-  { icon: Target, title: "Desirable asset discovery", desc: "You get a daily shortlist of high-conviction setups, scored on momentum, quality, and how they'd interact with your existing exposure." },
-  { icon: BarChart3, title: "Deep company dossiers", desc: "You get a twelve-dimension read on any company: management, capital flows, narrative, structural risk, and more." },
-  { icon: Sparkles, title: "Strategy factory", desc: "You can spin up scenarios, calibrate to the current regime, and paper-test a hypothesis before risking real capital." },
-  { icon: Zap, title: "Causal effects simulator", desc: "You see the cascade — first, second, and third order — before you place the trade, not after." },
+  { icon: Activity, title: "Quantitative risk engine", desc: "VaR and CVaR at 95% and 99%, liquidity adjusted, recomputed live for every position you hold." },
+  { icon: Shield, title: "CLANK constraint detection", desc: "Warns when structural limits in liquidity, positioning or derivatives gamma start to bend, before price reacts." },
+  { icon: Globe, title: "Geopolitical intelligence", desc: "A live read on global events with a market impact score and a regime label that adjusts the rest of the stack." },
+  { icon: TrendingUp, title: "10,000 path Monte Carlo", desc: "A probabilistic outcome distribution on every holding, run on real volatility, reported as profit probability and tail risk." },
+  { icon: Layers, title: "Statistical arbitrage", desc: "Mean reversion candidates, cointegrated pairs and Z score drift across the whole book, not a single ticker." },
+  { icon: Target, title: "Desirable asset discovery", desc: "A daily shortlist of setups scored on momentum, quality and how they would interact with your existing exposure." },
+  { icon: BarChart3, title: "Deep company dossiers", desc: "A twelve dimension read on any company: management, capital flows, narrative, structural risk and the rest." },
+  { icon: Sparkles, title: "Strategy factory", desc: "Spin up a scenario, calibrate to the current regime and paper test a hypothesis before risking real capital." },
+  { icon: Zap, title: "Causal effects simulator", desc: "First, second and third order cascade modelled before you place the trade, not after." },
 ];
 
 const HOW_IT_WORKS = [
-  { icon: Eye, step: "01", title: "Live data in", desc: "Yahoo Finance prices, GDELT geopolitics, multi-source news, FX, and institutional flow signals stream in continuously, timestamped and normalised to your base currency." },
-  { icon: Cpu, step: "02", title: "Twelve engines run in parallel", desc: "CLANK, Monte Carlo, statistical arbitrage, regime classifier, and the rest fire side by side and fuse into a single composed view." },
-  { icon: Brain, step: "03", title: "Probabilistic alerts", desc: "You're notified the moment portfolio VaR breaches your threshold or a structural constraint moves close to activation." },
-  { icon: GitBranch, step: "04", title: "Causal cascade modelling", desc: "Each event is propagated across correlated sectors, currencies, and asset classes through first, second, and third-order effects." },
-  { icon: LineChart, step: "05", title: "Strategy mapping", desc: "Strategy Factory turns the read into a concrete positioning idea with entry levels, projected ranges, and an invalidation zone." },
+  { icon: Eye, step: "01", title: "Live data in", desc: "Yahoo Finance prices, GDELT geopolitics, multi source news, FX and institutional flow signals stream in continuously, timestamped and normalised to your base currency." },
+  { icon: Cpu, step: "02", title: "Twelve engines run in parallel", desc: "CLANK, Monte Carlo, statistical arbitrage, regime classifier and the rest run side by side and resolve into a single composed view." },
+  { icon: Brain, step: "03", title: "Probabilistic alerts", desc: "Notified the moment portfolio VaR breaches your threshold, or a structural constraint moves close to activation." },
+  { icon: GitBranch, step: "04", title: "Causal cascade modelling", desc: "Each event is propagated across correlated sectors, currencies and asset classes through first, second and third order effects." },
+  { icon: LineChart, step: "05", title: "Strategy mapping", desc: "Strategy Factory turns the read into a concrete positioning idea with entry levels, projected ranges and an invalidation zone." },
   { icon: Workflow, step: "06", title: "It learns from your outcomes", desc: "Every trade you log feeds Scar Memory and the Outcome Gradient, so the system biases toward your winners and away from your repeated losses." },
 ];
 
 const FAQS = [
-  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens immediately. No card, no trial timer, no upsell wall." },
-  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario-modelling tool. Everything you see is an observation or a probability — every decision is yours." },
-  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto, and commodities. India-Only mode locks the entire stack to NSE/BSE." },
-  { q: "How is this different from a broker app?", a: "Brokers show you the price and the order ticket. Entropy Lite shows you the distribution behind the price, the structural constraints shaping it, and the cascade that follows an event." },
+  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens. No card, no trial timer, no upsell wall." },
+  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario modelling tool. Every output is an observation or a probability. Every decision is yours." },
+  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto and commodities. India Only mode locks the entire stack to NSE and BSE." },
+  { q: "How is this different from a broker app?", a: "Brokers show the price and the order ticket. Entropy Lite shows the distribution behind the price, the structural constraints shaping it and the cascade that follows an event." },
   { q: "Will my data be used to train models?", a: "No. Your portfolio and trade history bias only your own AI context through the Outcome Gradient. It never leaves your account." },
 ];
 
