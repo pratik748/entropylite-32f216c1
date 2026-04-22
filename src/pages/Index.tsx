@@ -432,15 +432,42 @@ const IndexContent = () => {
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
                             {!isLoading && !analysis && (
-                              <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
-                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
-                                  <Activity className="h-7 w-7 text-primary" />
+                              <div className="border border-border bg-surface-1 animate-fade-in">
+                                <div className="border-b border-border px-3 py-1.5 flex items-center justify-between bg-sidebar">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-1 w-1 bg-primary" />
+                                    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground/80 font-semibold">SYSTEM·IDLE</span>
+                                  </div>
+                                  <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">AWAITING INPUT</span>
                                 </div>
-                                <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
-                                <p className="max-w-md text-center text-xs text-muted-foreground px-4">
-                                  Enter any global asset: stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or
-                                  commodities (GC=F) for deep analysis with real-time pricing.
-                                </p>
+                                <div className="px-4 py-10">
+                                  <div className="flex items-start gap-3">
+                                    <div className="h-7 w-7 border border-primary/40 flex items-center justify-center accent-bar-l">
+                                      <Activity className="h-3.5 w-3.5 text-primary" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground font-semibold mb-1">No active position selected</h2>
+                                      <p className="font-mono text-[10px] text-muted-foreground leading-relaxed max-w-xl">
+                                        Submit a ticker — equity (AAPL · TCS.NS), crypto (BTC-USD), FX (EURUSD=X) or commodity (GC=F).
+                                        The engine will compute price, fundamentals, sentiment, regime, risk and a recommendation under live capital posture.
+                                      </p>
+                                      <div className="mt-3 grid grid-cols-3 gap-px bg-border max-w-md">
+                                        <div className="bg-surface-2 px-2 py-1.5">
+                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">CHANNELS</div>
+                                          <div className="font-mono text-[10px] text-foreground tabular-nums">12</div>
+                                        </div>
+                                        <div className="bg-surface-2 px-2 py-1.5">
+                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">PROVIDERS</div>
+                                          <div className="font-mono text-[10px] text-foreground tabular-nums">3</div>
+                                        </div>
+                                        <div className="bg-surface-2 px-2 py-1.5">
+                                          <div className="font-mono text-[7px] uppercase tracking-wider text-muted-foreground">POSTURE</div>
+                                          <div className="font-mono text-[10px] text-gain">READY</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             )}
                             {isLoading && <LoadingState />}
