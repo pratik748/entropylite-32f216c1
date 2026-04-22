@@ -125,7 +125,21 @@ const PreTradeValidator = ({ capital, residualBudgetPct, blocked, blockReasons, 
       </div>
 
       {error && (
-        <div className="rounded-sm border border-loss/40 bg-loss/5 px-2 py-1.5 text-[10px] font-mono text-loss mb-2">{error}</div>
+        <div className="rounded-sm border border-warning/40 bg-warning/5 px-2 py-1.5 text-[10px] font-mono mb-2">
+          <div className="flex items-start gap-1.5 text-warning">
+            <span className="mt-px">⚠</span>
+            <span className="flex-1">{error}</span>
+            <button
+              onClick={handleRun}
+              className="px-1.5 py-px rounded-sm border border-warning/40 hover:bg-warning/10 text-[9px] uppercase tracking-wider"
+            >Retry</button>
+          </div>
+          {tickerSuggestions.length > 0 && (
+            <div className="mt-1 text-[9px] text-muted-foreground">
+              Try one of your held tickers above ↑ — they have proven liquidity.
+            </div>
+          )}
+        </div>
       )}
 
       {validating && (
