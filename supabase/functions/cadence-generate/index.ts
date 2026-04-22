@@ -209,14 +209,52 @@ Output ONLY the JSON. No markdown fences, no commentary.`;
 }
 
 async function generateResearch(topic: string, discipline: string): Promise<{ entry: any; providersUsed: string[] }> {
-  console.log(`[research] Firing parallel providers for: ${topic}`);
-  const draftResults = await callAIParallel({
-    systemPrompt: RESEARCH_SYSTEM,
-    userPrompt: researchPrompt(topic, discipline),
-    jsonMode: true,
-    temperature: 0.45,
-    maxTokens: 4000,
-  });
+  console.log(`[research] Firing 2 fast providers (Cloudflare + Mistral) for: ${topic}`);
+  // Race only Cloudflare + Mistral to stay well under the 60s edge timeout.
+  // OpenAI is reserved as a single-shot fallback if both fail.
+  const racePromises = [
+    callAI({
+      systemPrompt: RESEARCH_SYSTEM,
+      userPrompt: researchPrompt(topic, discipline),
+      jsonMode: true,
+      temperature: 0.45,
+      maxTokens: 4000,
+      provider: "cloudflare",
+    }).then(r => ({ ...r, provider: "cloudflare" as const })).catch(e => {
+      console.warn("[research] Cloudflare failed:", (e as Error).message);
+      return null;
+    }),
+    callAI({
+      systemPrompt: RESEARCH_SYSTEM,
+      userPrompt: researchPrompt(topic, discipline),
+      jsonMode: true,
+      temperature: 0.5,
+      maxTokens: 4000,
+      provider: "mistral",
+    }).then(r => ({ ...r, provider: "mistral" as const })).catch(e => {
+      console.warn("[research] Mistral failed:", (e as Error).message);
+      return null;
+    }),
+  ];
+  const settled = await Promise.all(racePromises);
+  let draftResults = settled.filter((r): r is NonNullable<typeof r> => r !== null);
+
+  if (draftResults.length === 0) {
+    console.warn("[research] Both fast providers failed — falling back to OpenAI single-shot");
+    try {
+      const fallback = await callAI({
+        systemPrompt: RESEARCH_SYSTEM,
+        userPrompt: researchPrompt(topic, discipline),
+        jsonMode: true,
+        temperature: 0.45,
+        maxTokens: 4000,
+        provider: "openai",
+      });
+      draftResults = [{ ...fallback, provider: "openai" as const }];
+    } catch (e) {
+      console.error("[research] OpenAI fallback also failed:", (e as Error).message);
+    }
+  }
 
   const validDrafts: Array<{ provider: string; data: any }> = [];
   for (const r of draftResults) {
