@@ -608,7 +608,18 @@ const IndexContent = () => {
               )}
               {activeTab === "risk" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
-                  <RiskDashboard key={refreshKey} stocks={stocks} />
+                  <Tabs defaultValue="risk" className="w-full">
+                    <TabsList className="h-8 mb-2">
+                      <TabsTrigger value="risk" className="text-[10px] font-mono uppercase">Risk</TabsTrigger>
+                      <TabsTrigger value="ledger" className="text-[10px] font-mono uppercase">Trade Ledger</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="risk">
+                      <RiskDashboard key={refreshKey} stocks={stocks} />
+                    </TabsContent>
+                    <TabsContent value="ledger">
+                      <DeepTradeLedger />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               )}
               {activeTab === "fortress" && (
