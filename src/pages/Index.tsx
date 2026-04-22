@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Gauge } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Gauge, BookOpen, Zap } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -42,6 +42,7 @@ import ProofCard from "@/components/ProofCard";
 import LodgerLedgerDock from "@/components/intraday/LodgerLedgerDock";
 import DeepTradeLedger from "@/components/intraday/DeepTradeLedger";
 import IntradayDashboard from "@/components/intraday/IntradayDashboard";
+import RecentLessonsPanel from "@/components/intraday/RecentLessonsPanel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -57,7 +58,7 @@ import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useIntradayMode } from "@/hooks/useIntradayMode";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "reflexivity" | "risk" | "fortress" | "catalysts" | "lessons";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -67,6 +68,8 @@ const ALL_TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactN
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
+  { id: "catalysts", label: "Catalysts", shortLabel: "News", icon: <Zap className="h-3.5 w-3.5" /> },
+  { id: "lessons", label: "Lessons", shortLabel: "Less", icon: <BookOpen className="h-3.5 w-3.5" /> },
   { id: "reflexivity", label: "Reflexivity", shortLabel: "Reflex", icon: <Brain className="h-3.5 w-3.5" /> },
   { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
   { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
@@ -75,15 +78,18 @@ const ALL_TABS: { id: Tab; label: string; shortLabel: string; icon: React.ReactN
   { id: "fortress", label: "Fortress", shortLabel: "Fort", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
 ];
 
-// In Intraday Mode, only money-method surfaces are shown.
+// In Intraday Mode, only money-method surfaces are shown — each on its own tab.
 // Removed: Geopolitics, Reflexivity, Sandbox, Stat Arb, Augment, Fortress (long-horizon / research-only).
-const INTRADAY_TAB_IDS: Tab[] = ["dashboard", "market", "desirable", "risk"];
+const INTRADAY_TAB_IDS: Tab[] = ["dashboard", "market", "desirable", "catalysts", "lessons", "risk"];
 
 const IndexContent = () => {
   const { intradayMode } = useIntradayMode();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const visibleTabs = useMemo(
-    () => (intradayMode ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id)) : ALL_TABS),
+    () =>
+      intradayMode
+        ? ALL_TABS.filter((t) => INTRADAY_TAB_IDS.includes(t.id))
+        : ALL_TABS.filter((t) => t.id !== "catalysts" && t.id !== "lessons"),
     [intradayMode],
   );
   const [directProfitMode, setDirectProfitMode] = useState(false);
@@ -626,6 +632,24 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                </div>
+              )}
+              {activeTab === "catalysts" && intradayMode && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <div className="rounded-md border border-border bg-card overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
+                      <Zap className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                        Live Catalysts · Intraday
+                      </span>
+                    </div>
+                    <LiveNewsFeed key={refreshKey} compact />
+                  </div>
+                </div>
+              )}
+              {activeTab === "lessons" && intradayMode && (
+                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                  <RecentLessonsPanel key={refreshKey} />
                 </div>
               )}
               {activeTab === "reflexivity" && !intradayMode && (
