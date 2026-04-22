@@ -17,43 +17,43 @@ import dashboardPreview from "@/assets/dashboard-preview.png";
 const STATS = [
   { value: "10,000", label: "Monte Carlo paths per asset" },
   { value: "12", label: "Intelligence layers" },
-  { value: "Real-time", label: "Price and news feeds" },
+  { value: "Real time", label: "Price and news feeds" },
   { value: "Always on", label: "Background scenario scan" },
 ];
 
 const PRINCIPLES = [
-  { title: "Distributions, not forecasts", desc: "We don't tell you what will happen. We show you the range of what could, and how likely each path is." },
-  { title: "Structure beats narrative", desc: "Liquidity, positioning, and constraint thresholds move markets. Headlines are the echo. We model the cause." },
-  { title: "Your trades teach the system", desc: "Every outcome you log nudges the AI toward the patterns that work for you and away from the ones that didn't." },
-  { title: "Quiet by default", desc: "Twelve layers running underneath, one calm surface on top. The math stays out of your way until you ask for it." },
+  { title: "Distributions, not forecasts", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
+  { title: "Structure beats narrative", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
+  { title: "Your trades teach the system", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
+  { title: "Quiet by default", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
 ];
 
 const FEATURES = [
-  { icon: Activity, title: "Quantitative risk engine", desc: "You see VaR and CVaR at 95% and 99%, liquidity-adjusted, recomputed live for every position you hold." },
-  { icon: Shield, title: "CLANK constraint detection", desc: "You're warned when structural limits — liquidity, positioning, derivatives gamma — start to bend before price reacts." },
-  { icon: Globe, title: "Geopolitical intelligence", desc: "You get a live read on global events with a market-impact score and a regime label that adjusts the rest of the stack." },
-  { icon: TrendingUp, title: "10,000-path Monte Carlo", desc: "You get a probabilistic outcome distribution on every holding, run on real volatility, with profit and tail-risk percentages." },
-  { icon: Layers, title: "Statistical arbitrage", desc: "You see mean-reversion candidates, co-integrated pairs, and Z-score drift across your whole book — not just one ticker." },
-  { icon: Target, title: "Desirable asset discovery", desc: "You get a daily shortlist of high-conviction setups, scored on momentum, quality, and how they'd interact with your existing exposure." },
-  { icon: BarChart3, title: "Deep company dossiers", desc: "You get a twelve-dimension read on any company: management, capital flows, narrative, structural risk, and more." },
-  { icon: Sparkles, title: "Strategy factory", desc: "You can spin up scenarios, calibrate to the current regime, and paper-test a hypothesis before risking real capital." },
-  { icon: Zap, title: "Causal effects simulator", desc: "You see the cascade — first, second, and third order — before you place the trade, not after." },
+  { icon: Activity, title: "Quantitative risk engine", desc: "VaR and CVaR at 95% and 99%, liquidity adjusted, recomputed live for every position you hold." },
+  { icon: Shield, title: "CLANK constraint detection", desc: "Warns when structural limits in liquidity, positioning or derivatives gamma start to bend, before price reacts." },
+  { icon: Globe, title: "Geopolitical intelligence", desc: "A live read on global events with a market impact score and a regime label that adjusts the rest of the stack." },
+  { icon: TrendingUp, title: "10,000 path Monte Carlo", desc: "A probabilistic outcome distribution on every holding, run on real volatility, reported as profit probability and tail risk." },
+  { icon: Layers, title: "Statistical arbitrage", desc: "Mean reversion candidates, cointegrated pairs and Z score drift across the whole book, not a single ticker." },
+  { icon: Target, title: "Desirable asset discovery", desc: "A daily shortlist of setups scored on momentum, quality and how they would interact with your existing exposure." },
+  { icon: BarChart3, title: "Deep company dossiers", desc: "A twelve dimension read on any company: management, capital flows, narrative, structural risk and the rest." },
+  { icon: Sparkles, title: "Strategy factory", desc: "Spin up a scenario, calibrate to the current regime and paper test a hypothesis before risking real capital." },
+  { icon: Zap, title: "Causal effects simulator", desc: "First, second and third order cascade modelled before you place the trade, not after." },
 ];
 
 const HOW_IT_WORKS = [
-  { icon: Eye, step: "01", title: "Live data in", desc: "Yahoo Finance prices, GDELT geopolitics, multi-source news, FX, and institutional flow signals stream in continuously, timestamped and normalised to your base currency." },
-  { icon: Cpu, step: "02", title: "Twelve engines run in parallel", desc: "CLANK, Monte Carlo, statistical arbitrage, regime classifier, and the rest fire side by side and fuse into a single composed view." },
-  { icon: Brain, step: "03", title: "Probabilistic alerts", desc: "You're notified the moment portfolio VaR breaches your threshold or a structural constraint moves close to activation." },
-  { icon: GitBranch, step: "04", title: "Causal cascade modelling", desc: "Each event is propagated across correlated sectors, currencies, and asset classes through first, second, and third-order effects." },
-  { icon: LineChart, step: "05", title: "Strategy mapping", desc: "Strategy Factory turns the read into a concrete positioning idea with entry levels, projected ranges, and an invalidation zone." },
+  { icon: Eye, step: "01", title: "Live data in", desc: "Yahoo Finance prices, GDELT geopolitics, multi source news, FX and institutional flow signals stream in continuously, timestamped and normalised to your base currency." },
+  { icon: Cpu, step: "02", title: "Twelve engines run in parallel", desc: "CLANK, Monte Carlo, statistical arbitrage, regime classifier and the rest run side by side and resolve into a single composed view." },
+  { icon: Brain, step: "03", title: "Probabilistic alerts", desc: "Notified the moment portfolio VaR breaches your threshold, or a structural constraint moves close to activation." },
+  { icon: GitBranch, step: "04", title: "Causal cascade modelling", desc: "Each event is propagated across correlated sectors, currencies and asset classes through first, second and third order effects." },
+  { icon: LineChart, step: "05", title: "Strategy mapping", desc: "Strategy Factory turns the read into a concrete positioning idea with entry levels, projected ranges and an invalidation zone." },
   { icon: Workflow, step: "06", title: "It learns from your outcomes", desc: "Every trade you log feeds Scar Memory and the Outcome Gradient, so the system biases toward your winners and away from your repeated losses." },
 ];
 
 const FAQS = [
-  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens immediately. No card, no trial timer, no upsell wall." },
-  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario-modelling tool. Everything you see is an observation or a probability — every decision is yours." },
-  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto, and commodities. India-Only mode locks the entire stack to NSE/BSE." },
-  { q: "How is this different from a broker app?", a: "Brokers show you the price and the order ticket. Entropy Lite shows you the distribution behind the price, the structural constraints shaping it, and the cascade that follows an event." },
+  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens. No card, no trial timer, no upsell wall." },
+  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario modelling tool. Every output is an observation or a probability. Every decision is yours." },
+  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto and commodities. India Only mode locks the entire stack to NSE and BSE." },
+  { q: "How is this different from a broker app?", a: "Brokers show the price and the order ticket. Entropy Lite shows the distribution behind the price, the structural constraints shaping it and the cascade that follows an event." },
   { q: "Will my data be used to train models?", a: "No. Your portfolio and trade history bias only your own AI context through the Outcome Gradient. It never leaves your account." },
 ];
 
@@ -94,7 +94,7 @@ export default function LandingPage() {
           {/* Trust badge */}
           <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 py-1.5 rounded-full border border-black/10 bg-black/[0.02]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access · No credit card</span>
+            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access. No credit card.</span>
           </div>
 
           <h1 className="text-[2.35rem] sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.98] sm:leading-[1.05] mb-4 sm:mb-6">
@@ -104,8 +104,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-[15px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-6 sm:mb-10 leading-relaxed">
-            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints, and a live read on flows —
-            <span className="text-black font-semibold"> on one calm screen</span>.
+            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints and a live read on institutional flows. <span className="text-black font-semibold">On one screen.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 mb-3">
@@ -120,12 +119,12 @@ export default function LandingPage() {
               className="font-mono text-xs tracking-wide px-8 h-11 sm:h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
-              See What's Inside
+              See what is inside
             </button>
           </div>
 
           <p className="font-mono text-[10px] text-black/35 tracking-wide">
-            Google sign-in · 30-second setup · Cancel anytime (it's free)
+            Google sign in. 30 second setup. Cancel anytime, it is free.
           </p>
 
           {/* Stats strip */}
@@ -149,14 +148,14 @@ export default function LandingPage() {
               A different way of reading markets
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Four ideas shape every layer of the system. They're the reason the terminal looks and feels the way it does.
+              Four ideas shape every layer. They are the reason the terminal looks and feels the way it does.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
             {PRINCIPLES.map((p, i) => (
               <div key={p.title} className="bg-white p-6 sm:p-8">
-                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">— {String(i + 1).padStart(2, "0")}</p>
+                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">{String(i + 1).padStart(2, "0")}</p>
                 <h3 className="text-base sm:text-lg font-semibold tracking-tight mb-2">{p.title}</h3>
                 <p className="text-sm text-black/55 leading-relaxed">{p.desc}</p>
               </div>
@@ -169,7 +168,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Begin — Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Begin. Sign in free. <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -184,7 +183,7 @@ export default function LandingPage() {
               This is what you sign in to
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Live portfolio, 10,000-path Monte Carlo, VaR and CVaR, a multi-source intel feed, and a structural flow read — all on one screen.
+              Live portfolio, 10,000 path Monte Carlo, VaR and CVaR, a multi source intel feed and a structural flow read. All on one screen.
             </p>
           </div>
 
@@ -202,11 +201,11 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-10 pt-8 border-t border-black/5">
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Live portfolio</p>
-              <p className="text-sm text-black/70 leading-snug">Multi-currency and multi-exchange, normalised to your base currency.</p>
+              <p className="text-sm text-black/70 leading-snug">Multi currency and multi exchange, normalised to your base currency.</p>
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Monte Carlo</p>
-              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252-day horizon, with profit probability and tail risk.</p>
+              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252 day horizon, with profit probability and tail risk.</p>
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Risk metrics</p>
@@ -214,7 +213,7 @@ export default function LandingPage() {
             </div>
             <div>
               <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Flow detection</p>
-              <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma, and dark pools.</p>
+              <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma and dark pools.</p>
             </div>
           </div>
 
@@ -224,7 +223,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Open the terminal — Free <ArrowRight className="ml-1 h-4 w-4" />
+              Open the terminal. Free. <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -245,7 +244,7 @@ export default function LandingPage() {
             Twelve intelligence layers, one terminal
           </h2>
           <p className="text-sm sm:text-base text-black/55 max-w-xl mx-auto">
-            The same engines a professional desk runs, fused into one view and live by default.
+            The same engines a professional desk runs. Fused into one view. Live by default.
           </p>
         </div>
 
@@ -272,7 +271,7 @@ export default function LandingPage() {
               From raw data to a decision you can act on
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Six stages, running in the background while you're looking at something else.
+              Six stages, running in the background while you are looking at something else.
             </p>
           </div>
 
@@ -322,15 +321,15 @@ export default function LandingPage() {
               <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
                 <Clock className="h-4 w-4 text-black/60" />
               </div>
-              <p className="font-semibold text-sm mb-1">Thirty-second setup</p>
-              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set a base currency, and you're running.</p>
+              <p className="font-semibold text-sm mb-1">Thirty second setup</p>
+              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set a base currency, and you are running.</p>
             </div>
             <div className="flex flex-col items-center text-center">
               <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
                 <InfinityIcon className="h-4 w-4 text-black/60" />
               </div>
               <p className="font-semibold text-sm mb-1">Free during founding</p>
-              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing forever when paid tiers launch.</p>
+              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing for life once paid tiers launch.</p>
             </div>
           </div>
 
@@ -339,7 +338,7 @@ export default function LandingPage() {
               The terminal sharpens with every decision you make
             </h3>
             <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
-              Your trade history quietly biases the AI toward the patterns that worked for you, and away from the ones that didn't.
+              Your trade history quietly biases the AI toward the patterns that worked, and away from the ones that did not.
             </p>
             <Button
               size="lg"
@@ -383,7 +382,7 @@ export default function LandingPage() {
             Quietly capable, always on
           </h2>
           <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
-            Free while we're under our first ten thousand users. Founding members keep founding pricing after that. No card, no trial timer.
+            Free while we are under our first ten thousand users. Founding members keep founding pricing after that. No card. No trial timer.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
@@ -401,7 +400,7 @@ export default function LandingPage() {
             </button>
           </div>
           <p className="font-mono text-[10px] text-white/35 tracking-wide">
-            Founding members lock in founding pricing forever
+            Founding members lock in founding pricing for life
           </p>
         </div>
       </section>
@@ -431,7 +430,7 @@ export default function LandingPage() {
           className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-11"
           onClick={goSignup}
         >
-          Sign In Free — No Card Required <ArrowRight className="ml-1 h-4 w-4" />
+          Sign In Free. No Card Required. <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
     </div>

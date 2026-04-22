@@ -523,7 +523,7 @@ const IndexContent = () => {
                         <ResizableHandle withHandle />
 
                         <ResizablePanel defaultSize={45} minSize={20}>
-                          <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad>
+                          <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad collapsible defaultCollapsed>
                             <FlowDetectionPanel stocks={stocks} />
                           </PanelWrapper>
                         </ResizablePanel>

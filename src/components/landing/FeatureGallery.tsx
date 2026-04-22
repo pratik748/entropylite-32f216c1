@@ -26,10 +26,10 @@ const TABS: Tab[] = [
     title: "Global market state, in one quiet view.",
     desc: "Live indices across US, Europe, Asia, and India alongside an intelligence map of conflicts, capital flow, and entropy regime.",
     bullets: [
-      "16 global indices with live deltas — S&P, NASDAQ, FTSE, DAX, NIKKEI, NIFTY, SENSEX",
-      "VIX fear gauge, FX pairs, commodities, BTC/ETH — all normalized to your base currency",
+      "16 global indices with live deltas. S&P, NASDAQ, FTSE, DAX, NIKKEI, NIFTY, SENSEX.",
+      "VIX fear gauge, FX pairs, commodities, BTC and ETH, all normalised to your base currency",
       "Geopolitical map with active conflict tracking, regime classification, capital-flow direction",
-      "Intel feed with confidence-scored events: South China Sea, Russia-Ukraine, US-China trade",
+      "Intel feed with confidence scored events: South China Sea, Russia and Ukraine, US and China trade",
     ],
     img: marketsImg,
     alt: "Entropy Lite Markets module showing live global indices, VIX, FX, commodities and crypto",
@@ -38,13 +38,13 @@ const TABS: Tab[] = [
     id: "geo",
     label: "Geopolitics",
     icon: Map,
-    title: "God's Eye intelligence map.",
+    title: "An intelligence map of the world.",
     desc: "Conflicts, exposures, and regime shifts plotted on a live world map with severity-weighted intel feed.",
     bullets: [
       "Global Risk Index (75/100 CRITICAL) with regime, capital flow, entropy, and conflict counters",
-      "Map markers sized by event severity and currency-impact percentage",
-      "Auto-refreshing intel feed with confidence scores per event",
-      "Exposed-position flagging when a holding sits in a hot zone",
+      "Map markers sized by event severity and currency impact percentage",
+      "Auto refreshing intel feed with confidence scores per event",
+      "Exposed position flagging when a holding sits in a hot zone",
     ],
     img: geopoliticsImg,
     alt: "Entropy Lite Geopolitics map showing live conflicts, regime, capital flow and intel feed",
@@ -54,12 +54,12 @@ const TABS: Tab[] = [
     label: "Desirable Assets",
     icon: Sparkles,
     title: "Quant-validated discovery funnel.",
-    desc: "Four-stage pipeline — AI candidates → price verify → quant filter → Monte Carlo stress — surfaces only assets that pass every gate.",
+    desc: "Four stage pipeline. AI candidates, then price verify, then quant filter, then Monte Carlo stress. Only assets that pass every gate are shown.",
     bullets: [
       "Top picks ranked by Q-score, Sharpe ratio, max drawdown, volatility, and Z-score",
       "Per-asset thesis, momentum tag, sentiment, and earnings posture",
       "Quant Max Profit projection with confidence and methodology (drift + resistance + Fibonacci)",
-      "Market regime assessment recalibrates picks — bullish, bearish, risk-on, risk-off",
+      "Market regime assessment recalibrates picks: bullish, bearish, risk on, risk off",
     ],
     img: desirableImg,
     alt: "Entropy Lite Desirable Assets showing CHTR Q70 and IMVT Q67 with Sharpe, MaxDD, Vol, Z-score",
@@ -69,10 +69,10 @@ const TABS: Tab[] = [
     label: "Stat Arb",
     icon: ScatterChart,
     title: "Pure quantitative math, on your portfolio.",
-    desc: "GBM normalized returns, GARCH(1,1) volatility, HMM regime detection, and Markowitz optimization — across every asset you hold.",
+    desc: "GBM normalised returns, GARCH(1,1) volatility, HMM regime detection and Markowitz optimisation, across every asset you hold.",
     bullets: [
-      "Portfolio-wide normalized return paths with portfolio composite overlay",
-      "Per-asset price, weight, annualized vol, drift, beta, and live P&L",
+      "Portfolio wide normalised return paths with portfolio composite overlay",
+      "Per asset price, weight, annualised vol, drift, beta and live P&L",
       "Eleven sub-modules: Price Dynamics, Optimization, Factor Model, Liquidity, Stress Test, Foresight",
       "HMM regime detection running continuously to flag bull/bear/transition windows",
     ],
@@ -84,11 +84,11 @@ const TABS: Tab[] = [
     label: "Sandbox",
     icon: Zap,
     title: "Prediction + Aftermath engine.",
-    desc: "Thirteen modules to generate strategies, run 10K-path simulations, model causal cascades, and remember every scar.",
+    desc: "Thirteen modules that generate strategies, run 10,000 path simulations, model causal cascades and remember every scar.",
     bullets: [
       "Strategy Lab generates exact BUY/SELL plans calibrated to current regime, VIX, and mood",
       "Causal Effects Engine models 1st, 2nd, and 3rd order market reactions before you commit capital",
-      "Aftermath Matrix simulates your own market impact — slippage, depth absorption, signal leakage",
+      "Aftermath Matrix simulates your own market impact: slippage, depth absorption, signal leakage",
       "Scar Memory + Outcome Gradient continuously bias the AI toward what works for you",
     ],
     img: sandboxImg,
@@ -99,12 +99,12 @@ const TABS: Tab[] = [
     label: "Risk + Hedging",
     icon: Shield,
     title: "Institutional risk math, with action.",
-    desc: "VaR and CVaR at 95/99, liquidity-adjusted VaR, HHI concentration, AI-identified risks — and a hedging plan you can execute.",
+    desc: "VaR and CVaR at 95 and 99, liquidity adjusted VaR, HHI concentration, AI identified risks, and a hedging plan you can execute.",
     bullets: [
-      "Five live risk metrics: VaR 95/99, CVaR 95/99, Liquidity-adjusted VaR — all in your base currency",
+      "Five live risk metrics: VaR 95 and 99, CVaR 95 and 99, liquidity adjusted VaR. All in your base currency.",
       "Portfolio Risk Score, HHI concentration index, regime-aware recalibration",
       "AI-identified top risks: sector valuation, FX exposure, liquidity mismatch, regulatory regime",
-      "AI hedging recommendations with exact instruments — put spread collars, VIX calls, USDINR puts",
+      "AI hedging recommendations with exact instruments: put spread collars, VIX calls, USDINR puts",
     ],
     img: riskImg,
     alt: "Entropy Lite Risk module showing VaR, CVaR, Liquidity VaR, AI-identified risks and hedging recommendations",
@@ -139,7 +139,7 @@ export default function FeatureGallery() {
             Six core surfaces. Real screens. Real data.
           </h2>
           <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-            Each tab is a live capture from the running terminal — no mockups, no marketing renders.
+            Each tab is a live capture from the running terminal. No mockups, no marketing renders.
           </p>
         </div>
 
@@ -189,7 +189,7 @@ export default function FeatureGallery() {
             <ul className="space-y-2.5">
               {tab.bullets.map((b, i) => (
                 <li key={i} className="flex gap-3 text-sm text-black/70 leading-snug">
-                  <span className="font-mono text-[10px] text-black/30 mt-1 flex-shrink-0">— {String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono text-[10px] text-black/30 mt-1 flex-shrink-0">{String(i + 1).padStart(2, "0")}</span>
                   <span>{b}</span>
                 </li>
               ))}
