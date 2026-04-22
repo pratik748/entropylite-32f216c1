@@ -586,22 +586,22 @@ const IndexContent = () => {
                   <MarketOverview key={refreshKey} />
                 </div>
               )}
-              {activeTab === "augment" && (
+              {activeTab === "augment" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <AugmentDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "sandbox" && (
+              {activeTab === "sandbox" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <EntropySandbox key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "statarb" && (
+              {activeTab === "statarb" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <StatArbEngine key={refreshKey} stocks={stocks} />
                 </div>
               )}
-              {activeTab === "geopolitical" && (
+              {activeTab === "geopolitical" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <GeopoliticalGlobe
                     key={refreshKey}
@@ -619,7 +619,7 @@ const IndexContent = () => {
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
-              {activeTab === "reflexivity" && (
+              {activeTab === "reflexivity" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <ReflexivityEngine key={refreshKey} stocks={stocks} refreshKey={refreshKey} />
                 </div>
@@ -640,7 +640,7 @@ const IndexContent = () => {
                   </Tabs>
                 </div>
               )}
-              {activeTab === "fortress" && (
+              {activeTab === "fortress" && !intradayMode && (
                 <div className="px-2 sm:container py-2 sm:py-4 pb-12">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
