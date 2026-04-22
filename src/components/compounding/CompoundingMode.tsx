@@ -11,14 +11,34 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { ValidatorResult } from "@/hooks/useIntradayValidator";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
+import { useIntradayMode } from "@/hooks/useIntradayMode";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { type PortfolioStock } from "@/components/PortfolioPanel";
 
 const DEFAULT_CAPITAL = 10000;
 
-const CompoundingMode = () => {
+interface Props {
+  stocks?: PortfolioStock[];
+}
+
+const CompoundingMode = ({ stocks = [] }: Props) => {
   const lodgers = useLodgers();
+  const { intradayMode } = useIntradayMode();
+  const { totalValue, holdings } = useNormalizedPortfolio(stocks);
   const [capital, setCapital] = useLocalStorage<number>("compounding-capital", DEFAULT_CAPITAL);
   const [openLodges, setOpenLodges] = useLocalStorage<OpenLodge[]>("compounding-open-lodges", []);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+
+  // When intraday mode is ON and the user has a live portfolio, default capital to portfolio value
+  const effectiveCapital = useMemo(() => {
+    if (intradayMode && totalValue > 0) return totalValue;
+    return capital;
+  }, [intradayMode, totalValue, capital]);
+
+  const tickerSuggestions = useMemo(
+    () => holdings.map(h => h.ticker).slice(0, 12),
+    [holdings]
+  );
 
   // Live price polling for active lodges
   useEffect(() => {
