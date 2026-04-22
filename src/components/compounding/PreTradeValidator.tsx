@@ -19,13 +19,15 @@ interface Props {
   blockReasons: string[];
   onValidated?: (r: ValidatorResult) => void;
   onAccept?: (r: ValidatorResult, sizeShares: number) => void;
+  intradayMode?: boolean;
+  tickerSuggestions?: string[];
 }
 
-const PreTradeValidator = ({ capital, residualBudgetPct, blocked, blockReasons, onValidated, onAccept }: Props) => {
-  const [ticker, setTicker] = useState("AAPL");
-  const [target, setTarget] = useState(1.5);
-  const [stop, setStop] = useState(0.8);
-  const [horizon, setHorizon] = useState(30);
+const PreTradeValidator = ({ capital, residualBudgetPct, blocked, blockReasons, onValidated, onAccept, intradayMode = false, tickerSuggestions = [] }: Props) => {
+  const [ticker, setTicker] = useState(tickerSuggestions[0] || "AAPL");
+  const [target, setTarget] = useState(intradayMode ? 1.0 : 1.5);
+  const [stop, setStop] = useState(intradayMode ? 0.5 : 0.8);
+  const [horizon, setHorizon] = useState(intradayMode ? 15 : 30);
   const { validate, validating, result, error, reset } = useIntradayValidator();
   const regime = useMarketRegime(60_000);
   const [scars] = useLocalStorage<any[]>("entropy-scars", []);
@@ -60,8 +62,27 @@ const PreTradeValidator = ({ capital, residualBudgetPct, blocked, blockReasons, 
           <Activity className="h-3.5 w-3.5 text-primary" />
           <h3 className="text-[11px] font-mono uppercase tracking-wider text-foreground">Pre-Trade Validator</h3>
         </div>
-        <Badge variant="outline" className="text-[9px] font-mono">2,000-path GBM · regime-aware</Badge>
+        <Badge variant="outline" className="text-[9px] font-mono">
+          {intradayMode ? "Intraday · 2,000-path GBM" : "2,000-path GBM · regime-aware"}
+        </Badge>
       </div>
+
+      {intradayMode && tickerSuggestions.length > 0 && (
+        <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+          <span className="text-[9px] font-mono uppercase text-muted-foreground">From portfolio:</span>
+          {tickerSuggestions.slice(0, 8).map(t => (
+            <button
+              key={t}
+              onClick={() => setTicker(t)}
+              className={`px-1.5 py-0.5 rounded-sm border text-[9px] font-mono transition-colors ${
+                ticker === t
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:border-primary/40"
+              }`}
+            >{t}</button>
+          ))}
+        </div>
+      )}
 
       {blocked && (
         <div className="mb-2 rounded-sm border border-loss/40 bg-loss/5 px-2 py-1.5 text-[10px] font-mono text-loss">

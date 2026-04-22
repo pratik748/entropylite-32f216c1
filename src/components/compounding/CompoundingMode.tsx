@@ -180,11 +180,13 @@ const CompoundingMode = ({ stocks = [] }: Props) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <PreTradeValidator
-          capital={capital}
+          capital={effectiveCapital}
           residualBudgetPct={discipline.residualBudgetPct}
           blocked={discipline.blocked}
           blockReasons={discipline.reasons}
           onAccept={handleAcceptLodge}
+          intradayMode={intradayMode}
+          tickerSuggestions={tickerSuggestions}
         />
         <div className="rounded-sm border border-border bg-card p-3">
           <div className="flex items-center gap-2 mb-2">
