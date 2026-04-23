@@ -78,14 +78,17 @@ const EntropySandbox = ({ stocks }: Props) => {
               PREDICTION + AFTERMATH ENGINE · {analyzed.length} ASSETS LOADED
             </p>
           </div>
-          {/* Secret AI Provider Toggle */}
+          {/* Secret AI Provider Toggle — cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
           <button
             onClick={toggle}
+            title={`AI provider: ${provider}`}
             className="flex items-center gap-1 px-2 py-1 rounded border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer select-none"
           >
+            <span className={`text-[9px] font-mono font-bold ${provider === "mistral" ? "text-primary" : "text-muted-foreground/40"}`}>M</span>
+            <span className="text-[9px] text-muted-foreground/30">/</span>
             <span className={`text-[9px] font-mono font-bold ${provider === "cloudflare" ? "text-primary" : "text-muted-foreground/40"}`}>C</span>
             <span className="text-[9px] text-muted-foreground/30">/</span>
-            <span className={`text-[9px] font-mono font-bold ${provider === "mistral" ? "text-primary" : "text-muted-foreground/40"}`}>M</span>
+            <span className={`text-[9px] font-mono font-bold ${provider === "groq" ? "text-primary" : "text-muted-foreground/40"}`}>L</span>
           </button>
         </div>
       </div>
