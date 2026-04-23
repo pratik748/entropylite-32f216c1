@@ -132,7 +132,7 @@ async function callGroq(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
