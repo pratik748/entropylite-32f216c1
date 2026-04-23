@@ -513,21 +513,20 @@ const IndexContent = () => {
 
                     {/* Right: News + Flow Detection */}
                     <ResizablePanel defaultSize={23} minSize={15} maxSize={35}>
-                      <ResizablePanelGroup direction="vertical">
-                        <ResizablePanel defaultSize={30} minSize={15}>
+                      <div className="flex flex-col h-full min-h-0">
+                        <div className="flex-1 min-h-0">
                           <PanelWrapper title="Live Intel" icon={<Activity className="h-3 w-3" />} noPad>
                             <LiveNewsFeed ticker={analysis?.ticker} compact />
                           </PanelWrapper>
-                        </ResizablePanel>
-
-                        <ResizableHandle withHandle />
-
-                        <ResizablePanel defaultSize={45} minSize={20}>
+                        </div>
+                        <div className="shrink-0">
                           <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad collapsible defaultCollapsed>
-                            <FlowDetectionPanel stocks={stocks} />
+                            <div className="max-h-[40vh] overflow-auto">
+                              <FlowDetectionPanel stocks={stocks} />
+                            </div>
                           </PanelWrapper>
-                        </ResizablePanel>
-                      </ResizablePanelGroup>
+                        </div>
+                      </div>
                     </ResizablePanel>
                   </ResizablePanelGroup>
                 ))}
