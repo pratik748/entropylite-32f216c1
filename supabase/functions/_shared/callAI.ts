@@ -89,6 +89,71 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+async function callGroq(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("GROQ_API_KEY");
+  if (!apiKey) throw new Error("GROQ_API_KEY not set");
+
+  // Fast, capable default. Override via opts.model if needed.
+  const model = opts.model && opts.model.startsWith("groq:")
+    ? opts.model.slice(5)
+    : "llama-3.3-70b-versatile";
+
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 8192,
+  };
+
+  if (opts.tools) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  if (opts.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 45000 : 20000;
+  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`Groq error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Groq ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  if (!choice) throw new Error("Empty Groq response");
+
+  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+    const toolCall = choice.message.tool_calls[0];
+    return {
+      text: typeof toolCall.function?.arguments === "string"
+        ? toolCall.function.arguments
+        : JSON.stringify(toolCall.function?.arguments),
+      provider: "groq",
+      toolCall,
+    };
+  }
+
+  const raw = (choice.message?.content || "").trim();
+  if (!raw) throw new Error("Empty Groq response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "groq" };
+}
+
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
   const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
