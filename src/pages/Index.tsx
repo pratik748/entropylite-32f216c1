@@ -34,7 +34,6 @@ import SystemStatusBar from "@/components/terminal/SystemStatusBar";
 import ThemeToggle from "@/components/ThemeToggle";
 import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
-import FlowDetectionPanel from "@/components/terminal/FlowDetectionPanel";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ProofCard from "@/components/ProofCard";
