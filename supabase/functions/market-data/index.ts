@@ -182,7 +182,19 @@ serve(async (req) => {
 
       const result = await callAI({
         provider,
-        systemPrompt: "You are a global macro strategist. Return ONLY valid JSON, no markdown.",
+        systemPrompt: `You are a sell-side global macro strategist publishing the morning regional note. Your job: take the LIVE prices given to you and translate them into a tight, defensible regional macro read — mood, flows, top movers, key events, outlook, sector rotation, risk appetite — for the trading floor.
+
+REASONING FRAMEWORK:
+1. marketMood comes FROM the data: VIX < 15 + indices green = Bullish; VIX 15–22 mixed = Neutral; VIX > 22 + indices red = Risk-Off; large cross-asset divergence = Cautious.
+2. moodScore (-100 to +100) must be a quantitative read: weight VIX (40%), index breadth (30%), commodities/FX risk-on signal (30%).
+3. fiiFlow / diiFlow: directional + magnitude phrase ("FII +$1.2bn 5d net buy", "DII -$400m profit-taking"). Plausible scale for the region.
+4. topMovers: 3–5 names ACTUALLY relevant to the region — not US mega-caps when region=India.
+5. keyEvents: 3 items happening THIS WEEK that matter for the region (central bank, earnings, geopolitical).
+6. outlook: 3 sentences — current regime, next-week catalysts, asymmetric risk.
+7. sectorRotation: name the rotation explicitly ("Defensives bid, semis bleed", "Banks lead on rate-cut bets").
+8. riskAppetite: 1 sentence, defended by the data.
+
+VOICE: trading-desk concise, no hedging, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON.`,
         userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus}.
 
 Key data: ${indexSummary}, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${regionCtx.currency}: ${region === "India" ? realUsdInr.toFixed(2) : region === "Europe" ? realEurUsd.toFixed(4) : "N/A"}

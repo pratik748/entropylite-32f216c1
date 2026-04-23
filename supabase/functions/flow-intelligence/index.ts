@@ -32,8 +32,21 @@ serve(async (req) => {
 
     const result = await callAI({
       provider,
-      systemPrompt: `You are an institutional flow detection AI. Analyze portfolio structure, market context, and prediction market signals to detect flow signals.
-Return ONLY valid JSON array of flow signals:
+      systemPrompt: `You are the flows desk strategist at a global macro fund. Your job: given a book + market context + prediction-market priors, surface the institutional flow signals that will REPRICE the book in the next 1–10 sessions. You think like a dealer who sees the order tape.
+
+REASONING FRAMEWORK — for every signal:
+1. Name the mechanism: ETF Rebalancing (index quarterly + style drift), Vol Targeting (risk-parity de/leveraging vs realized vol), CTA Momentum (trend-follower trigger levels), Gamma Exposure (dealer hedging into pin), Dark Pool / Block Activity, Risk Parity (vol-weighted bond/equity rotation), Pension Rebalance (quarter-end mean reversion), Liquidity Stress, Polymarket Macro Skew (prediction-market priors).
+2. Direction MUST follow the mechanism — vol-spike → vol-target sells equities → SELL; gamma-pin under spot → dealer buys → BUY; pension end-of-quarter overshoot → mean revert.
+3. Intensity (0–100) reflects the size of the implied flow vs. average daily liquidity. Impact (0–100) reflects expected price displacement on the affected names.
+4. Reasoning: 1 sentence naming the mechanism + the trigger condition. NOT generic ("flows are positive") — must be specific ("VIX +3pts in 2d → vol-target funds shed ~$8bn equities, pressuring high-beta tech").
+5. If polymarket priors are provided, include 2–3 PRED signals tied to the highest-conviction macro markets — direction follows whether the bearish-keyword market is rising/falling.
+
+CALIBRATION GUARDS:
+• 6–12 signals total, covering at least 4 of the 8 mechanisms above.
+• Each signal must defend itself against the portfolio's beta, sector mix, or VIX level.
+• Strings ≤ 200 chars.
+
+Return ONLY valid JSON array:
 [{
   "name": string (signal name like "ETF Rebalancing", "Vol Targeting", "CTA Momentum", "Polymarket Macro Skew", etc.),
   "category": "STRUCT" | "FLOW" | "RISK" | "OPTIONS" | "PRED",
@@ -41,11 +54,16 @@ Return ONLY valid JSON array of flow signals:
   "direction": "BUY" | "SELL" | "NEUTRAL",
   "impact": number (0-100),
   "reasoning": string (1 sentence explanation)
-}]
-Generate 6-12 signals covering: ETF Rebalancing, Vol Targeting, Liquidity Stress, CTA Momentum, Gamma Exposure, Dark Pool Activity, Risk Parity, Pension Rebalance. If prediction market data is available, include 2-3 "PRED" category signals based on Polymarket probabilities. Base signals on the actual portfolio composition, market conditions, and prediction market odds.`,
+}]`,
       userPrompt: `Portfolio holdings: ${JSON.stringify(summary)}
 VIX: ${vix || "N/A"}, Regime: ${marketRegime || "Unknown"}${polyContext}
-Detect institutional flow patterns and prediction market-informed signals based on the portfolio's beta exposure, sector concentration, and risk profile.`,
+
+Walk the framework:
+(a) From VIX level + change, infer vol-targeting and risk-parity flows.
+(b) From sector concentration in the book, infer ETF rebalance / sector rotation pressure.
+(c) From beta + size profile, infer CTA + gamma exposure relative to dealer positioning.
+(d) If polymarket priors given, encode 2–3 PRED signals from the highest-volume macro markets.
+(e) Each signal must name a mechanism + trigger and tie its direction to the portfolio's actual exposure.`,
       temperature: 0.5,
       maxTokens: 2048,
     });

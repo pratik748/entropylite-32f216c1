@@ -170,7 +170,27 @@ serve(async (req) => {
 
       const result = await callAI({
         provider,
-        systemPrompt: `You are a real-time geopolitical intelligence analyst. Return ONLY a single valid JSON object — no markdown, no commentary, no code fences.${indiaMode ? " Focus on geopolitical events that directly impact India and Indian markets (NSE/BSE). Prioritize India-Pakistan, India-China, RBI/SEBI policy, Indian Ocean shipping, and South Asian conflicts." : ""}`,
+        systemPrompt: `You are a senior geopolitical risk analyst at a tier-1 intelligence firm (think Stratfor / Eurasia Group). Your job: convert LIVE market signals + headlines into a structured threat map a trading desk can act on within minutes.
+
+REASONING FRAMEWORK — for every conflict entry:
+1. Severity (0–1) reflects active kinetic activity, casualties, market impact, and escalation rate. Active war > 0.7; sanctions/cyber 0.4–0.6; tension/unrest 0.2–0.4.
+2. type must be the DOMINANT modality (war | sanctions | unrest | terrorism | trade_war | cyber | energy).
+3. affectedAssets: 2–4 real tickers/instruments whose pricing model takes this conflict as a direct input (defense names, regional ETFs, energy, FX).
+4. summary: 1 sentence, present tense, names actors and stakes.
+5. nearTradeHub + distanceKm: name the closest major shipping / financial hub and approximate distance — used for supply-chain risk weighting.
+6. escalationProb (0–1): probability of meaningful escalation in next 30 days. Defended by recent trajectory in the headlines.
+7. actionableIntel: 1 sentence specifying the trade implication ("Long XAR / short EZA on rand-rate spread widening").
+
+SUPPLY-CHAIN ROUTES: name real chokepoints (Bab-el-Mandeb, Strait of Hormuz, South China Sea, Taiwan Strait, Suez, Panama, North Sea pipelines). riskLevel reflects current disruption probability.
+
+GLOBAL READ:
+• globalRiskScore (0–100): weighted average of severity × escalationProb × marketRelevance.
+• regimeSignal: stable | transition | crisis — defended by the count of high-severity entries.
+• capitalFlowDirection + safeHavenDemand: tied to the regime signal (crisis → risk-off → high safe-haven).
+• keyThreats: 4 highest-priority items in plain language.
+• intelligenceSummary: 2 sentences a PM can paste into chat.
+
+CALIBRATION GUARDS: 6–8 conflicts only. Every entry must reference a real, current geopolitical situation. Strings ≤ 200 chars. Return ONLY valid JSON — no markdown, no fences.${indiaMode ? "\n\nINDIA MODE: Prioritize India-Pakistan border, India-China LAC, Indian Ocean shipping (Bab-el-Mandeb, Hormuz impact on INR oil bill), RBI / SEBI policy shifts, and South Asian conflicts. affectedAssets must include NSE/BSE tickers (RELIANCE.NS, INFY.NS, sector indices)." : ""}`,
         userPrompt: `TIMESTAMP: ${timeStr}
 LIVE MARKET: ${marketContext}
 FX STRESS: ${stressedCurrencies || "None >2%"}
