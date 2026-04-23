@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI + Mistral + OpenAI fallback chain.
+ * AI caller — Groq (primary) + Cloudflare Workers AI + Mistral + OpenAI fallback chain.
  */
 
 interface CallAIOptions {
@@ -10,13 +10,13 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral" | "openai";
+  provider?: "groq" | "cloudflare" | "mistral" | "openai";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral" | "openai";
+  provider: "groq" | "cloudflare" | "mistral" | "openai";
   toolCall?: any;
 }
 
@@ -87,6 +87,71 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function callGroq(opts: CallAIOptions): Promise<AIResult> {
+  const apiKey = Deno.env.get("GROQ_API_KEY");
+  if (!apiKey) throw new Error("GROQ_API_KEY not set");
+
+  // Fast, capable default. Override via opts.model if needed.
+  const model = opts.model && opts.model.startsWith("groq:")
+    ? opts.model.slice(5)
+    : "llama-3.3-70b-versatile";
+
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 8192,
+  };
+
+  if (opts.tools) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  if (opts.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 45000 : 20000;
+  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`Groq error ${res.status}:`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Groq ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  if (!choice) throw new Error("Empty Groq response");
+
+  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+    const toolCall = choice.message.tool_calls[0];
+    return {
+      text: typeof toolCall.function?.arguments === "string"
+        ? toolCall.function.arguments
+        : JSON.stringify(toolCall.function?.arguments),
+      provider: "groq",
+      toolCall,
+    };
+  }
+
+  const raw = (choice.message?.content || "").trim();
+  if (!raw) throw new Error("Empty Groq response content");
+  const text = stripThinkingBlocks(raw);
+  return { text, provider: "groq" };
 }
 
 async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
@@ -289,14 +354,18 @@ async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
 const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const provider = opts.provider || "cloudflare";
+  const provider = opts.provider || "groq";
 
-  if (provider === "cloudflare") {
+  // Default chain: Groq → Cloudflare → Mistral → OpenAI.
+  // Explicit non-groq providers still honored for callers that pinned a model.
+  if (provider === "groq" || provider === "cloudflare") {
     let lastError: any;
+
+    // Primary: Groq with one retry on 5xx.
     for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
       if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
       try {
-        return await callCloudflare(opts);
+        return await callGroq(opts);
       } catch (err: any) {
         lastError = err;
         if (err.status === 429 || err.status === 401 || err.status === 403 || err.name === "AbortError") break;
@@ -304,22 +373,30 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
         break;
       }
     }
-    try { return await callMistral(opts); } catch {}
-    try { return await callOpenAI(opts); } catch {}
+
+    // Fallbacks in order.
+    try { return await callCloudflare(opts); } catch (e) { lastError = e; }
+    try { return await callMistral(opts); } catch (e) { lastError = e; }
+    try { return await callOpenAI(opts); } catch (e) { lastError = e; }
     throw lastError;
   }
 
   if (provider === "openai") return await callOpenAI(opts);
-  return await callMistral(opts);
+  if (provider === "mistral") return await callMistral(opts);
+  return await callGroq(opts);
 }
 
 /**
  * Fire Cloudflare + Mistral in parallel (lighter), return all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Cloudflare + Mistral + OpenAI simultaneously");
+  console.log("callAIParallel → firing Groq + Cloudflare + Mistral + OpenAI simultaneously");
 
   const promises = [
+    callGroq(opts).then(r => ({ ...r, provider: "groq" as const })).catch((err) => {
+      console.warn("callAIParallel → Groq failed:", err.message || err);
+      return null;
+    }),
     callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
       console.warn("callAIParallel → Cloudflare failed:", err.message || err);
       return null;
@@ -347,7 +424,7 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
 
   if (successes.length === 0) {
     // Sequential final attempts
-    for (const fn of [callCloudflare, callMistral, callOpenAI]) {
+    for (const fn of [callGroq, callCloudflare, callMistral, callOpenAI]) {
       try {
         const result = await fn(opts);
         return [result];
@@ -356,6 +433,6 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
     throw new Error("callAIParallel: all providers failed");
   }
 
-  console.log(`callAIParallel → ${successes.length}/3 providers succeeded`);
+  console.log(`callAIParallel → ${successes.length}/4 providers succeeded`);
   return successes;
 }
