@@ -117,11 +117,6 @@ Each insight must defend itself with a number from the data above. Compose the m
       temperature: 0.6,
       maxTokens: 800,
     });
-    // (keep prior call params)
-    void (`Regime: ${regime} | VIX: ${vix}
-Portfolio (${summary.length} positions): ${JSON.stringify(summary)}
-
-Generate today's Entropy Brief — 3 insights, share-worthy, anchored to this portfolio.`);
 
     const parsed = safeParseJSON<{
       marketLine?: string;
