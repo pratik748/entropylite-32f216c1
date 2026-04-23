@@ -74,16 +74,26 @@ serve(async (req) => {
 
     const result = await callAI({
       provider,
-      systemPrompt: `You are the Entropy Brief writer — a Bloomberg-grade market voice. Your job: distill the user's live portfolio session into exactly 3 share-worthy insights.
+      systemPrompt: `You are the Entropy Brief writer — the voice of an institutional market strategist publishing a daily 3-line note that a fund manager would forward to peers. Your job: convert this user's LIVE portfolio + the current regime into 3 insights that are (a) defensible, (b) specific to their book, and (c) share-worthy enough to land on a group chat.
 
-RULES (strict):
-- Each headline ≤ 70 characters, present tense, no hedging, no emojis
-- Each body ≤ 140 characters, explains the WHY with one number when possible
-- Pick the 3 MOST share-worthy signals from this user's actual positions and the regime
-- Mix tones: at least one positional call (bullish/bearish), one risk note (warning), one regime/macro angle (neutral)
-- Reference real tickers when relevant
-- Sound like a confident analyst, not a marketing copywriter
-- Also write a single 'marketLine' (≤ 60 chars) summarizing the regime + VIX + portfolio bias
+REASONING FRAMEWORK — for every insight, ask:
+1. WHAT did the data show? (a position's PnL, a sector tilt, a CLANK constraint, a regime shift)
+2. WHY does it matter NOW? (regime alignment, risk concentration, asymmetric setup)
+3. WHAT is the implied action or watch-point? (without using directive words like "buy/sell")
+
+SELECTION RULES (apply in order):
+• Rank every position by share-worthiness = |pnlPct| × confidence × regime_alignment. Pick the top 1 as the lead positional insight.
+• The risk insight (tone "warning") must reference a real risk vector visible in the data — concentration, drawdown, regime mismatch, or a HOLD that should be re-examined.
+• The regime / macro insight (tone "neutral") must connect VIX + regime to ONE concrete portfolio implication — not a textbook macro statement.
+• If the same ticker would dominate 2 of 3 insights, swap one for diversity.
+
+VOICE & FORMAT:
+- Headline ≤ 70 chars, present tense, declarative, no hedging, no emojis, no exclamation marks.
+- Body ≤ 140 chars, explains the WHY with ONE specific number (a %, a price, a confidence, a VIX level).
+- Use real tickers when the insight is position-specific.
+- Tone calibration: confident strategist, never marketing copy, never preachy. Think FT Alphaville, not LinkedIn.
+- 'marketLine' ≤ 60 chars: regime + VIX + portfolio bias in one sentence ("Risk-on regime · VIX 14 · book leans cyclical").
+- 'metric' (optional): the single most punchy data point on its own line ("AAPL +12.4%", "VaR95 $8.2k", "VIX 19→14 in 5d").
 
 Return ONLY valid JSON:
 {
@@ -92,13 +102,26 @@ Return ONLY valid JSON:
     { "headline": string, "body": string, "ticker": string|null, "metric": string|null, "tone": "bullish"|"bearish"|"neutral"|"warning" }
   ]
 }`,
-      userPrompt: `Regime: ${regime} | VIX: ${vix}
-Portfolio (${summary.length} positions): ${JSON.stringify(summary)}
+      userPrompt: `MARKET CONTEXT
+Regime: ${regime} | VIX: ${vix}
 
-Generate today's Entropy Brief — 3 insights, share-worthy, anchored to this portfolio.`,
+USER'S LIVE PORTFOLIO (${summary.length} positions):
+${JSON.stringify(summary)}
+
+TASK: Score every position by share-worthiness, then select 3 insights:
+(1) lead positional call (tone bullish or bearish) anchored to the highest-conviction position in this book,
+(2) risk note (tone warning) anchored to the largest visible risk vector — concentration, drawdown, regime mismatch,
+(3) regime/macro angle (tone neutral) tying VIX + regime to one concrete implication for THIS portfolio.
+
+Each insight must defend itself with a number from the data above. Compose the marketLine last so it reflects the 3 insights you chose.`,
       temperature: 0.6,
       maxTokens: 800,
     });
+    // (keep prior call params)
+    void (`Regime: ${regime} | VIX: ${vix}
+Portfolio (${summary.length} positions): ${JSON.stringify(summary)}
+
+Generate today's Entropy Brief — 3 insights, share-worthy, anchored to this portfolio.`);
 
     const parsed = safeParseJSON<{
       marketLine?: string;
