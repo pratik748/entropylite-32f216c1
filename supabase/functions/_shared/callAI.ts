@@ -1,5 +1,5 @@
 /**
- * AI caller — Cloudflare Workers AI + Mistral + OpenAI fallback chain.
+ * AI caller — Groq (primary) + Cloudflare Workers AI + Mistral + OpenAI fallback chain.
  */
 
 interface CallAIOptions {
@@ -10,13 +10,13 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "cloudflare" | "mistral" | "openai";
+  provider?: "groq" | "cloudflare" | "mistral" | "openai";
   jsonMode?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "cloudflare" | "mistral" | "openai";
+  provider: "groq" | "cloudflare" | "mistral" | "openai";
   toolCall?: any;
 }
 
