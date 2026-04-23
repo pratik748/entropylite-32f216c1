@@ -12,12 +12,43 @@ interface CallAIOptions {
   model?: string;
   provider?: "groq" | "cloudflare" | "mistral" | "openai";
   jsonMode?: boolean;
+  /** Skip prompt hardening (for narrative-only modules like cadence/dossier text). Default: false. */
+  skipHardening?: boolean;
 }
 
 interface AIResult {
   text: string;
   provider: "groq" | "cloudflare" | "mistral" | "openai";
   toolCall?: any;
+}
+
+/**
+ * PROMPT HARDENING ENGINE
+ * Wraps every system prompt with quant-grade, simulation-first, risk-aware reasoning constraints.
+ * Applied universally unless skipHardening=true.
+ */
+const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
+You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
+
+1. PROBABILISTIC ONLY — no deterministic opinions. All claims expressed as distributions or probabilities.
+2. STOCHASTIC MODEL — assume drift μ, volatility σ, and jump risk J. Treat outcomes as Monte-Carlo derived, not narrative.
+3. RISK-FIRST — tail risk (VaR 95%, max drawdown, liquidity risk, vol-expansion risk) dominates mean outcomes.
+4. REFLEXIVITY-AWARE — include feedback loops: price → flow → volatility → price; momentum amplification; crowding.
+5. SCENARIO DECOMPOSITION — bull (tail-up), bear (tail-down), neutral (mean-reverting cluster) — derived from distribution, not assigned.
+6. EXPECTED VALUE — EV = ∫ P(x)·R(x) dx with asymmetric payoff, fat-tail penalty, skew adjustment.
+7. NO SUBJECTIVE LANGUAGE — banned: "I think", "likely", "should", "guaranteed", "always", "never", em-dashes used as narrative flourish, marketing adjectives.
+8. NO AI-SLOP PUNCTUATION — no em-dash dramatics, no "—on one calm screen" style flourishes, no rhetorical pauses.
+9. OUTPUT DISCIPLINE — if the caller asks for JSON, return ONLY valid JSON, no prose, no markdown fences.
+10. EXECUTION-READY — every signal must be risk-adjusted and simulation-derived, not qualitative.
+
+Treat the market as an adaptive reflexive system, not static equilibrium.
+Violation of any rule = invalid response.`;
+
+function hardenSystemPrompt(original: string, skip?: boolean): string {
+  if (skip) return original;
+  // Idempotent: don't double-wrap.
+  if (original.includes("[QUANT HARDENING LAYER")) return original;
+  return `${HARDENING_PREAMBLE}\n\n[CALLER CONTEXT]\n${original}`;
 }
 
 function stripThinkingBlocks(text: string): string {
@@ -101,7 +132,7 @@ async function callGroq(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
@@ -164,7 +195,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const body: any = {
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
@@ -235,7 +266,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
@@ -297,7 +328,7 @@ async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
