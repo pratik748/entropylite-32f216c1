@@ -518,13 +518,6 @@ const IndexContent = () => {
                             <LiveNewsFeed ticker={analysis?.ticker} compact />
                           </PanelWrapper>
                         </div>
-                        <div className="shrink-0">
-                          <PanelWrapper title="Flow Detection" icon={<Eye className="h-3 w-3" />} noPad collapsible defaultCollapsed>
-                            <div className="max-h-[40vh] overflow-auto">
-                              <FlowDetectionPanel stocks={stocks} />
-                            </div>
-                          </PanelWrapper>
-                        </div>
                       </div>
                     </ResizablePanel>
                   </ResizablePanelGroup>
