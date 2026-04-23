@@ -626,24 +626,6 @@ const IndexContent = () => {
                   </SheetContent>
                 </Sheet>
 
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      <span>Flows</span>
-                    </button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
-                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
-                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
-                        <BarChart3 className="h-3.5 w-3.5 text-primary" /> Flow Detection
-                      </SheetTitle>
-                    </SheetHeader>
-                    <div className="min-h-0 flex-1 overflow-auto">
-                      <FlowDetectionPanel stocks={stocks} />
-                    </div>
-                  </SheetContent>
-                </Sheet>
               </div>
             </div>
           )}
