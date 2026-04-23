@@ -124,10 +124,8 @@ async function callGroq(opts: CallAIOptions): Promise<AIResult> {
   const apiKey = Deno.env.get("GROQ_API_KEY");
   if (!apiKey) throw new Error("GROQ_API_KEY not set");
 
-  // Fast, capable default. Override via opts.model if needed.
-  const model = opts.model && opts.model.startsWith("groq:")
-    ? opts.model.slice(5)
-    : "llama-3.3-70b-versatile";
+  // Locked to llama-3.1-8b-instant per project policy.
+  const model = "llama-3.1-8b-instant";
 
   const body: any = {
     model,
