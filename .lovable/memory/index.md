@@ -11,4 +11,5 @@ All quant modules MUST consume `useQuantSnapshot` for real σ/μ/VaR — never i
 
 ## Memories
 - [Entropy Brief](mem://features/platform-modules/entropy-brief) — Shareable 3-insight card, html-to-image PNG export, X/WhatsApp deeplinks
+- [AI prompt standards](mem://tech/ai-prompt-standards) — All system prompts must use the 5-block structure: role, reasoning framework, calibration rules, guardrails, output contract
 - [Quantitative Engine](mem://tech/quantitative-engine) — Real historical math (σ, μ, VaR, CVaR, Merton DD) via useQuantSnapshot + quant-engine.ts; powers RiskModeling and MonteCarlo

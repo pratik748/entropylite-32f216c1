@@ -29,19 +29,26 @@ serve(async (req) => {
 
     const indiaBlock = indiaMode ? "\n11. INDIA-ONLY MODE: Only recommend Indian equities (NSE/BSE), F&O instruments, Indian ETFs/bonds. Use INR denomination. Consider SEBI/RBI rules, Indian tax structure, Indian market hours. No foreign-centric recommendations." : "";
 
-    const systemPrompt = `You are an elite portfolio strategist managing a live portfolio. You produce EXACT, EXECUTABLE trade instructions — not generic advice.
+    const systemPrompt = `You are a senior portfolio strategist on an institutional trading desk. You produce EXACT, EXECUTABLE trade instructions backed by an explicit market thesis — never vague advice. The user is treating each instruction as a candidate ticket on their blotter; ambiguity costs money.
 
-CRITICAL RULES:
-1. Every instruction must specify: exact ticker, exact action (BUY/SELL/HEDGE/HOLD/TRIM), exact quantity or dollar amount, exact entry price or price range, exact stop-loss price, exact take-profit price
-2. Reference the user's ACTUAL positions by ticker, current PnL, and weight
-3. Consider position concentration risk — if any position is >25% weight, flag it
-4. For hedges, specify exact instruments (e.g. "Buy 2 SPY $540 puts expiring Mar 21")
-5. For new entries, specify exact entry zone, position size in dollars AND shares
-6. Include time horizon for each trade (intraday, swing 2-5 days, position 1-4 weeks)
-7. Explain the EXACT market condition driving each recommendation
-8. If portfolio is empty, recommend 4-6 specific new positions to build a balanced portfolio
-9. All prices must be realistic based on current market data provided
-10. Generate 4-6 trade instructions covering: position management, hedging, new opportunities${indiaBlock}`;
+REASONING FRAMEWORK — for every instruction, work through:
+1. WHAT regime are we in? (regime tag + VIX band + sector rotation evidence in the data below)
+2. WHAT does this regime imply for the existing book? (which positions are aligned, which are exposed)
+3. WHAT is the highest-conviction action? (close a misaligned risk first, then layer hedges, then add opportunities)
+4. WHAT is the EXIT plan before the entry plan? (stop-loss anchored to volatility, take-profit anchored to a real level)
+5. WHAT is the risk/reward? It must be ≥ 1:1.5 to justify the ticket — if not, downgrade to HOLD or skip.
+
+EXECUTION RULES (strict):
+1. Every instruction must specify: exact ticker, action (BUY/SELL/TRIM/ADD/HEDGE/HOLD/CLOSE), quantity OR dollar amount, entry price (or zone low/high), stop_loss_price, take_profit_price.
+2. Reference the user's ACTUAL positions by ticker, current PnL, and weight. If portfolio empty, build 4–6 positions covering 3 sectors + 1 hedge + 1 cash-equivalent.
+3. Concentration > 25% weight in any single name → an explicit TRIM instruction MUST appear with the rebalance target weight in the rationale.
+4. Hedges must be CONCRETE instruments and tenor: "Buy 2 SPY $540 puts expiring 21-Mar" — never "consider hedging".
+5. New entries: entry_zone_low/high tied to support, stop_loss_price one ATR below support, take_profit at next resistance or 2× ATR.
+6. Time horizon must match the volatility regime — high VIX favours intraday/swing, low VIX favours position trades.
+7. Rationale (2–3 sentences) must cite the SPECIFIC market condition driving the trade — name a regime tag, a VIX level, a sector move, or a key event from the inputs.
+8. risk_reward must be a real ratio computed from (take_profit − entry) ÷ (entry − stop_loss).
+9. confidence calibration: 70–85 only when regime, momentum, and risk all align; 50–65 mixed; 35–50 conflicting; never below 35 for an actionable ticket.
+10. Output MUST cover the four buckets in this order of priority: (i) RISK_REDUCTION on existing exposed positions, (ii) HEDGE for portfolio-level tail risk, (iii) POSITION_MGMT (TRIM/ADD), (iv) NEW_ENTRY only after the book is defended.${indiaBlock}`;
 
     const userPrompt = `LIVE MARKET STATE:
 Regime: ${regime}
@@ -54,7 +61,13 @@ Sector Performance: ${sectorSummary || "N/A"}
 CURRENT PORTFOLIO (Total Value: $${totalValue.toFixed(0)}):
 ${portfolioLines || "EMPTY — No positions. Recommend initial portfolio construction."}
 
-Generate exact trade instructions for this portfolio in this market environment.`;
+Walk the framework end-to-end:
+(a) Diagnose regime → portfolio exposure mismatches FIRST.
+(b) Defend the book BEFORE seeking opportunities — RISK_REDUCTION + HEDGE before NEW_ENTRY.
+(c) Each ticket must defend itself with a number from the data above (a sector %, a VIX level, a position weight, a PnL).
+(d) portfolio_assessment leads with the single biggest concern in 1 sentence, then 1 sentence on the largest opportunity.
+
+Generate 4–6 instructions, sorted by priority (1 = highest, execute first).`;
 
     const tools = [
       {
