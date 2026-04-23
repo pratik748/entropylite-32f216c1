@@ -383,18 +383,19 @@ async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
 const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const provider = opts.provider || "groq";
+  const provider = opts.provider || "mistral";
 
-  // Default chain: Groq → Cloudflare → Mistral → OpenAI.
-  // Explicit non-groq providers still honored for callers that pinned a model.
-  if (provider === "groq" || provider === "cloudflare") {
+  // Default chain: Mistral (paid, reliable) → Groq → Cloudflare → OpenAI.
+  // Mistral leads because Groq free tier (6k TPM) and Cloudflare free tier
+  // (10k neurons/day) get exhausted on heavy load.
+  if (provider === "mistral" || provider === "groq" || provider === "cloudflare") {
     let lastError: any;
 
-    // Primary: Groq with one retry on 5xx.
+    // Primary: Mistral with one retry on 5xx.
     for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
       if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
       try {
-        return await callGroq(opts);
+        return await callMistral(opts);
       } catch (err: any) {
         lastError = err;
         if (err.status === 429 || err.status === 401 || err.status === 403 || err.name === "AbortError") break;
@@ -403,16 +404,15 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
       }
     }
 
-    // Fallbacks in order.
+    // Fallbacks in order — try free tiers, then OpenAI.
+    try { return await callGroq(opts); } catch (e) { lastError = e; }
     try { return await callCloudflare(opts); } catch (e) { lastError = e; }
-    try { return await callMistral(opts); } catch (e) { lastError = e; }
     try { return await callOpenAI(opts); } catch (e) { lastError = e; }
     throw lastError;
   }
 
   if (provider === "openai") return await callOpenAI(opts);
-  if (provider === "mistral") return await callMistral(opts);
-  return await callGroq(opts);
+  return await callMistral(opts);
 }
 
 /**
