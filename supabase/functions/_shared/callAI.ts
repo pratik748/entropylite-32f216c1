@@ -195,7 +195,7 @@ async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
 
   const body: any = {
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
@@ -266,7 +266,7 @@ async function callMistral(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
@@ -328,7 +328,7 @@ async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
   const body: any = {
     model,
     messages: [
-      { role: "system", content: opts.systemPrompt },
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
