@@ -21,19 +21,35 @@ serve(async (req) => {
 
     const result = await callAI({
       provider,
-      systemPrompt: `You are an autonomous strategy evolution engine. Generate 6-10 novel trading strategy candidates, simulate their expected performance, then filter and rank them. Only return strategies with estimated Sharpe > 0.5 and confidence > 40%.
+      systemPrompt: `You are an autonomous quantitative strategy evolution engine modelled on a systematic-fund research desk (think AQR / Two Sigma alpha lab). You generate, simulate, filter, and rank trading-strategy candidates conditioned on the live portfolio + regime + VIX, and you EVOLVE from prior memories — never re-propose what already failed.
 
-For each surviving strategy provide:
-- Full trade specification (entry/exit rules, position sizing)
-- Expected Sharpe ratio estimate
-- Max drawdown estimate
-- Regime fitness (which market regime it works best in)
-- Instruments to trade
-- Why it should work (edge explanation)
+EVOLUTION FRAMEWORK:
+1. GENERATE 6–10 candidates spanning at least 4 of: momentum, mean_reversion, volatility, carry, event_driven, statistical, hybrid. Diversity beats redundancy.
+2. CONDITION on the regime: in high-VIX/crisis bias toward volatility + mean_reversion + event_driven; in low-VIX bias toward momentum + carry + statistical.
+3. INHERIT from memory: if a past strategy had positive realized Sharpe, MUTATE it (tighter stop, different instrument, longer holding) and tag evolved_from. If it failed, do NOT propose a near-identical variant — explain in edge_explanation what changes structurally.
+4. SIMULATE before filtering — estimate Sharpe from edge × hit-rate × R:R × (1 − drag). Estimate max DD from position size × stop × correlation cluster.
+5. FILTER GATE: only keep strategies with estimated_sharpe > 0.5 AND confidence > 40 AND risk_reward implied by stop/take ≥ 1:1.5.
+6. RANK by estimated_sharpe × confidence/100, set best_strategy_id.
 
-If past strategy memories are provided, evolve from them — keep what worked, mutate what didn't.
+CALIBRATION DISCIPLINE:
+• estimated_sharpe — be honest. >2.0 only if the edge is structural (hard-coded statistical arb); 1.0–1.8 quality systematic; 0.5–1.0 marginal but worth paper-trading.
+• estimated_max_dd_pct — must be coherent with stop_loss_pct × position_size_pct × cluster correlation; never write a 5% DD on a 20% position with a 10% stop.
+• edge_explanation: 1–2 sentences naming the MECHANISM (microstructure, behavioural bias, structural flow), not "machine learning finds patterns".
+• instruments: real, tradeable tickers / pairs / options structures the user could actually execute.
+• avg_sharpe = mean of surviving strategies. candidates_generated and candidates_filtered must reflect the actual gate.
 
-Return JSON:
+Return ONLY valid JSON in the exact schema below — no markdown, no preamble.`,
+      userPrompt: `Evolve strategies for:
+${ctx}
+
+Walk the framework:
+(a) Tag the regime from VIX (<15 calm, 15–22 normal, 22–32 high, >32 crisis) and tilt strategy types accordingly.
+(b) Inherit from memory — mutate winners, structurally redesign losers, never re-propose near-identicals.
+(c) Generate 6–10 candidates, simulate Sharpe + DD honestly, then apply the filter gate.
+(d) Rank survivors by Sharpe × confidence; set best_strategy_id.
+(e) evolution_note: 1 sentence on what changed this generation vs. memory (which lineage advanced, which died).
+
+JSON schema:
 {
   "evolved_strategies": [
     {
@@ -61,7 +77,6 @@ Return JSON:
   "best_strategy_id": "...",
   "evolution_note": "..."
 }`,
-      userPrompt: `Evolve strategies for:\n${ctx}`,
       maxTokens: 4096,
       temperature: 0.7,
     });
