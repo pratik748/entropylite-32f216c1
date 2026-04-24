@@ -7,15 +7,29 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "1.5rem",
+      padding: {
+        DEFAULT: "1rem",
+        sm: "1.25rem",
+        lg: "2rem",
+      },
       screens: {
-        "2xl": "1440px",
+        "2xl": "1480px",
       },
     },
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
+      },
+      letterSpacing: {
+        tightest: "-0.04em",
+        tighter: "-0.025em",
+        eyebrow: "0.3em",
+      },
+      boxShadow: {
+        soft: "0 1px 2px hsl(0 0% 0% / 0.04), 0 4px 12px hsl(0 0% 0% / 0.04)",
+        "soft-lg": "0 4px 8px hsl(0 0% 0% / 0.05), 0 16px 40px hsl(0 0% 0% / 0.08)",
+        "ring-soft": "0 0 0 1px hsl(var(--border))",
       },
       colors: {
         border: "hsl(var(--border))",
