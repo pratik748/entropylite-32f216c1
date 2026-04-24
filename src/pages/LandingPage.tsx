@@ -141,7 +141,7 @@ export default function LandingPage() {
 
       {/* PRINCIPLES — quiet, classy positioning */}
       <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-28">
           <div className="text-center mb-10 sm:mb-14">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Principles</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
@@ -176,7 +176,7 @@ export default function LandingPage() {
 
       {/* PRODUCT PREVIEW — real terminal screenshot */}
       <section className="border-t border-black/5 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-8 sm:mb-12">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The terminal</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
@@ -236,7 +236,7 @@ export default function LandingPage() {
       <MathResearch />
 
       {/* FEATURES GRID */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <div className="text-center mb-10 sm:mb-14">
 
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The stack</p>
@@ -264,7 +264,7 @@ export default function LandingPage() {
 
       {/* HOW IT WORKS */}
       <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-10 sm:mb-14">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The pipeline</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
@@ -307,7 +307,7 @@ export default function LandingPage() {
       </section>
 
       {/* WHY NOW — risk reversal */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <div className="rounded-2xl border border-black/10 bg-gradient-to-br from-black/[0.02] to-transparent p-6 sm:p-10">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
             <div className="flex flex-col items-center text-center">
@@ -353,7 +353,7 @@ export default function LandingPage() {
 
       {/* FAQ — kill objections */}
       <section className="border-t border-black/5">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-10 sm:mb-12">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Last questions</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight">
