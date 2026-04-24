@@ -550,18 +550,14 @@ export default function MathResearch() {
                   Open full screen
                 </a>
               </div>
-              <object
-                data="/research/clank-theory-sehwag-2026.pdf#view=FitH"
-                type="application/pdf"
-                className="w-full h-[520px] sm:h-[720px]"
-                aria-label="Embedded research PDF viewer"
-              >
+              <div className="relative w-full h-[520px] sm:h-[720px] bg-neutral-100 overflow-hidden">
                 <iframe
                   title="CLANK research paper"
-                  src="/research/clank-theory-sehwag-2026.pdf#view=FitH"
-                  className="w-full h-[520px] sm:h-[720px]"
+                  src="/research/clank-theory-sehwag-2026.pdf#view=Fit&zoom=page-fit&toolbar=1&navpanes=0&scrollbar=1"
+                  className="absolute inset-0 w-full h-full border-0"
+                  loading="lazy"
                 />
-              </object>
+              </div>
             </div>
 
             <p className="font-mono text-[10px] text-black/35 mt-5 leading-relaxed">
