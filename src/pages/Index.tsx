@@ -575,12 +575,12 @@ const IndexContent = () => {
           </main>
 
           {showMobileDashboardDock && (
-            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border bg-surface-1/98 backdrop-blur-md shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)]">
-              <div className="grid grid-cols-3 gap-px bg-border">
+            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border/80 bg-surface-1/95 backdrop-blur-xl shadow-[0_-8px_28px_hsl(var(--foreground)/0.08)]">
+              <div className="grid grid-cols-2 gap-px bg-border/60">
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
-                      <LayoutDashboard className="h-3.5 w-3.5" />
+                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                      <LayoutDashboard className="h-4 w-4" />
                       <span>Portfolio</span>
                     </button>
                   </SheetTrigger>
@@ -609,8 +609,8 @@ const IndexContent = () => {
 
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
-                      <Newspaper className="h-3.5 w-3.5" />
+                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                      <Newspaper className="h-4 w-4" />
                       <span>News</span>
                     </button>
                   </SheetTrigger>
