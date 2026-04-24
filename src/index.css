@@ -414,24 +414,81 @@
     background-size: 200% 100%;
     animation: data-stream 4s linear infinite;
   }
+
+  /* ════════ Refined typography scale ════════ */
+  .h-display {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+  .h-section {
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  .h-card {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  .body-soft {
+    color: hsl(var(--muted-foreground));
+    line-height: 1.6;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.7;
+  }
+
+  /* ════════ Refined panel system ════════ */
+  .panel-soft {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .panel-soft:hover {
+    border-color: hsl(var(--muted-foreground) / 0.3);
+  }
+  .surface-soft {
+    background: hsl(var(--surface-2));
+    border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: calc(var(--radius) - 2px);
+  }
+
+  /* Section padding rhythm */
+  .section-pad {
+    padding-top: clamp(2.5rem, 6vw, 5rem);
+    padding-bottom: clamp(2.5rem, 6vw, 5rem);
+  }
+  .section-pad-sm {
+    padding-top: clamp(1.5rem, 4vw, 3rem);
+    padding-bottom: clamp(1.5rem, 4vw, 3rem);
+  }
 }
 
 /* ═══════ Mobile-first optimizations (≤768px) ═══════ */
 @media (max-width: 768px) {
   /* Readable body text */
   body {
-    font-size: 16px;
+    font-size: 15px;
     -webkit-text-size-adjust: 100%;
   }
 
   /* Touch-friendly tap targets */
-  button, a, [role="button"], input, select, textarea {
-    min-height: 44px;
-    min-width: 44px;
+  button, a[role="button"], [role="button"], input, select, textarea {
+    min-height: 40px;
   }
 
-  /* Except inline/icon buttons that set their own size */
-  .inline-btn, nav button, header button {
+  /* Inline/icon/tab buttons opt out */
+  .inline-btn, nav button, header button, [data-density="compact"] button, [data-density="compact"] [role="button"] {
     min-height: unset;
     min-width: unset;
   }
@@ -456,6 +513,12 @@
   img, video {
     max-width: 100%;
     height: auto;
+  }
+
+  /* Slightly larger scrollbars on mobile for thumb usability */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
   }
 }
 
