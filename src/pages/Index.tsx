@@ -524,27 +524,27 @@ const IndexContent = () => {
                 ))}
 
               {activeTab === "market" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <MarketOverview key={refreshKey} />
                 </div>
               )}
               {activeTab === "augment" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <AugmentDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "sandbox" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <EntropySandbox key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "statarb" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <StatArbEngine key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "geopolitical" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <GeopoliticalGlobe
                     key={refreshKey}
                     stocks={stocks}
@@ -557,17 +557,17 @@ const IndexContent = () => {
                 </div>
               )}
               {activeTab === "desirable" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
               {activeTab === "risk" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <RiskDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "fortress" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
               )}
