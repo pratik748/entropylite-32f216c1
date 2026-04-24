@@ -252,10 +252,12 @@ export default function LandingPage() {
           {FEATURES.map((f) => (
             <article
               key={f.title}
-              className="group rounded-lg border border-black/5 bg-white p-5 sm:p-6 hover:shadow-md hover:border-black/15 active:bg-black/[0.02] transition-all"
+              className="group rounded-2xl border border-black/[0.06] bg-white p-6 sm:p-7 hover:shadow-soft hover:border-black/15 active:bg-black/[0.02] transition-all"
             >
-              <f.icon className="h-5 w-5 text-black/40 mb-3 sm:mb-4 group-hover:text-black/80 transition-colors" />
-              <h3 className="font-semibold text-sm mb-1.5 sm:mb-2">{f.title}</h3>
+              <div className="w-9 h-9 rounded-xl bg-black/[0.04] flex items-center justify-center mb-4 group-hover:bg-black/[0.08] transition-colors">
+                <f.icon className="h-4 w-4 text-black/60 group-hover:text-black transition-colors" />
+              </div>
+              <h3 className="font-semibold text-[15px] tracking-tight mb-2">{f.title}</h3>
               <p className="text-sm text-black/55 leading-relaxed">{f.desc}</p>
             </article>
           ))}
@@ -363,12 +365,12 @@ export default function LandingPage() {
 
           <div className="space-y-3">
             {FAQS.map((f) => (
-              <details key={f.q} className="group rounded-lg border border-black/5 bg-white p-4 sm:p-5 open:border-black/15 transition-colors">
+              <details key={f.q} className="group rounded-2xl border border-black/[0.06] bg-white p-5 sm:p-6 open:border-black/15 hover:border-black/12 transition-all">
                 <summary className="flex items-center justify-between cursor-pointer list-none">
-                  <span className="font-semibold text-sm pr-4">{f.q}</span>
+                  <span className="font-semibold text-[15px] tracking-tight pr-4">{f.q}</span>
                   <ChevronRight className="h-4 w-4 text-black/40 flex-shrink-0 group-open:rotate-90 transition-transform" />
                 </summary>
-                <p className="text-sm text-black/55 leading-relaxed mt-3">{f.a}</p>
+                <p className="text-sm text-black/55 leading-relaxed mt-4">{f.a}</p>
               </details>
             ))}
           </div>
@@ -425,9 +427,9 @@ export default function LandingPage() {
       </footer>
 
       {/* STICKY MOBILE CTA — always one tap from signup */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-black/10 px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+      <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-xl border-t border-black/[0.08] px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
         <Button
-          className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-11"
+          className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-12 rounded-full"
           onClick={goSignup}
         >
           Sign In Free. No Card Required. <ArrowRight className="ml-1 h-4 w-4" />
