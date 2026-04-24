@@ -83,56 +83,56 @@ export default function LandingPage() {
 
       {/* HERO */}
       <header className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-16 pb-8 sm:pb-14 text-center">
+        <div className="max-w-4xl mx-auto px-5 sm:px-6 pt-10 sm:pt-20 pb-12 sm:pb-20 text-center">
           <img
             src={entropyLogoFull}
             alt="Entropy Lite"
-            className="h-12 sm:h-28 object-contain mx-auto mb-4 sm:mb-7"
+            className="h-14 sm:h-28 object-contain mx-auto mb-6 sm:mb-8"
             loading="eager"
           />
 
           {/* Trust badge */}
-          <div className="inline-flex items-center gap-2 mb-4 sm:mb-6 px-3 py-1.5 rounded-full border border-black/10 bg-black/[0.02]">
+          <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3.5 py-1.5 rounded-full border border-black/[0.08] bg-black/[0.015]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access. No credit card.</span>
+            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access · No credit card</span>
           </div>
 
-          <h1 className="text-[2.35rem] sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.98] sm:leading-[1.05] mb-4 sm:mb-6">
+          <h1 className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1] sm:leading-[1.02] mb-5 sm:mb-7">
             A research-grade way
             <br />
-            <span className="text-black/55">to observe the markets.</span>
+            <span className="text-black/45">to observe the markets.</span>
           </h1>
 
-          <p className="text-[15px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-6 sm:mb-10 leading-relaxed">
+          <p className="text-[16px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed">
             Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints and a live read on institutional flows. <span className="text-black font-semibold">On one screen.</span>
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 mb-3">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
               size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-11 sm:h-12 w-full sm:w-auto shadow-lg shadow-black/20"
+              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-lg shadow-black/20 rounded-full"
               onClick={goSignup}
             >
               Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
-              className="font-mono text-xs tracking-wide px-8 h-11 sm:h-12 rounded-md border border-black/15 bg-white text-black hover:bg-black/[0.03] transition-colors w-full sm:w-auto"
+              className="font-mono text-xs tracking-wide px-8 h-12 rounded-full border border-black/15 bg-white text-black hover:bg-black/[0.03] hover:border-black/25 transition-all w-full sm:w-auto"
               onClick={() => navigate("/about")}
             >
               See what is inside
             </button>
           </div>
 
-          <p className="font-mono text-[10px] text-black/35 tracking-wide">
-            Google sign in. 30 second setup. Cancel anytime, it is free.
+          <p className="font-mono text-[10px] text-black/35 tracking-[0.1em]">
+            Google sign in · 30 second setup · Cancel anytime, it is free
           </p>
 
           {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 mt-8 sm:mt-16 pt-6 sm:pt-10 border-t border-black/5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 sm:gap-8 mt-12 sm:mt-20 pt-8 sm:pt-12 border-t border-black/[0.06]">
             {STATS.map((s) => (
               <div key={s.label} className="text-center">
-                <div className="text-xl sm:text-3xl font-bold tracking-tight">{s.value}</div>
-                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-wider text-black/40 mt-1">{s.label}</div>
+                <div className="text-2xl sm:text-3xl font-bold tracking-tight">{s.value}</div>
+                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.15em] text-black/40 mt-1.5">{s.label}</div>
               </div>
             ))}
           </div>
