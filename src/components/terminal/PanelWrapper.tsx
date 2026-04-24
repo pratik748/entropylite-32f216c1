@@ -21,9 +21,10 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className={`flex flex-col h-full border border-border bg-card ${expanded ? "fixed inset-0 z-50" : ""} ${className}`}
+      data-density="compact"
+      className={`flex flex-col h-full border border-border/70 bg-card rounded-lg overflow-hidden transition-shadow hover:shadow-soft ${expanded ? "fixed inset-0 z-50 rounded-none" : ""} ${className}`}
     >
-      <div className="flex items-center justify-between px-2 py-1 border-b border-border bg-surface-2 shrink-0">
+      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border/60 bg-surface-2/40 shrink-0">
         <div
           className={`flex items-center gap-1.5 ${collapsible ? "cursor-pointer select-none" : ""}`}
           onClick={collapsible ? () => setCollapsed(!collapsed) : undefined}
@@ -36,14 +37,14 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
               <ChevronRight className="h-3 w-3 text-muted-foreground" />
             </motion.span>
           )}
-          {icon && <span className="text-primary">{icon}</span>}
-          <span className="font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</span>
+          {icon && <span className="text-foreground/70">{icon}</span>}
+          <span className="font-mono text-[10px] font-semibold text-muted-foreground/90 uppercase tracking-[0.18em]">{title}</span>
         </div>
         {!collapsed && (
           <motion.button
             whileTap={{ scale: 0.85 }}
             onClick={() => setExpanded(!expanded)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors p-1 -m-1 rounded"
           >
             {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </motion.button>

@@ -302,9 +302,9 @@ const IndexContent = () => {
           )}
 
           {/* Tab Navigation */}
-          <nav className="border-b border-border bg-surface-1 sticky top-0 z-30 shrink-0">
+          <nav data-density="compact" className="border-b border-border/70 bg-surface-1/95 backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div
-              className="px-1 sm:container flex items-center gap-0 overflow-x-auto scrollbar-hide relative"
+              className="px-2 sm:container flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
             >
               {tabs.map((tab) => (
@@ -312,10 +312,10 @@ const IndexContent = () => {
                   key={tab.id}
                   onClick={() => handleTabSwitch(tab.id)}
                   style={{ scrollSnapAlign: "start" }}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-[9px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 rounded-t ${
                     activeTab === tab.id
-                      ? "border-primary text-primary bg-surface-2"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                      ? "border-foreground text-foreground bg-surface-2/60"
+                      : "border-transparent text-muted-foreground/80 hover:text-foreground hover:bg-surface-2/40"
                   }`}
                 >
                   <span className="sm:hidden">
@@ -326,12 +326,12 @@ const IndexContent = () => {
                   <span className="sm:hidden uppercase tracking-wider">{tab.shortLabel}</span>
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-1 pl-1 pr-2 flex-shrink-0">
+              <div className="ml-auto flex items-center gap-1.5 pl-2 pr-2 flex-shrink-0">
                 <span className="relative flex h-1 w-1">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
                   <span className="relative inline-flex h-1 w-1 rounded-full bg-gain" />
                 </span>
-                <span className="text-[7px] font-mono text-gain/70 uppercase tracking-widest">Live</span>
+                <span className="text-[8px] font-mono text-gain/80 uppercase tracking-[0.2em]">Live</span>
               </div>
             </div>
           </nav>
@@ -524,27 +524,27 @@ const IndexContent = () => {
                 ))}
 
               {activeTab === "market" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <MarketOverview key={refreshKey} />
                 </div>
               )}
               {activeTab === "augment" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <AugmentDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "sandbox" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <EntropySandbox key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "statarb" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <StatArbEngine key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "geopolitical" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <GeopoliticalGlobe
                     key={refreshKey}
                     stocks={stocks}
@@ -557,17 +557,17 @@ const IndexContent = () => {
                 </div>
               )}
               {activeTab === "desirable" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                 </div>
               )}
               {activeTab === "risk" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <RiskDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "fortress" && (
-                <div className="px-2 sm:container py-2 sm:py-4 pb-12">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
               )}
@@ -575,12 +575,12 @@ const IndexContent = () => {
           </main>
 
           {showMobileDashboardDock && (
-            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border bg-surface-1/98 backdrop-blur-md shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)]">
-              <div className="grid grid-cols-3 gap-px bg-border">
+            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border/80 bg-surface-1/95 backdrop-blur-xl shadow-[0_-8px_28px_hsl(var(--foreground)/0.08)]">
+              <div className="grid grid-cols-2 gap-px bg-border/60">
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
-                      <LayoutDashboard className="h-3.5 w-3.5" />
+                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                      <LayoutDashboard className="h-4 w-4" />
                       <span>Portfolio</span>
                     </button>
                   </SheetTrigger>
@@ -609,8 +609,8 @@ const IndexContent = () => {
 
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-12 flex-col items-center justify-center gap-0.5 bg-surface-1 px-2 py-2 text-[9px] font-mono uppercase tracking-wider text-muted-foreground transition-colors active:bg-surface-2 active:text-foreground">
-                      <Newspaper className="h-3.5 w-3.5" />
+                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                      <Newspaper className="h-4 w-4" />
                       <span>News</span>
                     </button>
                   </SheetTrigger>

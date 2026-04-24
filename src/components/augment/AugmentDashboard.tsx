@@ -71,8 +71,8 @@ const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
   return (
     <div className="space-y-4">
       {/* Module selector */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="rounded-xl border border-border/70 bg-card p-3 sm:p-4 shadow-soft">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {modules.map((m) => {
             const Icon = m.icon;
             const active = activeModule === m.id;
@@ -80,10 +80,10 @@ const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
               <button
                 key={m.id}
                 onClick={() => setActiveModule(m.id)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] sm:text-xs font-medium tracking-wide transition-all ${
                   active
-                    ? "bg-foreground text-background"
-                    : "bg-surface-2 text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    ? "bg-foreground text-background shadow-sm"
+                    : "bg-surface-2/70 text-muted-foreground border border-transparent hover:border-border hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
