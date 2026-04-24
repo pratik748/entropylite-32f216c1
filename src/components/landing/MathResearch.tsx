@@ -535,6 +535,35 @@ export default function MathResearch() {
               </a>
             </div>
 
+            <div className="mt-6 rounded-lg overflow-hidden border border-black/10 bg-white">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-black/10 px-4 py-3">
+                <div>
+                  <p className="font-semibold text-sm">Read the paper inside the page</p>
+                  <p className="font-mono text-[10px] text-black/40">Embedded PDF viewer</p>
+                </div>
+                <a
+                  href="/research/clank-theory-sehwag-2026.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-black/65 hover:text-black transition-colors"
+                >
+                  Open full screen
+                </a>
+              </div>
+              <object
+                data="/research/clank-theory-sehwag-2026.pdf#view=FitH"
+                type="application/pdf"
+                className="w-full h-[520px] sm:h-[720px]"
+                aria-label="Embedded research PDF viewer"
+              >
+                <iframe
+                  title="CLANK research paper"
+                  src="/research/clank-theory-sehwag-2026.pdf#view=FitH"
+                  className="w-full h-[520px] sm:h-[720px]"
+                />
+              </object>
+            </div>
+
             <p className="font-mono text-[10px] text-black/35 mt-5 leading-relaxed">
               Wired into the terminal as the <span className="text-black/60">CLANK Structural Constraint Engine</span> —
               identifying institutional pressure points, structural locks and deterministic windows
