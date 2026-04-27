@@ -1086,11 +1086,10 @@ Return via the tool call only.`,
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
-      const isFallback = rec._isFallback === true;
-      // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold; fallbacks always pass
+      // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold.
       const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
-      if (!isHedge && !isFallback && dollarVolume < minDollarVol) { filtered++; continue; }
-      if (!isHedge && !isFallback && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
+      if (!isHedge && dollarVolume < minDollarVol) { filtered++; continue; }
+      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
@@ -1115,11 +1114,10 @@ Return via the tool call only.`,
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
 
-      // F4: Avoid weak upside profiles — relaxed for fallback candidates
-      if (!isHedge && !isFallback && expectedUpsidePct < 4) { filtered++; continue; }
-      if (!isHedge && isFallback && expectedUpsidePct < 1) { filtered++; continue; }
+      // F4: Avoid weak upside profiles
+      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
 
-      // Tiered pass logic to avoid empty result sets while preserving quality.
+      // Two-tier pass logic: strict (high quality) or balanced (acceptable). Anything below = drop.
       const strictPass = isHedge || (
         sr >= 0.15 &&
         mdd <= 35 &&
@@ -1145,25 +1143,8 @@ Return via the tool call only.`,
         momentum20d > -6
       );
 
-      // Fallback candidates get an even more lenient rescue tier
-      const rescueThresholds = isFallback
-        ? { sr: -0.6, mdd: 80, smaFactor: 0.8, winRate: 25, momentum: -20 }
-        : { sr: -0.35, mdd: 65, smaFactor: 0.9, winRate: 34, momentum: -12 };
-
-      const rescuePass = isHedge || isFallback || (
-        sr >= rescueThresholds.sr &&
-        mdd <= rescueThresholds.mdd &&
-        (!isPair ? price >= sma20 * rescueThresholds.smaFactor : true) &&
-        winRate >= rescueThresholds.winRate &&
-        momentum20d > rescueThresholds.momentum
-      );
-
-      if (!strictPass && !balancedPass && !rescuePass) { filtered++; continue; }
-      const filterTier: "strict" | "balanced" | "rescue" = strictPass
-        ? "strict"
-        : balancedPass
-          ? "balanced"
-          : "rescue";
+      if (!strictPass && !balancedPass) { filtered++; continue; }
+      const filterTier: FilterTier = strictPass ? "strict" : "balanced";
 
       // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
