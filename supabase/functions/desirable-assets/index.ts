@@ -884,15 +884,6 @@ Return via the tool call only.`,
       console.error("desirable-assets Stage 1 AI generation failed:", aiError);
     }
 
-    // Always blend in deterministic institutional fallback universe to prevent empty or low-quality sets.
-    const deterministicCandidates = buildDeterministicCandidates(
-      previousTickers,
-      portfolioTickers,
-      indiaMode,
-      preferredAssetTypes,
-      preferredSectors,
-    );
-
     // HARD FILTER: When indiaMode is ON, strip any non-Indian tickers from AI candidates
     if (indiaMode) {
       candidates = candidates.filter((c: any) => {
@@ -902,39 +893,22 @@ Return via the tool call only.`,
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
     }
 
-    // Only pad with deterministic fallback when AI is genuinely thin (<5 picks).
-    // This stops Desirable Assets from being dominated by the same mega-cap fallbacks every refresh.
-    const aiCandidateCount = candidates.length;
-    const padThreshold = preferredAssetTypes?.length || preferredSectors?.length ? 7 : 5;
-    if (candidates.length < padThreshold) {
-      const needed = padThreshold - candidates.length;
-      candidates = dedupeCandidates([...candidates, ...deterministicCandidates.slice(0, needed)]);
-      console.log(`desirable-assets: AI returned ${aiCandidateCount} picks (<${padThreshold}), padded with ${Math.max(0, candidates.length - aiCandidateCount)} rotated fallback`);
-    } else {
-      candidates = dedupeCandidates(candidates).slice(0, 28);
-      console.log(`desirable-assets: AI returned ${candidates.length} picks, no fallback padding`);
-    }
+    candidates = dedupeCandidates(candidates).slice(0, 28);
+    console.log(`desirable-assets: AI returned ${candidates.length} picks (no fallback substitution)`);
 
-    // Auto-Repair: AI totally failed AND fallback universe is also empty.
-    // Force-inject deterministic universe unconditionally rather than throw.
+    // No fallback. If AI produced nothing usable, return an honest empty set.
     if (candidates.length === 0) {
-      repairLog("AI + retry both returned zero — force-injecting deterministic institutional universe");
-      candidates = dedupeCandidates([...deterministicCandidates]).slice(0, 18);
-    }
-    if (candidates.length === 0) {
-      // This should be practically impossible (fallback universe is static).
-      // Emit a structured soft-failure so client can keep cached last-good response.
-      repairLog("CRITICAL: deterministic universe produced zero candidates");
+      repairLog("AI produced 0 candidates — returning honest empty set (no deterministic substitution)");
       return new Response(JSON.stringify({
         recommendations: [],
         marketCondition: "",
         regimeType: "transition",
         candidatesGenerated: 0,
         candidatesPassed: 0,
-        autoRepaired: true,
+        autoRepaired: false,
         softFailure: true,
         repairTrail,
-        repairMessage: "Asset universe is temporarily unavailable. Retrying automatically…",
+        repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
         timestamp: Date.now(),
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
