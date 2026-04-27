@@ -46,20 +46,56 @@ export async function loadSources(ids: string[]): Promise<Map<string, SourcePost
       alpha: Number(r.alpha), beta: Number(r.beta),
     });
   }
-  // Synthesise defaults for unseen sources (π0=0.5, n0=10)
+  // Synthesise tiered priors for unseen sources — NO whitelist; any crawled
+  // source is accepted and weighted by heuristic priors that improve over time
+  // via Bayesian feedback (twrd-feedback updates α/β from trade outcomes).
+  const unseen: { id: string; domain: TwrdDomain; alpha: number; beta: number }[] = [];
   for (const id of uniq) {
-    if (!out.has(id)) out.set(id, { id, domain: "news", alpha: 5, beta: 5 });
+    if (out.has(id)) continue;
+    const prior = inferPrior(id);
+    out.set(id, { id, ...prior });
+    unseen.push({ id, ...prior });
+  }
+  // Persist unseen sources so future weight updates have a row to learn against.
+  if (unseen.length) {
+    try { await client().from("twrd_sources").upsert(unseen, { onConflict: "id" }); }
+    catch { /* non-fatal — in-memory prior still applies */ }
   }
   return out;
+}
+
+/** Heuristic prior for any source id (domain-like string). No whitelist. */
+function inferPrior(rawId: string): { domain: TwrdDomain; alpha: number; beta: number } {
+  const id = rawId.toLowerCase();
+  // Domain classification
+  let domain: TwrdDomain = "news";
+  if (/(twitter|x\.com|reddit|stocktwits|tiktok|telegram|discord|youtube)/.test(id)) domain = "social";
+  else if (/(sec\.gov|federalreserve|treasury|imf\.org|worldbank|bls\.gov|ecb\.europa|rbi\.org)/.test(id)) domain = "financial";
+  else if (/(arxiv|nature\.com|science\.org|nih\.gov|ssrn|pubmed)/.test(id)) domain = "scientific";
+  else if (/(reuters|bloomberg|ft\.com|wsj|cnbc|nytimes|guardian|bbc|aljazeera|economist|forbes|barrons|seekingalpha|moneycontrol|economictimes|livemint|business-standard)/.test(id)) domain = "news";
+  else if (/(geopolitics|stratfor|cfr\.org|chathamhouse|csis\.org)/.test(id)) domain = "geo";
+
+  // Tiered confidence: .gov/.edu > tier-1 outlets > general .com/.org > social/unknown
+  let alpha = 5, beta = 5; // neutral default π0=0.5, n0=10
+  if (/\.gov(\.|$)|\.edu(\.|$)|sec\.gov|federalreserve|nih\.gov|bls\.gov/.test(id)) { alpha = 18; beta = 4; }
+  else if (/(reuters|bloomberg|ft\.com|wsj|economist|nature\.com|science\.org)/.test(id)) { alpha = 16; beta = 5; }
+  else if (/(cnbc|nytimes|bbc|guardian|forbes|barrons|seekingalpha|moneycontrol|economictimes|livemint)/.test(id)) { alpha = 12; beta = 6; }
+  else if (/(twitter|x\.com|reddit|stocktwits|tiktok|telegram|discord)/.test(id)) { alpha = 4; beta = 8; }
+  else if (/\.org(\.|$)/.test(id)) { alpha = 8; beta = 6; }
+  // else keep neutral 5/5 — any new source is ACCEPTED, not rejected.
+
+  return { domain, alpha, beta };
 }
 
 export async function bumpSource(id: string, outcome: 0 | 1): Promise<void> {
   const lower = id.toLowerCase();
   const { data } = await client().from("twrd_sources").select("*").eq("id", lower).maybeSingle();
   if (!data) {
+    const prior = inferPrior(lower);
     await client().from("twrd_sources").insert({
-      id: lower, domain: "news",
-      alpha: outcome ? 6 : 5, beta: outcome ? 5 : 6,
+      id: lower, domain: prior.domain,
+      alpha: prior.alpha + (outcome ? 1 : 0),
+      beta:  prior.beta  + (outcome ? 0 : 1),
     });
     return;
   }
