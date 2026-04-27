@@ -546,62 +546,9 @@ const ALLOWED_STRATEGIES = new Set([
   "momentum",
 ]);
 
-const ELITE_FALLBACK_UNIVERSE = [
-  { ticker: "MSFT", name: "Microsoft", sector: "Technology", marketCap: "mega", strategy: "equity" },
-  { ticker: "NVDA", name: "NVIDIA", sector: "Technology", marketCap: "mega", strategy: "momentum" },
-  { ticker: "AMZN", name: "Amazon", sector: "Consumer Discretionary", marketCap: "mega", strategy: "equity" },
-  { ticker: "META", name: "Meta Platforms", sector: "Communication", marketCap: "mega", strategy: "equity" },
-  { ticker: "GOOGL", name: "Alphabet", sector: "Communication", marketCap: "mega", strategy: "equity" },
-  { ticker: "AVGO", name: "Broadcom", sector: "Technology", marketCap: "large", strategy: "momentum" },
-  { ticker: "LLY", name: "Eli Lilly", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", marketCap: "large", strategy: "equity" },
-  { ticker: "UNH", name: "UnitedHealth", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "COST", name: "Costco", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
-  { ticker: "ORCL", name: "Oracle", sector: "Technology", marketCap: "large", strategy: "equity" },
-  { ticker: "TSM", name: "Taiwan Semiconductor", sector: "Technology", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "ASML", name: "ASML", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "V", name: "Visa", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "MA", name: "Mastercard", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "QQQ", name: "Invesco QQQ ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "SPY", name: "SPDR S&P 500 ETF Trust", sector: "Index", marketCap: "large", strategy: "equity", assetClass: "ETF" },
-  { ticker: "VTI", name: "Vanguard Total Stock Market ETF", sector: "Index", marketCap: "large", strategy: "equity", assetClass: "ETF" },
-  { ticker: "IWM", name: "iShares Russell 2000 ETF", sector: "Index", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "XLF", name: "Financial Select Sector SPDR", sector: "Financials", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-  { ticker: "XLV", name: "Health Care Select Sector SPDR", sector: "Healthcare", marketCap: "large", strategy: "equity", assetClass: "ETF" },
-  { ticker: "SMH", name: "VanEck Semiconductor ETF", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "XLE", name: "Energy Select Sector SPDR", sector: "Energy", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-  { ticker: "GLD", name: "SPDR Gold Shares", sector: "Commodities", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "TLT", name: "iShares 20+ Year Treasury Bond ETF", sector: "Bonds", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "SH", name: "ProShares Short S&P500", sector: "Hedge", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-];
-
-const INDIA_FALLBACK_UNIVERSE = [
-  { ticker: "RELIANCE.NS", name: "Reliance Industries", sector: "Energy", marketCap: "mega", strategy: "equity" },
-  { ticker: "TCS.NS", name: "Tata Consultancy Services", sector: "Technology", marketCap: "mega", strategy: "equity" },
-  { ticker: "HDFCBANK.NS", name: "HDFC Bank", sector: "Financials", marketCap: "mega", strategy: "equity" },
-  { ticker: "INFY.NS", name: "Infosys", sector: "Technology", marketCap: "mega", strategy: "momentum" },
-  { ticker: "ICICIBANK.NS", name: "ICICI Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", sector: "Communication", marketCap: "large", strategy: "momentum" },
-  { ticker: "ITC.NS", name: "ITC Limited", sector: "Consumer Staples", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "SBIN.NS", name: "State Bank of India", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "LT.NS", name: "Larsen & Toubro", sector: "Industrials", marketCap: "large", strategy: "equity" },
-  { ticker: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", sector: "Financials", marketCap: "large", strategy: "pair_trade" },
-  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", sector: "Consumer Staples", marketCap: "large", strategy: "equity" },
-  { ticker: "BAJFINANCE.NS", name: "Bajaj Finance", sector: "Financials", marketCap: "large", strategy: "momentum" },
-  { ticker: "MARUTI.NS", name: "Maruti Suzuki", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
-  { ticker: "TATAMOTORS.NS", name: "Tata Motors", sector: "Consumer Discretionary", marketCap: "large", strategy: "momentum" },
-  { ticker: "AXISBANK.NS", name: "Axis Bank", sector: "Financials", marketCap: "large", strategy: "equity" },
-  { ticker: "SUNPHARMA.NS", name: "Sun Pharma", sector: "Healthcare", marketCap: "large", strategy: "equity" },
-  { ticker: "TITAN.NS", name: "Titan Company", sector: "Consumer Discretionary", marketCap: "large", strategy: "equity" },
-  { ticker: "WIPRO.NS", name: "Wipro", sector: "Technology", marketCap: "large", strategy: "mean_reversion" },
-  { ticker: "POWERGRID.NS", name: "Power Grid Corp", sector: "Utilities", marketCap: "large", strategy: "sector_hedge" },
-  { ticker: "NIFTYBEES.NS", name: "Nippon India Nifty BeES", sector: "Index", marketCap: "large", strategy: "correlation_hedge", assetClass: "ETF" },
-  { ticker: "JUNIORBEES.NS", name: "Nippon India Junior BeES", sector: "Index", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "BANKBEES.NS", name: "Nippon India Bank BeES", sector: "Financials", marketCap: "large", strategy: "sector_hedge", assetClass: "ETF" },
-  { ticker: "ITBEES.NS", name: "Nippon India ETF Nifty IT", sector: "Technology", marketCap: "large", strategy: "momentum", assetClass: "ETF" },
-  { ticker: "GOLDBEES.NS", name: "Nippon India Gold BeES", sector: "Commodities", marketCap: "large", strategy: "vol_arb", assetClass: "ETF" },
-];
+// NOTE: deterministic fallback universes removed by design. The engine now returns
+// only AI-generated picks that survive the live data + portfolio risk filters.
+// If nothing survives in a given cycle, the response is an honest empty set.
 
 function normalizeCandidate(rec: any): any | null {
   const ticker = String(rec?.ticker || "").trim().toUpperCase();
