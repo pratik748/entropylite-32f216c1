@@ -1015,58 +1015,7 @@ Return via the tool call only.`,
 
     const scored: ScoredRec[] = [];
 
-    const buildDeterministicScoredRec = (fallbackRec: any, forcedQuantScore = 42): ScoredRec | null => {
-      if (portfolioTickers.includes(fallbackRec.ticker)) return null;
-      const fbTickerUpper = String(fallbackRec.ticker || "").toUpperCase();
-      if (sellTickers.includes(fbTickerUpper) || highRiskTickers.includes(fbTickerUpper)) return null;
-      const fbSectorLower = String(fallbackRec.sector || "").toLowerCase().trim();
-      if (fbSectorLower && avoidSectorsLower.some((s) => fbSectorLower.includes(s) || s.includes(fbSectorLower))) return null;
-
-      const td = tickerData[fallbackRec.ticker];
-      if (!td || td.closes.length < 20 || td.price <= 0) return null;
-
-      const returns = logReturns(td.closes);
-      const sr = sharpeRatio(returns);
-      const mdd = maxDrawdown(td.closes);
-      const vol = annualizedVol(returns);
-      const zs = zScore(td.closes);
-      const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
-      const portCorr = portReturns.length > 10 ? pearsonCorrelation(returns, portReturns) : 0;
-      const sma20 = mean(td.closes.slice(-20));
-
-      return {
-        rec: fallbackRec,
-        sharpeRatio: Math.round(sr * 100) / 100,
-        maxDrawdown: Math.round(mdd * 10) / 10,
-        portfolioCorrelation: Math.round(portCorr * 100) / 100,
-        volatility: Math.round(vol * 10) / 10,
-        zScore: Math.round(zs * 100) / 100,
-        quantScore: forcedQuantScore,
-        priceVerified: true,
-        stalePrice: td.stalePrice || false,
-        realPrice: td.price,
-        realCurrency: td.currency,
-        priceChange24h: Math.round(td.change * 100) / 100,
-        volume: td.volume,
-        fiftyTwoHigh: td.fiftyTwoHigh,
-        fiftyTwoLow: td.fiftyTwoLow,
-        closes: td.closes.slice(-60),
-        highs: (td.highs || []).slice(-60),
-        maxProfitTarget: mpt.maxTarget,
-        maxProfitConfidence: mpt.confidence,
-        maxProfitMethod: mpt.method,
-        momentum20d: Math.round((((td.price - sma20) / Math.max(sma20, 1)) * 100) * 100) / 100,
-        momentum5d: td.closes.length >= 5 ? Math.round((((td.price - td.closes[td.closes.length - 5]) / td.closes[td.closes.length - 5]) * 100) * 100) / 100 : 0,
-        trendStrength: 50,
-        winRate: 50,
-        filterTier: "rescue",
-        sentimentScore: 0,
-        sentimentLabel: "Neutral",
-        earningsSignal: "neutral",
-        sentimentHeadline: "",
-        sentimentArticleCount: 0,
-      };
-    };
+    // Deterministic-rescue scored builder removed by design.
 
     let noData = 0, thinData = 0, filtered = 0;
     for (const rec of candidates) {
