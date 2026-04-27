@@ -9,6 +9,7 @@ import { useMarketRegime } from "@/hooks/useMarketRegime";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useEffect, useState } from "react";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
+import TruthBadge from "@/components/twrd/TruthBadge";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -118,7 +119,7 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
     );
   }
 
-  const { consensus, conviction, contradictions, shiftETA, thesis, actionable, signalCount } = data;
+  const { consensus, conviction, contradictions, shiftETA, thesis, actionable, signalCount, veracity } = data;
 
   const directionColor =
     consensus.direction > 10 ? "text-gain" :
@@ -142,9 +143,18 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} className="h-7 text-[10px] font-mono uppercase tracking-wider">
-          <RefreshCw className="h-3 w-3 mr-1.5" /> Recompute
-        </Button>
+        <div className="flex items-center gap-2">
+          {veracity && (
+            <TruthBadge
+              T={veracity.meanT}
+              contradictionRisk={veracity.contradictionRisk}
+              falseConsensus={veracity.falseConsensus}
+            />
+          )}
+          <Button variant="outline" size="sm" onClick={refresh} className="h-7 text-[10px] font-mono uppercase tracking-wider">
+            <RefreshCw className="h-3 w-3 mr-1.5" /> Recompute
+          </Button>
+        </div>
       </div>
 
       {/* Top row: Consensus / Conviction / Shift ETA */}
