@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-  AreaChart, Area, LineChart, Line, ReferenceLine,
+  AreaChart, Area,
 } from "recharts";
 
 // --- mocked but mathematically faithful illustrations of the live TWRD layer ---
@@ -25,21 +24,6 @@ const credibilityCurve = SOURCE_TIERS.map((t) => ({
   credibility: Number((t.alpha / (t.alpha + t.beta) * 100).toFixed(1)),
 }));
 
-// truth score sigmoid demo: T = σ(w1 S + w2 A + w3 D − w4 B − w5 C + b)
-const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
-const truthSurface = Array.from({ length: 21 }, (_, i) => {
-  const agreement = i / 20;
-  const w = { w1: 1.4, w2: 1.6, w3: 1.0, w4: 1.2, w5: 1.5, b: -0.4 };
-  const baseS = 0.7, baseD = 0.85, baseB = 0.15;
-  const lowDiv = sigmoid(w.w1 * baseS + w.w2 * agreement + w.w3 * baseD - w.w4 * baseB - w.w5 * Math.max(0, agreement - 0.55) * 1.2 + w.b);
-  const highDiv = sigmoid(w.w1 * baseS + w.w2 * agreement + w.w3 * baseD - w.w4 * baseB - w.w5 * 0.05 + w.b);
-  return {
-    agreement: Number((agreement * 100).toFixed(0)),
-    lowDiversity: Number((lowDiv * 100).toFixed(1)),
-    highDiversity: Number((highDiv * 100).toFixed(1)),
-  };
-});
-
 // temporal decay D(Δt) = exp(−λ Δt)
 const decayCurve = Array.from({ length: 25 }, (_, i) => {
   const hours = i;
@@ -50,14 +34,6 @@ const decayCurve = Array.from({ length: 25 }, (_, i) => {
     structural: Number((Math.exp(-0.015 * hours) * 100).toFixed(1)),
   };
 });
-
-const radarFactors = [
-  { factor: "Source S", live: 78, raw: 50 },
-  { factor: "Agreement A", live: 72, raw: 50 },
-  { factor: "Decay D", live: 84, raw: 50 },
-  { factor: "Bias B (inv)", live: 80, raw: 50 },
-  { factor: "Contradict. C (inv)", live: 70, raw: 50 },
-];
 
 const PIPELINE = [
   { icon: Database, title: "Ingest", desc: "Crawl any domain — .gov, Tier-1 press, niche blogs, X, Reddit. No whitelist. Auto-registers new sources with Bayesian Beta priors." },
