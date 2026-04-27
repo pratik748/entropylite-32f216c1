@@ -91,9 +91,11 @@ export async function bumpSource(id: string, outcome: 0 | 1): Promise<void> {
   const lower = id.toLowerCase();
   const { data } = await client().from("twrd_sources").select("*").eq("id", lower).maybeSingle();
   if (!data) {
+    const prior = inferPrior(lower);
     await client().from("twrd_sources").insert({
-      id: lower, domain: "news",
-      alpha: outcome ? 6 : 5, beta: outcome ? 5 : 6,
+      id: lower, domain: prior.domain,
+      alpha: prior.alpha + (outcome ? 1 : 0),
+      beta:  prior.beta  + (outcome ? 0 : 1),
     });
     return;
   }
