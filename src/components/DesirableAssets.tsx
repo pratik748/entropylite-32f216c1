@@ -640,7 +640,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const alreadyOwned = existingTickers.includes(rec.ticker);
           const justAdded = addedTickers.has(rec.ticker);
           const odgs = getAssetBoost(rec.ticker);
-          const qs = Math.round((rec.quantScore || 0) * odgs.scoreMult);
+          const qs = Math.round(rec.quantScore || 0);
+          const boostedAlloc = Math.max(1, Math.round((rec.suggestedQty || 1) * odgs.allocMult));
+          const disagreement = rec.riskVerdict === "high";
 
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
@@ -675,6 +677,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
                   {odgs.isHot && <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">ODGS ↑</span>}
+                  {disagreement && (
+                    <span className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss flex items-center gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" /> RISK CONFLICT
+                    </span>
+                  )}
                   
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -733,6 +740,29 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                       {rec.zScore?.toFixed(2)}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {(rec.evidenceSummary?.length || rec.portfolioFit || rec.riskCompositeScore !== undefined) && (
+                <div className="mb-3 rounded-lg border border-border bg-card/60 p-3 relative z-10">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-primary">Why this passed</span>
+                    {rec.riskCompositeScore !== undefined && (
+                      <span className={`text-[9px] font-mono ${rec.riskVerdict === "high" ? "text-loss" : rec.riskVerdict === "medium" ? "text-warning" : "text-gain"}`}>
+                        Risk {rec.riskCompositeScore}/100
+                      </span>
+                    )}
+                  </div>
+                  {rec.portfolioFit && <p className="mb-2 text-[10px] text-foreground">{rec.portfolioFit}</p>}
+                  {rec.evidenceSummary?.length ? (
+                    <div className="flex flex-wrap gap-1">
+                      {rec.evidenceSummary.map((item) => (
+                        <span key={item} className="rounded-full bg-surface-2 px-2 py-0.5 text-[9px] text-muted-foreground">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -798,11 +828,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               <div className="rounded-lg bg-surface-2 px-3 py-2 mb-3 text-[10px] font-mono relative z-10">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Position Size</span>
-                  <span className="text-foreground font-bold">{Math.max(1, rec.suggestedQty || 1)} units</span>
+                  <span className="text-foreground font-bold">{boostedAlloc} units</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-muted-foreground">Capital</span>
-                  <span className="text-primary">{sym}{(rec.positionValue || (price * Math.max(1, rec.suggestedQty || 1))).toLocaleString()}</span>
+                  <span className="text-primary">{sym}{(price * boostedAlloc).toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-muted-foreground">Allocation</span>
@@ -844,11 +874,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   ))}
                   <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9px] text-muted-foreground">{rec.sector}</span>
                 </div>
-                <Button
+                  <Button
                   size="sm"
                   variant={justAdded ? "secondary" : "default"}
                   disabled={alreadyOwned || justAdded}
-                  onClick={() => handleAdd(rec)}
+                    onClick={() => handleAdd({ ...rec, suggestedQty: boostedAlloc, positionValue: price * boostedAlloc })}
                   className="h-7 gap-1 text-[10px]"
                 >
                   {justAdded ? "Added ✓" : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add</>}
