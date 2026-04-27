@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-  AreaChart, Area, LineChart, Line, ReferenceLine,
+  AreaChart, Area,
 } from "recharts";
 
 // --- mocked but mathematically faithful illustrations of the live TWRD layer ---
@@ -25,21 +24,6 @@ const credibilityCurve = SOURCE_TIERS.map((t) => ({
   credibility: Number((t.alpha / (t.alpha + t.beta) * 100).toFixed(1)),
 }));
 
-// truth score sigmoid demo: T = σ(w1 S + w2 A + w3 D − w4 B − w5 C + b)
-const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
-const truthSurface = Array.from({ length: 21 }, (_, i) => {
-  const agreement = i / 20;
-  const w = { w1: 1.4, w2: 1.6, w3: 1.0, w4: 1.2, w5: 1.5, b: -0.4 };
-  const baseS = 0.7, baseD = 0.85, baseB = 0.15;
-  const lowDiv = sigmoid(w.w1 * baseS + w.w2 * agreement + w.w3 * baseD - w.w4 * baseB - w.w5 * Math.max(0, agreement - 0.55) * 1.2 + w.b);
-  const highDiv = sigmoid(w.w1 * baseS + w.w2 * agreement + w.w3 * baseD - w.w4 * baseB - w.w5 * 0.05 + w.b);
-  return {
-    agreement: Number((agreement * 100).toFixed(0)),
-    lowDiversity: Number((lowDiv * 100).toFixed(1)),
-    highDiversity: Number((highDiv * 100).toFixed(1)),
-  };
-});
-
 // temporal decay D(Δt) = exp(−λ Δt)
 const decayCurve = Array.from({ length: 25 }, (_, i) => {
   const hours = i;
@@ -50,14 +34,6 @@ const decayCurve = Array.from({ length: 25 }, (_, i) => {
     structural: Number((Math.exp(-0.015 * hours) * 100).toFixed(1)),
   };
 });
-
-const radarFactors = [
-  { factor: "Source S", live: 78, raw: 50 },
-  { factor: "Agreement A", live: 72, raw: 50 },
-  { factor: "Decay D", live: 84, raw: 50 },
-  { factor: "Bias B (inv)", live: 80, raw: 50 },
-  { factor: "Contradict. C (inv)", live: 70, raw: 50 },
-];
 
 const PIPELINE = [
   { icon: Database, title: "Ingest", desc: "Crawl any domain — .gov, Tier-1 press, niche blogs, X, Reddit. No whitelist. Auto-registers new sources with Bayesian Beta priors." },
@@ -200,16 +176,19 @@ export default function DataAggregationPage() {
       <section className="border-b border-black/[0.06] bg-black/[0.015]">
         <div className="max-w-6xl mx-auto px-5 sm:px-6 py-14 sm:py-20">
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The math, visualised</p>
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-10">Four lenses on one truth surface.</h2>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">Two views. The rest is written down.</h2>
+          <p className="text-sm sm:text-base text-black/55 max-w-2xl mb-10">
+            We deliberately keep the visuals minimal. Two charts cover the inputs that matter most — <span className="text-black font-semibold">who</span> a claim came from, and <span className="text-black font-semibold">how fast</span> it goes stale. Everything else is explained in plain language so you can audit the logic, not just admire the dashboard.
+          </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-12">
             {/* Source credibility curve */}
             <div className="rounded-xl border border-black/10 bg-white p-6">
               <div className="flex items-baseline justify-between mb-1">
                 <h3 className="font-semibold text-sm tracking-tight">Source credibility — Beta posteriors</h3>
                 <span className="font-mono text-[9px] text-black/40">α / (α + β)</span>
               </div>
-              <p className="text-[11px] text-black/50 mb-4">Each domain class enters with a tier-appropriate prior, then updates from real outcomes.</p>
+              <p className="text-[11px] text-black/50 mb-4">Each domain class enters with a tier-appropriate Beta prior, then updates from real trade outcomes — every win sharpens α, every false signal sharpens β.</p>
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart data={credibilityCurve} layout="vertical" margin={{ left: 90 }}>
@@ -225,39 +204,13 @@ export default function DataAggregationPage() {
               </div>
             </div>
 
-            {/* Sigmoid truth surface */}
-            <div className="rounded-xl border border-black/10 bg-white p-6">
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="font-semibold text-sm tracking-tight">Truth surface vs. agreement</h3>
-                <span className="font-mono text-[9px] text-black/40">T(x, t) %</span>
-              </div>
-              <p className="text-[11px] text-black/50 mb-4">High agreement only earns high truth when paired with high source diversity. Echo chambers self-cap.</p>
-              <div className="h-64">
-                <ResponsiveContainer>
-                  <LineChart data={truthSurface} margin={{ left: 0, right: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                    <XAxis dataKey="agreement" tick={{ fill: "rgba(0,0,0,0.45)", fontSize: 10 }} axisLine={{ stroke: "rgba(0,0,0,0.1)" }} label={{ value: "Cross-source agreement A (%)", position: "insideBottom", offset: -4, fill: "rgba(0,0,0,0.4)", fontSize: 10 }} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "rgba(0,0,0,0.45)", fontSize: 10 }} axisLine={{ stroke: "rgba(0,0,0,0.1)" }} />
-                    <Tooltip contentStyle={tipStyle} formatter={(v: number, n: string) => [`${v}%`, n === "highDiversity" ? "High diversity" : "Low diversity"]} />
-                    <Line type="monotone" dataKey="highDiversity" stroke="#000" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="lowDiversity" stroke="rgba(0,0,0,0.35)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
-                    <ReferenceLine y={50} stroke="rgba(0,0,0,0.15)" strokeDasharray="2 2" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex gap-4 mt-2 text-[10px] text-black/55">
-                <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-black" /> Diverse sources</span>
-                <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-black/35" style={{ borderTop: "1px dashed" }} /> Echo chamber</span>
-              </div>
-            </div>
-
             {/* Temporal decay */}
             <div className="rounded-xl border border-black/10 bg-white p-6">
               <div className="flex items-baseline justify-between mb-1">
                 <h3 className="font-semibold text-sm tracking-tight">Temporal decay D(Δt)</h3>
                 <span className="font-mono text-[9px] text-black/40">exp(−λ Δt)</span>
               </div>
-              <p className="text-[11px] text-black/50 mb-4">Different claim types decay at different rates. A breaking rumour dies in hours; a structural rate-cycle thesis decays in weeks.</p>
+              <p className="text-[11px] text-black/50 mb-4">Different claim types decay at different rates. A breaking rumour dies in hours, a macro print in days, a structural rate-cycle thesis in weeks. λ is tuned per claim class.</p>
               <div className="h-64">
                 <ResponsiveContainer>
                   <AreaChart data={decayCurve} margin={{ left: 0, right: 10 }}>
@@ -282,31 +235,29 @@ export default function DataAggregationPage() {
                 <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-black/30" /> Structural (λ=0.015/h)</span>
               </div>
             </div>
+          </div>
 
-            {/* Radar — gated vs ungated */}
-            <div className="rounded-xl border border-black/10 bg-white p-6">
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="font-semibold text-sm tracking-tight">Truth factor profile — gated vs raw</h3>
-                <span className="font-mono text-[9px] text-black/40">5-factor scan</span>
-              </div>
-              <p className="text-[11px] text-black/50 mb-4">A typical claim entering the gate vs. a naive system that treats every source as equal.</p>
-              <div className="h-64">
-                <ResponsiveContainer>
-                  <RadarChart data={radarFactors} cx="50%" cy="50%" outerRadius="70%">
-                    <PolarGrid stroke="rgba(0,0,0,0.08)" />
-                    <PolarAngleAxis dataKey="factor" tick={{ fill: "rgba(0,0,0,0.55)", fontSize: 9 }} />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                    <Radar name="Raw" dataKey="raw" stroke="rgba(0,0,0,0.3)" fill="rgba(0,0,0,0.05)" strokeDasharray="3 3" strokeWidth={1} />
-                    <Radar name="TWRD-gated" dataKey="live" stroke="#000" fill="rgba(0,0,0,0.12)" strokeWidth={1.6} />
-                    <Tooltip contentStyle={tipStyle} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex gap-4 mt-2 text-[10px] text-black/55">
-                <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-black" /> TWRD-gated</span>
-                <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 bg-black/30" /> Raw / ungated</span>
-              </div>
-            </div>
+          {/* WRITTEN EXPLANATION — agreement, diversity, gated vs raw */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <article className="rounded-xl border border-black/10 bg-white p-6">
+              <h3 className="text-base font-semibold tracking-tight mb-2">Why agreement alone doesn't prove anything.</h3>
+              <p className="text-[13px] text-black/65 leading-relaxed mb-3">
+                Twenty outlets shouting the same headline is not twenty pieces of evidence — it is one wire-service quote, copy-pasted twenty times. TWRD measures source <span className="font-semibold text-black">diversity</span> using Shannon entropy across the cluster of sources backing a claim. Agreement (A) is then combined with diversity (H) inside the truth function so that <span className="font-semibold text-black">echo chambers self-cap</span>: the more correlated the publishers, the less each additional repetition is worth.
+              </p>
+              <p className="text-[13px] text-black/65 leading-relaxed">
+                Concretely: if a story is carried by Reuters, the SEC filing, an FT analyst piece and a regional broker note, T climbs quickly. If the same story is carried by 40 SEO-farm rewrites of one tweet, T stays low — sometimes lower than a single tier-1 source on its own.
+              </p>
+            </article>
+
+            <article className="rounded-xl border border-black/10 bg-white p-6">
+              <h3 className="text-base font-semibold tracking-tight mb-2">Gated input vs. raw input — the practical delta.</h3>
+              <p className="text-[13px] text-black/65 leading-relaxed mb-3">
+                A naive terminal feeds every headline into the model with weight 1. TWRD multiplies every input by its truth score T ∈ [0, 1] before it touches prediction, position sizing or risk. The downstream model sees a <span className="font-semibold text-black">veracity-weighted signal</span>, not a popularity-weighted one.
+              </p>
+              <p className="text-[13px] text-black/65 leading-relaxed">
+                In practice this means a single SEC 8-K can outweigh a hundred Reddit posts, and a coordinated narrative push gets quietly damped to near-zero influence — even while it still appears on every news ticker on the street.
+              </p>
+            </article>
           </div>
         </div>
       </section>
