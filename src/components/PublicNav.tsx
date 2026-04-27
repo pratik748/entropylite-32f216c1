@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { label: "About", path: "/about" },
   { label: "Backbone", path: "/backbone" },
   { label: "Cadence", path: "/cadence" },
+  { label: "Data", path: "/data" },
   { label: "Pricing", path: "/pricing" },
   { label: "Access", path: "/access" },
 ];

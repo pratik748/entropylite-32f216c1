@@ -14,6 +14,7 @@ import LandingPage from "./pages/LandingPage";
 import PricingPage from "./pages/PricingPage";
 import AboutPage from "./pages/AboutPage";
 import AccessPage from "./pages/AccessPage";
+import DataAggregationPage from "./pages/DataAggregationPage";
 import DisclaimerPage from "./pages/DisclaimerPage";
 import BackbonePage from "./pages/BackbonePage";
 import CadencePage from "./pages/CadencePage";
@@ -71,6 +72,7 @@ const App = () => (
           <Route path="/backbone" element={<BackbonePage />} />
           <Route path="/cadence" element={<CadencePage />} />
           <Route path="/cadence/:slug" element={<CadenceEntryPage />} />
+          <Route path="/data" element={<DataAggregationPage />} />
           <Route path="/access" element={<AccessPage />} />
           <Route path="/disclaimer" element={<DisclaimerPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
