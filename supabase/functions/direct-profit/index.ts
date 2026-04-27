@@ -731,6 +731,8 @@ Deno.serve(async (req) => {
 
     const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nRISK METRICS:\n- VaR 95%: ${currencySymbol}${riskMetrics.var95}/share | CVaR 95%: ${currencySymbol}${riskMetrics.cvar95}/share\n- VaR 99%: ${currencySymbol}${riskMetrics.var99}/share\n- Sharpe: ${riskMetrics.sharpeRatio} | Sortino: ${riskMetrics.sortinoRatio}\n- Max DD: ${riskMetrics.maxDrawdown}% | Beta: ${riskMetrics.betaEstimate}\n- Kelly: ${riskMetrics.kellyFraction}\n\n${clankSignals.length > 0 ? "STRUCTURAL CONSTRAINTS:\n" + clankSignals.map(s => `[${s.severity}] ${s.label}`).join("\n") : "No active structural constraints."}\n\n${newsHeadlines.length > 0 ? "RECENT NEWS:\n" + newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n") : "No recent headlines available."}\n\nProduce a complete, executable trade decision grounded in ALL the data above.`;
 
+    const deterministic = buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol);
+
     const results = await callAIParallel({
       systemPrompt,
       userPrompt,
@@ -762,10 +764,7 @@ Deno.serve(async (req) => {
 
     if (parsed.length === 0) {
       console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
-      output = {
-        ...buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol),
-        fallback: true,
-      };
+        output = { ...deterministic, fallback: true };
     } else {
       const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
       for (const item of parsed) {
@@ -791,7 +790,7 @@ Deno.serve(async (req) => {
             .sort((a, b) => b._score - a._score)[0]
         : scored.sort((a, b) => b._score - a._score)[0];
 
-      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines);
+      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines, deterministic);
     }
 
     console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%) | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
