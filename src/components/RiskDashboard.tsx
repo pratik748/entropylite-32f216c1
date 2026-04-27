@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
+import TruthBadge from "@/components/twrd/TruthBadge";
 
 interface RiskDashboardProps {
   stocks: PortfolioStock[];
