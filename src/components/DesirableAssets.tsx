@@ -60,6 +60,10 @@ interface Recommendation {
   riskBudgetPct?: number;
   hedgeInstrument?: string;
   hedgeRatioPct?: number;
+  evidenceSummary?: string[];
+  portfolioFit?: string;
+  riskVerdict?: "low" | "medium" | "high";
+  riskCompositeScore?: number;
 }
 
 interface Props {
