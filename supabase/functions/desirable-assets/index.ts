@@ -1510,6 +1510,7 @@ Return via the tool call only.`,
         ...s.rec,
         thesis,
         catalyst,
+        riskCompositeScore: s.riskCompositeScore,
         evidenceSummary: [
           `Sharpe ${s.sharpeRatio.toFixed(2)}`,
           `MaxDD ${s.maxDrawdown.toFixed(1)}%`,
@@ -1524,9 +1525,9 @@ Return via the tool call only.`,
             : s.portfolioCorrelation <= 0.55
               ? "Moderate correlation, acceptable add"
               : "High correlation, only justified by score strength",
-        riskVerdict: s.volatility >= 45 || s.maxDrawdown >= 30 || s.portfolioCorrelation >= 0.7
+        riskVerdict: s.riskCompositeScore >= 60
           ? "high"
-          : s.volatility >= 28 || s.maxDrawdown >= 18 || s.portfolioCorrelation >= 0.45
+          : s.riskCompositeScore >= 35
             ? "medium"
             : "low",
         suggestedQty: positionSizing.suggestedQty,
