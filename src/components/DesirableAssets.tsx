@@ -94,7 +94,7 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v3";
+const DA_CACHE_KEY = "da_recommendations_v4";
 const DA_PREV_TICKERS_KEY = "da_previous_tickers";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
 
