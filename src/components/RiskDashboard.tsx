@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
+import TruthBadge from "@/components/twrd/TruthBadge";
 
 interface RiskDashboardProps {
   stocks: PortfolioStock[];
@@ -309,6 +310,40 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {aiData?.twrd && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Truth Risk (TWRD Veracity Layer)</h3>
+            <TruthBadge
+              T={aiData.twrd.meanTruthConfidence ?? 0.5}
+              contradictionRisk={0}
+              falseConsensus={!!aiData.twrd.falseConsensus}
+            />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Mean Truth</div>
+              <div className="text-lg font-mono font-bold text-foreground">{Math.round((aiData.twrd.meanTruthConfidence ?? 0) * 100)}%</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Truth Risk</div>
+              <div className="text-lg font-mono font-bold text-warning">{Math.round((aiData.twrd.truthRisk ?? 0) * 100)}%</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Size Multiplier</div>
+              <div className="text-lg font-mono font-bold text-foreground">{(aiData.twrd.sizeMultiplier ?? 1).toFixed(2)}×</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Hedge Bias</div>
+              <div className="text-lg font-mono font-bold text-foreground">+{Math.round((aiData.twrd.hedgeBias ?? 0) * 100)}%</div>
+            </div>
+          </div>
+          {aiData.twrd.note && (
+            <p className="mt-3 text-[11px] font-mono text-muted-foreground">{aiData.twrd.note}</p>
+          )}
         </div>
       )}
 

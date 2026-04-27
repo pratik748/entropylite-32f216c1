@@ -373,6 +373,187 @@ export type Database = {
         }
         Relationships: []
       }
+      twrd_claims: {
+        Row: {
+          alpha: number
+          beta: number
+          created_at: string
+          decay_rate: number
+          domain: string
+          evidence: Json
+          id: string
+          object: string
+          relation: string
+          subject: string
+          superseded_by: string | null
+          truth_score: number
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          created_at?: string
+          decay_rate?: number
+          domain: string
+          evidence?: Json
+          id?: string
+          object: string
+          relation: string
+          subject: string
+          superseded_by?: string | null
+          truth_score: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          created_at?: string
+          decay_rate?: number
+          domain?: string
+          evidence?: Json
+          id?: string
+          object?: string
+          relation?: string
+          subject?: string
+          superseded_by?: string | null
+          truth_score?: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twrd_claims_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "twrd_claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twrd_contradictions: {
+        Row: {
+          claim_a: string
+          claim_b: string
+          detected_at: string
+        }
+        Insert: {
+          claim_a: string
+          claim_b: string
+          detected_at?: string
+        }
+        Update: {
+          claim_a?: string
+          claim_b?: string
+          detected_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twrd_contradictions_claim_a_fkey"
+            columns: ["claim_a"]
+            isOneToOne: false
+            referencedRelation: "twrd_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twrd_contradictions_claim_b_fkey"
+            columns: ["claim_b"]
+            isOneToOne: false
+            referencedRelation: "twrd_claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twrd_feedback: {
+        Row: {
+          claim_id: string | null
+          id: string
+          observed_at: string
+          outcome: number
+          user_id: string | null
+        }
+        Insert: {
+          claim_id?: string | null
+          id?: string
+          observed_at?: string
+          outcome: number
+          user_id?: string | null
+        }
+        Update: {
+          claim_id?: string | null
+          id?: string
+          observed_at?: string
+          outcome?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twrd_feedback_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "twrd_claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twrd_sources: {
+        Row: {
+          alpha: number
+          beta: number
+          domain: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          domain: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          domain?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      twrd_weights: {
+        Row: {
+          b: number
+          id: number
+          updated_at: string
+          w1: number
+          w2: number
+          w3: number
+          w4: number
+          w5: number
+        }
+        Insert: {
+          b?: number
+          id?: number
+          updated_at?: string
+          w1?: number
+          w2?: number
+          w3?: number
+          w4?: number
+          w5?: number
+        }
+        Update: {
+          b?: number
+          id?: number
+          updated_at?: string
+          w1?: number
+          w2?: number
+          w3?: number
+          w4?: number
+          w5?: number
+        }
+        Relationships: []
+      }
       user_analysis_history: {
         Row: {
           buy_price: number

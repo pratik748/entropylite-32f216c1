@@ -2,6 +2,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
+import { veracityGate, aggregateVeracity } from "../_shared/twrd/gate.ts";
+import type { RawSignal } from "../_shared/twrd/types.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +35,35 @@ serve(async (req) => {
     }));
 
     const totalValue = portfolioSummary.reduce((s: number, p: any) => s + p.currentPrice * p.qty, 0);
+
+    // ---------- TWRD TRUTH RISK ----------
+    // For each portfolio holding we form a single "fundamentals_belief" claim.
+    // No external sources here → defaults to the ticker's own data feed; the
+    // gate fills source_id with yahoo-finance and treats it as a single source.
+    let truthRisk = 0;
+    let truthMeanT = 0.7;
+    let truthFalseConsensus = false;
+    try {
+      const nowIso = new Date().toISOString();
+      const sigs: RawSignal[] = portfolioSummary.map((p: any, i: number): RawSignal => ({
+        id: `hold-${i}-${p.ticker}`,
+        value: 1,
+        claim: { subject: String(p.ticker).toUpperCase(), relation: "fundamentals_belief", object: String(p.sector || "Unknown") },
+        domain: "financial",
+        evidence: [{ source_id: "yahoo-finance", ts: nowIso }],
+      }));
+      const weighted = await veracityGate(sigs);
+      const agg = aggregateVeracity(weighted);
+      truthMeanT = agg.meanT;
+      truthRisk = agg.truthRisk;
+      truthFalseConsensus = agg.falseConsensus;
+    } catch (e) {
+      console.warn("TWRD risk gate skipped:", (e as Error).message);
+    }
+
+    // Position-size dampener if mean truth confidence falls below 0.4
+    const sizeMultiplier = truthMeanT < 0.4 ? Math.max(0.3, truthMeanT / 0.4) : 1;
+    const hedgeBias = truthMeanT < 0.4 ? Math.min(0.35, (0.4 - truthMeanT)) : 0;
 
     const result = await callAI({
       provider,
@@ -90,7 +121,19 @@ Produce the risk dossier. WORK THROUGH THE FRAMEWORK:
     });
 
     const riskData = safeParseJSON(result.text);
-    return new Response(JSON.stringify(riskData), {
+    return new Response(JSON.stringify({
+      ...riskData,
+      twrd: {
+        meanTruthConfidence: truthMeanT,
+        truthRisk,
+        falseConsensus: truthFalseConsensus,
+        sizeMultiplier,
+        hedgeBias,
+        note: truthMeanT < 0.4
+          ? "Truth confidence below 0.4 — reduce position size; raise hedge weight."
+          : "Truth confidence acceptable.",
+      },
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

@@ -10,6 +10,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
+import { veracityGate, aggregateVeracity } from "../_shared/twrd/gate.ts";
+import type { RawSignal } from "../_shared/twrd/types.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,6 +181,48 @@ serve(async (req) => {
     const contradictions = deriveContradictions(consensus, input);
     const shiftETA = deriveShiftETA(conviction, contradictions, input.vix);
 
+    // ---------- TWRD VERACITY LAYER ----------
+    // Convert every flow + sentiment + portfolio signal into a TWRD-gated signal,
+    // then expose mean truth, contradiction risk, and a False Consensus override.
+    let veracity: {
+      meanT: number; truthRisk: number;
+      falseConsensus: boolean; contradictionRisk: number;
+    } = { meanT: 0.7, truthRisk: 0.3, falseConsensus: false, contradictionRisk: 0 };
+    try {
+      const nowIso = new Date().toISOString();
+      const sigs: RawSignal[] = [];
+      (input.flows ?? []).forEach((f: any, i: number) => {
+        if (!f?.ticker) return;
+        sigs.push({
+          id: `flow-${i}-${f.ticker}`,
+          value: f.direction === "BUY" ? 1 : f.direction === "SELL" ? -1 : 0,
+          claim: { subject: String(f.ticker).toUpperCase(), relation: "flow_direction", object: String(f.direction || "NEUTRAL") },
+          domain: "financial",
+          evidence: [{ source_id: String(f.source || "polygon").toLowerCase(), ts: f.ts || nowIso }],
+        });
+      });
+      const sent = input.sentiment as any;
+      if (sent && typeof sent.compositeScore === "number") {
+        sigs.push({
+          id: "sent-composite",
+          value: sent.compositeScore / 100,
+          claim: { subject: "MARKET", relation: "sentiment", object: sent.compositeScore > 0 ? "BULL" : "BEAR" },
+          domain: "social",
+          evidence: [{ source_id: String(sent.source || "twitter").toLowerCase(), ts: sent.ts || nowIso }],
+        });
+      }
+      const weighted = await veracityGate(sigs);
+      veracity = aggregateVeracity(weighted);
+
+      // False-Consensus override on Shift ETA — directly per TWRD spec.
+      if (veracity.falseConsensus) {
+        shiftETA.label = "FALSE CONSENSUS";
+        shiftETA.probability = Math.max(shiftETA.probability, 70);
+      }
+    } catch (e) {
+      console.warn("TWRD veracity gate skipped:", (e as Error).message);
+    }
+
     // AI narrative layer — interprets the deterministic math into a Soros-voice thesis.
     // The math above is real and complete; the AI only adds the narrative interpretation.
     // If the AI provider fails (rate limit, timeout, parse failure), we return the math
@@ -246,6 +290,7 @@ Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what t
         thesis,
         actionable,
         aiError,
+        veracity,
         signalCount: [
           input.flows?.length ? 1 : 0,
           input.sentiment ? 1 : 0,
