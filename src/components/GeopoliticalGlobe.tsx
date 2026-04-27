@@ -89,7 +89,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             </span>
           </div>
           <div className="min-w-0">
-            <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye — Intelligence Map</h2>
+            <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye, Intelligence Map</h2>
             <p className="text-[8px] text-muted-foreground font-mono tracking-widest truncate">
               LIVE 20s · {data.conflictEvents.length} CONFLICTS
               {exposedTickers.length > 0 && <span className="text-loss ml-1">⚠ {exposedTickers.length} EXPOSED</span>}

@@ -1,7 +1,7 @@
 /**
  * Fortress Execution Layer
  * Translates abstract DefensiveActions into REAL Alpaca paper-trading orders.
- * No synthetic UI badges — every applied action submits a market order.
+ * No synthetic UI badges, every applied action submits a market order.
  */
 import type { DefensiveAction } from "./fortress-engine";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
@@ -26,7 +26,7 @@ export function resolveHedgeSymbol(action: DefensiveAction): { symbol: string; n
   const hit = INSTRUMENT_MAP.find((m) => m.match.test(hint));
   if (hit) return { symbol: hit.symbol, note: hit.note };
   // If the action target is itself a real ticker (sector pair-hedge picked a low-β holding),
-  // fall back to the universal hedge — we want an inverse, not more long exposure.
+  // fall back to the universal hedge, we want an inverse, not more long exposure.
   return { symbol: DEFAULT_HEDGE_SYMBOL, note: "Inverse S&P 500 (default portfolio hedge)" };
 }
 

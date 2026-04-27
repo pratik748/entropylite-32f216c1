@@ -95,7 +95,7 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
         <div className="flex items-start gap-3">
           <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-mono text-xs uppercase tracking-wider text-foreground mb-1">Reflexivity Engine — Unavailable</h3>
+            <h3 className="font-mono text-xs uppercase tracking-wider text-foreground mb-1">Reflexivity Engine, Unavailable</h3>
             <p className="text-[11px] text-muted-foreground mb-3">{error}</p>
             <Button variant="outline" size="sm" onClick={refresh} className="h-7 text-[10px] font-mono uppercase tracking-wider">
               <RefreshCw className="h-3 w-3 mr-1.5" /> Retry
@@ -112,7 +112,7 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
         <div className="flex items-center gap-3">
           <RefreshCw className="h-4 w-4 text-primary animate-spin" />
           <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            Computing belief map — fusing flows, sentiment, causal cascades…
+            Computing belief map, fusing flows, sentiment, causal cascades…
           </span>
         </div>
       </Card>
@@ -139,7 +139,7 @@ export default function ReflexivityEngine({ stocks, refreshKey }: Props) {
           <div>
             <h2 className="font-mono text-sm uppercase tracking-widest text-foreground">Reflexivity Engine</h2>
             <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              What the market believes the market believes — and where it's wrong
+              What the market believes the market believes, and where it's wrong
             </p>
           </div>
         </div>

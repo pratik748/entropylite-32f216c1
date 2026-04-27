@@ -269,7 +269,7 @@ export function ForexView({ data }: { data: GeoData }) {
                 <span className="text-[9px] font-bold text-foreground">{fx.currency}</span>
                 <span className="text-[7px] text-muted-foreground">{fx.country}</span>
               </div>
-              <p className="font-mono text-[10px] font-bold text-foreground">{fx.rate > 0 ? fx.rate.toFixed(fx.rate > 100 ? 0 : 2) : "—"}</p>
+              <p className="font-mono text-[10px] font-bold text-foreground">{fx.rate > 0 ? fx.rate.toFixed(fx.rate > 100 ? 0 : 2) : ","}</p>
               <p className={`font-mono text-[9px] font-semibold ${fx.change24h >= 0 ? "text-gain" : "text-loss"}`}>
                 {fx.change24h >= 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
               </p>

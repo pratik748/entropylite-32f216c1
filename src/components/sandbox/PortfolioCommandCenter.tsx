@@ -44,7 +44,7 @@ const PortfolioCommandCenter = ({ stocks }: Props) => {
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center gap-2 mb-5">
           <Layers className="h-5 w-5 text-foreground" />
-          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Heatmap — All Dimensions</h3>
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Portfolio Heatmap, All Dimensions</h3>
         </div>
 
         <div className="overflow-x-auto">

@@ -56,7 +56,7 @@ const ProfitTaskbar = ({
   // Task 2: Risk assessment
   tasks.push({
     label: `Risk Level: ${riskLevel}`,
-    detail: riskLevel === "High" ? "Elevated volatility — monitor positioning" : riskLevel === "Medium" ? "Moderate risk — standard monitoring" : "Favorable risk profile observed",
+    detail: riskLevel === "High" ? "Elevated volatility, monitor positioning" : riskLevel === "Medium" ? "Moderate risk, standard monitoring" : "Favorable risk profile observed",
     status: "done",
     icon: <AlertTriangle className="h-4 w-4" />,
   });
@@ -72,7 +72,7 @@ const ProfitTaskbar = ({
   } else {
     tasks.push({
       label: `Unrealized Loss: ${pnlPct.toFixed(1)}%`,
-      detail: `₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} — reassess thesis if fundamentals shift`,
+      detail: `₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })}, reassess thesis if fundamentals shift`,
       status: "active",
       icon: <TrendingDown className="h-4 w-4" />,
     });
@@ -108,7 +108,7 @@ const ProfitTaskbar = ({
   tasks.push({
     label: hitUpside20 ? "20% Projected Range Reached" : hitUpside10 ? "10% Projected Range Reached" : `Projected Range: ₹${projectedUpside.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
     detail: hitUpside20
-      ? "Upper projected range achieved — reassess positioning"
+      ? "Upper projected range achieved, reassess positioning"
       : hitUpside10
       ? `Next level: ₹${projectedUpside20.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+20%)`
       : `Invalidation zone: ₹${invalidationZone.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (-8%)`,
@@ -120,7 +120,7 @@ const ProfitTaskbar = ({
   if (currentPrice <= bearRange[0]) {
     tasks.push({
       label: "Price in Downside Zone",
-      detail: `Below ₹${bearRange[0].toLocaleString("en-IN")} — reassess thesis`,
+      detail: `Below ₹${bearRange[0].toLocaleString("en-IN")}, reassess thesis`,
       status: "active",
       icon: <AlertTriangle className="h-4 w-4" />,
     });

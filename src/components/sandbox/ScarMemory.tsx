@@ -63,7 +63,7 @@ export function computeScarBiases(scars: Scar[]): ScarBias[] {
     });
   }
 
-  // Sector-level soft bias (lighter — half the worst ticker penalty in that sector)
+  // Sector-level soft bias (lighter, half the worst ticker penalty in that sector)
   const sectorPenalties: Record<string, number> = {};
   biases.forEach(b => {
     if (!sectorPenalties[b.sector]) sectorPenalties[b.sector] = 0;
@@ -177,7 +177,7 @@ const ScarMemory = ({ stocks = [] }: Props) => {
               ))}
             </div>
             <p className="text-[9px] text-muted-foreground/60 mt-2 italic">
-              Soft penalties reduce confidence in similar bets — they never fully block opportunities.
+              Soft penalties reduce confidence in similar bets, they never fully block opportunities.
             </p>
           </div>
         )}

@@ -120,9 +120,9 @@ const ValuationModule = ({ stocks }: Props) => {
                   <td className="px-2 py-2 font-mono text-foreground">{h.fairValue}</td>
                   <td className="px-2 py-2 font-mono text-muted-foreground">{h.current}</td>
                   <td className={`px-2 py-2 font-mono ${h.upside.startsWith("+") ? "text-gain" : "text-loss"}`}>{h.upside}</td>
-                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.pe > 0 ? `${h.pe.toFixed(1)}x` : "—"}</td>
-                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.pbv > 0 ? `${h.pbv.toFixed(1)}x` : "—"}</td>
-                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.divYield > 0 ? `${h.divYield.toFixed(1)}%` : "—"}</td>
+                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.pe > 0 ? `${h.pe.toFixed(1)}x` : ","}</td>
+                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.pbv > 0 ? `${h.pbv.toFixed(1)}x` : ","}</td>
+                  <td className="px-2 py-2 font-mono text-muted-foreground">{h.divYield > 0 ? `${h.divYield.toFixed(1)}%` : ","}</td>
                 </tr>
               ))}
             </tbody>

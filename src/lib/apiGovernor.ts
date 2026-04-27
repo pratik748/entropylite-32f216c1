@@ -1,5 +1,5 @@
 /**
- * API Governor — Central intelligent request controller for Entropy Lite.
+ * API Governor, Central intelligent request controller for Entropy Lite.
  *
  * Responsibilities:
  *  • In-memory cache with configurable TTL per endpoint
@@ -33,15 +33,15 @@ interface GovernorMetrics {
 type Tier = "realtime" | "frequent" | "slow" | "static" | "ai" | "continuous" | "evolution" | "heavy" | "reflexivity";
 
 const TTL: Record<Tier, number> = {
-  realtime:    8_000,       // 8s — prices
-  frequent:    15_000,      // 15s — market overview, ticker strip
-  slow:        60_000,      // 1 min — news, geopolitical, desirable assets
-  static:      Infinity,    // permanent — historical data
+  realtime:    8_000,       // 8s, prices
+  frequent:    15_000,      // 15s, market overview, ticker strip
+  slow:        60_000,      // 1 min, news, geopolitical, desirable assets
+  static:      Infinity,    // permanent, historical data
   ai:          30_000,      // 30s cooldown for AI calls
-  continuous:  60_000,      // 60s — background simulation loops
-  evolution:   120_000,     // 120s — strategy discovery
-  heavy:       1_800_000,   // 30 min — expensive analytical modules (derivatives, deep intel, risk)
-  reflexivity: 21_600_000,  // 6h — reflexivity belief map (persisted to localStorage)
+  continuous:  60_000,      // 60s, background simulation loops
+  evolution:   120_000,     // 120s, strategy discovery
+  heavy:       1_800_000,   // 30 min, expensive analytical modules (derivatives, deep intel, risk)
+  reflexivity: 21_600_000,  // 6h, reflexivity belief map (persisted to localStorage)
 };
 
 // Tiers that should survive page reloads (persisted to localStorage)
@@ -78,7 +78,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "derivatives-intelligence":"heavy",
   "historical-prices":        "slow",
   "reflexivity-engine":      "reflexivity",
-  // company-intelligence removed — uses its own 24h localStorage cache
+  // company-intelligence removed, uses its own 24h localStorage cache
 };
 
 // Rough cost weights for monitoring (relative units)
@@ -114,7 +114,7 @@ const metrics: GovernorMetrics = {
 
 function cacheKey(fn: string, body?: any): string {
   if (!body) return fn;
-  // Stable JSON key — sort keys for consistency
+  // Stable JSON key, sort keys for consistency
   try {
     const sorted = JSON.stringify(body, Object.keys(body).sort());
     return `${fn}::${sorted}`;
@@ -204,7 +204,7 @@ export interface InvokeOptions {
 }
 
 /**
- * Governed supabase.functions.invoke — all API calls should go through here.
+ * Governed supabase.functions.invoke, all API calls should go through here.
  */
 export async function governedInvoke<T = any>(
   functionName: string,
@@ -241,7 +241,7 @@ export async function governedInvoke<T = any>(
         metrics.requestsBlocked++;
         return { data: stale.data as T, error: null, cached: true };
       }
-      // No cache — allow through but log
+      // No cache, allow through but log
     }
   }
 
@@ -257,7 +257,7 @@ export async function governedInvoke<T = any>(
     }
   }
 
-  // 4. Execute request — inject AI provider for AI-tier calls
+  // 4. Execute request, inject AI provider for AI-tier calls
   const promise = (async () => {
     let body = opts.body;
     // Inject provider and indiaMode for all calls
@@ -368,7 +368,7 @@ export function getThrottleMultiplier(): number {
 }
 
 /**
- * Flush ALL cached data — used on page load / tab refocus to force live recomputation.
+ * Flush ALL cached data, used on page load / tab refocus to force live recomputation.
  */
 export function flushAllCaches() {
   cache.clear();
@@ -395,7 +395,7 @@ export function flushAnalyticalCaches() {
 }
 
 /**
- * Flush AI-tier caches only — called when provider is switched.
+ * Flush AI-tier caches only, called when provider is switched.
  */
 export function flushAICaches() {
   const aiTiers: Tier[] = ["ai", "continuous", "evolution", "heavy", "reflexivity"];

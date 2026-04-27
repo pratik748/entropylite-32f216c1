@@ -55,8 +55,8 @@ const ComplianceModule = ({ stocks }: Props) => {
     const audit = holdings.map(h => ({
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       user: "System",
-      action: `Compliance check — ${h.ticker} ${h.suggestion} position`,
-      result: h.risk < 70 ? "APPROVED" : "FLAGGED — High Risk",
+      action: `Compliance check, ${h.ticker} ${h.suggestion} position`,
+      result: h.risk < 70 ? "APPROVED" : "FLAGGED, High Risk",
     }));
 
     return { checks: ruleChecks, complianceScore: score, violations: v, auditTrail: audit, gaugeData: gauge, ruleBarData: bars };

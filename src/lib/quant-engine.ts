@@ -195,7 +195,7 @@ export function portfolioVariance(weights: number[], cov: number[][]): number {
 
 export const portfolioSigma = (w: number[], cov: number[][]) => Math.sqrt(Math.max(0, portfolioVariance(w, cov)));
 
-// ── 9. VaR / CVaR — three methods ───────────────────────────────
+// ── 9. VaR / CVaR, three methods ───────────────────────────────
 const Z_95 = 1.6448536269514722;
 const Z_99 = 2.3263478740408408;
 
@@ -205,7 +205,7 @@ export function parametricVaR(portfolioValue: number, sigmaDaily: number, conf: 
   return portfolioValue * sigmaDaily * Math.sqrt(horizonDays) * z;
 }
 
-/** Historical VaR — uses the actual return distribution */
+/** Historical VaR, uses the actual return distribution */
 export function historicalVaR(portfolioValue: number, portfolioRets: number[], conf: 0.95 | 0.99 = 0.95): number {
   if (portfolioRets.length === 0) return 0;
   const sorted = [...portfolioRets].sort((a, b) => a - b);
@@ -240,7 +240,7 @@ export function portfolioReturns(retsByT: Record<string, number[]>, weights: Rec
   return out;
 }
 
-/** Rolling VaR backtest — true historical, not synthetic noise */
+/** Rolling VaR backtest, true historical, not synthetic noise */
 export function rollingHistoricalVaR(
   portfolioValue: number,
   portfolioRets: number[],

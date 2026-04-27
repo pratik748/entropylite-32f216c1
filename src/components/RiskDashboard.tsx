@@ -226,7 +226,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
             <span>{t.label}</span>
           </button>
         ))}
-        {/* Secret AI Provider Toggle — cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
+        {/* Secret AI Provider Toggle, cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
         <button
           onClick={toggle}
           title={`AI provider: ${provider}`}
@@ -255,7 +255,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
             <p className="mt-1 font-mono text-lg font-bold text-loss">
-              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","}
             </p>
             <p className="text-[9px] text-muted-foreground">1-day parametric</p>
           </div>

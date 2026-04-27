@@ -129,7 +129,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
     const resamplePaths: number[][] = [];
     const randomPaths: number[][] = [];
 
-    // Generate original paths — uses REAL calibrated drift, σ, jump params
+    // Generate original paths, uses REAL calibrated drift, σ, jump params
     for (let p = 0; p < NUM_PATHS; p++) {
       let value = totalValue;
       const storePath = p < VISIBLE_PATHS;
@@ -174,7 +174,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       randomPaths.push(path);
     }
 
-    // "Real" path — the median trajectory
+    // "Real" path, the median trajectory
     const realPath: number[] = [totalValue];
     let realValue = totalValue;
     for (let d = 1; d <= NUM_DAYS; d++) {
@@ -182,7 +182,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
       if (d % sampleEvery === 0) realPath.push(realValue);
     }
 
-    // Build chart data — each step has all path values
+    // Build chart data, each step has all path values
     const chartData = Array.from({ length: stepsCount }, (_, step) => {
       const point: Record<string, number> = { day: Math.round((step / (stepsCount - 1)) * NUM_DAYS) };
       point.real = realPath[step] ?? realPath[realPath.length - 1];
@@ -300,15 +300,15 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           <span className="text-[10px] text-muted-foreground font-mono">
             {calibrated.source === "historical"
               ? `μ=${(calibrated.drift * 252 * 100).toFixed(1)}%/yr · σ=${(calibrated.sigmaDaily * Math.sqrt(252) * 100).toFixed(1)}%/yr · jumps=${(calibrated.jumpProb * 100).toFixed(2)}%/day · ${calibrated.lookbackDays}d`
-              : "Insufficient history — using risk-score proxy"}
+              : "Insufficient history, using risk-score proxy"}
           </span>
         </div>
         <MethodologyTooltip
           title="Monte Carlo Methodology"
           methods={[
             { label: "Path generation", formula: "S(t+1) = S(t) · exp(μ − σ²/2 + σ·Z + J)", source: "Geometric Brownian Motion + Merton jump-diffusion", notes: "10,000 paths × 252 days" },
-            { label: "Drift μ", formula: "Weighted mean of log-returns", source: "Yahoo / Alpha Vantage 1y daily closes", lookback: `${calibrated.lookbackDays || "—"} days` },
-            { label: "Volatility σ", formula: "√(wᵀΣw) — full covariance, not weighted average", source: "Real correlation × stdev matrix" },
+            { label: "Drift μ", formula: "Weighted mean of log-returns", source: "Yahoo / Alpha Vantage 1y daily closes", lookback: `${calibrated.lookbackDays || ","} days` },
+            { label: "Volatility σ", formula: "√(wᵀΣw), full covariance, not weighted average", source: "Real correlation × stdev matrix" },
             { label: "Jump intensity λ", formula: "Empirical fraction of |r| > 3σ events", source: "Historical tail observations" },
             { label: "VaR / CVaR (sim)", formula: "5th percentile / mean of tail across 10k final values", source: "Simulated distribution" },
             { label: "Scenario stress", formula: "σ_eff = σ · volMult,  jumpProb_eff = max(empirical, scenario)", source: "Layered on real calibration" },
@@ -415,7 +415,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           </ResponsiveContainer>
         </div>
 
-        {/* Drawdown stats table — like the reference image */}
+        {/* Drawdown stats table, like the reference image */}
         <div className="mt-4 border-t border-border pt-3">
           <div className="grid grid-cols-2 gap-6">
             <div>

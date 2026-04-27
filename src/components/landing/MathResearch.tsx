@@ -237,7 +237,7 @@ function CovarianceHeatmap() {
         </table>
       </div>
       <p className="font-mono text-[9px] text-black/45 mt-3 leading-relaxed">
-        Pearson ρ from log-returns, 252d window.  Portfolio σ uses true covariance Σ — not a weighted average — so concentration and diversification are scored honestly.
+        Pearson ρ from log-returns, 252d window.  Portfolio σ uses true covariance Σ, not a weighted average, so concentration and diversification are scored honestly.
       </p>
     </div>
   );
@@ -374,11 +374,11 @@ function StatArbMini() {
 
 /* -------------------- Section -------------------- */
 const RESEARCH = [
-  { tag: "Risk", title: "Value at Risk & Expected Shortfall", cite: "Acerbi & Tasche (2002), Rockafellar & Uryasev (2000)", desc: "Why CVaR is the coherent risk measure VaR isn't — and why we report both at 95% and 99%." },
+  { tag: "Risk", title: "Value at Risk & Expected Shortfall", cite: "Acerbi & Tasche (2002), Rockafellar & Uryasev (2000)", desc: "Why CVaR is the coherent risk measure VaR isn't, and why we report both at 95% and 99%." },
   { tag: "Credit", title: "Pricing of Corporate Debt", cite: "Merton (1974), J. of Finance 29(2)", desc: "Equity as a call option on assets. Distance-to-default replaces the rating-agency black box with a structural number." },
-  { tag: "Vol", title: "GARCH & stochastic volatility", cite: "Bollerslev (1986), Heston (1993)", desc: "Why a single σ is a lie — and how we feed clustered, regime-aware vol into Monte Carlo paths." },
+  { tag: "Vol", title: "GARCH & stochastic volatility", cite: "Bollerslev (1986), Heston (1993)", desc: "Why a single σ is a lie, and how we feed clustered, regime-aware vol into Monte Carlo paths." },
   { tag: "Stat-arb", title: "Pairs trading: performance of a relative-value strategy", cite: "Gatev, Goetzmann & Rouwenhorst (2006)", desc: "The empirical foundation under our cointegration + OU mean-reversion engine." },
-  { tag: "Portfolio", title: "Portfolio selection", cite: "Markowitz (1952), J. of Finance 7(1)", desc: "The reason Σ matters more than σᵢ alone — and why we always solve √(wᵀΣw)." },
+  { tag: "Portfolio", title: "Portfolio selection", cite: "Markowitz (1952), J. of Finance 7(1)", desc: "The reason Σ matters more than σᵢ alone, and why we always solve √(wᵀΣw)." },
   { tag: "Reflexivity", title: "The Alchemy of Finance", cite: "Soros (1987)", desc: "Markets aren't a mirror of fundamentals; they shape them. Our reflexivity engine quantifies the feedback loop." },
 ];
 
@@ -455,7 +455,7 @@ export default function MathResearch() {
           </p>
         </div>
 
-        {/* Original Research — CLANK Theory whitepaper */}
+        {/* Original Research, CLANK Theory whitepaper */}
         <div className="mt-12 sm:mt-16 pt-10 border-t border-black/10">
           <div className="flex items-center justify-center gap-2 mb-3">
             <FileText className="h-4 w-4 text-black/45" />
@@ -466,7 +466,7 @@ export default function MathResearch() {
           </h3>
           <p className="text-sm text-black/55 max-w-2xl mx-auto text-center mb-8">
             The CLANK engine inside the terminal is built on a structural theory of deterministic
-            opportunity in complex systems — formalised in a peer-distributed manuscript on SSRN.
+            opportunity in complex systems, formalised in a peer-distributed manuscript on SSRN.
           </p>
 
           <article className="rounded-xl border border-black/10 bg-gradient-to-br from-white to-black/[0.02] p-6 sm:p-8 max-w-4xl mx-auto">
@@ -484,7 +484,7 @@ export default function MathResearch() {
               <p className="text-xs sm:text-sm text-black/65 leading-relaxed italic">
                 "Within many complex systems there exist fleeting intervals during which probabilistic rules
                 are suspended in favour of rigid structural determinism. The system 'clanks' into a state of
-                temporary, absolute certainty — a deterministic opportunity where the future state is no
+                temporary, absolute certainty, a deterministic opportunity where the future state is no
                 longer a matter of probability, but of structural necessity."
               </p>
             </div>
@@ -561,7 +561,7 @@ export default function MathResearch() {
             </div>
 
             <p className="font-mono text-[10px] text-black/35 mt-5 leading-relaxed">
-              Wired into the terminal as the <span className="text-black/60">CLANK Structural Constraint Engine</span> —
+              Wired into the terminal as the <span className="text-black/60">CLANK Structural Constraint Engine</span> ,
               identifying institutional pressure points, structural locks and deterministic windows
               before the rest of the market sees them.
             </p>

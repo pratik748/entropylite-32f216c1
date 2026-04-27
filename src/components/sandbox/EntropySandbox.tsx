@@ -33,8 +33,8 @@ const sections = [
   { id: "crown", label: "Risk→Profit", icon: TrendingUp, desc: "Convert risk signals into actionable $$ opportunities" },
   { id: "execution", label: "Execution Engine", icon: Target, desc: "VWAP/TWAP slicing, dark pool routing, liquidity-aware sizing" },
   { id: "command", label: "Command Center", icon: Layers, desc: "Portfolio heatmap, risk constellation, liquidity radar" },
-  { id: "scar", label: "Scar Memory", icon: Skull, desc: "Track past mistakes and lessons — never repeat errors" },
-  { id: "factory", label: "Strategy Factory", icon: Dna, desc: "AI evolution machine — autonomous strategy discovery & ranking" },
+  { id: "scar", label: "Scar Memory", icon: Skull, desc: "Track past mistakes and lessons, never repeat errors" },
+  { id: "factory", label: "Strategy Factory", icon: Dna, desc: "AI evolution machine, autonomous strategy discovery & ranking" },
   { id: "derivatives", label: "Derivatives", icon: LineChart, desc: "Correlations, pair trades, options intel, futures, hedging" },
   { id: "odgs", label: "Profit Gradient", icon: Flame, desc: "Outcome-driven system bias toward profit-rich zones" },
 ] as const;
@@ -78,7 +78,7 @@ const EntropySandbox = ({ stocks }: Props) => {
               PREDICTION + AFTERMATH ENGINE · {analyzed.length} ASSETS LOADED
             </p>
           </div>
-          {/* Secret AI Provider Toggle — cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
+          {/* Secret AI Provider Toggle, cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
           <button
             onClick={toggle}
             title={`AI provider: ${provider}`}

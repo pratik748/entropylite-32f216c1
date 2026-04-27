@@ -23,7 +23,7 @@ const WorkflowModule = ({ stocks }: Props) => {
 
     const stages = [
       { stage: "Research", status: hasData ? "complete" : "active", description: "AI-powered analysis, news sentiment, risk scoring", completion: hasData ? 100 : 20,
-        metrics: [{ label: "Stocks Analyzed", value: holdings.length.toString() }, { label: "Avg Confidence", value: hasData ? `${avgConf.toFixed(0)}%` : "—" }] },
+        metrics: [{ label: "Stocks Analyzed", value: holdings.length.toString() }, { label: "Avg Confidence", value: hasData ? `${avgConf.toFixed(0)}%` : "," }] },
       { stage: "Portfolio", status: hasData ? "complete" : "pending", description: "Construction, allocation, optimization", completion: hasData ? 100 : 0,
         metrics: [{ label: "Positions", value: holdings.length.toString() }, { label: "Total Value", value: fmt(totalValue) }] },
       { stage: "Trade", status: hasData ? "active" : "pending", description: "Order generation, execution", completion: hasData ? 75 : 0,

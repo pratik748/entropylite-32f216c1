@@ -98,7 +98,7 @@ const IndexContent = () => {
     refresh: geoRefresh,
   } = useGeoIntelligence(stocks, refreshKey);
 
-  // Sell notification system — monitors positions for profit drawdowns and sell signals
+  // Sell notification system, monitors positions for profit drawdowns and sell signals
   useSellNotifications(stocks);
 
   // Proof Card auto-pops when a trade is CLOSED (crossed off) with a positive PnL
@@ -281,7 +281,7 @@ const IndexContent = () => {
       {proofStock && (
         <ProofCard open={!!proofStock} onClose={() => setProofStock(null)} stock={proofStock} />
       )}
-      {/* Direct Profit Mode — replaces entire UI */}
+      {/* Direct Profit Mode, replaces entire UI */}
       {directProfitMode ? (
         <div className="flex-1 min-h-0 overflow-auto">
           <DirectProfitMode />
@@ -339,7 +339,7 @@ const IndexContent = () => {
           {/* Global Ticker Strip */}
           <TickerStrip />
 
-          {/* Main Content — fills all remaining space, above the status bar */}
+          {/* Main Content, fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
               {activeTab === "dashboard" &&

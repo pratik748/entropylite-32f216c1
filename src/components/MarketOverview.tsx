@@ -180,14 +180,14 @@ const MarketOverview = () => {
         <div className="grid gap-3 lg:grid-cols-[280px_1fr]">
           <VixGauge vix={data.macro.vix} />
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3">
-            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `${data.macro.usdInr.toFixed(2)}` : "—"} />
-            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="EUR/USD" value={data.macro.eurUsd ? `$${data.macro.eurUsd.toFixed(4)}` : "—"} />
-            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="GBP/USD" value={data.macro.gbpUsd ? `$${data.macro.gbpUsd.toFixed(4)}` : "—"} />
-            <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={data.macro.crudeBrent > 0 ? `$${data.macro.crudeBrent.toFixed(2)}` : "—"} />
-            <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Gold" value={data.macro.goldPrice ? `$${data.macro.goldPrice.toFixed(0)}` : "—"} />
-            <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Silver" value={data.macro.silverPrice ? `$${data.macro.silverPrice.toFixed(2)}` : "—"} />
-            <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Bitcoin" value={data.macro.btcUsd ? `$${data.macro.btcUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"} />
-            <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Ethereum" value={data.macro.ethUsd ? `$${data.macro.ethUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"} />
+            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="USD/INR" value={data.macro.usdInr > 0 ? `${data.macro.usdInr.toFixed(2)}` : ","} />
+            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="EUR/USD" value={data.macro.eurUsd ? `$${data.macro.eurUsd.toFixed(4)}` : ","} />
+            <MacroCard icon={<DollarSign className="h-4 w-4" />} label="GBP/USD" value={data.macro.gbpUsd ? `$${data.macro.gbpUsd.toFixed(4)}` : ","} />
+            <MacroCard icon={<Fuel className="h-4 w-4" />} label="Brent Crude" value={data.macro.crudeBrent > 0 ? `$${data.macro.crudeBrent.toFixed(2)}` : ","} />
+            <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Gold" value={data.macro.goldPrice ? `$${data.macro.goldPrice.toFixed(0)}` : ","} />
+            <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Silver" value={data.macro.silverPrice ? `$${data.macro.silverPrice.toFixed(2)}` : ","} />
+            <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Bitcoin" value={data.macro.btcUsd ? `$${data.macro.btcUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","} />
+            <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Ethereum" value={data.macro.ethUsd ? `$${data.macro.ethUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","} />
             <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
           </div>
         </div>
@@ -296,7 +296,7 @@ const MarketOverview = () => {
                     {typeof ind.value === "number" ? ind.value.toFixed(2) : ind.value}
                   </span>
                   <span className={`text-[9px] font-mono ${ind.trend === "rising" ? "text-gain" : ind.trend === "falling" ? "text-loss" : "text-muted-foreground"}`}>
-                    {ind.trend === "rising" ? "▲" : ind.trend === "falling" ? "▼" : "—"}
+                    {ind.trend === "rising" ? "▲" : ind.trend === "falling" ? "▼" : ","}
                   </span>
                 </div>
                 <p className="text-[8px] text-muted-foreground mt-0.5">{ind.source} · {ind.lastUpdated}</p>
@@ -313,7 +313,7 @@ const MarketOverview = () => {
         </div>
       )}
 
-      {/* Live News Feed — region-aware */}
+      {/* Live News Feed, region-aware */}
       <LiveNewsFeed region={region} />
     </div>
   );

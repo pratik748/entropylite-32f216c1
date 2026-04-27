@@ -1,5 +1,5 @@
 /**
- * CLANK — Structural Constraint Engine
+ * CLANK, Structural Constraint Engine
  * Detects inevitable market movements caused by institutional constraints
  * rather than predicting price from past data.
  */

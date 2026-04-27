@@ -66,7 +66,7 @@ const RiskModelingModule = ({ stocks }: Props) => {
       const stats = snap.assetStats[t];
       const h = stocks.find(s => s.ticker === t);
       const E = stats.lastPrice * (h?.quantity || 0);
-      const debt = E * 0.4; // approximate D/(D+E) = 0.29 — fallback when fundamentals absent
+      const debt = E * 0.4; // approximate D/(D+E) = 0.29, fallback when fundamentals absent
       const merton = mertonDistanceToDefault(E, debt, stats.sigmaAnnual);
       const dd = merton.dd;
       const pd = merton.pd * 100;
@@ -118,7 +118,7 @@ const RiskModelingModule = ({ stocks }: Props) => {
             { label: "Volatility (σ)", formula: "σ = stdev(ln(Pₜ/Pₜ₋₁))", source: "Yahoo Finance daily closes (Alpha Vantage fallback)", lookback: `${snap.lookbackDays} days`, notes: "Annualized as σ × √252" },
             { label: "Parametric VaR (95%)", formula: "VaR = V × σ × √h × 1.645", source: "Portfolio σ from real covariance", lookback: `${snap.lookbackDays} days` },
             { label: "Historical VaR (95%)", formula: "5th percentile of portfolio return distribution", source: "Real portfolio return series", lookback: `${snap.lookbackDays} days`, notes: "Captures fat tails parametric VaR misses" },
-            { label: "CVaR / Expected Shortfall", formula: "E[L | L > VaR] — mean of tail beyond VaR", source: "Empirical distribution", lookback: `${snap.lookbackDays} days` },
+            { label: "CVaR / Expected Shortfall", formula: "E[L | L > VaR], mean of tail beyond VaR", source: "Empirical distribution", lookback: `${snap.lookbackDays} days` },
             { label: "Rolling VaR backtest", formula: "60-day rolling 5th percentile", source: "Real return series", lookback: "30 trailing observations", notes: "Replaces previous synthetic sine-wave trend" },
             { label: "Correlation matrix", formula: "Pearson on aligned log-returns", source: "Multi-asset history" },
             { label: "Merton Distance-to-Default", formula: "DD = (ln(V/D) + (r − 0.5σᵥ²)T) / (σᵥ√T), PD = N(−DD)", source: "Equity vol + leverage proxy", lookback: "1y equity history", notes: "Iterative solve for asset value V and asset vol σᵥ" },

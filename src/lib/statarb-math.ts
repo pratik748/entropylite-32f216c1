@@ -1,5 +1,5 @@
 /**
- * Statistical Arbitrage — Pure Mathematics Library
+ * Statistical Arbitrage, Pure Mathematics Library
  * Zero UI dependencies. All functions take arrays of numbers, return arrays of numbers.
  */
 
@@ -81,7 +81,7 @@ export function garch11(
   return { sigma, forecast: Math.sqrt(sig2) };
 }
 
-/** Hidden Markov Model — 2-state (bull/bear) Baum-Welch simplified */
+/** Hidden Markov Model, 2-state (bull/bear) Baum-Welch simplified */
 export function hmmRegimeDetect(
   logReturns: number[], nStates = 3
 ): { regimeProbs: number[][]; currentRegime: number; transitionMatrix: number[][] } {
@@ -597,7 +597,7 @@ export function meanReversionHalfLife(theta: number): number {
   return theta > 0 ? Math.log(2) / theta : Infinity;
 }
 
-/** Hurst exponent via R/S analysis — H < 0.5 = mean-reverting, H > 0.5 = trending */
+/** Hurst exponent via R/S analysis, H < 0.5 = mean-reverting, H > 0.5 = trending */
 export function hurstExponent(prices: number[]): number {
   const n = prices.length;
   if (n < 20) return 0.5;
@@ -664,7 +664,7 @@ export function meanReversionBands(prices: number[], window = 20, numStd = 2): {
 
 // ─── 11. Advanced Analytics (Unique) ────────────────────────────────
 
-/** Shannon Entropy — measures portfolio disorder/unpredictability */
+/** Shannon Entropy, measures portfolio disorder/unpredictability */
 export function shannonEntropy(weights: number[]): number {
   const filtered = weights.filter(w => w > 0);
   if (filtered.length === 0) return 0;
@@ -683,7 +683,7 @@ export function entropyRatio(weights: number[]): number {
   return max > 0 ? shannonEntropy(weights) / max : 0;
 }
 
-/** Tail Dependence — measures co-movement in crash scenarios (lower tail) */
+/** Tail Dependence, measures co-movement in crash scenarios (lower tail) */
 export function tailDependence(returnSeriesA: number[], returnSeriesB: number[], threshold = 0.1): number {
   const n = Math.min(returnSeriesA.length, returnSeriesB.length);
   if (n < 20) return 0;
@@ -718,7 +718,7 @@ export function tailDependenceMatrix(returnSeries: number[][], threshold = 0.1):
   return matrix;
 }
 
-/** Regime-Conditional VaR — separate VaR for bull/neutral/bear regimes */
+/** Regime-Conditional VaR, separate VaR for bull/neutral/bear regimes */
 export function regimeConditionalVaR(
   portfolioReturns: number[], regimeAssignments: number[],
   confidence = 0.95, nRegimes = 3
@@ -741,12 +741,12 @@ export function regimeConditionalVaR(
   return results;
 }
 
-/** Portfolio Fragility Index — CVaR/VaR ratio. >1 means fat tail, losses accelerate beyond VaR */
+/** Portfolio Fragility Index, CVaR/VaR ratio. >1 means fat tail, losses accelerate beyond VaR */
 export function fragilityIndex(var95: number, cvar95: number): number {
   return var95 > 0 ? cvar95 / var95 : 1;
 }
 
-/** Optimal Horizon — uses OU half-life and drift to find best holding period */
+/** Optimal Horizon, uses OU half-life and drift to find best holding period */
 export function optimalHorizon(
   ou: { theta: number; mu: number; sigma: number },
   currentPrice: number, drift: number
@@ -758,10 +758,10 @@ export function optimalHorizon(
   // Optimal horizon is ~1.5x half-life for mean-reverting, drift-adjusted
   let optDays: number;
   if (relativeDistance > 0.05 && ou.theta > 0.5) {
-    // Strong mean reversion signal — use half-life
+    // Strong mean reversion signal, use half-life
     optDays = Math.min(120, Math.max(5, halfLife * 1.5));
   } else {
-    // Drift-dominated — use momentum horizon
+    // Drift-dominated, use momentum horizon
     const absReturn = Math.abs(drift) * 252;
     optDays = absReturn > 0.2 ? 20 : absReturn > 0.1 ? 40 : 60;
   }
@@ -775,7 +775,7 @@ export function optimalHorizon(
   return { optimalDays: Math.round(optDays), expectedReturn: totalExpectedReturn, riskRewardRatio: rrRatio };
 }
 
-/** Kurtosis — measures tail heaviness. >3 = fat tails (leptokurtic) */
+/** Kurtosis, measures tail heaviness. >3 = fat tails (leptokurtic) */
 export function kurtosis(arr: number[]): number {
   const n = arr.length;
   if (n < 4) return 3;
@@ -785,7 +785,7 @@ export function kurtosis(arr: number[]): number {
   return arr.reduce((acc, v) => acc + Math.pow((v - m) / s, 4), 0) / n;
 }
 
-/** Sortino Ratio — like Sharpe but only penalizes downside deviation */
+/** Sortino Ratio, like Sharpe but only penalizes downside deviation */
 export function sortinoRatio(returns: number[], riskFreeRate = 0.04): number {
   const excessReturns = returns.map(r => r - riskFreeRate / 252);
   const avgExcess = mean(excessReturns);
@@ -796,12 +796,12 @@ export function sortinoRatio(returns: number[], riskFreeRate = 0.04): number {
   return (avgExcess * Math.sqrt(252)) / (downsideDev * Math.sqrt(252));
 }
 
-/** Calmar Ratio — annualized return / max drawdown */
+/** Calmar Ratio, annualized return / max drawdown */
 export function calmarRatio(annualReturn: number, maxDD: number): number {
   return maxDD > 0 ? annualReturn / maxDD : 0;
 }
 
-/** Omega Ratio — probability-weighted gains over losses */
+/** Omega Ratio, probability-weighted gains over losses */
 export function omegaRatio(returns: number[], threshold = 0): number {
   const gains = returns.filter(r => r > threshold).reduce((s, r) => s + (r - threshold), 0);
   const losses = returns.filter(r => r <= threshold).reduce((s, r) => s + (threshold - r), 0);

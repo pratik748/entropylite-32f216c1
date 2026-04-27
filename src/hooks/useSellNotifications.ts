@@ -61,7 +61,7 @@ function computeMaxProfitFromAnalysis(
   // Base target: use analysis target if sensible, else compute from momentum
   let baseTarget = targetFromAnalysis > currentPrice ? targetFromAnalysis : currentPrice * 1.08;
   
-  // Cap by risk — high risk stocks shouldn't be held for max profit
+  // Cap by risk, high risk stocks shouldn't be held for max profit
   const maxTarget = buyPrice + (baseTarget - buyPrice) * riskFactor;
   
   // Confidence in reaching this target
@@ -80,8 +80,8 @@ function computeMaxProfitFromAnalysis(
  * Instead of generic "profit fading" alerts, computes the realistic
  * maximum profit a position can achieve and alerts when:
  * 1. Price reaches 90% of max profit target → "Consider taking profit"
- * 2. Price reaches 100% of max profit target → "Max profit zone — SELL"
- * 3. Price exceeded target then fell back → "Missed max — exit now"
+ * 2. Price reaches 100% of max profit target → "Max profit zone, SELL"
+ * 3. Price exceeded target then fell back → "Missed max, exit now"
  * 4. AI says sell/exit
  * 5. High risk + loss combination
  */
@@ -161,7 +161,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `🎯 ${ticker} — Near Max Profit`,
+            title: `🎯 ${ticker}, Near Max Profit`,
             description: `At ${(progressToMax * 100).toFixed(0)}% of computed max target ($${maxTarget.toFixed(2)}, +${maxProfitPct.toFixed(1)}%). Consider scaling out. Confidence: ${tracker.maxProfitConfidence}%`,
             variant: "destructive",
             duration: 20000,
@@ -174,7 +174,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `🏆 ${ticker} — MAX PROFIT ZONE`,
+            title: `🏆 ${ticker}, MAX PROFIT ZONE`,
             description: `Price $${currentPrice.toFixed(2)} reached computed ceiling $${maxTarget.toFixed(2)} (+${maxProfitPct.toFixed(1)}%). TAKE PROFIT NOW. Beyond this, risk/reward deteriorates.`,
             variant: "destructive",
             duration: 30000,
@@ -186,7 +186,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `📉 ${ticker} — Falling From Peak`,
+            title: `📉 ${ticker}, Falling From Peak`,
             description: `Was at max profit zone ($${maxTarget.toFixed(2)}), now $${currentPrice.toFixed(2)} (+${pnlPct.toFixed(1)}%). Exit before gains erode further.`,
             variant: "destructive",
             duration: 20000,
@@ -205,7 +205,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `🔴 ${ticker} — Sell Signal`,
+          title: `🔴 ${ticker}, Sell Signal`,
           description: `Intelligence recommends: ${analysis.suggestion}. Current P&L: ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%${maxTarget ? ` | Max target was $${maxTarget.toFixed(2)}` : ""}`,
           variant: "destructive",
           duration: 15000,
@@ -222,8 +222,8 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `⚠️ ${ticker} — High Risk`,
-          description: `Risk ${analysis.riskScore}/100 with ${pnlPct.toFixed(1)}% loss. ${maxTarget ? `Max target was $${maxTarget.toFixed(2)} — unlikely to recover.` : "Review position."}`,
+          title: `⚠️ ${ticker}, High Risk`,
+          description: `Risk ${analysis.riskScore}/100 with ${pnlPct.toFixed(1)}% loss. ${maxTarget ? `Max target was $${maxTarget.toFixed(2)}, unlikely to recover.` : "Review position."}`,
           variant: "destructive",
           duration: 15000,
         });
@@ -238,7 +238,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `🚨 ${ticker} — Profit Erased`,
+          title: `🚨 ${ticker}, Profit Erased`,
           description: `Was +${tracker.lastPnlPct.toFixed(1)}%, now ${pnlPct.toFixed(1)}%. Previous gains wiped out.`,
           variant: "destructive",
           duration: 15000,

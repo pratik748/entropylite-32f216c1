@@ -53,7 +53,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          {/* Entropy Brief — share button */}
+          {/* Entropy Brief, share button */}
           {onOpenBrief && (
             <button
               onClick={onOpenBrief}

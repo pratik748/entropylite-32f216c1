@@ -13,12 +13,12 @@ export default function CadencePage() {
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    document.title = "Cadence | Entropy Lite — Daily research on the math behind the system";
+    document.title = "Cadence | Entropy Lite, Daily research on the math behind the system";
     const meta = document.querySelector('meta[name="description"]');
     if (meta)
       meta.setAttribute(
         "content",
-        "A daily research stream from Entropy Lite. One concept per 24 hours — unpacked with intuition, mathematics, and live system traces.",
+        "A daily research stream from Entropy Lite. One concept per 24 hours, unpacked with intuition, mathematics, and live system traces.",
       );
 
     let cancelled = false;
@@ -70,7 +70,7 @@ export default function CadencePage() {
             <span className="text-black/50">Unpacked every 24 hours.</span>
           </h1>
           <p className="text-base sm:text-lg text-black/60 leading-relaxed max-w-2xl">
-            A research note from inside Entropy Lite. Each entry takes a single idea that powers the system — a model, a measure, a structural assumption — and unpacks it the way a quant team would brief a new hire: intuition first, math second, and a custom diagram showing exactly where the idea lands in production.
+            A research note from inside Entropy Lite. Each entry takes a single idea that powers the system, a model, a measure, a structural assumption, and unpacks it the way a quant team would brief a new hire: intuition first, math second, and a custom diagram showing exactly where the idea lands in production.
           </p>
         </header>
 
@@ -94,11 +94,11 @@ export default function CadencePage() {
             {generating ? (
               <div className="flex items-center gap-2 text-black/60 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Multi-provider research in progress. This usually takes 30–60 seconds — refresh in a moment.
+                Multi-provider research in progress. This usually takes 30–60 seconds, refresh in a moment.
               </div>
             ) : (
               <p className="text-base text-black/65 leading-relaxed">
-                The daily research generator is warming up. The first Cadence entry will publish within 24 hours, and a new one every day after that — automatically curated, multi-provider researched, peer-critiqued, and illustrated.
+                The daily research generator is warming up. The first Cadence entry will publish within 24 hours, and a new one every day after that, automatically curated, multi-provider researched, peer-critiqued, and illustrated.
               </p>
             )}
           </div>

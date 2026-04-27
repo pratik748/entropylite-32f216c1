@@ -207,7 +207,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="flex items-center gap-2">
               <Eye className="h-3.5 w-3.5 text-primary" />
               <span className="font-bold text-primary text-[11px]">GOD'S EYE MODE</span>
-              <span className="text-muted-foreground text-[10px]">— {discoveries.length} cross-market opportunities</span>
+              <span className="text-muted-foreground text-[10px]">, {discoveries.length} cross-market opportunities</span>
             </div>
             <div className="flex items-center gap-2">
               {urgentCount > 0 && (
@@ -515,15 +515,15 @@ const DerivativesEngine = ({ stocks }: Props) => {
               <div className="grid grid-cols-3 gap-2 mb-2 text-center">
                 <div>
                   <div className="text-[8px] text-muted-foreground">Skew</div>
-                  <div className="text-[11px] font-bold text-foreground">{o.skew?.toFixed(3) ?? "—"}</div>
+                  <div className="text-[11px] font-bold text-foreground">{o.skew?.toFixed(3) ?? ","}</div>
                 </div>
                 <div>
                   <div className="text-[8px] text-muted-foreground">Gamma Exp</div>
-                  <div className="text-[11px] font-bold text-foreground">{o.gamma_exposure ? `${(o.gamma_exposure / 1e6).toFixed(1)}M` : "—"}</div>
+                  <div className="text-[11px] font-bold text-foreground">{o.gamma_exposure ? `${(o.gamma_exposure / 1e6).toFixed(1)}M` : ","}</div>
                 </div>
                 <div>
                   <div className="text-[8px] text-muted-foreground">Signal</div>
-                  <div className="text-[11px] font-bold text-primary">{o.signal_type?.replace(/_/g, " ") ?? "—"}</div>
+                  <div className="text-[11px] font-bold text-primary">{o.signal_type?.replace(/_/g, " ") ?? ","}</div>
                 </div>
               </div>
               <p className="text-[9px] text-muted-foreground">{o.opportunity}</p>
@@ -606,7 +606,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
         <div className="glass-panel rounded-xl p-4">
           <h3 className="text-sm font-bold text-foreground mb-2">Portfolio Beta Exposure</h3>
           <div className="flex items-center gap-4">
-            <div className="text-3xl font-bold text-foreground">{n.beta_exposure?.toFixed(2) ?? "—"}</div>
+            <div className="text-3xl font-bold text-foreground">{n.beta_exposure?.toFixed(2) ?? ","}</div>
             <div className="flex-1">
               <div className="h-3 bg-muted/30 rounded-full relative">
                 <div className="absolute left-1/2 top-0 w-0.5 h-3 bg-muted-foreground/40" />

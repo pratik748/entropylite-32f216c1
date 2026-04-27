@@ -77,7 +77,7 @@ export const demoAnalysis = {
   suggestion: "Hold" as const,
   confidence: 74,
   summary:
-    "Reliance Industries shows resilient fundamentals with strong Jio subscriber growth and improving retail margins. However, petrochemical margins face pressure from global oversupply. The macro environment in India remains supportive with stable rates and strong GDP growth. SEBI's regulatory scrutiny on related-party transactions warrants monitoring. Overall, current valuations are fairly priced — hold with a watchful eye on Q4 earnings and crude oil trends.",
+    "Reliance Industries shows resilient fundamentals with strong Jio subscriber growth and improving retail margins. However, petrochemical margins face pressure from global oversupply. The macro environment in India remains supportive with stable rates and strong GDP growth. SEBI's regulatory scrutiny on related-party transactions warrants monitoring. Overall, current valuations are fairly priced, hold with a watchful eye on Q4 earnings and crude oil trends.",
   macroFactors: [
     "RBI Rates",
     "Crude Oil",

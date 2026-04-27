@@ -11,7 +11,7 @@ export interface TruthBadgeProps {
   compact?: boolean;
 }
 
-/** Compact veracity chip — surfaces TWRD truth confidence next to any signal. */
+/** Compact veracity chip, surfaces TWRD truth confidence next to any signal. */
 export default function TruthBadge({
   T, contradictionRisk = 0, falseConsensus = false, kSources, className, compact,
 }: TruthBadgeProps) {
@@ -46,7 +46,7 @@ export default function TruthBadge({
             )}
             <div><strong>Contradiction risk:</strong> {Math.round(contradictionRisk * 100)}%</div>
             {falseConsensus && (
-              <div className="text-loss">High agreement with low source diversity — reduce size.</div>
+              <div className="text-loss">High agreement with low source diversity, reduce size.</div>
             )}
             <div className="text-muted-foreground">TWRD Veracity Layer (T(x,t))</div>
           </div>

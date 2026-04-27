@@ -51,7 +51,7 @@
     --surface-2: 0 0% 8%;
     --surface-3: 0 0% 12%;
 
-    /* Liquid Glass tokens — monochromatic */
+    /* Liquid Glass tokens, monochromatic */
     --glass-bg: 0 0% 4% / 0.75;
     --glass-border: 0 0% 30% / 0.15;
     --glass-highlight: 0 0% 80% / 0.06;
@@ -384,7 +384,7 @@
     animation: flash-red-kf 0.6s ease-out;
   }
 
-  /* Ticker strip marquee — GPU accelerated */
+  /* Ticker strip marquee, GPU accelerated */
   @keyframes ticker-marquee {
     0% { transform: translate3d(0, 0, 0); }
     100% { transform: translate3d(-50%, 0, 0); }

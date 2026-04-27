@@ -113,7 +113,7 @@ const ExecutionEngine = ({ stocks }: Props) => {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Execution Progress — {algo}</h3>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Execution Progress, {algo}</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={results.executionPath} margin={{ left: 10, right: 10 }}>

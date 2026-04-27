@@ -1,5 +1,5 @@
 /**
- * Fortress Engine — live, growth-aware capital-protection core.
+ * Fortress Engine, live, growth-aware capital-protection core.
  *
  * Pure synchronous functions that consume normalized portfolio holdings + LIVE
  * system intelligence (regime, geo, macro, institutional flows, per-ticker
@@ -187,7 +187,7 @@ export function scanThreats(
   const threats: Threat[] = [];
   const profile = deriveRegimeProfile(signals);
 
-  // 1. Concentration — regime-aware ceiling + early-warning band (proactive, portfolio-wide)
+  // 1. Concentration, regime-aware ceiling + early-warning band (proactive, portfolio-wide)
   const earlyConcBand = profile.concentrationLimit * 0.7; // start flagging at 70% of the regime limit
   holdings.forEach((h) => {
     const weight = h.value / totalValue;
@@ -206,15 +206,15 @@ export function scanThreats(
         target: h.ticker,
         severity: sev,
         evidence: overLimit
-          ? `Position weight ${(weight * 100).toFixed(1)}% — exceeds ${(profile.concentrationLimit * 100) | 0}% regime limit`
-          : `Position weight ${(weight * 100).toFixed(1)}% — approaching ${(profile.concentrationLimit * 100) | 0}% regime cap`,
+          ? `Position weight ${(weight * 100).toFixed(1)}%, exceeds ${(profile.concentrationLimit * 100) | 0}% regime limit`
+          : `Position weight ${(weight * 100).toFixed(1)}%, approaching ${(profile.concentrationLimit * 100) | 0}% regime cap`,
         contributionToRisk: Math.round(weight * 60),
         source: "portfolio",
       });
     }
   });
 
-  // 2. Sector cluster correlation — regime-aware sector weight
+  // 2. Sector cluster correlation, regime-aware sector weight
   const sectorMap: Record<string, number> = {};
   holdings.forEach((h) => {
     sectorMap[h.sector] = (sectorMap[h.sector] || 0) + h.value;
@@ -229,14 +229,14 @@ export function scanThreats(
         kind: "correlation",
         target: sector,
         severity: sev,
-        evidence: `Sector cluster ${(weight * 100).toFixed(1)}% — correlated drawdown risk in current regime`,
+        evidence: `Sector cluster ${(weight * 100).toFixed(1)}%, correlated drawdown risk in current regime`,
         contributionToRisk: Math.round(weight * 40),
         source: "portfolio",
       });
     }
   });
 
-  // 3. Trajectory deviation — regime-aware stop discipline + early-warning band
+  // 3. Trajectory deviation, regime-aware stop discipline + early-warning band
   const earlyTrajBand = profile.trajectoryStopPct * 0.6; // e.g. -8% stop → warn at -4.8%
   holdings.forEach((h) => {
     if (h.pnlPct <= earlyTrajBand) {
@@ -254,15 +254,15 @@ export function scanThreats(
         target: h.ticker,
         severity: sev,
         evidence: pastStop
-          ? `Trajectory ${h.pnlPct.toFixed(1)}% — past regime stop ${profile.trajectoryStopPct}%`
-          : `Trajectory ${h.pnlPct.toFixed(1)}% — drifting toward regime stop ${profile.trajectoryStopPct}%`,
+          ? `Trajectory ${h.pnlPct.toFixed(1)}%, past regime stop ${profile.trajectoryStopPct}%`
+          : `Trajectory ${h.pnlPct.toFixed(1)}%, drifting toward regime stop ${profile.trajectoryStopPct}%`,
         contributionToRisk: Math.min(40, Math.round(Math.abs(h.pnlPct))),
         source: "portfolio",
       });
     }
   });
 
-  // 4. Volatility — flag any elevated-β position; risk score modulates severity, doesn't gate it
+  // 4. Volatility, flag any elevated-β position; risk score modulates severity, doesn't gate it
   holdings.forEach((h) => {
     if (h.beta >= profile.volatilityBetaTrigger || h.risk >= 65) {
       const composite = (h.beta - 1) * 50 + (h.risk - 40) * 0.6;
@@ -272,14 +272,14 @@ export function scanThreats(
         kind: "volatility",
         target: h.ticker,
         severity: sev,
-        evidence: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100 — vulnerable in current vol regime`,
+        evidence: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100, vulnerable in current vol regime`,
         contributionToRisk: Math.round((h.risk / 100) * 30 + Math.max(0, h.beta - 1) * 20),
         source: "portfolio",
       });
     }
   });
 
-  // 5. Geopolitical — pulled from useGeoIntelligence per-ticker map
+  // 5. Geopolitical, pulled from useGeoIntelligence per-ticker map
   if (signals?.geoThreats) {
     for (const h of holdings) {
       const g = signals.geoThreats[h.rawTicker] || signals.geoThreats[h.ticker];
@@ -298,7 +298,7 @@ export function scanThreats(
     }
   }
 
-  // 6. Macro — only when high-impact signals are present and we have meaningful book exposure
+  // 6. Macro, only when high-impact signals are present and we have meaningful book exposure
   if (signals?.macro && (signals.macro.regime === "contraction" || signals.macro.regime === "slowdown") && signals.macro.confidence >= 60) {
     threats.push({
       id: `macro-${signals.macro.regime}`,
@@ -311,7 +311,7 @@ export function scanThreats(
     });
   }
 
-  // 7. Flow — smart money decisively risk-off is a real signal
+  // 7. Flow, smart money decisively risk-off is a real signal
   if (signals?.flows?.smartMoneyDirection === "RISK_OFF" && (signals.flows.unusualActivityCount ?? 0) >= 3) {
     threats.push({
       id: `flow-riskoff`,
@@ -376,7 +376,7 @@ export function proposeActions(
           kind: "trim",
           target: t.target,
           sizePct: trimPct,
-          rationale: `Trim ${t.target} ${trimPct}% — concentration ${(weight * 100).toFixed(0)}% vs ${(profile.concentrationLimit * 100) | 0}% cap`,
+          rationale: `Trim ${t.target} ${trimPct}%, concentration ${(weight * 100).toFixed(0)}% vs ${(profile.concentrationLimit * 100) | 0}% cap`,
           trigger: `weight ${(weight * 100) | 0}% vs ${(profile.concentrationLimit * 100) | 0}% threshold`,
           riskReductionBps: Math.round(trimPct * 4 * (h.beta || 1)),
           costBps: 4,
@@ -417,8 +417,8 @@ export function proposeActions(
           target: t.target,
           sizePct: trimPct,
           rationale: pastStop
-            ? `Trim ${t.target} ${trimPct}% — past regime stop (${h.pnlPct.toFixed(1)}%)`
-            : `Trim ${t.target} ${trimPct}% — drifting toward regime stop`,
+            ? `Trim ${t.target} ${trimPct}%, past regime stop (${h.pnlPct.toFixed(1)}%)`
+            : `Trim ${t.target} ${trimPct}%, drifting toward regime stop`,
           trigger: `unrealized ${h.pnlPct.toFixed(1)}% vs regime stop ${profile.trajectoryStopPct}%`,
           riskReductionBps: Math.round(trimPct * 3),
           costBps: 4,
@@ -441,7 +441,7 @@ export function proposeActions(
             target: t.target,
             sizePct: 100,
             instrument: "protective collar",
-            rationale: `Collar ${t.target} — preserve gains, cap vol-spike downside`,
+            rationale: `Collar ${t.target}, preserve gains, cap vol-spike downside`,
             trigger: `β=${h.beta.toFixed(2)} · risk=${h.risk}/100`,
             riskReductionBps: Math.round((h.risk / 100) * 25 + (h.beta - 1) * 12),
             costBps: 12,
@@ -460,7 +460,7 @@ export function proposeActions(
             kind: "trim",
             target: t.target,
             sizePct: trimPct,
-            rationale: `Trim ${t.target} ${trimPct}% — high β + unrealized loss compounds vol risk`,
+            rationale: `Trim ${t.target} ${trimPct}%, high β + unrealized loss compounds vol risk`,
             trigger: `β=${h.beta.toFixed(2)} · pnl=${h.pnlPct.toFixed(1)}%`,
             riskReductionBps: Math.round(trimPct * 3.5),
             costBps: 4,
@@ -482,7 +482,7 @@ export function proposeActions(
           kind: "trim",
           target: t.target,
           sizePct: trimPct,
-          rationale: `Reduce ${t.target} ${trimPct}% — live geopolitical exposure detected`,
+          rationale: `Reduce ${t.target} ${trimPct}%, live geopolitical exposure detected`,
           trigger: t.evidence,
           riskReductionBps: Math.round(trimPct * 3.5),
           costBps: 4,
@@ -501,7 +501,7 @@ export function proposeActions(
         sizePct,
         instrument:
           signals?.regime?.vix && signals.regime.vix >= 25 ? "VIX call spread" : "Index put overlay",
-        rationale: `Top-down hedge — ${t.kind === "macro" ? "macro regime risk" : "smart-money risk-off"}`,
+        rationale: `Top-down hedge, ${t.kind === "macro" ? "macro regime risk" : "smart-money risk-off"}`,
         trigger: t.evidence,
         riskReductionBps: Math.round(sizePct * 5),
         costBps: 14,
@@ -526,7 +526,7 @@ export function proposeActions(
       target: "Portfolio β",
       sizePct,
       instrument: "Index put overlay (3M, 5% OTM)",
-      rationale: `Baseline β-overlay ${sizePct}% — portfolio β=${avgBeta.toFixed(2)} carries systemic exposure`,
+      rationale: `Baseline β-overlay ${sizePct}%, portfolio β=${avgBeta.toFixed(2)} carries systemic exposure`,
       trigger: `avg β ${avgBeta.toFixed(2)} · regime ${signals?.regime?.label || "balanced"}`,
       riskReductionBps: Math.round(sizePct * 5.5),
       costBps: 10,
@@ -582,8 +582,8 @@ export function proposeActions(
       sizePct,
       rationale:
         direction === "trim"
-          ? `Rebalance ${h.ticker} −${sizePct}% — drift ${(drift * 100).toFixed(1)}% above equal-weight target`
-          : `Rebalance ${h.ticker} +${sizePct}% — under equal-weight target by ${(Math.abs(drift) * 100).toFixed(1)}%`,
+          ? `Rebalance ${h.ticker} −${sizePct}%, drift ${(drift * 100).toFixed(1)}% above equal-weight target`
+          : `Rebalance ${h.ticker} +${sizePct}%, under equal-weight target by ${(Math.abs(drift) * 100).toFixed(1)}%`,
       trigger: `weight ${(weight * 100).toFixed(1)}% vs target ${(targetWeight * 100).toFixed(1)}%`,
       riskReductionBps: Math.round(sizePct * 1.5),
       costBps: 3,
@@ -630,7 +630,7 @@ export function simulateDefensiveOutcome(
       preMaxDD: 0,
       postMaxDD: 0,
       upsidePreserved: 100,
-      regimeLabel: signals?.regime?.label || "—",
+      regimeLabel: signals?.regime?.label || ",",
     };
   }
 

@@ -71,7 +71,7 @@ function setCachedIntel(ticker: string, data: CompanyIntelligence) {
       CACHE_PREFIX + ticker.toUpperCase(),
       JSON.stringify({ data, ts: Date.now() })
     );
-  } catch { /* storage full — ignore */ }
+  } catch { /* storage full, ignore */ }
 }
 
 export function useCompanyIntelligence(ticker: string | null) {
