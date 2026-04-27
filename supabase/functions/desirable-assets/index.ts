@@ -1498,6 +1498,25 @@ Return via the tool call only.`,
         ...s.rec,
         thesis,
         catalyst,
+        evidenceSummary: [
+          `Sharpe ${s.sharpeRatio.toFixed(2)}`,
+          `MaxDD ${s.maxDrawdown.toFixed(1)}%`,
+          `Corr ${s.portfolioCorrelation.toFixed(2)}`,
+          `Vol ${s.volatility.toFixed(1)}%`,
+          `${s.filterTier.toUpperCase()} filter`,
+        ],
+        portfolioFit: Math.abs(s.portfolioCorrelation) <= 0.2
+          ? "Low correlation diversifier"
+          : s.portfolioCorrelation < 0
+            ? "Negative-correlation hedge sleeve"
+            : s.portfolioCorrelation <= 0.55
+              ? "Moderate correlation, acceptable add"
+              : "High correlation, only justified by score strength",
+        riskVerdict: s.volatility >= 45 || s.maxDrawdown >= 30 || s.portfolioCorrelation >= 0.7
+          ? "high"
+          : s.volatility >= 28 || s.maxDrawdown >= 18 || s.portfolioCorrelation >= 0.45
+            ? "medium"
+            : "low",
         suggestedQty: positionSizing.suggestedQty,
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
