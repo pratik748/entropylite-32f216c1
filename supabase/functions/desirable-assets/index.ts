@@ -1268,8 +1268,48 @@ Return via the tool call only.`,
 
     const selected: ScoredRec[] = [];
     const selectedTickers = new Set<string>();
+    const selectedSectors = new Map<string, number>();
+    const selectedCaps = new Map<string, number>();
+    const selectedNonHedge = new Set<string>();
+    const forcedSectorMode = (preferredSectors?.length || 0) <= 1;
+    const maxPerSector = forcedSectorMode ? 2 : 1;
+    const maxPerMarketCap = 2;
+    const maxHighlyCorrelatedNames = portfolioTickers.length > 0 ? 1 : 2;
 
-    // First: try to pick one from each available strategy bucket for diversity
+    const getSectorKey = (s: ScoredRec) => normalizeSectorPreference(String(s.rec.sector || "unknown"));
+    const getCapKey = (s: ScoredRec) => String(s.rec.marketCap || "large").toLowerCase();
+    const isHedgeStrategy = (s: ScoredRec) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""));
+    const passesDiversityGuards = (s: ScoredRec) => {
+      if (selectedTickers.has(s.rec.ticker)) return false;
+      if (isHedgeStrategy(s)) return true;
+
+      const sectorKey = getSectorKey(s);
+      const capKey = getCapKey(s);
+      const sectorCount = selectedSectors.get(sectorKey) || 0;
+      const capCount = selectedCaps.get(capKey) || 0;
+      const highCorrCount = Array.from(selectedNonHedge).filter((ticker) => {
+        const other = selected.find((item) => item.rec.ticker === ticker);
+        return other ? Math.abs(other.portfolioCorrelation) >= 0.65 : false;
+      }).length;
+
+      if (sectorCount >= maxPerSector) return false;
+      if (capCount >= maxPerMarketCap) return false;
+      if (Math.abs(s.portfolioCorrelation) >= 0.65 && highCorrCount >= maxHighlyCorrelatedNames) return false;
+      return true;
+    };
+    const registerSelection = (s: ScoredRec) => {
+      selected.push(s);
+      selectedTickers.add(s.rec.ticker);
+      if (!isHedgeStrategy(s)) {
+        const sectorKey = getSectorKey(s);
+        const capKey = getCapKey(s);
+        selectedSectors.set(sectorKey, (selectedSectors.get(sectorKey) || 0) + 1);
+        selectedCaps.set(capKey, (selectedCaps.get(capKey) || 0) + 1);
+        selectedNonHedge.add(s.rec.ticker);
+      }
+    };
+
+    // First: pick best candidate from each strategy bucket if it passes diversification guards.
     const strategyBuckets: Record<string, ScoredRec[]> = {};
     for (const s of selectionPool) {
       const strat = s.rec.strategy || "equity";
@@ -1277,19 +1317,26 @@ Return via the tool call only.`,
       strategyBuckets[strat].push(s);
     }
     for (const strat of Object.keys(strategyBuckets)) {
-      const bucket = strategyBuckets[strat];
-      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
-        selected.push(bucket[0]);
-        selectedTickers.add(bucket[0].rec.ticker);
+      const bucket = strategyBuckets[strat].sort((a, b) => b.quantScore - a.quantScore);
+      const candidate = bucket.find((entry) => passesDiversityGuards(entry));
+      if (candidate) registerSelection(candidate);
+    }
+
+    // Then fill remaining by quantScore while enforcing sector/cap/correlation limits.
+    for (const s of selectionPool) {
+      if (selected.length >= 12) break;
+      if (passesDiversityGuards(s)) {
+        registerSelection(s);
       }
     }
 
-    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
-    for (const s of selectionPool) {
-      if (selected.length >= 25) break;
-      if (!selectedTickers.has(s.rec.ticker)) {
-        selected.push(s);
-        selectedTickers.add(s.rec.ticker);
+    // If guards were too strict, backfill only with the highest-scoring remaining names.
+    if (selected.length < Math.min(6, selectionPool.length)) {
+      for (const s of selectionPool) {
+        if (selected.length >= Math.min(8, selectionPool.length)) break;
+        if (!selectedTickers.has(s.rec.ticker)) {
+          registerSelection(s);
+        }
       }
     }
 
@@ -1306,7 +1353,7 @@ Return via the tool call only.`,
       for (const hedgeCandidate of hedgePool) {
         if (hedgeCount >= minHedgeCount) break;
 
-        if (selected.length >= 25) {
+        if (selected.length >= 12) {
           let replaceIdx = -1;
           for (let i = selected.length - 1; i >= 0; i--) {
             if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
