@@ -1,9 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
-import { fetchTickerLiveBundle, bundleToPromptContext } from "../_shared/liveData.ts";
+import { fetchTickerLiveBundle, type TickerLiveBundle } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,19 +10,125 @@ const corsHeaders = {
 };
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHAVANTAGE_API_KEY") || "";
 
-/** Alpha Vantage fallback for when Yahoo is blocked */
+type Bars = {
+  closes: number[];
+  volumes: number[];
+  timestamps: number[];
+  source: "yahoo" | "alphavantage";
+};
+
+type DisplayNewsItem = {
+  headline: string;
+  date?: string;
+  category: "Company" | "Sector" | "Macro" | "Competitor";
+  sentiment: number;
+  shortTermImpact: number;
+  longTermImpact: number;
+  confidence: number;
+  explanation: string;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function round(value: number, digits = 2) {
+  return Number.isFinite(value) ? Number(value.toFixed(digits)) : 0;
+}
+
+function mean(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function stdev(values: number[]) {
+  if (values.length < 2) return 0;
+  const m = mean(values);
+  return Math.sqrt(values.reduce((sum, value) => sum + (value - m) ** 2, 0) / (values.length - 1));
+}
+
+function percentile(values: number[], p: number) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = clamp((sorted.length - 1) * p, 0, sorted.length - 1);
+  const lower = Math.floor(idx);
+  const upper = Math.ceil(idx);
+  if (lower === upper) return sorted[lower];
+  const weight = idx - lower;
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+}
+
+function sma(values: number[], period: number) {
+  if (values.length === 0) return 0;
+  const slice = values.slice(-Math.min(period, values.length));
+  return mean(slice);
+}
+
+function pctReturns(closes: number[]) {
+  const out: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    const prev = closes[i - 1];
+    const cur = closes[i];
+    if (prev > 0 && cur > 0) out.push((cur - prev) / prev);
+  }
+  return out;
+}
+
+function rsi(closes: number[], period = 14) {
+  if (closes.length <= period) return 50;
+  let gains = 0;
+  let losses = 0;
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  if (losses === 0 && gains === 0) return 50;
+  if (losses === 0) return 100;
+  const rs = gains / losses;
+  return 100 - 100 / (1 + rs);
+}
+
+function sharpeFromReturns(returns: number[], annualRiskFree = 0.045) {
+  if (returns.length < 20) return 0;
+  const sigma = stdev(returns);
+  if (sigma === 0) return 0;
+  const rfDaily = annualRiskFree / 252;
+  return ((mean(returns) - rfDaily) / sigma) * Math.sqrt(252);
+}
+
+function sortinoFromReturns(returns: number[], annualRiskFree = 0.045) {
+  if (returns.length < 20) return 0;
+  const rfDaily = annualRiskFree / 252;
+  const downside = returns.filter((r) => r < rfDaily).map((r) => r - rfDaily);
+  if (downside.length === 0) return 0;
+  const downsideDev = Math.sqrt(mean(downside.map((d) => d * d)));
+  if (downsideDev === 0) return 0;
+  return ((mean(returns) - rfDaily) / downsideDev) * Math.sqrt(252);
+}
+
+function maxDrawdown(closes: number[]) {
+  if (closes.length === 0) return 0;
+  let peak = closes[0];
+  let maxDd = 0;
+  for (const close of closes) {
+    if (close > peak) peak = close;
+    const dd = (peak - close) / peak;
+    if (dd > maxDd) maxDd = dd;
+  }
+  return maxDd * 100;
+}
+
 async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
-  const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
-  if (!apiKey) return null;
+  if (!ALPHA_VANTAGE_KEY) return null;
   try {
-    // Strip .NS/.BO (and legacy .NSE/.BSE) suffix for Alpha Vantage — it uses BSE:/NSE: prefix format
     const normalized = normalizeTickerInput(symbol);
     const cleanSymbol = normalized.replace(/\.(NS|BO)$/, "");
     const exchange = normalized.endsWith(".BO") ? "BSE" : "NSE";
     const avSymbol = normalized.endsWith(".NS") || normalized.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
-
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${apiKey}`;
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${ALPHA_VANTAGE_KEY}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -37,113 +141,234 @@ async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevC
       low: parseFloat(q["04. low"] || "0"),
       volume: parseInt(q["06. volume"] || "0"),
     };
-  } catch (e) {
-    console.error(`AlphaVantage error for ${symbol}:`, e);
+  } catch {
     return null;
   }
+}
+
+async function fetchYahooBars(symbol: string, range = "1y"): Promise<Bars | null> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}&_t=${Date.now()}`;
+    const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+    const timestamps = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    const volumes = result.indicators?.quote?.[0]?.volume || [];
+    const validCloses: number[] = [];
+    const validVolumes: number[] = [];
+    const validTimestamps: number[] = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (closes[i] != null && closes[i] > 0) {
+        validCloses.push(closes[i]);
+        validVolumes.push(volumes[i] || 0);
+        validTimestamps.push(timestamps[i] || 0);
+      }
+    }
+    if (validCloses.length < 30) return null;
+    return { closes: validCloses, volumes: validVolumes, timestamps: validTimestamps, source: "yahoo" };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAlphaBars(symbol: string, range = "1y"): Promise<Bars | null> {
+  if (!ALPHA_VANTAGE_KEY) return null;
+  const cleanSym = symbol.replace(/\.(NS|BO)$/, "");
+  try {
+    const outputsize = range === "1y" ? "full" : "compact";
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${ALPHA_VANTAGE_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const series = data?.["Time Series (Daily)"];
+    if (!series) return null;
+    const dates = Object.keys(series).sort();
+    const closes: number[] = [];
+    const volumes: number[] = [];
+    const timestamps: number[] = [];
+    for (const date of dates) {
+      const close = parseFloat(series[date]?.["4. close"] || "0");
+      const volume = parseFloat(series[date]?.["5. volume"] || "0");
+      if (close > 0) {
+        closes.push(close);
+        volumes.push(Number.isFinite(volume) ? volume : 0);
+        timestamps.push(Math.floor(new Date(date).getTime() / 1000));
+      }
+    }
+    if (closes.length < 30) return null;
+    return {
+      closes: closes.slice(-252),
+      volumes: volumes.slice(-252),
+      timestamps: timestamps.slice(-252),
+      source: "alphavantage",
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchHistoricalBars(ticker: string) {
+  const candidates = buildTickerCandidates(ticker);
+  for (const symbol of candidates) {
+    const yahoo = await fetchYahooBars(symbol, "1y");
+    if (yahoo) return yahoo;
+  }
+  for (const symbol of candidates) {
+    const alpha = await fetchAlphaBars(symbol, "1y");
+    if (alpha) return alpha;
+  }
+  return null;
+}
+
+function inferAssetClass(ticker: string) {
+  if (ticker.includes("-USD") || ticker.includes("-EUR")) return "Crypto";
+  if (ticker.includes("=X")) return "Forex";
+  if (ticker.includes("=F")) return "Commodity";
+  if (ticker.includes("ETF") || ticker === "SPY" || ticker === "QQQ") return "ETF";
+  return "Equity";
+}
+
+function inferExchange(ticker: string, isIndian: boolean) {
+  if (ticker.endsWith(".NS")) return "NSE";
+  if (ticker.endsWith(".BO")) return "BSE";
+  if (ticker.includes("-USD") || ticker.includes("-EUR")) return "Crypto Spot";
+  if (ticker.includes("=X")) return "FX";
+  if (ticker.includes("=F")) return "Futures";
+  return isIndian ? "NSE/BSE" : "NASDAQ/NYSE";
+}
+
+function inferMarketCapCategory(isIndian: boolean, marketCapValue: number | null) {
+  if (marketCapValue == null || !Number.isFinite(marketCapValue)) return "N/A";
+  if (isIndian) {
+    if (marketCapValue >= 100000) return "Large Cap";
+    if (marketCapValue >= 20000) return "Mid Cap";
+    if (marketCapValue >= 5000) return "Small Cap";
+    return "Micro Cap";
+  }
+  if (marketCapValue >= 10_000_000_000) return "Large Cap";
+  if (marketCapValue >= 2_000_000_000) return "Mid Cap";
+  if (marketCapValue >= 300_000_000) return "Small Cap";
+  return "Micro Cap";
+}
+
+function newsCategory(title: string, source: string): DisplayNewsItem["category"] {
+  const t = title.toLowerCase();
+  if (/fed|rbi|inflation|gdp|yield|oil|crude|rupee|dollar|fii|rates|macro|cpi|ppi/.test(t)) return "Macro";
+  if (/sector|industry|peer|competitor/.test(t)) return "Sector";
+  if (/filing|board|earnings|results|stake|order|contract|approval|launch|acquisition|probe|sebi|court|supreme/.test(t)) return "Company";
+  if (/bse|sec/.test(source.toLowerCase())) return "Company";
+  return "Company";
+}
+
+function headlineSentiment(title: string) {
+  const t = title.toLowerCase();
+  const positive = [
+    "beats", "beat", "surge", "jumps", "jump", "wins", "win", "approval", "approves", "order", "orders",
+    "growth", "upgrade", "raises", "strong", "record", "rebound", "recovery", "stake buy", "expands",
+  ];
+  const negative = [
+    "miss", "misses", "falls", "fall", "drop", "drops", "slump", "cuts", "downgrade", "probe", "investigation",
+    "sebi", "court", "lawsuit", "decline", "warning", "weak", "delay", "debt", "default", "outflow",
+  ];
+  let score = 0;
+  for (const word of positive) if (t.includes(word)) score += 16;
+  for (const word of negative) if (t.includes(word)) score -= 16;
+  return clamp(score, -90, 90);
+}
+
+function mapNews(bundle: TickerLiveBundle) {
+  const combined = [...bundle.filings, ...bundle.news];
+  const deduped = combined.filter((item, index, arr) => arr.findIndex((x) => x.title === item.title) === index).slice(0, 8);
+  const news: DisplayNewsItem[] = deduped.map((item) => {
+    const sentiment = headlineSentiment(item.title);
+    const category = newsCategory(item.title, item.source);
+    const baseImpact = Math.max(0.8, Math.abs(sentiment) / 18);
+    const sourceBoost = /bse|sec/i.test(item.source) ? 1.35 : /moneycontrol/i.test(item.source) ? 1.1 : 1;
+    const shortTermImpact = round(Math.sign(sentiment) * baseImpact * sourceBoost, 1);
+    const longTermImpact = round(Math.sign(sentiment) * baseImpact * 0.6 * sourceBoost, 1);
+    const confidence = /bse|sec/i.test(item.source) ? 90 : /yahoo/i.test(item.source) ? 78 : 72;
+    return {
+      headline: item.title,
+      date: item.publishedAt,
+      category,
+      sentiment,
+      shortTermImpact,
+      longTermImpact,
+      confidence,
+      explanation: `${item.source} item. Impact score is inferred directly from headline wording and event type.`,
+    };
+  });
+  const overallSentiment = news.length > 0 ? round(mean(news.map((item) => item.sentiment)), 0) : 0;
+  const totalPressure = round(news.reduce((sum, item) => sum + item.shortTermImpact, 0), 1);
+  return { news, overallSentiment, totalPressure };
+}
+
+function deriveSectorRisk(sector: string | null) {
+  const s = (sector || "").toLowerCase();
+  if (/bank|financial/.test(s)) return 58;
+  if (/metal|energy|power|infrastructure|shipping|logistics/.test(s)) return 64;
+  if (/technology|software/.test(s)) return 46;
+  if (/consumer|pharma|health/.test(s)) return 38;
+  return 50;
+}
+
+function deriveMacroRisk(sector: string | null, beta: number, overallSentiment: number) {
+  const s = (sector || "").toLowerCase();
+  let score = 42 + Math.max(0, beta - 1) * 18;
+  if (/infrastructure|power|capital goods|metals|energy/.test(s)) score += 10;
+  if (overallSentiment < -20) score += 8;
+  return clamp(Math.round(score), 15, 95);
+}
+
+function deriveRegulatoryRisk(ticker: string, sector: string | null, news: DisplayNewsItem[]) {
+  const joined = `${ticker} ${(sector || "")} ${news.map((item) => item.headline).join(" ")}`.toLowerCase();
+  let score = 32;
+  if (/adani|ports|power|utilities|infrastructure/.test(joined)) score += 12;
+  if (/sebi|probe|investigation|court|supreme|regulator|approval/.test(joined)) score += 20;
+  return clamp(score, 10, 95);
+}
+
+function inferRiskBreakdown(params: {
+  annualizedVol: number;
+  sector: string | null;
+  debtToEquity: number | null;
+  beta: number;
+  news: DisplayNewsItem[];
+  ticker: string;
+  overallSentiment: number;
+}) {
+  const volatility = clamp(Math.round(params.annualizedVol * 1.25), 10, 95);
+  const sector = deriveSectorRisk(params.sector);
+  const regulatory = deriveRegulatoryRisk(params.ticker, params.sector, params.news);
+  const financial = clamp(Math.round(28 + Math.max(0, (params.debtToEquity || 0) - 40) * 0.35 + Math.max(0, params.beta - 1) * 10), 12, 95);
+  const macro = deriveMacroRisk(params.sector, params.beta, params.overallSentiment);
+  return { volatility, sector, regulatory, financial, macro };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const auth = await requireAuth(req, corsHeaders);
-    const userId = auth.user.id;
+    await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
-    const provider = rawBody.provider;
-    const indiaMode = rawBody.indiaMode === true;
     const requestedTicker = (rawBody.ticker || "").toString();
     const ticker = normalizeTickerInput(requestedTicker);
-    const buyPrice = rawBody.buyPrice;
-    const quantity = rawBody.quantity;
-    if (!ticker || !buyPrice || !quantity) {
-      return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const buyPrice = Number(rawBody.buyPrice);
+    const quantity = Number(rawBody.quantity);
+
+    if (!ticker || !Number.isFinite(buyPrice) || !Number.isFinite(quantity) || buyPrice <= 0 || quantity <= 0) {
+      return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // ─── ODGS Ledger Context: per-user historical outcomes for profit/risk bias ───
-    let odgsContext = "";
-    try {
-      const supaUrl = Deno.env.get("SUPABASE_URL");
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      if (supaUrl && serviceKey) {
-        const ledgerRes = await fetch(`${supaUrl}/rest/v1/odgs_trade_ledger?user_id=eq.${userId}&order=trade_timestamp.desc&limit=200`, {
-          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-        });
-        const gradRes = await fetch(`${supaUrl}/rest/v1/odgs_gradient_state?user_id=eq.${userId}&select=*`, {
-          headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-        });
-        const ledger: any[] = ledgerRes.ok ? await ledgerRes.json() : [];
-        const gradArr: any[] = gradRes.ok ? await gradRes.json() : [];
-        const grad = gradArr[0];
-
-        if (ledger.length > 0) {
-          // ── KEY TAKEAWAYS ONLY (no raw history dump) ──
-          const N = ledger.length;
-          const wins = ledger.filter(t => Number(t.pnl_pct) > 0).length;
-          const wr = Math.round((wins / N) * 100);
-          const avgPnl = ledger.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / N;
-
-          // Loss-regime concentration: which regime burns this user most
-          const regimeLoss: Record<string, { n: number; sum: number }> = {};
-          for (const t of ledger) {
-            const r = t.feature_regime || "unknown";
-            const p = Number(t.pnl_pct || 0);
-            if (p < 0) {
-              regimeLoss[r] = regimeLoss[r] || { n: 0, sum: 0 };
-              regimeLoss[r].n++;
-              regimeLoss[r].sum += p;
-            }
-          }
-          const worstRegime = Object.entries(regimeLoss)
-            .sort((a, b) => a[1].sum - b[1].sum)[0];
-          const worstRegimeLine = worstRegime
-            ? ` Weakest in ${worstRegime[0]} regime (${worstRegime[1].n} losses, avg ${(worstRegime[1].sum / worstRegime[1].n).toFixed(1)}%).`
-            : "";
-
-          // This-ticker takeaway only
-          const tT = ledger.filter(t => (t.asset || "").toUpperCase() === ticker.toUpperCase());
-          let tickerLine = "";
-          if (tT.length > 0) {
-            const tWR = Math.round((tT.filter(t => Number(t.pnl_pct) > 0).length / tT.length) * 100);
-            const tAvg = tT.reduce((s, t) => s + Number(t.pnl_pct || 0), 0) / tT.length;
-            tickerLine = ` On ${ticker}: ${tT.length} trades, ${tWR}% WR, avg ${tAvg.toFixed(1)}%.`;
-          }
-
-          // Learned bias for this ticker (single number, no array)
-          const bias = grad?.asset_biases?.[ticker.toUpperCase()];
-          const biasLine = typeof bias === "number" && Math.abs(bias - 1) > 0.05
-            ? ` Learned bias ${bias.toFixed(2)}×.`
-            : "";
-
-          odgsContext = `\nUSER TAKEAWAYS: ${N} trades, ${wr}% WR, avg ${avgPnl.toFixed(1)}%.${tickerLine}${worstRegimeLine}${biasLine} Lean into profitable patterns; tighten risk if setup matches weakest regime.`;
-        }
-      }
-    } catch (e: any) { console.warn("ODGS context fetch failed:", e?.message); }
-
-
-    // Fetch Polymarket prediction signals for price skewing
-    let polymarketContext = "";
-    try {
-      const polyRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/polymarket-signals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
-        body: JSON.stringify({ ticker }),
-      });
-      if (polyRes.ok) {
-        const polyData = await polyRes.json();
-        if (polyData?.signals?.length > 0) {
-          const topSignals = polyData.signals.slice(0, 6);
-          polymarketContext = `\nPREDICTION MARKET SIGNALS (Polymarket — real money bets):\n${topSignals.map((s: any) => 
-            `- "${s.market}": ${(s.probability * 100).toFixed(0)}% probability, direction: ${s.direction}, conviction: ${s.conviction}/100, 24h volume: $${((s.volume24h || 0) / 1000).toFixed(0)}K`
-          ).join("\n")}\nUse these prediction market odds to SKEW your price targets and risk assessment. High-probability bearish signals should compress bull ranges and widen bear ranges. High-probability bullish signals should do the opposite.`;
-        }
-      }
-    } catch (e) { console.warn("Polymarket fetch for analyze-stock failed:", e.message); }
-
-    const t = Date.now();
-    let currentPrice = 0;
     const isIndian = isIndianTicker(ticker);
     let currency = isIndian ? "INR" : "USD";
+    let currentPrice = 0;
     let prevClose = 0;
     let dayHigh = 0;
     let dayLow = 0;
@@ -151,21 +376,14 @@ serve(async (req) => {
     let fiftyTwoWeekHigh = 0;
     let fiftyTwoWeekLow = 0;
 
-    const isCrypto = ticker.includes("-USD") || ticker.includes("-EUR");
-    const isForex = ticker.includes("=X");
-    const isCommodity = ticker.includes("=F");
     const symbolsToTry = buildTickerCandidates(ticker);
     console.log(`Ticker normalized: "${requestedTicker}" -> "${ticker}"; candidates: ${symbolsToTry.join(", ")}`);
 
-    // ─── Yahoo Finance attempts ───
     for (const symbol of symbolsToTry) {
       if (currentPrice > 0) break;
-
-      // v8 chart
       try {
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${t}`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${Date.now()}`;
         const yahooRes = await fetch(yahooUrl, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
-        console.log(`v8 ${symbol}: HTTP ${yahooRes.status}`);
         if (yahooRes.ok) {
           const yahooData = await yahooRes.json();
           const meta = yahooData?.chart?.result?.[0]?.meta;
@@ -178,65 +396,16 @@ serve(async (req) => {
             volume = meta.regularMarketVolume || 0;
             fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || 0;
             fiftyTwoWeekLow = meta.fiftyTwoWeekLow || 0;
-            console.log(`✓ ${symbol} via v8: ${currency} ${currentPrice}`);
             break;
           }
         }
-      } catch (e) { console.error(`Yahoo v8 error for ${symbol}:`, e); }
-
-      // v6 quote
-      try {
-        const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`;
-        const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
-        console.log(`v6 ${symbol}: HTTP ${res.status}`);
-        if (res.ok) {
-          const data = await res.json();
-          const q = data?.quoteResponse?.result?.[0];
-          if (q?.regularMarketPrice && q.regularMarketPrice > 0) {
-            currentPrice = q.regularMarketPrice;
-            if (!isIndian) currency = q.currency || currency;
-            prevClose = q.regularMarketPreviousClose || 0;
-            dayHigh = q.regularMarketDayHigh || 0;
-            dayLow = q.regularMarketDayLow || 0;
-            volume = q.regularMarketVolume || 0;
-            fiftyTwoWeekHigh = q.fiftyTwoWeekHigh || 0;
-            fiftyTwoWeekLow = q.fiftyTwoWeekLow || 0;
-            console.log(`✓ ${symbol} via v6: ${currency} ${currentPrice}`);
-            break;
-          }
-        }
-      } catch (e) { console.error(`Yahoo v6 error for ${symbol}:`, e); }
-
-      // v10 quoteSummary
-      try {
-        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
-        const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
-        console.log(`v10 ${symbol}: HTTP ${res.status}`);
-        if (res.ok) {
-          const data = await res.json();
-          const pm = data?.quoteSummary?.result?.[0]?.price;
-          const p = pm?.regularMarketPrice?.raw;
-          if (p && p > 0) {
-            currentPrice = p;
-            if (!isIndian) currency = pm?.currency || currency;
-            prevClose = pm?.regularMarketPreviousClose?.raw || 0;
-            dayHigh = pm?.regularMarketDayHigh?.raw || 0;
-            dayLow = pm?.regularMarketDayLow?.raw || 0;
-            volume = pm?.regularMarketVolume?.raw || 0;
-            fiftyTwoWeekHigh = pm?.fiftyTwoWeekHigh?.raw || 0;
-            fiftyTwoWeekLow = pm?.fiftyTwoWeekLow?.raw || 0;
-            console.log(`✓ ${symbol} via v10: ${currency} ${currentPrice}`);
-            break;
-          }
-        }
-      } catch (e) { console.error(`Yahoo v10 error for ${symbol}:`, e); }
+      } catch {
+        // ignore and continue
+      }
     }
 
-    // ─── Alpha Vantage fallback when Yahoo fails ───
     if (currentPrice <= 0) {
-      console.log("Yahoo failed for all symbols, trying Alpha Vantage...");
       for (const symbol of symbolsToTry) {
-        if (currentPrice > 0) break;
         const av = await fetchAlphaVantage(symbol);
         if (av && av.price > 0) {
           currentPrice = av.price;
@@ -244,145 +413,216 @@ serve(async (req) => {
           dayHigh = av.high;
           dayLow = av.low;
           volume = av.volume;
-          console.log(`✓ ${symbol} via AlphaVantage: ${currency} ${currentPrice}`);
+          break;
         }
       }
     }
 
-    console.log(`Price resolution for ${ticker}: ${currentPrice > 0 ? `${currency} ${currentPrice}` : "FAILED — all endpoints returned no data"}`);
-
-    // ─── Live scraped fundamentals (Screener / Yahoo / Finviz / Filings / News) ───
-    let liveContext = "";
-    try {
-      const bundle = await fetchTickerLiveBundle(ticker, isIndian);
-      liveContext = bundleToPromptContext(bundle);
-      const sources = [
-        bundle.screener && "Screener.in",
-        bundle.yahoo && "Yahoo",
-        bundle.finviz && "Finviz",
-        bundle.filings.length && `${bundle.filings.length} filings`,
-        bundle.news.length && `${bundle.news.length} news`,
-      ].filter(Boolean).join(", ");
-      console.log(`Live bundle for ${ticker}: ${sources || "no live sources hit"}`);
-    } catch (e: any) {
-      console.warn("Live bundle fetch failed:", e.message);
+    if (currentPrice <= 0) {
+      return new Response(JSON.stringify({ error: `Could not fetch price data for ${ticker}. Check the ticker symbol and try again.` }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const currencySymbol = currency === "INR" ? "₹" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "JPY" ? "¥" : "$";
-    const dayChange = prevClose > 0 ? ((currentPrice - prevClose) / prevClose * 100).toFixed(2) : "N/A";
-    const from52High = fiftyTwoWeekHigh > 0 ? ((currentPrice - fiftyTwoWeekHigh) / fiftyTwoWeekHigh * 100).toFixed(1) : "N/A";
+    const [bars, bundle] = await Promise.all([
+      fetchHistoricalBars(ticker),
+      fetchTickerLiveBundle(ticker, isIndian),
+    ]);
 
-    const priceUnavailable = currentPrice <= 0;
-    const prompt = `Today is ${new Date().toISOString().split('T')[0]}. 
-Perform DEEP analysis of "${ticker}" for an investor who bought at ${currencySymbol}${buyPrice} with ${quantity} units.
-${priceUnavailable ? `\nIMPORTANT: Live price data could not be fetched. You MUST use your latest knowledge of ${ticker}'s approximate current market price in ${currency}. Set "currentPrice" to your best estimate in ${currency}. ${isIndian ? "This is an Indian stock listed on NSE/BSE — ALL prices MUST be in INR (Indian Rupees), NOT USD." : ""}\n` : ""}
-REAL-TIME MARKET DATA:
-- Current Price: ${currentPrice > 0 ? `${currencySymbol}${currentPrice}` : "unavailable — use your knowledge"}
-- Currency: ${currency}
-- Day Change: ${dayChange}%
-- Previous Close: ${currencySymbol}${prevClose}
-- Day Range: ${currencySymbol}${dayLow} - ${currencySymbol}${dayHigh}
-- Volume: ${volume.toLocaleString()}
-- 52-Week Range: ${currencySymbol}${fiftyTwoWeekLow} - ${currencySymbol}${fiftyTwoWeekHigh}
-- Distance from 52W High: ${from52High}%
+    const closes = bars?.closes || [currentPrice];
+    const volumes = bars?.volumes || [volume];
+    const returns = pctReturns(closes);
+    const sigmaDaily = stdev(returns);
+    const annualizedVol = sigmaDaily * Math.sqrt(252) * 100;
+    const rsi14 = rsi(closes, 14);
+    const sma20 = sma(closes, 20) || currentPrice;
+    const sma50 = sma(closes, 50) || sma20;
+    const sma200 = sma(closes, 200) || sma50;
+    const latest20 = closes.slice(-20);
+    const support = latest20.length > 0 ? percentile(latest20, 0.15) : currentPrice * 0.95;
+    const resistance = latest20.length > 0 ? percentile(latest20, 0.85) : currentPrice * 1.05;
+    const realizedSharpe = sharpeFromReturns(returns);
+    const realizedSortino = sortinoFromReturns(returns);
+    const drawdown = maxDrawdown(closes);
+    const changePct = prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0;
+    const volumeRatio = mean(volumes.slice(-20)) > 0 ? volume / Math.max(mean(volumes.slice(-20)), 1) : 1;
+    const trend = currentPrice > sma20 && sma20 >= sma50 ? "bullish" : currentPrice < sma20 && sma20 <= sma50 ? "bearish" : "sideways";
+    const maSignal = currentPrice > sma200 * 1.01 ? "above_200dma" : currentPrice < sma200 * 0.99 ? "below_200dma" : "crossing";
+    const posIn52w = fiftyTwoWeekHigh > fiftyTwoWeekLow
+      ? ((currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow)) * 100
+      : 50;
 
-Asset type: ${isCrypto ? "Cryptocurrency" : isForex ? "Forex pair" : isCommodity ? "Commodity futures" : isIndian ? "Indian equity (NSE/BSE) — prices in INR" : "Global equity"}
-${liveContext ? `\n${liveContext}\n` : ""}${polymarketContext}${odgsContext}
+    const marketCapValue = isIndian
+      ? bundle.screener?.marketCap ?? null
+      : bundle.yahoo?.marketCap ?? null;
+    const sector = bundle.screener?.industry || bundle.yahoo?.sector || bundle.yahoo?.industry || null;
+    const pe = bundle.screener?.pe ?? bundle.yahoo?.pe ?? null;
+    const pbv = bundle.screener?.pb ?? bundle.yahoo?.priceToBook ?? null;
+    const dividendYield = bundle.screener?.dividendYield ?? bundle.yahoo?.dividendYield ?? null;
+    const roe = bundle.screener?.roe ?? (bundle.yahoo?.returnOnEquity != null ? bundle.yahoo.returnOnEquity * 100 : null);
+    const debtToEquity = bundle.yahoo?.debtToEquity ?? null;
+    const beta = bundle.yahoo?.beta ?? round(clamp(annualizedVol / 22, 0.65, 2.75), 2);
+    const marketCap = inferMarketCapCategory(isIndian, marketCapValue);
+    const { news, overallSentiment, totalPressure } = mapNews(bundle);
 
-Return a JSON object with EXACTLY this structure (no markdown, just raw JSON):
-{
-  "currentPrice": <number in ${currency}>,
-  "currency": "${currency}",
-  "riskLevel": "<High | Medium | Low>",
-  "riskScore": <0-100>,
-  "riskBreakdown": { "volatilityRisk": <0-100>, "sectorRisk": <0-100>, "regulatoryRisk": <0-100>, "financialRisk": <0-100>, "macroRisk": <0-100> },
-  "keyRisks": ["<risk1>", "<risk2>", "<risk3>", "<risk4>"],
-  "bullRange": [<lower>, <upper>],
-  "neutralRange": [<lower>, <upper>],
-  "bearRange": [<lower>, <upper>],
-  "suggestion": "<Hold | Add | Exit>",
-  "confidence": <0-100>,
-  "confidenceReasoning": "<2-3 sentence explanation of confidence score based on data quality, macro alignment, and structural factors>",
-  "verdict": "<1 sentence probabilistic scenario assessment e.g. 'High-probability upside scenario toward 1850 projected range if support at 1500 holds with current momentum structure' or 'Downside scenario likely — structural deterioration with volatility expansion forming below key levels'>",
-  "hedgeStrategy": "<Specific hedge positioning if primary scenario is invalidated, e.g. 'ATM put at strike 1450 (~2% premium) limits downside exposure to -5%' or 'Nifty IT index futures 1:0.5 ratio to offset sector beta exposure' — NEVER say 'no hedge needed', always provide a concrete defensive positioning>",
-  "summary": "<4-5 sentence deep analysis using observational and probabilistic language — describe what market structure indicates, not what the user should do>",
-  "macroFactors": ["<factor1>", "<factor2>"],
-  "overallSentiment": <-100 to 100>,
-  "totalPressure": <number>,
-  "sector": "<sector name>",
-  "assetClass": "<Equity | Crypto | Forex | Commodity | ETF>",
-  "exchange": "<exchange name>",
-  "marketCap": "<Large Cap | Mid Cap | Small Cap | Micro Cap | N/A>",
-  "pe": <number or null>,
-  "pbv": <number or null>,
-  "dividendYield": <number or null>,
-  "beta": <number>,
-  "roe": <number or null>,
-  "debtToEquity": <number or null>,
-  "esgScore": <0-100 or null>,
-  "technicals": { "rsi": <number>, "support": <number>, "resistance": <number>, "trend": "<bullish|bearish|sideways>", "maSignal": "<above_200dma|below_200dma|crossing>" },
-  "news": [{ "headline": "<REAL recent headline from the last 7 days — must be a genuine news event, not fabricated>", "date": "<YYYY-MM-DD>", "category": "<Company|Sector|Macro>", "sentiment": <-100 to 100>, "shortTermImpact": <% number>, "longTermImpact": <% number>, "confidence": <0-100>, "explanation": "<2 sentence>" }]
-}
-ALL price values (currentPrice, support, resistance, bullRange, bearRange, neutralRange) MUST be in ${currency}.
-CRITICAL NEWS RULES:
-- Include 6-8 news items with REAL headlines from the LAST 7 DAYS only. Today is ${new Date().toISOString().split('T')[0]}.
-- Each headline must reference a real event (earnings release, analyst upgrade/downgrade, regulatory action, macro data release, sector development).
-- Include the date each headline was published.
-- DO NOT fabricate or hallucinate headlines. If you cannot recall a real headline, describe the real event factually (e.g. "Fed holds rates steady at June FOMC meeting").
-- News must be MARKET-MOVING — no generic filler like "Company continues operations".
-FORMATTING: Do NOT use markdown. No asterisks, no bold (**), no italic (*), no headers (#), no bullet points. Use plain text only. Numbers and percentages are fine.
-Every data point must reflect current market reality.`;
+    const riskBreakdown = inferRiskBreakdown({
+      annualizedVol,
+      sector,
+      debtToEquity,
+      beta,
+      news,
+      ticker,
+      overallSentiment,
+    });
+    const riskScore = Math.round(
+      riskBreakdown.volatility * 0.28 +
+      riskBreakdown.sector * 0.16 +
+      riskBreakdown.regulatory * 0.22 +
+      riskBreakdown.financial * 0.20 +
+      riskBreakdown.macro * 0.14
+    );
+    const riskLevel = riskScore >= 67 ? "High" : riskScore >= 40 ? "Medium" : "Low";
 
-    let jsonStr: string;
-    try {
-      const aiOpts = {
-        systemPrompt: `You are an institutional-grade market research analyst. You provide probabilistic scenario assessments — NOT investment advice. Use observational, data-driven language. Never use directive words like "buy", "sell", "enter", "exit". Instead use "market structure indicates", "high-probability scenario", "projected range", "liquidity zone forming", "volatility expansion likely". Return only valid JSON. Every number must be based on real current market data. No placeholders. Keep strings short to avoid truncation. ALL monetary values must be in ${currency}.${indiaMode ? "\nFocus exclusively on Indian market context (NSE/BSE). Consider SEBI/RBI regulations, Indian tax structure, INR denomination. Global events included only if they directly impact Indian markets." : ""}`,
-        userPrompt: prompt,
-        maxTokens: 8192,
-      };
+    const keyRisks = [
+      annualizedVol > 35 ? `Realized volatility is elevated at ${round(annualizedVol, 1)}% annualized.` : "Volatility is contained relative to typical single-name equity swings.",
+      debtToEquity != null && debtToEquity > 80 ? `Leverage is heavy with debt/equity near ${round(debtToEquity, 1)}.` : `Balance-sheet stress is moderate${debtToEquity != null ? ` with debt/equity near ${round(debtToEquity, 1)}` : " based on available public data"}.`,
+      posIn52w > 80 ? `Price is near the top of its 52-week range (${round(posIn52w, 0)}%), so upside may need fresh catalysts.` : posIn52w < 25 ? `Price is in the lower quartile of its 52-week range (${round(posIn52w, 0)}%), which raises downside persistence risk.` : `Price is mid-range at ${round(posIn52w, 0)}% of the 52-week band.`,
+      news.some((item) => item.sentiment < -20) ? "Recent headline flow includes adverse event language that can pressure the tape." : "Recent headline flow is not signaling a major negative shock.",
+    ].slice(0, 4);
 
-      // Fire both providers in parallel, pick the best result
-      const parallelResults = await callAIParallel(aiOpts);
-      console.log(`analyze-stock: ${parallelResults.length} parallel AI responses received`);
+    const monthlySigma = sigmaDaily > 0 ? sigmaDaily * Math.sqrt(21) : Math.max(Math.abs(changePct) / 100, 0.04);
+    const bullRange: [number, number] = [
+      round(currentPrice * (1 + monthlySigma * 0.45)),
+      round(currentPrice * (1 + monthlySigma * 1.15)),
+    ];
+    const neutralRange: [number, number] = [
+      round(currentPrice * (1 - monthlySigma * 0.3)),
+      round(currentPrice * (1 + monthlySigma * 0.3)),
+    ];
+    const bearRange: [number, number] = [
+      round(Math.max(0.01, currentPrice * (1 - monthlySigma * 1.15))),
+      round(Math.max(0.01, currentPrice * (1 - monthlySigma * 0.45))),
+    ];
 
-      // Pick the response with the most complete JSON (longest valid parse)
-      let bestText = "";
-      let bestScore = -1;
-      for (const result of parallelResults) {
-        const parsed = safeParseJSON(result.text);
-        if (!parsed) continue;
-        // Score by completeness: count non-null keys
-        const keys = Object.keys(parsed);
-        const score = keys.filter(k => parsed[k] != null).length;
-        if (score > bestScore) {
-          bestScore = score;
-          bestText = result.text;
-          console.log(`analyze-stock: picked ${result.provider} response (${score} fields)`);
-        }
-      }
+    let signal = 0;
+    if (trend === "bullish") signal += 2;
+    if (trend === "bearish") signal -= 2;
+    if (rsi14 >= 45 && rsi14 <= 68) signal += 1;
+    if (rsi14 >= 72) signal -= 1;
+    if (overallSentiment > 15) signal += 1;
+    if (overallSentiment < -15) signal -= 1;
+    if (currentPrice > resistance) signal += 1;
+    if (currentPrice < support) signal -= 1;
+    if (riskScore >= 72) signal -= 1;
+    if (realizedSharpe > 0.75) signal += 1;
+    if (realizedSharpe < -0.2) signal -= 1;
 
-      if (!bestText && parallelResults.length > 0) {
-        bestText = parallelResults[0].text;
-      }
-      jsonStr = bestText;
-    } catch (e: any) {
-      if (e.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      throw e;
-    }
+    const dataCoverage = [
+      currentPrice > 0,
+      closes.length >= 90,
+      sector != null,
+      pe != null || pbv != null || roe != null,
+      news.length > 0,
+    ].filter(Boolean).length;
 
-    // Robust JSON parsing with safeParseJSON
-    let analysis: any;
-    try {
-      analysis = safeParseJSON(jsonStr);
-    } catch (parseErr: any) {
-      console.error("JSON parse failed even after repair:", parseErr.message);
-      throw new Error(`JSON parse failed: ${parseErr.message}`);
-    }
-    if (currentPrice > 0) analysis.currentPrice = currentPrice;
-    // Always enforce correct currency
-    analysis.currency = currency;
+    const suggestion = signal >= 2 ? "Add" : signal <= -2 ? "Exit" : "Hold";
+    const confidence = clamp(
+      Math.round(38 + dataCoverage * 6 + Math.abs(signal) * 5 + (trend === "sideways" ? -4 : 0) - Math.max(0, riskScore - 60) * 0.15),
+      35,
+      86,
+    );
+
+    const macroFactors = [
+      `${sector || "Sector"} exposure is carrying a macro risk score of ${riskBreakdown.macro}/100.`,
+      `20-day realized volatility is ${round(annualizedVol, 1)}% annualized with beta near ${round(beta, 2)}.`,
+      news.length > 0
+        ? `Recent headline pressure reads ${overallSentiment >= 0 ? "+" : ""}${overallSentiment} with net ${totalPressure >= 0 ? "+" : ""}${totalPressure}% short-horizon pressure.`
+        : "Headline flow is thin, so conviction rests more heavily on price structure and fundamentals.",
+    ];
+
+    const verdict = suggestion === "Add"
+      ? `${ticker} still has a constructive base while holding ${currency} ${round(support)} support, with upside distribution centred toward ${currency} ${bullRange[1]}.`
+      : suggestion === "Exit"
+        ? `${ticker} is trading with deteriorating structure, and downside distribution remains open toward ${currency} ${bearRange[0]} if ${currency} ${round(support)} fails.`
+        : `${ticker} is in a balanced regime, with the highest-probability path still inside ${currency} ${neutralRange[0]} to ${currency} ${neutralRange[1]} until a cleaner break develops.`;
+
+    const confidenceReasoning = `Confidence is ${confidence}% because data coverage is ${dataCoverage}/5, trend is ${trend}, realized Sharpe is ${round(realizedSharpe, 2)}, and composite risk is ${riskScore}/100.`;
+
+    const summary = [
+      `${ticker} is trading at ${currency} ${round(currentPrice)} versus your entry at ${currency} ${round(buyPrice)}, with ${round(changePct, 2)}% day change and ${round(annualizedVol, 1)}% annualized realized volatility from the last ${returns.length} sessions.` ,
+      `Trend structure is ${trend}: price is ${currentPrice >= sma20 ? "above" : "below"} the 20-day average (${currency} ${round(sma20)}) and ${maSignal === "above_200dma" ? "above" : maSignal === "below_200dma" ? "below" : "near"} the 200-day trend anchor (${currency} ${round(sma200)}).`,
+      `${sector || "Public"} fundamentals show ${pe != null ? `P/E ${round(pe, 2)}` : "no clean P/E read"}${pbv != null ? `, P/B ${round(pbv, 2)}` : ""}${roe != null ? `, ROE ${round(roe, 1)}%` : ""}${debtToEquity != null ? `, and debt/equity ${round(debtToEquity, 1)}` : ""}.`,
+      news.length > 0
+        ? `Recent real headlines skew ${overallSentiment >= 0 ? "slightly constructive" : "defensive"}, with net pressure at ${totalPressure >= 0 ? "+" : ""}${totalPressure}%.`
+        : "Recent headline coverage is light, so the read relies mostly on price, volume, and reported fundamentals.",
+    ].join(" ");
+
+    const hedgeStrike = round(support);
+    const hedgeStrategy = suggestion === "Exit"
+      ? `${ticker} can be defended with a protective put near ${currency} ${hedgeStrike} or a hard risk stop below ${currency} ${round(support)} until the price reclaims ${currency} ${round(resistance)}.`
+      : `${ticker} can be hedged with a protective put near ${currency} ${hedgeStrike}, keeping invalidation tied to a sustained break below ${currency} ${round(support)}.`;
+
+    const analysis = {
+      analyzedAt: new Date().toISOString(),
+      currentPrice: round(currentPrice),
+      currency,
+      riskLevel,
+      riskScore,
+      riskBreakdown: {
+        volatilityRisk: riskBreakdown.volatility,
+        sectorRisk: riskBreakdown.sector,
+        regulatoryRisk: riskBreakdown.regulatory,
+        financialRisk: riskBreakdown.financial,
+        macroRisk: riskBreakdown.macro,
+      },
+      keyRisks,
+      bullRange,
+      neutralRange,
+      bearRange,
+      suggestion,
+      confidence,
+      confidenceReasoning,
+      verdict,
+      hedgeStrategy,
+      summary,
+      macroFactors,
+      overallSentiment,
+      totalPressure,
+      sector: sector || "Unknown",
+      assetClass: inferAssetClass(ticker),
+      exchange: inferExchange(ticker, isIndian),
+      marketCap,
+      marketCapValue,
+      pe: pe != null ? round(pe, 2) : null,
+      pbv: pbv != null ? round(pbv, 2) : null,
+      dividendYield: dividendYield != null ? round(dividendYield, 2) : null,
+      beta: round(beta, 2),
+      roe: roe != null ? round(roe, 2) : null,
+      debtToEquity: debtToEquity != null ? round(debtToEquity, 2) : null,
+      esgScore: null,
+      technicals: {
+        rsi: round(rsi14, 1),
+        support: round(support),
+        resistance: round(resistance),
+        trend,
+        maSignal,
+      },
+      news,
+      targetPrice: bullRange[1],
+      momentum: round((((currentPrice - sma20) / Math.max(sma20, 1)) * 100), 2),
+      volatility: round(annualizedVol, 2),
+      sentiment: overallSentiment,
+      regime: trend === "bullish" ? "risk-on" : trend === "bearish" ? "risk-off" : "range-bound",
+      quantMetrics: {
+        sharpe1y: round(realizedSharpe, 2),
+        sortino1y: round(realizedSortino, 2),
+        maxDrawdown: round(drawdown, 2),
+        sigmaAnnual: round(annualizedVol, 2),
+        sessions: returns.length,
+        source: bars?.source || "spot-only",
+      },
+    };
 
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
@@ -390,6 +630,9 @@ Every data point must reflect current market reality.`;
   } catch (error: any) {
     console.error("Error in analyze-stock:", error);
     if (error instanceof Response) return error;
-    return new Response(JSON.stringify({ error: "Analysis failed", details: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Analysis failed", details: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
