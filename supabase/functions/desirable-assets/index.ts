@@ -800,12 +800,14 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
 
     try {
       const aiOpts = {
-        systemPrompt: `You are an institutional quant PM. Output only liquid, large/mega-cap, highly tradeable assets with strict risk controls and no fluff.
-QUALITY MANDATE: Bias HARD toward proven blue-chip leaders and category-dominant compounders with high expected forward growth. Use household-name mega/large-caps freely when fundamentals and price action support it — do NOT avoid them for the sake of being contrarian. Obscure, low-coverage, or unfamiliar names are forbidden unless they are clearly institutional-grade (>$10B mkt cap, deep liquidity, analyst coverage).
-Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
-Reject microcaps, low-float names, story stocks, and anything not actively held by major institutions.
-Use exact tickers supported by Yahoo Finance.
-Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Bias toward Nifty50 / BSE Sensex constituents and top-tier Nifty Next 50 names. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nBias toward S&P 500 / Nasdaq-100 constituents and global mega-caps. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and evidence-backed portfolio fit.
+QUALITY MANDATE:
+- Build a diversified recommendation slate, not a popularity contest.
+- Avoid clustered lookalikes: do not emit multiple names expressing the same crowded trade, same business model, or same mega-cap factor exposure.
+- Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
+- Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
+- Use exact tickers supported by Yahoo Finance.
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -816,18 +818,21 @@ ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
 
 Create 8-10 recommendations that prioritize:
-1) Blue-chip / index-constituent quality with proven multi-year compounding
+1) Diversified opportunity sources across sectors, strategies, and factor exposures
 2) Positive earnings momentum + heavy institutional participation
-3) Price trend confirmation (above 50/200-day averages)
-4) Catalyst-driven upside in 1-6 months with high expected forward growth
+3) Price trend confirmation (above key moving averages) without chasing crowded correlation clusters
+4) Catalyst-driven upside in 1-6 months with defendable downside control
 5) Deep liquidity and tight bid/ask — must be easily executable in size
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
 - ABSOLUTELY NO obscure, unheard-of, microcap, penny, meme, or low-liquidity names
 - ABSOLUTELY NO deteriorating fundamentals or broken charts
-- Prefer names with >$10B market cap (or Nifty50/Sensex/Nifty Next 50 in India mode)
+- Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
+- Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
+- Prefer names with >$3B market cap and strong liquidity; allow liquid mid-caps when they materially improve diversification
 - Provide strategy diversity across at least 3 strategy types
+- Each idea must be defendable with evidence, not narrative fluff
 
 Return via the tool call only.`,
         tools: candidateTools,
@@ -983,6 +988,7 @@ Return via the tool call only.`,
       sharpeRatio: number;
       maxDrawdown: number;
       portfolioCorrelation: number;
+      riskCompositeScore: number;
       volatility: number;
       zScore: number;
       quantScore: number;
@@ -1063,6 +1069,15 @@ Return via the tool call only.`,
 
       const isHedge = HEDGE_STRATEGIES.has(String(rec.strategy || ""));
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
+      const riskCompositeScore = Math.round(clamp(
+        vol * 0.55 +
+        mdd * 0.65 +
+        Math.max(0, portCorr) * 28 +
+        Math.max(0, -momentum20d) * 1.4 -
+        Math.max(0, sr) * 8,
+        5,
+        95,
+      ));
 
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
@@ -1116,6 +1131,7 @@ Return via the tool call only.`,
 
       // F4: Avoid weak upside profiles
       if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
+      if (!isHedge && riskCompositeScore >= 60) { filtered++; continue; }
 
       // Two-tier pass logic: strict (high quality) or balanced (acceptable). Anything below = drop.
       const strictPass = isHedge || (
@@ -1175,6 +1191,7 @@ Return via the tool call only.`,
         sharpeRatio: Math.round(sr * 100) / 100,
         maxDrawdown: Math.round(mdd * 10) / 10,
         portfolioCorrelation: Math.round(portCorr * 100) / 100,
+        riskCompositeScore,
         volatility: Math.round(vol * 10) / 10,
         zScore: Math.round(zs * 100) / 100,
         quantScore: Math.min(quantScore, 99),
@@ -1263,8 +1280,48 @@ Return via the tool call only.`,
 
     const selected: ScoredRec[] = [];
     const selectedTickers = new Set<string>();
+    const selectedSectors = new Map<string, number>();
+    const selectedCaps = new Map<string, number>();
+    const selectedNonHedge = new Set<string>();
+    const forcedSectorMode = (preferredSectors?.length || 0) <= 1;
+    const maxPerSector = forcedSectorMode ? 2 : 1;
+    const maxPerMarketCap = 2;
+    const maxHighlyCorrelatedNames = portfolioTickers.length > 0 ? 1 : 2;
 
-    // First: try to pick one from each available strategy bucket for diversity
+    const getSectorKey = (s: ScoredRec) => normalizeSectorPreference(String(s.rec.sector || "unknown"));
+    const getCapKey = (s: ScoredRec) => String(s.rec.marketCap || "large").toLowerCase();
+    const isHedgeStrategy = (s: ScoredRec) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""));
+    const passesDiversityGuards = (s: ScoredRec) => {
+      if (selectedTickers.has(s.rec.ticker)) return false;
+      if (isHedgeStrategy(s)) return true;
+
+      const sectorKey = getSectorKey(s);
+      const capKey = getCapKey(s);
+      const sectorCount = selectedSectors.get(sectorKey) || 0;
+      const capCount = selectedCaps.get(capKey) || 0;
+      const highCorrCount = Array.from(selectedNonHedge).filter((ticker) => {
+        const other = selected.find((item) => item.rec.ticker === ticker);
+        return other ? Math.abs(other.portfolioCorrelation) >= 0.65 : false;
+      }).length;
+
+      if (sectorCount >= maxPerSector) return false;
+      if (capCount >= maxPerMarketCap) return false;
+      if (Math.abs(s.portfolioCorrelation) >= 0.65 && highCorrCount >= maxHighlyCorrelatedNames) return false;
+      return true;
+    };
+    const registerSelection = (s: ScoredRec) => {
+      selected.push(s);
+      selectedTickers.add(s.rec.ticker);
+      if (!isHedgeStrategy(s)) {
+        const sectorKey = getSectorKey(s);
+        const capKey = getCapKey(s);
+        selectedSectors.set(sectorKey, (selectedSectors.get(sectorKey) || 0) + 1);
+        selectedCaps.set(capKey, (selectedCaps.get(capKey) || 0) + 1);
+        selectedNonHedge.add(s.rec.ticker);
+      }
+    };
+
+    // First: pick best candidate from each strategy bucket if it passes diversification guards.
     const strategyBuckets: Record<string, ScoredRec[]> = {};
     for (const s of selectionPool) {
       const strat = s.rec.strategy || "equity";
@@ -1272,19 +1329,26 @@ Return via the tool call only.`,
       strategyBuckets[strat].push(s);
     }
     for (const strat of Object.keys(strategyBuckets)) {
-      const bucket = strategyBuckets[strat];
-      if (bucket.length > 0 && !selectedTickers.has(bucket[0].rec.ticker)) {
-        selected.push(bucket[0]);
-        selectedTickers.add(bucket[0].rec.ticker);
+      const bucket = strategyBuckets[strat].sort((a, b) => b.quantScore - a.quantScore);
+      const candidate = bucket.find((entry) => passesDiversityGuards(entry));
+      if (candidate) registerSelection(candidate);
+    }
+
+    // Then fill remaining by quantScore while enforcing sector/cap/correlation limits.
+    for (const s of selectionPool) {
+      if (selected.length >= 12) break;
+      if (passesDiversityGuards(s)) {
+        registerSelection(s);
       }
     }
 
-    // Then fill remaining by quantScore — allow ALL that passed filters (up to 25)
-    for (const s of selectionPool) {
-      if (selected.length >= 25) break;
-      if (!selectedTickers.has(s.rec.ticker)) {
-        selected.push(s);
-        selectedTickers.add(s.rec.ticker);
+    // If guards were too strict, backfill only with the highest-scoring remaining names.
+    if (selected.length < Math.min(6, selectionPool.length)) {
+      for (const s of selectionPool) {
+        if (selected.length >= Math.min(8, selectionPool.length)) break;
+        if (!selectedTickers.has(s.rec.ticker)) {
+          registerSelection(s);
+        }
       }
     }
 
@@ -1301,7 +1365,7 @@ Return via the tool call only.`,
       for (const hedgeCandidate of hedgePool) {
         if (hedgeCount >= minHedgeCount) break;
 
-        if (selected.length >= 25) {
+        if (selected.length >= 12) {
           let replaceIdx = -1;
           for (let i = selected.length - 1; i >= 0; i--) {
             if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
@@ -1446,6 +1510,26 @@ Return via the tool call only.`,
         ...s.rec,
         thesis,
         catalyst,
+        riskCompositeScore: s.riskCompositeScore,
+        evidenceSummary: [
+          `Sharpe ${s.sharpeRatio.toFixed(2)}`,
+          `MaxDD ${s.maxDrawdown.toFixed(1)}%`,
+          `Corr ${s.portfolioCorrelation.toFixed(2)}`,
+          `Vol ${s.volatility.toFixed(1)}%`,
+          `${s.filterTier.toUpperCase()} filter`,
+        ],
+        portfolioFit: Math.abs(s.portfolioCorrelation) <= 0.2
+          ? "Low correlation diversifier"
+          : s.portfolioCorrelation < 0
+            ? "Negative-correlation hedge sleeve"
+            : s.portfolioCorrelation <= 0.55
+              ? "Moderate correlation, acceptable add"
+              : "High correlation, only justified by score strength",
+        riskVerdict: s.riskCompositeScore >= 60
+          ? "high"
+          : s.riskCompositeScore >= 35
+            ? "medium"
+            : "low",
         suggestedQty: positionSizing.suggestedQty,
         targetPrice: Math.round(targetPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
