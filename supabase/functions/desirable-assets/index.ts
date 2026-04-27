@@ -1331,7 +1331,7 @@ Return via the tool call only.`,
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
 
     console.log(`desirable-assets: ${candidates.length} candidates, ${noData} no Yahoo data, ${thinData} thin data, ${scored.length} scored, ${selected.length} selected`);
-    console.log(`desirable-assets tiers: strict=${strictPool.length}, balanced=${balancedPool.length - strictPool.length}, rescue=${rescuePool.length}`);
+    console.log(`desirable-assets tiers: strict=${strictPool.length}, balanced=${balancedPool.length - strictPool.length}`);
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
     // Helper to strip markdown artifacts from any AI text field
@@ -1490,7 +1490,7 @@ Return via the tool call only.`,
     console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed tiered quant filters`);
 
     if (enriched.length === 0) {
-      repairLog(`enrichment produced 0 rows from ${scored.length} scored — emitting last-resort deterministic rescue`);
+      repairLog(`enrichment produced 0 rows from ${scored.length} scored — returning honest empty set (no deterministic rescue)`);
     }
 
     return new Response(JSON.stringify({
