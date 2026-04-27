@@ -137,7 +137,7 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
   for (const symbol of symbolsToTry) {
     if (result) break;
     try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo&_t=${Date.now()}`;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1y&_t=${Date.now()}`;
       const res = await fetch(url, { headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" } });
       if (res.ok) {
         const data = await res.json();
@@ -587,7 +587,7 @@ function buildDeterministicFallback(
   };
 }
 
-function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number, riskMetrics: RiskMetrics, clankSignals: ClankSignal[], newsHeadlines: string[]) {
+function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number, riskMetrics: RiskMetrics, clankSignals: ClankSignal[], newsHeadlines: string[], deterministic: ReturnType<typeof buildDeterministicFallback>) {
   const action = ["BUY", "SELL", "WAIT"].includes(best?.action) ? best.action : "WAIT";
   const realPrice = roundPrice(snap.currentPrice);
   const volatilityRegime = ["LOW", "NORMAL", "HIGH"].includes(best?.volatilityRegime)
@@ -629,35 +629,10 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     else confidence = clamp(confidence - 3, 25, 88);
   }
 
-  let entryLow = Number(best?.entryLow);
-  let entryHigh = Number(best?.entryHigh);
-  let targetPrice = Number(best?.targetPrice);
-  let stopLoss = Number(best?.stopLoss);
-
-  if (!Number.isFinite(entryLow)) entryLow = realPrice * 0.985;
-  if (!Number.isFinite(entryHigh)) entryHigh = realPrice * 1.01;
-  if (entryLow > entryHigh) [entryLow, entryHigh] = [entryHigh, entryLow];
-
-  if (Math.abs(entryLow - realPrice) / Math.max(realPrice, 1) > 0.18) entryLow = realPrice * 0.985;
-  if (Math.abs(entryHigh - realPrice) / Math.max(realPrice, 1) > 0.18) entryHigh = realPrice * 1.01;
-
-  if (!Number.isFinite(targetPrice)) {
-    targetPrice = action === "SELL" ? realPrice * 0.95 : realPrice * 1.05;
-  }
-  if (!Number.isFinite(stopLoss)) {
-    stopLoss = action === "SELL" ? realPrice * 1.04 : realPrice * 0.96;
-  }
-
-  if (action === "BUY") {
-    if (targetPrice <= entryHigh) targetPrice = Math.max(realPrice * 1.04, tech.resistance || realPrice * 1.04);
-    if (stopLoss >= entryLow) stopLoss = Math.min(realPrice * 0.96, tech.support || realPrice * 0.96);
-  } else if (action === "SELL") {
-    if (targetPrice >= entryLow) targetPrice = Math.min(realPrice * 0.96, tech.support || realPrice * 0.96);
-    if (stopLoss <= entryHigh) stopLoss = Math.max(realPrice * 1.04, tech.resistance || realPrice * 1.04);
-  } else {
-    targetPrice = tech.resistance || realPrice * 1.02;
-    stopLoss = tech.support || realPrice * 0.98;
-  }
+  let entryLow = Number(deterministic.entryLow);
+  let entryHigh = Number(deterministic.entryHigh);
+  let targetPrice = Number(deterministic.targetPrice);
+  let stopLoss = Number(deterministic.stopLoss);
 
   const midEntry = (entryLow + entryHigh) / 2;
   const riskRewardRatio = action === "BUY"
@@ -674,14 +649,14 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     entryHigh: roundPrice(entryHigh),
     targetPrice: roundPrice(targetPrice),
     stopLoss: roundPrice(stopLoss),
-    timeframe: typeof best?.timeframe === "string" && best.timeframe.trim() ? best.timeframe.slice(0, 40) : "1-3 weeks",
+     timeframe: typeof best?.timeframe === "string" && best.timeframe.trim() ? best.timeframe.slice(0, 40) : String(deterministic.timeframe),
     direction: ["UP", "DOWN", "SIDEWAYS"].includes(best?.direction) ? best.direction : action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : "SIDEWAYS",
-    directionReason: (typeof best?.directionReason === "string" && best.directionReason.trim() ? best.directionReason : "Signal alignment is mixed").slice(0, 60),
+     directionReason: (typeof best?.directionReason === "string" && best.directionReason.trim() ? best.directionReason : String(deterministic.directionReason)).slice(0, 60),
     positiveNews: (typeof best?.positiveNews === "string" && best.positiveNews.trim() ? best.positiveNews : "No significant positive catalyst").slice(0, 120),
     negativeNews: (typeof best?.negativeNews === "string" && best.negativeNews.trim() ? best.negativeNews : "No significant downside catalyst").slice(0, 120),
-    protection: (typeof best?.protection === "string" && best.protection.trim() ? best.protection : "Exit if price breaks the stop level.").slice(0, 120),
+     protection: (typeof best?.protection === "string" && best.protection.trim() ? best.protection : String(deterministic.protection)).slice(0, 120),
     currentPrice: realPrice,
-    quantScore: clamp(Math.round(Number(best?.quantScore) || 50), 0, 100),
+     quantScore: Number(deterministic.quantScore),
     volatilityRegime,
     riskRewardRatio: action === "WAIT" ? 0 : Number(Math.abs(riskRewardRatio).toFixed(2)),
     providersUsed: parsedCount,
