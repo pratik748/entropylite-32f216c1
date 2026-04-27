@@ -988,6 +988,7 @@ Return via the tool call only.`,
       sharpeRatio: number;
       maxDrawdown: number;
       portfolioCorrelation: number;
+      riskCompositeScore: number;
       volatility: number;
       zScore: number;
       quantScore: number;
@@ -1068,6 +1069,15 @@ Return via the tool call only.`,
 
       const isHedge = HEDGE_STRATEGIES.has(String(rec.strategy || ""));
       const isPair = rec.strategy === "pair_trade" || rec.strategy === "vol_arb" || rec.strategy === "mean_reversion";
+      const riskCompositeScore = Math.round(clamp(
+        vol * 0.55 +
+        mdd * 0.65 +
+        Math.max(0, portCorr) * 28 +
+        Math.max(0, -momentum20d) * 1.4 -
+        Math.max(0, sr) * 8,
+        5,
+        95,
+      ));
 
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) continue;
@@ -1121,6 +1131,7 @@ Return via the tool call only.`,
 
       // F4: Avoid weak upside profiles
       if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
+      if (!isHedge && riskCompositeScore >= 60) { filtered++; continue; }
 
       // Two-tier pass logic: strict (high quality) or balanced (acceptable). Anything below = drop.
       const strictPass = isHedge || (
@@ -1180,6 +1191,7 @@ Return via the tool call only.`,
         sharpeRatio: Math.round(sr * 100) / 100,
         maxDrawdown: Math.round(mdd * 10) / 10,
         portfolioCorrelation: Math.round(portCorr * 100) / 100,
+        riskCompositeScore,
         volatility: Math.round(vol * 10) / 10,
         zScore: Math.round(zs * 100) / 100,
         quantScore: Math.min(quantScore, 99),
