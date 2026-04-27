@@ -1155,7 +1155,7 @@ Return via the tool call only.`,
       const trendScore = trendStrength / 100;
       const winRateScore = winRate / 100;
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
-      const tierBonus = filterTier === "strict" ? 0.1 : filterTier === "balanced" ? 0.04 : -0.06;
+      const tierBonus = filterTier === "strict" ? 0.1 : 0.04;
 
       const quantScore = Math.round(
         (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
@@ -1205,27 +1205,11 @@ Return via the tool call only.`,
     }
 
     if (scored.length === 0) {
-      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — activating hard rescue`);
-      const hardRescue = deterministicCandidates
-        .map((fallbackRec) => buildDeterministicScoredRec(fallbackRec, 38))
-        .filter((value): value is ScoredRec => value !== null)
-        .slice(0, 8);
-
-      if (hardRescue.length > 0) {
-        scored.push(...hardRescue);
-        console.log(`desirable-assets: hard rescue appended ${hardRescue.length} deterministic candidates after zero-score pass`);
-        repairLog(`hard rescue appended ${hardRescue.length} deterministic survivors`);
-      } else {
-        repairLog(`hard rescue also produced 0 survivors — Yahoo pricing may be down`);
-      }
+      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — no deterministic rescue (by design)`);
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
-    // Skip sentiment if we're running on fallback-only (no AI candidates) to save time
-    const hasAICandidates = candidates.some((c: any) => !c._isFallback);
-    const sentimentCandidates = hasAICandidates
-      ? [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(8, scored.length))
-      : [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(4, scored.length));
+    const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(8, scored.length));
 
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
     const SENTIMENT_BATCH = 4;
@@ -1256,7 +1240,7 @@ Return via the tool call only.`,
       const sentimentImpact = Math.round(sentiment.sentimentScore * 0.14);
       const earningsImpact = sentiment.earningsSignal === "bullish" ? 5 : sentiment.earningsSignal === "bearish" ? -8 : 0;
       const severeEarningsPenalty = !isHedge && sentiment.sentimentScore <= -45 && sentiment.earningsSignal === "bearish"
-        ? s.filterTier === "rescue" ? 14 : 8
+        ? 8
         : 0;
 
       s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
@@ -1267,7 +1251,6 @@ Return via the tool call only.`,
 
     const strictPool = scored.filter((s) => s.filterTier === "strict");
     const balancedPool = scored.filter((s) => s.filterTier === "strict" || s.filterTier === "balanced");
-    const rescuePool = scored.filter((s) => s.filterTier === "rescue");
 
     let selectionPool: ScoredRec[];
     if (strictPool.length >= 8) {
@@ -1275,8 +1258,7 @@ Return via the tool call only.`,
     } else if (balancedPool.length >= 8) {
       selectionPool = balancedPool;
     } else {
-      selectionPool = scored.filter((s) => s.quantScore >= 20);
-      if (selectionPool.length < 6) selectionPool = scored; // take everything
+      selectionPool = scored;
     }
 
     const selected: ScoredRec[] = [];
@@ -1306,23 +1288,7 @@ Return via the tool call only.`,
       }
     }
 
-    // Reliability backstop: ensure at least 8 output candidates when market filters are too harsh.
-    const preBackstopCount = selected.length;
-    if (selected.length < 8) {
-      for (const fallbackRec of deterministicCandidates) {
-        if (selected.length >= 8) break;
-        if (selectedTickers.has(fallbackRec.ticker) || portfolioTickers.includes(fallbackRec.ticker)) continue;
-
-        const fallbackScored = buildDeterministicScoredRec(fallbackRec, 42);
-        if (!fallbackScored) continue;
-
-        selected.push(fallbackScored);
-        selectedTickers.add(fallbackRec.ticker);
-      }
-      if (selected.length > preBackstopCount) {
-        repairLog(`reliability backstop padded ${selected.length - preBackstopCount} deterministic picks (pre=${preBackstopCount})`);
-      }
-    }
+    // Reliability backstop removed by design — no deterministic padding.
 
     // Ensure hedge coverage exists in final set.
     const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
