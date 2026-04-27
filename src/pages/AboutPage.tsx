@@ -38,7 +38,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">The System</h2>
             <p className="text-sm sm:text-base mb-3">
-              EntropyLite bridges this gap by delivering institutional-grade research capabilities without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and generates probabilistic intelligence — all in real time.
+              EntropyLite bridges this gap by delivering institutional-grade research capabilities without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and generates probabilistic intelligence, all in real time.
             </p>
             <p className="text-sm sm:text-base">
               The system is organized into interconnected intelligence modules, each handling a specific analytical domain: risk quantification, statistical arbitrage, geopolitical monitoring, regime classification, causal chain modeling, and autonomous strategy generation.
@@ -48,7 +48,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-black mb-3">Market Structure Analysis</h2>
             <p className="text-sm sm:text-base mb-3">
-              Every asset exists within a web of structural forces — liquidity constraints, positioning patterns, regime shifts, and geopolitical pressure. EntropyLite maps these forces continuously, providing a probabilistic intelligence layer that adapts as market structure evolves.
+              Every asset exists within a web of structural forces, liquidity constraints, positioning patterns, regime shifts, and geopolitical pressure. EntropyLite maps these forces continuously, providing a probabilistic intelligence layer that adapts as market structure evolves.
             </p>
             <p className="text-sm sm:text-base">
               The CLANK engine (Constraint, Liquidity, Accumulation, Narrative, Kinetic) monitors five structural dimensions simultaneously, generating alerts when any dimension approaches a critical threshold.

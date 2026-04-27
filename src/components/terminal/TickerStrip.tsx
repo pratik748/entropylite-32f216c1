@@ -126,7 +126,7 @@ const TickerStrip = () => {
   const items = [...tickers, ...tickers];
   const baseSym = getCurrencySymbol(baseCurrency);
 
-  // Some tickers are ratios/indices — don't convert those
+  // Some tickers are ratios/indices, don't convert those
   const isRatio = (sym: string) => ["EURUSD=X", "DX-Y.NYB", "^TNX", "USDINR=X"].includes(sym);
 
   return (
@@ -156,7 +156,7 @@ const TickerStrip = () => {
             >
               <span className="font-mono text-[9px] text-muted-foreground font-semibold">{t.name}</span>
               <span className="font-mono text-[10px] text-foreground font-medium tabular-nums">
-                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ","}
               </span>
               <span className={`font-mono text-[9px] font-semibold tabular-nums ${positive ? "text-gain" : "text-loss"}`}>
                 {positive ? "+" : ""}{t.change.toFixed(2)}%

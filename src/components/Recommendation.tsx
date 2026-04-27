@@ -22,7 +22,7 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
         <h2 className="text-base font-semibold text-foreground">Scenario Assessment</h2>
       </div>
 
-      {/* Scenario Banner — top prominence */}
+      {/* Scenario Banner, top prominence */}
       {verdict && (
         <div className={`mb-4 rounded-lg border-2 ${config.border} ${config.bg} p-4`}>
           <div className="flex items-start gap-3">

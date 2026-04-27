@@ -454,7 +454,7 @@ const DirectProfitMode = () => {
             <div className={`border-b ${actionBg} p-5 text-center`}>
               <div className={`text-4xl font-black tracking-tight ${actionColor}`}>{result.action}</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence — {" "}
+                {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence, {" "}
                 <span className="font-bold text-foreground">{result.confidence}%</span>
               </div>
               <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">

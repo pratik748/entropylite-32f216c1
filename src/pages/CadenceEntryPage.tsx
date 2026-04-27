@@ -21,7 +21,7 @@ export default function CadenceEntryPage() {
 
   useEffect(() => {
     if (!entry) return;
-    document.title = `${entry.concept} | Cadence — Entropy Lite`;
+    document.title = `${entry.concept} | Cadence, Entropy Lite`;
     const meta = document.querySelector('meta[name="description"]');
     const desc = `${entry.tagline} A research note from Entropy Lite.`;
     if (meta) meta.setAttribute("content", desc);
@@ -35,7 +35,7 @@ export default function CadenceEntryPage() {
       }
       el.setAttribute("content", content);
     };
-    setOG("og:title", `${entry.concept} — Cadence`);
+    setOG("og:title", `${entry.concept}, Cadence`);
     setOG("og:description", desc);
     setOG("og:type", "article");
     setOG("og:url", window.location.href);
@@ -66,7 +66,7 @@ export default function CadenceEntryPage() {
   }
 
   const url = typeof window !== "undefined" ? window.location.href : "";
-  const shareText = `${entry.concept} — ${entry.tagline}`;
+  const shareText = `${entry.concept}, ${entry.tagline}`;
 
   const onCopy = async () => {
     try {
@@ -145,13 +145,13 @@ export default function CadenceEntryPage() {
                 loading="lazy"
               />
               <figcaption className="px-4 py-2.5 border-t border-black/10 font-mono text-[10px] text-black/45 uppercase tracking-wider">
-                Fig. — {entry.insideTheSystem.caption}
+                Fig., {entry.insideTheSystem.caption}
               </figcaption>
             </figure>
           ) : (
             <div className="border border-black/10 bg-black/[0.015] p-6 mb-4">
               <p className="font-mono text-[10px] text-black/40 uppercase tracking-wider">
-                Fig. — {entry.insideTheSystem.caption}
+                Fig., {entry.insideTheSystem.caption}
               </p>
             </div>
           )}

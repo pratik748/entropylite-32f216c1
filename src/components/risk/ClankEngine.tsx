@@ -431,7 +431,7 @@ function LearningTab({
           { label: "Total Samples", value: totalSamples, icon: Activity },
           { label: "Avg Accuracy", value: (() => {
             const withAcc = events.filter(e => e.outcome_accuracy != null);
-            return withAcc.length > 0 ? `${(withAcc.reduce((s, e) => s + (e.outcome_accuracy || 0), 0) / withAcc.length * 100).toFixed(0)}%` : "—";
+            return withAcc.length > 0 ? `${(withAcc.reduce((s, e) => s + (e.outcome_accuracy || 0), 0) / withAcc.length * 100).toFixed(0)}%` : ",";
           })(), icon: Shield },
         ].map(m => (
           <div key={m.label} className="rounded-xl border border-border bg-card p-3 sm:p-4">
@@ -469,7 +469,7 @@ function LearningTab({
                       →{(learned * 100).toFixed(0)}%
                     </span>
                   ) : (
-                    <span className="text-[9px] text-muted-foreground w-10 text-right">—</span>
+                    <span className="text-[9px] text-muted-foreground w-10 text-right">,</span>
                   )}
                   {ov && (
                     <span className="rounded bg-muted px-1.5 py-0.5 text-[8px] text-muted-foreground">
@@ -525,7 +525,7 @@ function LearningTab({
                           <span className={ev.observed_price_impact < 0 ? "text-loss" : "text-gain"}>
                             {ev.observed_price_impact.toFixed(2)}%
                           </span>
-                        ) : "—"}
+                        ) : ","}
                       </td>
                       <td className="py-1.5 px-2 text-right">
                         {hasOutcome ? (
@@ -535,7 +535,7 @@ function LearningTab({
                           }`}>
                             {(ev.outcome_accuracy! * 100).toFixed(0)}%
                           </span>
-                        ) : "—"}
+                        ) : ","}
                       </td>
                       <td className="py-1.5 px-2 text-right">
                         {!hasOutcome ? (

@@ -36,7 +36,7 @@ const decayCurve = Array.from({ length: 25 }, (_, i) => {
 });
 
 const PIPELINE = [
-  { icon: Database, title: "Ingest", desc: "Crawl any domain — .gov, Tier-1 press, niche blogs, X, Reddit. No whitelist. Auto-registers new sources with Bayesian Beta priors." },
+  { icon: Database, title: "Ingest", desc: "Crawl any domain, .gov, Tier-1 press, niche blogs, X, Reddit. No whitelist. Auto-registers new sources with Bayesian Beta priors." },
   { icon: Filter, title: "Clean & extract", desc: "Strip boilerplate, deduplicate, extract structured (subject, predicate, object, t) claim triples ready for scoring." },
   { icon: GitMerge, title: "Cross-source fuse", desc: "Noisy-OR agreement across independent sources. Source diversity (Shannon entropy H) measured to detect echo chambers." },
   { icon: Scale, title: "Truth gate T(x,t)", desc: "Sigmoid of weighted factors: source credibility, agreement, temporal freshness, bias, contradictions. Output ∈ [0,1]." },
@@ -45,7 +45,7 @@ const PIPELINE = [
 ];
 
 const GUARDS = [
-  { icon: AlertTriangle, title: "False Consensus", math: "A > 0.85 ∧ H < 0.35 ∧ C > 0.25", desc: "Many sources agree — but they all copy the same wire. Triggers a hard contrarian flag in Reflexivity." },
+  { icon: AlertTriangle, title: "False Consensus", math: "A > 0.85 ∧ H < 0.35 ∧ C > 0.25", desc: "Many sources agree, but they all copy the same wire. Triggers a hard contrarian flag in Reflexivity." },
   { icon: Activity, title: "Adversarial Spike", math: "ΔClaim/Δt > 3σ in <60s", desc: "Coordinated narrative push (pump, rumour, manipulation). Source weights are temporarily down-shifted." },
   { icon: Clock, title: "Stale Fact", math: "D(Δt) < 0.20", desc: "Information has decayed below its half-life. Signal multiplier collapses regardless of original credibility." },
   { icon: Layers, title: "Overfit Drift", math: "‖Δw‖ > τ over rolling 100 trades", desc: "Weight vector is diverging. Regularisation kicks in to prevent the truth engine from chasing recent noise." },
@@ -66,7 +66,7 @@ export default function DataAggregationPage() {
   useEffect(() => {
     document.title = "Data Aggregation · TWRD Veracity Layer | Entropy Lite";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "TWRD — the Truth-Weighted Reality Database powering Entropy Lite. Every signal is gated by T(x,t)=σ(w1S+w2A+w3D−w4B−w5C+b) before reaching prediction or risk.");
+    if (meta) meta.setAttribute("content", "TWRD, the Truth-Weighted Reality Database powering Entropy Lite. Every signal is gated by T(x,t)=σ(w1S+w2A+w3D−w4B−w5C+b) before reaching prediction or risk.");
   }, []);
 
   return (
@@ -86,7 +86,7 @@ export default function DataAggregationPage() {
             <span className="text-black/45">weighted by truth, not by source.</span>
           </h1>
           <p className="text-[16px] sm:text-lg text-black/60 max-w-2xl leading-relaxed mb-8">
-            Most terminals trust whatever lands first. <span className="text-black font-semibold">TWRD</span> — the Truth-Weighted Reality Database — gates every claim through a sigmoid of source credibility, cross-source agreement, temporal decay, bias and contradiction, before it reaches a single decision engine.
+            Most terminals trust whatever lands first. <span className="text-black font-semibold">TWRD</span>, the Truth-Weighted Reality Database, gates every claim through a sigmoid of source credibility, cross-source agreement, temporal decay, bias and contradiction, before it reaches a single decision engine.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-12">
@@ -178,17 +178,17 @@ export default function DataAggregationPage() {
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The math, visualised</p>
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">Two views. The rest is written down.</h2>
           <p className="text-sm sm:text-base text-black/55 max-w-2xl mb-10">
-            We deliberately keep the visuals minimal. Two charts cover the inputs that matter most — <span className="text-black font-semibold">who</span> a claim came from, and <span className="text-black font-semibold">how fast</span> it goes stale. Everything else is explained in plain language so you can audit the logic, not just admire the dashboard.
+            We deliberately keep the visuals minimal. Two charts cover the inputs that matter most, <span className="text-black font-semibold">who</span> a claim came from, and <span className="text-black font-semibold">how fast</span> it goes stale. Everything else is explained in plain language so you can audit the logic, not just admire the dashboard.
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-12">
             {/* Source credibility curve */}
             <div className="rounded-xl border border-black/10 bg-white p-6">
               <div className="flex items-baseline justify-between mb-1">
-                <h3 className="font-semibold text-sm tracking-tight">Source credibility — Beta posteriors</h3>
+                <h3 className="font-semibold text-sm tracking-tight">Source credibility, Beta posteriors</h3>
                 <span className="font-mono text-[9px] text-black/40">α / (α + β)</span>
               </div>
-              <p className="text-[11px] text-black/50 mb-4">Each domain class enters with a tier-appropriate Beta prior, then updates from real trade outcomes — every win sharpens α, every false signal sharpens β.</p>
+              <p className="text-[11px] text-black/50 mb-4">Each domain class enters with a tier-appropriate Beta prior, then updates from real trade outcomes, every win sharpens α, every false signal sharpens β.</p>
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart data={credibilityCurve} layout="vertical" margin={{ left: 90 }}>
@@ -237,25 +237,25 @@ export default function DataAggregationPage() {
             </div>
           </div>
 
-          {/* WRITTEN EXPLANATION — agreement, diversity, gated vs raw */}
+          {/* WRITTEN EXPLANATION, agreement, diversity, gated vs raw */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <article className="rounded-xl border border-black/10 bg-white p-6">
               <h3 className="text-base font-semibold tracking-tight mb-2">Why agreement alone doesn't prove anything.</h3>
               <p className="text-[13px] text-black/65 leading-relaxed mb-3">
-                Twenty outlets shouting the same headline is not twenty pieces of evidence — it is one wire-service quote, copy-pasted twenty times. TWRD measures source <span className="font-semibold text-black">diversity</span> using Shannon entropy across the cluster of sources backing a claim. Agreement (A) is then combined with diversity (H) inside the truth function so that <span className="font-semibold text-black">echo chambers self-cap</span>: the more correlated the publishers, the less each additional repetition is worth.
+                Twenty outlets shouting the same headline is not twenty pieces of evidence, it is one wire-service quote, copy-pasted twenty times. TWRD measures source <span className="font-semibold text-black">diversity</span> using Shannon entropy across the cluster of sources backing a claim. Agreement (A) is then combined with diversity (H) inside the truth function so that <span className="font-semibold text-black">echo chambers self-cap</span>: the more correlated the publishers, the less each additional repetition is worth.
               </p>
               <p className="text-[13px] text-black/65 leading-relaxed">
-                Concretely: if a story is carried by Reuters, the SEC filing, an FT analyst piece and a regional broker note, T climbs quickly. If the same story is carried by 40 SEO-farm rewrites of one tweet, T stays low — sometimes lower than a single tier-1 source on its own.
+                Concretely: if a story is carried by Reuters, the SEC filing, an FT analyst piece and a regional broker note, T climbs quickly. If the same story is carried by 40 SEO-farm rewrites of one tweet, T stays low, sometimes lower than a single tier-1 source on its own.
               </p>
             </article>
 
             <article className="rounded-xl border border-black/10 bg-white p-6">
-              <h3 className="text-base font-semibold tracking-tight mb-2">Gated input vs. raw input — the practical delta.</h3>
+              <h3 className="text-base font-semibold tracking-tight mb-2">Gated input vs. raw input, the practical delta.</h3>
               <p className="text-[13px] text-black/65 leading-relaxed mb-3">
                 A naive terminal feeds every headline into the model with weight 1. TWRD multiplies every input by its truth score T ∈ [0, 1] before it touches prediction, position sizing or risk. The downstream model sees a <span className="font-semibold text-black">veracity-weighted signal</span>, not a popularity-weighted one.
               </p>
               <p className="text-[13px] text-black/65 leading-relaxed">
-                In practice this means a single SEC 8-K can outweigh a hundred Reddit posts, and a coordinated narrative push gets quietly damped to near-zero influence — even while it still appears on every news ticker on the street.
+                In practice this means a single SEC 8-K can outweigh a hundred Reddit posts, and a coordinated narrative push gets quietly damped to near-zero influence, even while it still appears on every news ticker on the street.
               </p>
             </article>
           </div>

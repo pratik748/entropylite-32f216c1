@@ -58,7 +58,7 @@ const StressTestModule = ({ stocks }: Props) => {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Scenario Impact — Your Portfolio</h3>
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Scenario Impact, Your Portfolio</h3>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ left: 120 }}>

@@ -134,7 +134,7 @@ const OutcomeGradientDashboard = () => {
               <div className="flex items-center gap-1.5 mb-3">
                 <Eye className="h-3.5 w-3.5 text-primary" />
                 <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">
-                  Live Intelligence — {intelligenceSignals.length} Actionable Signals
+                  Live Intelligence, {intelligenceSignals.length} Actionable Signals
                 </span>
               </div>
               <div className="space-y-2">
@@ -188,7 +188,7 @@ const OutcomeGradientDashboard = () => {
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-1.5 mb-3">
               <BarChart3 className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Profit Field — Top 20 Assets by Weighted Score</span>
+              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Profit Field, Top 20 Assets by Weighted Score</span>
             </div>
             {heatmapData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -245,7 +245,7 @@ const OutcomeGradientDashboard = () => {
               )}
             </div>
 
-            {/* Gradient Direction — Feature Weights */}
+            {/* Gradient Direction, Feature Weights */}
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center gap-1.5 mb-3">
                 <Activity className="h-3.5 w-3.5 text-primary" />
@@ -303,7 +303,7 @@ const OutcomeGradientDashboard = () => {
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-1.5 mb-3">
               <Layers className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Shadow Evolution — Active vs Biased</span>
+              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Shadow Evolution, Active vs Biased</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border border-border/50 bg-muted/10 p-3 text-center">
@@ -403,13 +403,13 @@ const OutcomeGradientDashboard = () => {
                       <td className="px-2 py-2 text-center">
                         {a.recentTrend === "rising" && <TrendingUp className="h-3 w-3 text-gain inline" />}
                         {a.recentTrend === "falling" && <TrendingDown className="h-3 w-3 text-loss inline" />}
-                        {a.recentTrend === "stable" && <span className="text-muted-foreground">—</span>}
+                        {a.recentTrend === "stable" && <span className="text-muted-foreground">,</span>}
                       </td>
                       <td className="px-2 py-2 text-center">
                         {a.isHotZone ? (
                           <Badge className="text-[8px] px-1.5 py-0 bg-gain/20 text-gain border-gain/30">HOT</Badge>
                         ) : (
-                          <span className="text-muted-foreground text-[9px]">—</span>
+                          <span className="text-muted-foreground text-[9px]">,</span>
                         )}
                       </td>
                     </tr>

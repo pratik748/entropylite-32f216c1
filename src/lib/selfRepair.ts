@@ -26,7 +26,7 @@ export interface RepairResult<T> {
 }
 
 export interface RunWithRepairOptions<T> {
-  /** Async operation to run — typically a governedInvoke() call. */
+  /** Async operation to run, typically a governedInvoke() call. */
   run: () => Promise<{ data: T | null; error: { message: string } | null }>;
   /** Optional: how many client-side retries to attempt. Default 2. */
   maxRetries?: number;
@@ -49,7 +49,7 @@ function backoff(attempt: number, base: number): number {
  * runWithRepair
  * ---------------------------------------------------------------
  * Executes `run` with automatic retry and stale-cache fallback.
- * Never throws — always returns a RepairResult.
+ * Never throws, always returns a RepairResult.
  */
 export async function runWithRepair<T>({
   run,
@@ -86,19 +86,19 @@ export async function runWithRepair<T>({
 
       // Soft failure → retry before giving up.
       if (softFail && attempt < maxRetries) {
-        trail.push(`[${label}] soft-failure signaled by server — retrying`);
+        trail.push(`[${label}] soft-failure signaled by server, retrying`);
         await new Promise((r) => setTimeout(r, backoff(attempt, baseBackoffMs)));
         continue;
       }
 
-      // Usable payload check — if caller says "no", treat like a soft failure.
+      // Usable payload check, if caller says "no", treat like a soft failure.
       if (data && isUsable && !isUsable(data)) {
         trail.push(`[${label}] payload failed usability check on attempt ${attempt + 1}`);
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, backoff(attempt, baseBackoffMs)));
           continue;
         }
-        // Exhausted — fall through to stale cache.
+        // Exhausted, fall through to stale cache.
         break;
       }
 
@@ -117,11 +117,11 @@ export async function runWithRepair<T>({
     }
   }
 
-  // All live attempts failed — serve stale cache if available.
+  // All live attempts failed, serve stale cache if available.
   if (staleCache) {
     const stale = staleCache();
     if (stale) {
-      trail.push(`[${label}] live calls exhausted — served from last-good cache`);
+      trail.push(`[${label}] live calls exhausted, served from last-good cache`);
       return {
         data: stale,
         autoRepaired: true,

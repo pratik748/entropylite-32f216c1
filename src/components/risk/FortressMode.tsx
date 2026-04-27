@@ -124,7 +124,7 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
               )}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Capital-preservation supervisor. One toggle — system continuously scans, hedges,
+              Capital-preservation supervisor. One toggle, system continuously scans, hedges,
               and bounds your downside.
             </p>
             {active && activatedAgo !== null && (
@@ -153,7 +153,7 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         <MetricCard
           label="Bounded Downside"
-          value={metrics.boundedDownside > 0 ? `${sym}${fmt(metrics.boundedDownside)}` : "—"}
+          value={metrics.boundedDownside > 0 ? `${sym}${fmt(metrics.boundedDownside)}` : ","}
           sub="1-day · 99% conf · post-hedge"
           tone="loss"
         />
@@ -171,7 +171,7 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
         />
         <MetricCard
           label="Risk Reduction"
-          value={metrics.reductionPct > 0 ? `▼ ${metrics.reductionPct}%` : "—"}
+          value={metrics.reductionPct > 0 ? `▼ ${metrics.reductionPct}%` : ","}
           sub={active ? "since activation" : "fortress inactive"}
           tone="gain"
         />
@@ -355,7 +355,7 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
                       className="flex items-center gap-2 text-[10px] text-muted-foreground"
                     >
                       <CheckCircle2 className="h-3 w-3 text-gain" />
-                      <span>{a.kind.toUpperCase()} {a.target} — risk −{a.riskReductionBps}bps</span>
+                      <span>{a.kind.toUpperCase()} {a.target}, risk −{a.riskReductionBps}bps</span>
                     </div>
                   ))}
                 </div>
@@ -389,7 +389,7 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
         </div>
         <p className="mt-3 text-[10px] text-muted-foreground">
           Projections are scenario observations, not guarantees. Fortress maintains balanced
-          efficiency — hedge costs are capped to preserve upside.
+          efficiency, hedge costs are capped to preserve upside.
         </p>
       </div>
     </div>

@@ -117,7 +117,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
       randomPaths.push(path);
     }
 
-    // "Real" path — deterministic drift
+    // "Real" path, deterministic drift
     const realPath: number[] = [currentPrice];
     let rp = currentPrice;
     for (let d = 1; d <= NUM_DAYS; d++) {
@@ -288,7 +288,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
               }}
             />
 
-            {/* Individual simulation paths — the spaghetti */}
+            {/* Individual simulation paths, the spaghetti */}
             {visiblePrefixes.flatMap(prefix =>
               Array.from({ length: NUM_VISIBLE_PATHS }, (_, i) => (
                 <Line key={`${prefix}${i}`} type="monotone" dataKey={`${prefix}${i}`}
@@ -306,7 +306,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         </ResponsiveContainer>
       </div>
 
-      {/* Drawdown stats — like reference image */}
+      {/* Drawdown stats, like reference image */}
       <div className="border-t border-border pt-3">
         <div className="grid grid-cols-2 gap-6">
           <div>

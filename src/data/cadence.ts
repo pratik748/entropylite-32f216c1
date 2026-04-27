@@ -1,4 +1,4 @@
-// Cadence — daily research stream
+// Cadence, daily research stream
 // Entries live in the `cadence_entries` Supabase table, generated daily by
 // the `cadence-generate` edge function (cron'd via pg_cron at 06:00 UTC).
 // This module is the typed data-access layer.

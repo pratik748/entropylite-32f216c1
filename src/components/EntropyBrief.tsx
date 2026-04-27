@@ -121,7 +121,7 @@ export default function EntropyBrief({ open, onClose, stocks }: Props) {
   const buildShareText = () => {
     if (!brief) return "";
     const lines = brief.insights.map((i, idx) => `${idx + 1}. ${i.headline}`).join("\n");
-    return `Today's Entropy Brief\n\n${lines}\n\nGenerated from my live market session — ${SHARE_URL}`;
+    return `Today's Entropy Brief\n\n${lines}\n\nGenerated from my live market session, ${SHARE_URL}`;
   };
 
   const shareTwitter = async () => {
@@ -223,7 +223,7 @@ export default function EntropyBrief({ open, onClose, stocks }: Props) {
                   Market State
                 </div>
                 <div className="text-[13px] sm:text-[15px] text-white/85 font-medium leading-snug">
-                  {brief?.marketLine || (loading ? "Composing today's read…" : "—")}
+                  {brief?.marketLine || (loading ? "Composing today's read…" : ",")}
                 </div>
               </div>
 

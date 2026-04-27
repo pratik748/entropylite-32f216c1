@@ -310,7 +310,7 @@ const SentimentDashboard = ({ ticker, compact }: Props) => {
           <div className="rounded border border-border bg-surface-2 p-2 text-center">
             <div className="text-[8px] text-muted-foreground">F&G Index</div>
             <div className={`text-lg font-black ${(data.cnnFearGreed?.score ?? 50) > 50 ? "text-gain" : (data.cnnFearGreed?.score ?? 50) < 50 ? "text-loss" : "text-warning"}`}>
-              {data.cnnFearGreed?.score ?? "—"}
+              {data.cnnFearGreed?.score ?? ","}
             </div>
             <div className="text-[7px] text-muted-foreground">{data.cnnFearGreed?.label ?? ""}</div>
           </div>

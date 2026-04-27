@@ -139,7 +139,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* PRINCIPLES — quiet, classy positioning */}
+      {/* PRINCIPLES, quiet, classy positioning */}
       <section className="border-t border-black/5 bg-black/[0.015]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-28">
           <div className="text-center mb-10 sm:mb-14">
@@ -174,7 +174,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRODUCT PREVIEW — real terminal screenshot */}
+      {/* PRODUCT PREVIEW, real terminal screenshot */}
       <section className="border-t border-black/5 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-8 sm:mb-12">
@@ -229,10 +229,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TABBED GALLERY — real screen captures of every core surface */}
+      {/* TABBED GALLERY, real screen captures of every core surface */}
       <FeatureGallery />
 
-      {/* MATH & RESEARCH — flaunt the real quant under the hood */}
+      {/* MATH & RESEARCH, flaunt the real quant under the hood */}
       <MathResearch />
 
       {/* FEATURES GRID */}
@@ -308,7 +308,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* WHY NOW — risk reversal */}
+      {/* WHY NOW, risk reversal */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <div className="rounded-2xl border border-black/10 bg-gradient-to-br from-black/[0.02] to-transparent p-6 sm:p-10">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
@@ -353,7 +353,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FAQ — kill objections */}
+      {/* FAQ, kill objections */}
       <section className="border-t border-black/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-10 sm:mb-12">
@@ -426,7 +426,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* STICKY MOBILE CTA — always one tap from signup */}
+      {/* STICKY MOBILE CTA, always one tap from signup */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-xl border-t border-black/[0.08] px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
         <Button
           className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-12 rounded-full"

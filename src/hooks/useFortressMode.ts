@@ -201,7 +201,7 @@ export function useFortressMode(
     [fortressHoldings, totalValue, appliedActions, state.active, signals],
   );
 
-  // AI overlay — refines rationales when fortress is ON. Falls back gracefully.
+  // AI overlay, refines rationales when fortress is ON. Falls back gracefully.
   useEffect(() => {
     if (!state.active || actions.length === 0 || fortressHoldings.length === 0) return;
     let alive = true;
@@ -278,7 +278,7 @@ export function useFortressMode(
         );
         toast({
           title: `Fortress · ${action.kind === "trim" ? "Trimmed" : "Rebalanced"} ${action.target}`,
-          description: `Reduced exposure by ${action.sizePct.toFixed(1)}% — risk −${action.riskReductionBps}bps`,
+          description: `Reduced exposure by ${action.sizePct.toFixed(1)}%, risk −${action.riskReductionBps}bps`,
         });
         return;
       }
@@ -365,7 +365,7 @@ export function useFortressMode(
 
   const resetActions = useCallback(() => {
     // Reset only clears the proposal ledger. Real portfolio mutations
-    // (trims, added hedges) stay — undo them manually from the dashboard.
+    // (trims, added hedges) stay, undo them manually from the dashboard.
     setState((s) => ({ ...s, dismissedActionIds: [], appliedActionIds: [] }));
   }, []);
 

@@ -183,13 +183,13 @@ const HedgingModule = ({ stocks }: Props) => {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Portfolio β</p>
           <p className={`mt-1 font-mono text-2xl font-bold ${portfolioGreeks && portfolioGreeks.beta > 1.2 ? "text-warning" : "text-foreground"}`}>
-            {portfolioGreeks?.beta.toFixed(3) || "—"}
+            {portfolioGreeks?.beta.toFixed(3) || ","}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Portfolio σ (ann.)</p>
           <p className={`mt-1 font-mono text-2xl font-bold ${portfolioGreeks && portfolioGreeks.vol > 0.25 ? "text-loss" : "text-foreground"}`}>
-            {portfolioGreeks ? `${(portfolioGreeks.vol * 100).toFixed(1)}%` : "—"}
+            {portfolioGreeks ? `${(portfolioGreeks.vol * 100).toFixed(1)}%` : ","}
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -259,7 +259,7 @@ const HedgingModule = ({ stocks }: Props) => {
                   <td className="px-2 py-2.5 font-mono text-foreground">{h.notionalFmt}</td>
                   <td className="px-2 py-2.5 font-mono text-foreground">{h.delta.toFixed(2)}</td>
                   <td className="px-2 py-2.5 font-mono text-foreground">{h.gamma.toFixed(2)}</td>
-                  <td className="px-2 py-2.5 font-mono text-loss">{h.theta < 0 ? fmt(Math.abs(h.theta)) : "—"}</td>
+                  <td className="px-2 py-2.5 font-mono text-loss">{h.theta < 0 ? fmt(Math.abs(h.theta)) : ","}</td>
                   <td className="px-2 py-2.5 text-[10px] text-muted-foreground max-w-[180px]">{h.trigger}</td>
                   <td className="px-2 py-2.5 font-mono text-muted-foreground">{h.costBps.toFixed(1)}</td>
                 </tr>

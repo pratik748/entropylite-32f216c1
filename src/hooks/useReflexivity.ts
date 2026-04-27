@@ -72,7 +72,7 @@ export function useReflexivity(input: ReflexivityInput, refreshKey?: number) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Stable cache key — derived ONLY from structural identity, not live-drifting
+  // Stable cache key, derived ONLY from structural identity, not live-drifting
   // numeric fields (vix, intensities, scores). Without this the cache never hits
   // because every poll produces a slightly different body and a new key.
   const stableKey = (() => {

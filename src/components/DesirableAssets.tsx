@@ -126,7 +126,7 @@ function getCachedDA() {
 }
 
 /**
- * Stale cache — ignores TTL. Used by the self-repair layer as a last resort
+ * Stale cache, ignores TTL. Used by the self-repair layer as a last resort
  * so the panel never renders empty when the backend is hiccuping.
  */
 function getStaleCachedDA() {
@@ -330,7 +330,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
           },
-          // Stable cache key — exclude live-drifting fields (portfolioWeights/Value vary
+          // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
           // every poll because currentPrice ticks). Keying on structural identity only.
           cacheKey: [
             "v1",
@@ -351,7 +351,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         setRepairNote(
           result.servedFromStaleCache
             ? "Served last-good intelligence while live feed recovers."
-            : "Live feed hiccupped — auto-repaired and retrying.",
+            : "Live feed hiccupped, auto-repaired and retrying.",
         );
         console.log("[DesirableAssets] auto-repair trail:", result.repairTrail);
       } else {
@@ -359,7 +359,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       }
 
       if (!data || !Array.isArray(data.recommendations) || data.recommendations.length === 0) {
-        // Absolutely nothing usable — even stale cache was empty.
+        // Absolutely nothing usable, even stale cache was empty.
         throw new Error(
           result.error ||
             "No recommendations available right now. The auto-repair layer will retry on next refresh.",
@@ -405,7 +405,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     }
   }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors]);
 
-  // No auto-fetch on mount — user must set constraints and click "Find Assets"
+  // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
   // Hydrate from cache on mount so returning users see their last results instantly
   // without having to re-run the funnel. Cache TTL is 2h.
@@ -583,7 +583,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
-      {/* Auto-Repair Badge — shown only when backend self-healed or we served stale cache */}
+      {/* Auto-Repair Badge, shown only when backend self-healed or we served stale cache */}
       {autoRepaired && recommendations.length > 0 && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
@@ -595,13 +595,13 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               <span className="text-[9px] font-mono text-muted-foreground">SELF-HEALED</span>
             </div>
             <p className="text-xs text-foreground mt-0.5">
-              {repairNote || "Live feed recovered automatically — results are valid."}
+              {repairNote || "Live feed recovered automatically, results are valid."}
             </p>
           </div>
         </div>
       )}
 
-      {/* Initial state — no search yet */}
+      {/* Initial state, no search yet */}
       {!hasSearched && !loading && recommendations.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -811,8 +811,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   </div>
                   <div>
                     <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
-                    <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || "—"}</p>
-                    <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || "—"}</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
+                    <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || ","}</p>
                   </div>
                 </div>
                 <Sparkline data={rec.closes || []} />

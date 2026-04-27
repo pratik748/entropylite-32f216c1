@@ -135,7 +135,7 @@ const StrategyFactory = ({ stocks }: Props) => {
   const totalPnlPct = equity > 0 ? (totalPnl / (equity - totalPnl)) * 100 : 0;
   const winCount = alpaca.positions.filter(p => parseFloat(p.unrealized_pl || "0") > 0).length;
   const loseCount = alpaca.positions.filter(p => parseFloat(p.unrealized_pl || "0") < 0).length;
-  const winRate = alpaca.positions.length > 0 ? ((winCount / alpaca.positions.length) * 100).toFixed(0) : "—";
+  const winRate = alpaca.positions.length > 0 ? ((winCount / alpaca.positions.length) * 100).toFixed(0) : ",";
 
   return (
     <div className="space-y-4">
@@ -308,7 +308,7 @@ const StrategyFactory = ({ stocks }: Props) => {
                         "bg-warning/15 text-warning"
                       }`}>{o.status}</span>
                     </td>
-                    <td className="px-2 py-1.5 font-mono">{o.filled_avg_price ? `$${parseFloat(o.filled_avg_price).toFixed(2)}` : "—"}</td>
+                    <td className="px-2 py-1.5 font-mono">{o.filled_avg_price ? `$${parseFloat(o.filled_avg_price).toFixed(2)}` : ","}</td>
                     <td className="px-2 py-1.5 font-mono text-muted-foreground">{new Date(o.submitted_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                   </tr>
                 ))}
@@ -355,8 +355,8 @@ const StrategyFactory = ({ stocks }: Props) => {
           {[
             { label: "Generation", value: generation, color: "text-foreground" },
             { label: "Survivors", value: allStrategies.length, color: "text-gain" },
-            { label: "Avg Sharpe", value: allStrategies.length > 0 ? (allStrategies.reduce((s, st) => s + st.estimated_sharpe, 0) / allStrategies.length).toFixed(2) : "—", color: "text-primary" },
-            { label: "Best Sharpe", value: allStrategies.length > 0 ? Math.max(...allStrategies.map(s => s.estimated_sharpe)).toFixed(2) : "—", color: "text-gain" },
+            { label: "Avg Sharpe", value: allStrategies.length > 0 ? (allStrategies.reduce((s, st) => s + st.estimated_sharpe, 0) / allStrategies.length).toFixed(2) : ",", color: "text-primary" },
+            { label: "Best Sharpe", value: allStrategies.length > 0 ? Math.max(...allStrategies.map(s => s.estimated_sharpe)).toFixed(2) : ",", color: "text-gain" },
           ].map(m => (
             <div key={m.label} className="rounded-lg border border-border/50 bg-muted/30 p-2.5 text-center">
               <p className="text-[8px] uppercase tracking-wider text-muted-foreground">{m.label}</p>

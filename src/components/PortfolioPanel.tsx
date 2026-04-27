@@ -5,7 +5,7 @@ import { getCurrencySymbol, formatCurrency, formatCompact, isMultiCurrency, reso
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { type PriceStatusMap, type PriceFreshness } from "@/pages/Index";
 
-/** Tickers that Fortress Mode adds as defensive hedges — used to render a Hedge badge. */
+/** Tickers that Fortress Mode adds as defensive hedges, used to render a Hedge badge. */
 const FORTRESS_HEDGES = new Set(["SH", "VXX", "PSQ", "SEF", "DUG", "GLD", "TLT", "UUP"]);
 
 export interface PortfolioStock {

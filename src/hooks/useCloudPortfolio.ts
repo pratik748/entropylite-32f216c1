@@ -89,7 +89,7 @@ export function useCloudPortfolio() {
     if (!userId || savingRef.current) return;
     savingRef.current = true;
     try {
-      // All positions persist — including Fortress-added defensive hedges.
+      // All positions persist, including Fortress-added defensive hedges.
       const persistable = updated;
 
       // Get current DB rows

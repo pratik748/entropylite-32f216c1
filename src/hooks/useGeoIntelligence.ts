@@ -32,7 +32,7 @@ export interface TickerThreat {
   topConflict?: string;
 }
 
-const POLL_INTERVAL = 20_000; // 20s — near real-time geo updates
+const POLL_INTERVAL = 20_000; // 20s, near real-time geo updates
 
 function stripSuffix(ticker: string): string {
   return ticker.replace(/\.(NS|BO|L|T|TYO|HK|SS|SZ|DE|F|PA)$/i, "").replace(/[-=].*$/, "");
@@ -148,7 +148,7 @@ export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
         alertedRef.current.add(alertKey);
         toast({
           title: `🆕 New Threat: ${conflict.name}`,
-          description: `Severity: ${(conflict.severity * 100).toFixed(0)}% — ${conflict.summary?.slice(0, 100)}`,
+          description: `Severity: ${(conflict.severity * 100).toFixed(0)}%, ${conflict.summary?.slice(0, 100)}`,
         });
       } else if (prevConflict && conflict.severity - prevConflict.severity >= 0.15 && !alertedRef.current.has(alertKey)) {
         alertedRef.current.add(alertKey);

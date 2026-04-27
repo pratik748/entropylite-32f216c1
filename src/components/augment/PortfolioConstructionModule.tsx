@@ -118,12 +118,12 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     const regimeName = regime?.regime || "Range-Bound";
     const regimeAdvice = (() => {
       switch (regimeName) {
-        case "Trending Bull": return { color: "text-gain", suggestion: "Tilt toward momentum — overweight high-beta winners", recommended: "momentum" as Strategy };
-        case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance — reduce beta exposure aggressively", recommended: "min_variance" as Strategy };
-        case "Crisis": return { color: "text-loss", suggestion: "Emergency risk parity — equalize risk and raise cash allocation", recommended: "risk_parity" as Strategy };
-        case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance — normalize contribution per position", recommended: "risk_parity" as Strategy };
-        case "Rotation": return { color: "text-info", suggestion: "Equal weight rebalance — capture sector rotation evenly", recommended: "equal_weight" as Strategy };
-        default: return { color: "text-muted-foreground", suggestion: "Maintain current allocation — no regime trigger detected", recommended: "equal_weight" as Strategy };
+        case "Trending Bull": return { color: "text-gain", suggestion: "Tilt toward momentum, overweight high-beta winners", recommended: "momentum" as Strategy };
+        case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as Strategy };
+        case "Crisis": return { color: "text-loss", suggestion: "Emergency risk parity, equalize risk and raise cash allocation", recommended: "risk_parity" as Strategy };
+        case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as Strategy };
+        case "Rotation": return { color: "text-info", suggestion: "Equal weight rebalance, capture sector rotation evenly", recommended: "equal_weight" as Strategy };
+        default: return { color: "text-muted-foreground", suggestion: "Maintain current allocation, no regime trigger detected", recommended: "equal_weight" as Strategy };
       }
     })();
 
@@ -356,14 +356,14 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
                   <td className="py-2.5 px-2 text-center">
                     <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${d.action === "TRIM" ? "bg-loss/10 text-loss" : d.action === "ADD" ? "bg-gain/10 text-gain" : "bg-surface-3 text-muted-foreground"}`}>{d.action}</span>
                   </td>
-                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : "—"}</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : ","}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {driftData.every(d => d.action === "HOLD") && (
-          <p className="mt-3 text-sm text-gain flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> Portfolio within tolerance — no rebalancing needed.</p>
+          <p className="mt-3 text-sm text-gain flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> Portfolio within tolerance, no rebalancing needed.</p>
         )}
         {driftData.some(d => d.action !== "HOLD") && (
           <div className="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground">
