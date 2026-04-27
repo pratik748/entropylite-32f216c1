@@ -800,12 +800,14 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
 
     try {
       const aiOpts = {
-        systemPrompt: `You are an institutional quant PM. Output only liquid, large/mega-cap, highly tradeable assets with strict risk controls and no fluff.
-QUALITY MANDATE: Bias HARD toward proven blue-chip leaders and category-dominant compounders with high expected forward growth. Use household-name mega/large-caps freely when fundamentals and price action support it — do NOT avoid them for the sake of being contrarian. Obscure, low-coverage, or unfamiliar names are forbidden unless they are clearly institutional-grade (>$10B mkt cap, deep liquidity, analyst coverage).
-Every pick must include a concrete catalyst, hedge, and asymmetric risk/reward.
-Reject microcaps, low-float names, story stocks, and anything not actively held by major institutions.
-Use exact tickers supported by Yahoo Finance.
-Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Bias toward Nifty50 / BSE Sensex constituents and top-tier Nifty Next 50 names. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nBias toward S&P 500 / Nasdaq-100 constituents and global mega-caps. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+        systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and evidence-backed portfolio fit.
+QUALITY MANDATE:
+- Build a diversified recommendation slate, not a popularity contest.
+- Avoid clustered lookalikes: do not emit multiple names expressing the same crowded trade, same business model, or same mega-cap factor exposure.
+- Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
+- Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
+- Use exact tickers supported by Yahoo Finance.
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -816,18 +818,21 @@ ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
 
 Create 8-10 recommendations that prioritize:
-1) Blue-chip / index-constituent quality with proven multi-year compounding
+1) Diversified opportunity sources across sectors, strategies, and factor exposures
 2) Positive earnings momentum + heavy institutional participation
-3) Price trend confirmation (above 50/200-day averages)
-4) Catalyst-driven upside in 1-6 months with high expected forward growth
+3) Price trend confirmation (above key moving averages) without chasing crowded correlation clusters
+4) Catalyst-driven upside in 1-6 months with defendable downside control
 5) Deep liquidity and tight bid/ask — must be easily executable in size
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
 - ABSOLUTELY NO obscure, unheard-of, microcap, penny, meme, or low-liquidity names
 - ABSOLUTELY NO deteriorating fundamentals or broken charts
-- Prefer names with >$10B market cap (or Nifty50/Sensex/Nifty Next 50 in India mode)
+- Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
+- Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
+- Prefer names with >$3B market cap and strong liquidity; allow liquid mid-caps when they materially improve diversification
 - Provide strategy diversity across at least 3 strategy types
+- Each idea must be defendable with evidence, not narrative fluff
 
 Return via the tool call only.`,
         tools: candidateTools,
