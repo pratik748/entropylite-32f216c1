@@ -38,6 +38,13 @@ export interface ReflexivityActionable {
   risk: string;
 }
 
+export interface ReflexivityVeracity {
+  meanT: number;
+  truthRisk: number;
+  falseConsensus: boolean;
+  contradictionRisk: number;
+}
+
 export interface ReflexivityData {
   consensus: ReflexivityConsensus;
   conviction: ReflexivityConviction;
@@ -48,6 +55,7 @@ export interface ReflexivityData {
   aiError?: string | null;
   signalCount: number;
   timestamp: string;
+  veracity?: ReflexivityVeracity;
 }
 
 interface ReflexivityInput {
