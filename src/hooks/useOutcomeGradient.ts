@@ -659,10 +659,59 @@ export function useOutcomeGradient() {
     }
 
     const urgencyOrder = { high: 0, medium: 1, low: 2 };
-    return signals
-      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence)
+    const validated = signals.map((sig): IntelligenceSignal => {
+      const primary = sig.assets[0];
+      const recentForAsset = entries.find(e => e.asset === primary) || entries[0];
+      const features = recentForAsset?.features ?? { momentum: 0, vol: 0, sentiment: 0, regime: "unknown" };
+      const bias = gradient.assetBiases[primary] || 1.0;
+      const validation = validateTrade({
+        ticker: primary,
+        signalType: sig.type as SignalKind,
+        features: {
+          momentum: features.momentum,
+          vol: features.vol,
+          sentiment: features.sentiment,
+        },
+        regime: features.regime || "unknown",
+        history: entries,
+        scarMemory,
+        bias,
+      });
+      return { ...sig, validation };
+    });
+    return validated
+      .sort((a, b) => {
+        const aExec = a.validation?.executable ? 0 : 1;
+        const bExec = b.validation?.executable ? 0 : 1;
+        if (aExec !== bExec) return aExec - bExec;
+        const aG = a.validation?.gNew ?? 0;
+        const bG = b.validation?.gNew ?? 0;
+        if (aG !== bG) return bG - aG;
+        return urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence;
+      })
       .slice(0, 12);
-  }, [entries, profitField, desirableZones, combinationScores, gradient, shadowComparison]);
+  }, [entries, profitField, desirableZones, combinationScores, gradient, shadowComparison, scarMemory]);
+
+  // ─── Validation utilities ────────────────────────
+
+  const validateSignal = useCallback(
+    (input: { ticker: string; signalType: SignalKind; features?: { momentum: number; vol: number; sentiment: number }; regime?: string }): ValidationResult => {
+      const recentForAsset = entries.find(e => e.asset === input.ticker);
+      const features = input.features ?? (recentForAsset?.features ?? { momentum: 0, vol: 0, sentiment: 0 });
+      const regime = input.regime ?? recentForAsset?.features.regime ?? "unknown";
+      const bias = gradient.assetBiases[input.ticker] || 1.0;
+      return validateTrade({
+        ticker: input.ticker,
+        signalType: input.signalType,
+        features,
+        regime,
+        history: entries,
+        scarMemory,
+        bias,
+      });
+    },
+    [entries, gradient, scarMemory],
+  );
 
   // ─── Clear ─────────────────────────────────────────
 
