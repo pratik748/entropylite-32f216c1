@@ -1130,8 +1130,10 @@ Return via the tool call only.`,
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
 
       // F4: Avoid weak upside profiles
-      if (!isHedge && expectedUpsidePct < 4) { filtered++; continue; }
-      if (!isHedge && riskCompositeScore >= 60) { filtered++; continue; }
+      if (!isHedge && expectedUpsidePct < 2) { filtered++; continue; }
+      // Risk composite gate relaxed: only reject extreme-risk names (>=78), not merely
+      // elevated. In a volatile India regime, 60+ is normal for liquid mid/large caps.
+      if (!isHedge && riskCompositeScore >= 78) { filtered++; continue; }
 
       // Two-tier pass logic: strict (high quality) or balanced (acceptable). Anything below = drop.
       const strictPass = isHedge || (
@@ -1148,15 +1150,15 @@ Return via the tool call only.`,
       );
 
       const balancedPass = isHedge || (
-        sr >= -0.1 &&
-        mdd <= 50 &&
-        (!isPair ? price >= sma20 * 0.95 : true) &&
-        (!isPair ? trendStrength >= 35 : true) &&
-        cumReturn20d >= -15 &&
-        fiftyTwoPos >= 15 &&
-        (!isPair ? portCorr <= 0.88 : true) &&
-        winRate >= 40 &&
-        momentum20d > -6
+        sr >= -0.25 &&
+        mdd <= 60 &&
+        (!isPair ? price >= sma20 * 0.92 : true) &&
+        (!isPair ? trendStrength >= 25 : true) &&
+        cumReturn20d >= -20 &&
+        fiftyTwoPos >= 10 &&
+        (!isPair ? portCorr <= 0.92 : true) &&
+        winRate >= 35 &&
+        momentum20d > -10
       );
 
       if (!strictPass && !balancedPass) { filtered++; continue; }
