@@ -311,7 +311,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         label: "desirable-assets",
         maxRetries: 2,
         baseBackoffMs: 2000,
-        isUsable: (d) => Array.isArray(d?.recommendations) && d.recommendations.length > 0,
+        // A successful response with an empty recommendations array is a VALID outcome
+        // (no setup passed the elite quant filters this cycle), not a service failure.
+        // Treat it as usable so we surface a clear empty-state instead of looping into
+        // "Unable to reach service".
+        isUsable: (d) => d != null && Array.isArray(d?.recommendations),
         staleCache: () => {
           const stale = getStaleCachedDA();
           return stale && Array.isArray(stale.recommendations) && stale.recommendations.length > 0 ? stale : null;
@@ -358,12 +362,25 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         setRepairNote(null);
       }
 
-      if (!data || !Array.isArray(data.recommendations) || data.recommendations.length === 0) {
-        // Absolutely nothing usable, even stale cache was empty.
-        throw new Error(
-          result.error ||
-            "No recommendations available right now. The auto-repair layer will retry on next refresh.",
+      if (!data || !Array.isArray(data.recommendations)) {
+        throw new Error(result.error || "Service unreachable. Please retry.");
+      }
+
+      if (data.recommendations.length === 0) {
+        // Honest empty: backend ran cleanly but no candidate cleared the elite quant gate.
+        setMarketCondition(data.marketCondition || "");
+        setRegimeType(data.regimeType || "");
+        setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+        setRecommendations([]);
+        setLastFetch(Date.now());
+        const gen = data.candidatesGenerated || 0;
+        setError(
+          gen > 0
+            ? `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the quant filters this cycle. Try widening sectors or budget.`
+            : "No setups generated this cycle. Try again or adjust filters.",
         );
+        retryCount.current = 0;
+        return;
       }
 
       const payload = {
