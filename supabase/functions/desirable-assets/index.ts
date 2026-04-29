@@ -192,11 +192,15 @@ function computeOptimalPositionSize(params: {
   filterTier: FilterTier;
   isHedge: boolean;
   sentimentScore: number;
+  targetPrice?: number;
+  userBudget?: number;
 }): {
   suggestedQty: number;
   allocationPct: number;
   positionValue: number;
   riskBudgetPct: number;
+  kellyFraction: number;
+  sizingBasis: string;
 } {
   const {
     portfolioValue,
@@ -207,12 +211,21 @@ function computeOptimalPositionSize(params: {
     filterTier,
     isHedge,
     sentimentScore,
+    targetPrice,
+    userBudget,
   } = params;
 
   if (!Number.isFinite(price) || price <= 0) {
-    return { suggestedQty: 1, allocationPct: 0, positionValue: price || 0, riskBudgetPct: 0 };
+    return { suggestedQty: 1, allocationPct: 0, positionValue: price || 0, riskBudgetPct: 0, kellyFraction: 0, sizingBasis: "invalid_price" };
   }
 
+  // Capital base: prefer explicit user budget when provided (user is telling us
+  // exactly how much they want to deploy on this single idea). Otherwise fall
+  // back to portfolio value with a reasonable floor.
+  const hasBudget = Number.isFinite(userBudget) && (userBudget as number) > 0;
+  const capitalBase = hasBudget
+    ? (userBudget as number)
+    : Math.max(10_000, Number.isFinite(portfolioValue) ? portfolioValue : 100_000);
   const safePortfolio = Math.max(10_000, Number.isFinite(portfolioValue) ? portfolioValue : 100_000);
   const baseRiskPctByTier: Record<FilterTier, number> = {
     strict: 0.012,
@@ -236,12 +249,44 @@ function computeOptimalPositionSize(params: {
   const stopDistancePct = clamp((price - stopLoss) / price, 0.03, 0.25);
   const riskBudgetDollar = safePortfolio * riskBudgetPct;
 
+  // ─── Kelly criterion ──────────────────────────────────────────
+  // f* = (p·b − q) / b   where b = win/loss ratio, p = win prob, q = 1−p.
+  // We derive p from confidence (calibrated, not raw) and b from the
+  // target/stop asymmetry. Then apply a 0.25× fractional-Kelly safety
+  // discount (industry standard) to stay survivable.
+  const winProb = clamp(0.40 + (confidence - 50) / 200, 0.40, 0.78);
+  const upPct = Number.isFinite(targetPrice) && (targetPrice as number) > price
+    ? clamp(((targetPrice as number) - price) / price, 0.02, 0.60)
+    : stopDistancePct * 1.8; // assume ~1.8R if no target supplied
+  const b = upPct / Math.max(stopDistancePct, 0.01);
+  const rawKelly = (winProb * b - (1 - winProb)) / Math.max(b, 0.01);
+  const fractionalKelly = clamp(rawKelly * 0.25, 0, 0.20); // cap at 20% of capital
+  const qtyByKelly = Math.floor((capitalBase * fractionalKelly) / price);
+
   const qtyByRisk = Math.floor(riskBudgetDollar / (price * stopDistancePct));
   const maxAllocPct = clamp(maxAllocPctByTier[filterTier] * confidenceFactor * (isHedge ? 0.8 : 1), 0.04, isHedge ? 0.12 : 0.18);
   const qtyByAllocation = Math.floor((safePortfolio * maxAllocPct) / price);
   const hardCapQty = Math.floor((safePortfolio * 0.2) / price);
+  // If user gave us a budget, allow up to 100% of THAT budget on this idea
+  // (it's their explicit deployable capital). Otherwise the portfolio caps
+  // above keep us in check.
+  const qtyByBudget = hasBudget ? Math.floor(capitalBase / price) : Infinity;
 
-  const suggestedQty = Math.max(1, Math.min(Math.max(1, qtyByRisk), Math.max(1, qtyByAllocation), Math.max(1, hardCapQty)));
+  // Pick the LARGEST of the disciplined sizers (Kelly vs risk-budget vs
+  // allocation), then bound it by the absolute caps. This stops the old
+  // behaviour of always collapsing to qty=1 when one path was tight.
+  const aggressiveQty = Math.max(qtyByKelly, qtyByRisk, qtyByAllocation);
+  const boundedQty = Math.min(aggressiveQty, hardCapQty, qtyByBudget);
+  const suggestedQty = Math.max(1, boundedQty);
+
+  // Tag which constraint is binding so the UI can explain the size.
+  let sizingBasis = "kelly";
+  if (suggestedQty === qtyByBudget && hasBudget) sizingBasis = "user_budget";
+  else if (suggestedQty === hardCapQty) sizingBasis = "hard_cap_20pct";
+  else if (qtyByKelly >= qtyByRisk && qtyByKelly >= qtyByAllocation) sizingBasis = "kelly";
+  else if (qtyByRisk >= qtyByAllocation) sizingBasis = "risk_budget";
+  else sizingBasis = "max_allocation";
+
   const positionValue = suggestedQty * price;
   const allocationPct = (positionValue / safePortfolio) * 100;
 
@@ -250,6 +295,8 @@ function computeOptimalPositionSize(params: {
     allocationPct: Math.round(allocationPct * 100) / 100,
     positionValue: Math.round(positionValue * 100) / 100,
     riskBudgetPct: Math.round(riskBudgetPct * 10000) / 100,
+    kellyFraction: Math.round(fractionalKelly * 10000) / 100,
+    sizingBasis,
   };
 }
 
