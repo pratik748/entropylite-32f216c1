@@ -46,8 +46,13 @@ export function useIntelligenceRefresh() {
   }, []);
 
   useEffect(() => {
-    // Trigger on initial mount (page load / reload)
-    triggerRefresh();
+    // NOTE: do NOT trigger on initial mount. Each module already fetches its
+    // own data on mount with its own cache layer. Calling triggerRefresh here
+    // would (a) flush every cache the moment the dashboard loads, and
+    // (b) bump refreshKey from 0→1, remounting every module mid-fetch and
+    // leaving Desirable Assets / Analysis stuck on a loading spinner whose
+    // owning component was already unmounted. The first natural fetch IS
+    // the refresh.
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
