@@ -31,7 +31,7 @@ const OutcomeGradientDashboard = () => {
   const {
     entries, profitField, desirableZones, combinationScores,
     gradient, safetyStatus, shadowComparison, allocationHistory,
-    intelligenceSignals,
+    intelligenceSignals, blockRate,
     computeAndApplyGradient, clearAll, totalTrades, generation,
   } = useOutcomeGradient();
 
