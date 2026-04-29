@@ -94,7 +94,7 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v4";
+const DA_CACHE_KEY = "da_recommendations_v5";
 const DA_PREV_TICKERS_KEY = "da_previous_tickers";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
 
@@ -337,7 +337,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
           // every poll because currentPrice ticks). Keying on structural identity only.
           cacheKey: [
-            "v1",
+            "v2",
             baseCurrency,
             existingTickers.slice().sort().join(","),
             sellTickers.slice().sort().join(",") || "ns",
@@ -366,7 +366,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         throw new Error(result.error || "Service unreachable. Please retry.");
       }
 
-      if (data.recommendations.length === 0) {
+        if (data.recommendations.length === 0) {
         // Honest empty: backend ran cleanly but no candidate cleared the elite quant gate.
         setMarketCondition(data.marketCondition || "");
         setRegimeType(data.regimeType || "");
@@ -374,9 +374,12 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         setRecommendations([]);
         setLastFetch(Date.now());
         const gen = data.candidatesGenerated || 0;
+          const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
+            ? ` ${data.rejectSummary.join(". ")}.`
+            : "";
         setError(
           gen > 0
-            ? `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the quant filters this cycle. Try widening sectors or budget.`
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}`
             : "No setups generated this cycle. Try again or adjust filters.",
         );
         retryCount.current = 0;
