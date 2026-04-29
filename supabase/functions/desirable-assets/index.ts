@@ -762,6 +762,27 @@ serve(async (req) => {
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
     const preferredSectors: string[] | undefined = body.preferredSectors;
 
+    // ── ODGS — Outcome Density Gradient System (client-supplied) ──
+    // The user's own learned profit field. Past trades teach the engine
+    // which assets, regimes, and synergies have been profitable for THIS
+    // user. We surface that to the AI and use it as a reranker on the
+    // server. Never overrides hard quant filters; only tilts selection.
+    const odgs = body.odgs && typeof body.odgs === "object" ? body.odgs : null;
+    const odgsHotMap = new Map<string, number>();
+    const odgsColdMap = new Map<string, number>();
+    const odgsScarSet = new Set<string>();
+    if (odgs) {
+      for (const h of (odgs.hotAssets || [])) {
+        if (h?.ticker) odgsHotMap.set(String(h.ticker).toUpperCase(), Number(h.bias) || 1);
+      }
+      for (const c of (odgs.coldAssets || [])) {
+        if (c?.ticker) odgsColdMap.set(String(c.ticker).toUpperCase(), Number(c.bias) || 1);
+      }
+      for (const t of (odgs.scarTickers || [])) {
+        if (t) odgsScarSet.add(String(t).toUpperCase());
+      }
+    }
+
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
@@ -805,6 +826,45 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
     const hardExclusionBlock = heldTickersUpper.length > 0
       ? `\n## HARD EXCLUSION — DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list — keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
       : "";
+
+    // ODGS prompt block — exposes the user's learned profit field to the model
+    // so candidate generation is *biased* by what has actually worked for this
+    // user, not just generic quant aesthetics.
+    let odgsBlock = "";
+    if (odgs && (odgs.totalTrades || 0) >= 5) {
+      const hotList = (odgs.hotAssets || [])
+        .map((h: any) => `${h.ticker}(×${Number(h.bias).toFixed(2)})`)
+        .join(", ");
+      const coldList = (odgs.coldAssets || [])
+        .map((c: any) => `${c.ticker}(×${Number(c.bias).toFixed(2)})`)
+        .join(", ");
+      const synergyList = (odgs.synergyPairs || [])
+        .map((p: any) => `${p.pair} [synergy ${Number(p.synergy).toFixed(2)}, jointWR ${Math.round((p.jointWinRate || 0) * 100)}%]`)
+        .join("; ");
+      const zoneList = (odgs.hotZones || [])
+        .map((z: any) => `{regime:${z.regime}, assets:[${(z.assets || []).join(",")}], avgPnL:${Number(z.avgPnlPct).toFixed(2)}%}`)
+        .join(" | ");
+      const featList = (odgs.featureWeights || [])
+        .map((f: any) => `${f.feature}:${Number(f.weight).toFixed(2)}`)
+        .join(", ");
+      const scarList = (odgs.scarTickers || []).join(", ");
+
+      odgsBlock = `\n## ODGS — USER'S OWN LEARNED PROFIT FIELD (gen ${odgs.generation}, ${odgs.totalTrades} trades)
+The user's historical trade outcomes have shaped a personalized profit gradient. Use this to TILT selection, not as a hard rule:
+- HOT assets (proven winners for this user, prefer when liquid & quant filters pass): ${hotList || "none"}
+- COLD / underperforming assets (deprioritize even if narrative is strong): ${coldList || "none"}
+- SYNERGY pairs (these combinations historically lifted joint win rate — prefer at least 1 candidate that pairs well with current holdings): ${synergyList || "none"}
+- HOT regime zones (asset clusters that have produced density of profits in similar regimes): ${zoneList || "none"}
+- Feature weights (what drives this user's profit field — favor candidates whose thesis aligns): ${featList || "none"}
+- SCAR tickers (caused real losses for this user — STRONGLY avoid recycling): ${scarList || "none"}
+
+Rules:
+1. Prefer hot assets and synergy partners when they pass quality filters.
+2. Avoid scar tickers entirely unless thesis is fundamentally different from prior failure pattern.
+3. Do NOT over-concentrate the slate in hot assets — diversification still matters.
+4. If a hot asset is already held (HARD EXCLUSION above), DO NOT emit it; pick a non-held name with similar exposure instead.
+`;
+    }
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
     const candidateTools = [
@@ -906,7 +966,7 @@ QUALITY MANDATE:
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${hardExclusionBlock}${crossModuleBlock}${antiRepeatBlock}${macroBlock}
+${hardExclusionBlock}${crossModuleBlock}${odgsBlock}${antiRepeatBlock}${macroBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
@@ -1455,6 +1515,51 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         : 0;
 
       s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
+    }
+
+    // ── STAGE 3.6: ODGS rerank ─────────────────────────────────
+    // Tilt scores using the user's learned profit field. Bounded so it can
+    // never override a fundamentally bad quant score, only break ties and
+    // promote names the user's own history has proven profitable on.
+    if (odgs && (odgs.totalTrades || 0) >= 5 && scored.length > 0) {
+      let tiltApplied = 0;
+      for (const s of scored) {
+        const t = String(s.rec.ticker || "").toUpperCase();
+        let tilt = 0;
+        const hotBias = odgsHotMap.get(t);
+        if (hotBias) {
+          // bias 1.05..1.5+ → +3..+10 score points
+          tilt += clamp(Math.round((hotBias - 1) * 22), 1, 12);
+        }
+        const coldBias = odgsColdMap.get(t);
+        if (coldBias) {
+          // bias 0.5..0.85 → -3..-10
+          tilt -= clamp(Math.round((1 - coldBias) * 22), 1, 12);
+        }
+        if (odgsScarSet.has(t)) {
+          tilt -= 12; // scarred name penalty
+        }
+        // Synergy bonus: if any held ticker forms a known synergy pair with rec
+        if (Array.isArray(odgs.synergyPairs)) {
+          for (const p of odgs.synergyPairs) {
+            const pair = String(p?.pair || "").toUpperCase();
+            if (!pair.includes(t)) continue;
+            const partners = pair.split(/[^A-Z0-9.]+/).filter(Boolean);
+            const partnerHeld = partners.some((x) =>
+              x !== t && heldTickersUpper.includes(x)
+            );
+            if (partnerHeld) {
+              tilt += clamp(Math.round((Number(p.synergy) || 0) * 6), 1, 8);
+              break;
+            }
+          }
+        }
+        if (tilt !== 0) {
+          s.quantScore = clamp(s.quantScore + tilt, 1, 99);
+          tiltApplied++;
+        }
+      }
+      console.log(`[desirable-assets] ODGS rerank applied to ${tiltApplied}/${scored.length} candidates (gen ${odgs.generation})`);
     }
 
     // ── STAGE 4: Select top candidates by score ─────────────────

@@ -213,7 +213,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { getAssetBoost, validateSignal } = useOutcomeGradient();
+  const {
+    getAssetBoost,
+    validateSignal,
+    gradient,
+    desirableZones,
+    combinationScores,
+    scarMemory,
+    totalTrades: odgsTotalTrades,
+  } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
   // Needs & Constraints state
@@ -338,6 +346,44 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+            // ODGS — Outcome Density Gradient System signals. Lets the AI
+            // pick names the user's own learned profit field already favours
+            // and avoid scarred patterns. Only sent when there's enough
+            // trade history to be meaningful.
+            odgs: odgsTotalTrades >= 5 ? {
+              generation: gradient.generation,
+              totalTrades: odgsTotalTrades,
+              hotAssets: Object.entries(gradient.assetBiases || {})
+                .filter(([, b]) => Number(b) > 1.05)
+                .sort((a, b) => Number(b[1]) - Number(a[1]))
+                .slice(0, 12)
+                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
+              coldAssets: Object.entries(gradient.assetBiases || {})
+                .filter(([, b]) => Number(b) < 0.85)
+                .sort((a, b) => Number(a[1]) - Number(b[1]))
+                .slice(0, 8)
+                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
+              synergyPairs: combinationScores.slice(0, 6).map((c) => ({
+                pair: c.pair,
+                synergy: c.synergyScore,
+                jointWinRate: c.jointWinRate,
+              })),
+              hotZones: desirableZones.slice(0, 4).map((z) => ({
+                assets: z.assets.slice(0, 5),
+                regime: z.regime,
+                avgPnlPct: z.avgPnlPct,
+                density: z.density,
+              })),
+              featureWeights: gradient.featureWeights.map((f) => ({
+                feature: f.feature,
+                weight: f.weight,
+              })),
+              scarTickers: Array.from(new Set(
+                scarMemory
+                  .filter((s) => s.realized_pnl_pct < -2)
+                  .map((s) => s.ticker)
+              )).slice(0, 10),
+            } : undefined,
           },
           // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
           // every poll because currentPrice ticks). Keying on structural identity only.
