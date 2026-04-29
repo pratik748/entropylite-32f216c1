@@ -40,7 +40,7 @@ import ProofCard from "@/components/ProofCard";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
-import { governedInvoke, flushAllCaches } from "@/lib/apiGovernor";
+import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { normalizeUserTicker } from "@/lib/ticker";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
@@ -77,7 +77,7 @@ const IndexContent = () => {
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
-  const { refreshKey, isRefreshing, triggerRefresh } = useIntelligenceRefresh();
+  const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
 
   // Force refresh when user switches tabs
