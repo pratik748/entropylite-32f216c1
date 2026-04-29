@@ -993,6 +993,65 @@ Return via the tool call only.`,
     candidates = dedupeCandidates(candidates).slice(0, 28);
     console.log(`desirable-assets: AI returned ${candidates.length} picks (no fallback substitution)`);
 
+    // ── STAGE 1B: Refill pass if first AI pass is contaminated by held/repeat names ──
+    // The dominant failure mode was the AI emitting names the user already owns or
+    // names we just recommended. Detect that BEFORE the expensive Yahoo / Monte Carlo
+    // stage and ask the model for replacements with the explicit exclusion list.
+    try {
+      const heldSetUpper = new Set(portfolioTickers.map((t) => String(t).toUpperCase()));
+      const recentSetUpper = new Set(previousTickers.map((t) => String(t).toUpperCase()));
+      const contaminated = candidates.filter((c: any) => {
+        const t = String(c?.ticker || "").toUpperCase();
+        return heldSetUpper.has(t) || recentSetUpper.has(t);
+      });
+      const cleanCount = candidates.length - contaminated.length;
+      const needsRefill = candidates.length > 0 && (cleanCount < 6 || contaminated.length / candidates.length >= 0.4);
+      if (needsRefill) {
+        repairLog(`Stage 1B refill: ${contaminated.length}/${candidates.length} candidates collided with held/recent — requesting replacements`);
+        const bannedList = [
+          ...heldSetUpper,
+          ...Array.from(recentSetUpper).slice(-12),
+          ...contaminated.map((c: any) => String(c?.ticker || "").toUpperCase()),
+        ];
+        const uniqueBanned = Array.from(new Set(bannedList)).filter(Boolean);
+        const refillOpts = {
+          systemPrompt: `You are an institutional quant PM emitting REPLACEMENT picks only.
+The previous slate was rejected because too many names were already in the user's portfolio or were recently shown.
+You MUST return at least 8 NEW, liquid, tradeable names that are NOT on the banned list, with realistic targets ABOVE the live price.
+Output only the tool call. No markdown.${indiaMode ? " India-only listings (.NS / .BO)." : ""}`,
+          userPrompt: `[SEED:${seed + 1}] REPLACEMENT REQUEST.
+Banned tickers (do NOT emit any of these): ${uniqueBanned.join(", ") || "none"}.
+${preferredAssetTypes?.length ? `Preferred asset types: ${preferredAssetTypes.join(", ")}.\n` : ""}${preferredSectors?.length ? `Preferred sectors: ${preferredSectors.join(", ")}.\n` : ""}${userBudget ? `User budget: ${baseCurrency} ${userBudget.toLocaleString()}. Size positions for this budget.\n` : ""}Home-market rule: ${homeMarketRule}
+Return 8-10 replacement recommendations via the tool call only. Each must have entryZone, targetPrice (> live price), stopLoss, hedgingStrategy, and a concrete catalyst.`,
+          tools: candidateTools,
+          toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
+          maxTokens: 2400,
+          temperature: 0.55,
+        };
+        const refillResults = await callAIParallel(refillOpts);
+        const refillCandidates: any[] = [];
+        for (const result of refillResults) {
+          const p = safeParseJSON(result.text);
+          const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+          refillCandidates.push(...recs);
+        }
+        // Drop any refill candidate that is itself on the banned list.
+        const refillClean = refillCandidates.filter((c: any) => {
+          const t = String(c?.ticker || "").toUpperCase();
+          return t && !heldSetUpper.has(t) && !recentSetUpper.has(t);
+        });
+        // Keep originally-clean candidates plus refill output.
+        const originallyClean = candidates.filter((c: any) => {
+          const t = String(c?.ticker || "").toUpperCase();
+          return !heldSetUpper.has(t) && !recentSetUpper.has(t);
+        });
+        candidates = dedupeCandidates([...originallyClean, ...refillClean]).slice(0, 32);
+        repairLog(`Stage 1B refill produced ${refillClean.length} clean replacements; merged total=${candidates.length}`);
+      }
+    } catch (refillErr) {
+      console.warn("desirable-assets refill pass failed:", (refillErr as Error).message);
+    }
+
     // No fallback. If AI produced nothing usable, return an honest empty set.
     if (candidates.length === 0) {
       repairLog("AI produced 0 candidates — returning honest empty set (no deterministic substitution)");
@@ -1196,8 +1255,16 @@ Return via the tool call only.`,
         continue;
       }
 
-      // F2: Target must be above current price
-      if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; bumpReject("F2_target_below_price"); continue; }
+      // F2: Target must be above current price.
+      // Repair-first: if the AI's target is stale (below live price), don't throw the
+      // name away — clear the field so the downstream quant layer recomputes a fresh
+      // target from volatility / 52w range. Only reject if the AI handed us something
+      // structurally absurd (e.g. negative or zero target with no recoverable signal).
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) {
+        rec.targetPrice = 0; // signal to enrichment stage to recompute
+        rec.entryZone = null; // let enrichment re-derive entry zone too
+      }
+      if (rec.targetPrice && rec.targetPrice < 0) { filtered++; bumpReject("F2_invalid_target"); continue; }
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
