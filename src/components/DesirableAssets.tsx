@@ -367,24 +367,24 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       }
 
         if (data.recommendations.length === 0) {
-        // Honest empty: backend ran cleanly but no candidate cleared the elite quant gate.
-        setMarketCondition(data.marketCondition || "");
-        setRegimeType(data.regimeType || "");
-        setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
-        setRecommendations([]);
-        setLastFetch(Date.now());
-        const gen = data.candidatesGenerated || 0;
+          // Honest empty: backend ran cleanly but no candidate cleared the screening rules.
+          setMarketCondition(data.marketCondition || "");
+          setRegimeType(data.regimeType || "");
+          setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+          setRecommendations([]);
+          setLastFetch(Date.now());
+          const gen = data.candidatesGenerated || 0;
           const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
             ? ` ${data.rejectSummary.join(". ")}.`
             : "";
-        setError(
-          gen > 0
+          setError(
+            gen > 0
               ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}`
-            : "No setups generated this cycle. Try again or adjust filters.",
-        );
-        retryCount.current = 0;
-        return;
-      }
+              : "No setups generated this cycle. Try again or adjust filters.",
+          );
+          retryCount.current = 0;
+          return;
+        }
 
       const payload = {
         recommendations: data.recommendations,
