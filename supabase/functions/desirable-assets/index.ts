@@ -1517,6 +1517,51 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       s.quantScore = clamp(s.quantScore + sentimentImpact + earningsImpact - severeEarningsPenalty, 1, 99);
     }
 
+    // ── STAGE 3.6: ODGS rerank ─────────────────────────────────
+    // Tilt scores using the user's learned profit field. Bounded so it can
+    // never override a fundamentally bad quant score, only break ties and
+    // promote names the user's own history has proven profitable on.
+    if (odgs && (odgs.totalTrades || 0) >= 5 && scored.length > 0) {
+      let tiltApplied = 0;
+      for (const s of scored) {
+        const t = String(s.rec.ticker || "").toUpperCase();
+        let tilt = 0;
+        const hotBias = odgsHotMap.get(t);
+        if (hotBias) {
+          // bias 1.05..1.5+ → +3..+10 score points
+          tilt += clamp(Math.round((hotBias - 1) * 22), 1, 12);
+        }
+        const coldBias = odgsColdMap.get(t);
+        if (coldBias) {
+          // bias 0.5..0.85 → -3..-10
+          tilt -= clamp(Math.round((1 - coldBias) * 22), 1, 12);
+        }
+        if (odgsScarSet.has(t)) {
+          tilt -= 12; // scarred name penalty
+        }
+        // Synergy bonus: if any held ticker forms a known synergy pair with rec
+        if (Array.isArray(odgs.synergyPairs)) {
+          for (const p of odgs.synergyPairs) {
+            const pair = String(p?.pair || "").toUpperCase();
+            if (!pair.includes(t)) continue;
+            const partners = pair.split(/[^A-Z0-9.]+/).filter(Boolean);
+            const partnerHeld = partners.some((x) =>
+              x !== t && heldTickersUpper.includes(x)
+            );
+            if (partnerHeld) {
+              tilt += clamp(Math.round((Number(p.synergy) || 0) * 6), 1, 8);
+              break;
+            }
+          }
+        }
+        if (tilt !== 0) {
+          s.quantScore = clamp(s.quantScore + tilt, 1, 99);
+          tiltApplied++;
+        }
+      }
+      console.log(`[desirable-assets] ODGS rerank applied to ${tiltApplied}/${scored.length} candidates (gen ${odgs.generation})`);
+    }
+
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
