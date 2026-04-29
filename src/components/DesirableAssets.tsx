@@ -925,11 +925,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   <Button
                   size="sm"
                   variant={justAdded ? "secondary" : "default"}
-                  disabled={alreadyOwned || justAdded}
+                  disabled={alreadyOwned || justAdded || tradeBlocked}
+                  title={tradeBlocked ? `ODG gate: ${validation.topReason}` : undefined}
                     onClick={() => handleAdd({ ...rec, suggestedQty: boostedAlloc, positionValue: price * boostedAlloc })}
                   className="h-7 gap-1 text-[10px]"
                 >
-                  {justAdded ? "Added ✓" : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add</>}
+                  {justAdded
+                    ? "Added ✓"
+                    : alreadyOwned
+                    ? "Owned"
+                    : tradeBlocked
+                    ? validation.status === "ARMED"
+                      ? "Armed"
+                      : "Blocked"
+                    : <><Plus className="h-3 w-3" /> Add</>}
                 </Button>
               </div>
             </div>
