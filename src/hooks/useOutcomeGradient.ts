@@ -252,7 +252,31 @@ export function useOutcomeGradient() {
       });
       if (error) console.warn("ODGS ledger persist failed:", error.message);
     }
-  }, [userId, setEntries, setUpdateCounter]);
+
+    // Scar Memory: capture pattern of losing trades
+    if (trade.pnlPct < 0) {
+      const pattern = classifyFailure(trade.features, trade.pnlPct, trade.features.regime);
+      const buckets = bucketsFor(trade.features);
+      const scar: ScarRecord = {
+        ticker: trade.asset,
+        signal_type: trade.source || "manual",
+        regime: trade.features.regime || "unknown",
+        vol_bucket: buckets.vol_bucket,
+        sentiment_bucket: buckets.sentiment_bucket,
+        momentum_bucket: buckets.momentum_bucket,
+        failure_pattern: pattern,
+        realized_pnl_pct: trade.pnlPct,
+      };
+      setScarMemory(prev => [scar, ...prev].slice(0, 500));
+      if (userId) {
+        const { error: scarErr } = await supabase.from("scar_memory").insert({
+          user_id: userId,
+          ...scar,
+        });
+        if (scarErr) console.warn("ODGS scar persist failed:", scarErr.message);
+      }
+    }
+  }, [userId, setEntries, setUpdateCounter, setScarMemory]);
 
   // ─── Persist gradient state to cloud ───────────────
   const persistGradient = useCallback(async (g: GradientVector) => {
