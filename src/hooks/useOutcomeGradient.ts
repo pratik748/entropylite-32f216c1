@@ -735,6 +735,13 @@ export function useOutcomeGradient() {
     shadowComparison,
     allocationHistory,
     intelligenceSignals,
+    scarMemory,
+    blockRate: intelligenceSignals.length
+      ? (intelligenceSignals.filter(s => s.validation && !s.validation.executable).length /
+          intelligenceSignals.length) *
+        100
+      : 0,
+    validateSignal,
     ingestTrade,
     computeAndApplyGradient,
     getAssetBoost,
