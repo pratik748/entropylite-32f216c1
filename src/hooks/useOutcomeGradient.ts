@@ -203,6 +203,17 @@ export function useOutcomeGradient() {
           generation: g.generation || 0,
         });
       }
+
+      // Pull scar memory
+      const { data: scars } = await supabase
+        .from("scar_memory")
+        .select("ticker, signal_type, regime, vol_bucket, sentiment_bucket, momentum_bucket, failure_pattern, realized_pnl_pct")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (!cancelled && scars) {
+        setScarMemory(scars as any);
+      }
+
       if (!cancelled) setHydrated(true);
     })();
 
