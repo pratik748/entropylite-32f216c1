@@ -79,7 +79,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-type FilterTier = "strict" | "balanced";
+type FilterTier = "strict" | "balanced" | "relaxed";
 
 interface RealtimeSentiment {
   sentimentScore: number;
@@ -217,10 +217,12 @@ function computeOptimalPositionSize(params: {
   const baseRiskPctByTier: Record<FilterTier, number> = {
     strict: 0.012,
     balanced: 0.009,
+    relaxed: 0.006,
   };
   const maxAllocPctByTier: Record<FilterTier, number> = {
     strict: 0.13,
     balanced: 0.10,
+    relaxed: 0.07,
   };
 
   const confidenceFactor = clamp(confidence / 70, 0.65, 1.35);
