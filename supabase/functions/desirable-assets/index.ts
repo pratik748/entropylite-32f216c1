@@ -1406,6 +1406,9 @@ Return via the tool call only.`,
     const uniqueStrategies = new Set(selected.map(s => s.rec.strategy || "equity"));
 
     console.log(`desirable-assets: ${candidates.length} candidates, ${noData} no Yahoo data, ${thinData} thin data, ${scored.length} scored, ${selected.length} selected`);
+    if (Object.keys(rejectReasons).length > 0) {
+      console.log(`desirable-assets reject breakdown: ${JSON.stringify(rejectReasons)}`);
+    }
     console.log(`desirable-assets tiers: strict=${strictPool.length}, balanced=${balancedPool.length - strictPool.length}`);
     console.log(`desirable-assets: ${uniqueStrategies.size} unique strategies: ${[...uniqueStrategies].join(", ")}`);
 
