@@ -85,10 +85,15 @@ const IndexContent = () => {
     (tab: Tab) => {
       setActiveTab(tab);
       tabSwitchCounter.current++;
-      flushAllCaches();
-      triggerRefresh();
+      // Note: we intentionally do NOT flush caches or trigger a global
+      // refresh on tab switches anymore. That caused every heavy module
+      // (desirable-assets, risk, deep-intel, etc.) to refire concurrently
+      // and stampede the backend, leading to "Unable to reach service"
+      // errors and the app feeling crashed. The per-module caches in
+      // apiGovernor already serve fresh-enough data; users can hit the
+      // explicit Refresh button for a hard reload.
     },
-    [triggerRefresh],
+    [],
   );
   const {
     data: geoData,
