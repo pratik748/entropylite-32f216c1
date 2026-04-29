@@ -664,6 +664,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const boostedAlloc = Math.max(1, Math.round((rec.suggestedQty || 1) * odgs.allocMult));
           const disagreement = rec.riskVerdict === "high";
 
+          // ── ODG outcome-path validation: desirable asset != desirable trade ──
+          const validation = validateSignal({
+            ticker: rec.ticker,
+            signalType: "invest",
+            features: {
+              momentum: rec.momentum20d ?? 0,
+              vol: rec.volatility ?? 0,
+              sentiment: rec.sentimentScore ?? 0,
+            },
+            regime: regimeType || "unknown",
+          });
+          const tradeBlocked = !validation.executable;
+
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
               {/* Header row */}
