@@ -786,8 +786,23 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
         : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
     // Anti-repeat instruction
-    const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+    // Scoped anti-repeat: only the most recent slate is treated as a soft avoid.
+    // We deliberately don't broadcast a 30-deep ban list to the model — that
+    // starves the engine and was the root cause of the "Most rejected names
+    // were already in your portfolio" failure mode the user kept hitting.
+    const recentBan = previousTickers.slice(-12);
+    const antiRepeatBlock = recentBan.length > 0
+      ? `\n## ANTI-REPEAT (soft):\nAvoid recycling these tickers from the most recent slate unless they are clearly the best available pick today: ${recentBan.join(", ")}. Prefer fresh, equally-liquid alternatives.\n`
+      : "";
+
+    // HARD portfolio exclusion: anything the user already owns is NOT a
+    // recommendation candidate, full stop. The model frequently ignored a
+    // soft mention buried in the prompt — promoting this to its own block
+    // with explicit replacement language fixes the "6 already in portfolio"
+    // collapse.
+    const heldTickersUpper = portfolioTickers.map((t) => String(t).toUpperCase());
+    const hardExclusionBlock = heldTickersUpper.length > 0
+      ? `\n## HARD EXCLUSION — DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list — keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
@@ -884,11 +899,13 @@ QUALITY MANDATE:
 - Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
 - Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
 - Use exact tickers supported by Yahoo Finance.
+- NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
+- Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${crossModuleBlock}${antiRepeatBlock}${macroBlock}
+${hardExclusionBlock}${crossModuleBlock}${antiRepeatBlock}${macroBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
