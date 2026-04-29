@@ -378,13 +378,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
           setRecommendations([]);
           setLastFetch(Date.now());
+          // Clear stale exclusion memory — it's almost certainly part of why
+          // we got an empty set. Next refresh starts from a clean slate.
+          try { localStorage.removeItem(DA_PREV_TICKERS_KEY); } catch { /* ignore */ }
           const gen = data.candidatesGenerated || 0;
           const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
             ? ` ${data.rejectSummary.join(". ")}.`
             : "";
+          const refillTried = Array.isArray(data.repairTrail)
+            && data.repairTrail.some((s: string) => typeof s === "string" && s.toLowerCase().includes("refill"));
+          const refillNote = refillTried
+            ? " Replacement search was attempted but didn't return enough fresh names."
+            : "";
           setError(
             gen > 0
-              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}`
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry — the next pass will start with a fresh exclusion window.`
               : "No setups generated this cycle. Try again or adjust filters.",
           );
           retryCount.current = 0;
