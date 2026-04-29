@@ -210,7 +210,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { getAssetBoost } = useOutcomeGradient();
+  const { getAssetBoost, validateSignal } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
   // Needs & Constraints state
