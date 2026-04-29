@@ -715,7 +715,22 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                       <AlertTriangle className="h-2.5 w-2.5" /> RISK CONFLICT
                     </span>
                   )}
-                  
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                      validation.status === "EXECUTABLE"
+                        ? "bg-gain/10 text-gain"
+                        : validation.status === "ARMED"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-loss/10 text-loss"
+                    }`}
+                    title={`Adverse ${(validation.pAdverse * 100).toFixed(0)}% · DD ${validation.expectedDrawdownPct.toFixed(1)}% / budget ${validation.drawdownBudgetPct.toFixed(1)}%`}
+                  >
+                    {validation.status === "EXECUTABLE"
+                      ? "✓ ODG OK"
+                      : validation.status === "ARMED"
+                      ? `⏸ ARMED · ${validation.confirmationsMissing[0]?.replace(/_/g, " ") || "wait"}`
+                      : `✕ BLOCKED · ${validation.topReason}`}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {/* Quant Score badge */}
