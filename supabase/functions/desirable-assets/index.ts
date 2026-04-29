@@ -827,6 +827,45 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
       ? `\n## HARD EXCLUSION — DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list — keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
       : "";
 
+    // ODGS prompt block — exposes the user's learned profit field to the model
+    // so candidate generation is *biased* by what has actually worked for this
+    // user, not just generic quant aesthetics.
+    let odgsBlock = "";
+    if (odgs && (odgs.totalTrades || 0) >= 5) {
+      const hotList = (odgs.hotAssets || [])
+        .map((h: any) => `${h.ticker}(×${Number(h.bias).toFixed(2)})`)
+        .join(", ");
+      const coldList = (odgs.coldAssets || [])
+        .map((c: any) => `${c.ticker}(×${Number(c.bias).toFixed(2)})`)
+        .join(", ");
+      const synergyList = (odgs.synergyPairs || [])
+        .map((p: any) => `${p.pair} [synergy ${Number(p.synergy).toFixed(2)}, jointWR ${Math.round((p.jointWinRate || 0) * 100)}%]`)
+        .join("; ");
+      const zoneList = (odgs.hotZones || [])
+        .map((z: any) => `{regime:${z.regime}, assets:[${(z.assets || []).join(",")}], avgPnL:${Number(z.avgPnlPct).toFixed(2)}%}`)
+        .join(" | ");
+      const featList = (odgs.featureWeights || [])
+        .map((f: any) => `${f.feature}:${Number(f.weight).toFixed(2)}`)
+        .join(", ");
+      const scarList = (odgs.scarTickers || []).join(", ");
+
+      odgsBlock = `\n## ODGS — USER'S OWN LEARNED PROFIT FIELD (gen ${odgs.generation}, ${odgs.totalTrades} trades)
+The user's historical trade outcomes have shaped a personalized profit gradient. Use this to TILT selection, not as a hard rule:
+- HOT assets (proven winners for this user, prefer when liquid & quant filters pass): ${hotList || "none"}
+- COLD / underperforming assets (deprioritize even if narrative is strong): ${coldList || "none"}
+- SYNERGY pairs (these combinations historically lifted joint win rate — prefer at least 1 candidate that pairs well with current holdings): ${synergyList || "none"}
+- HOT regime zones (asset clusters that have produced density of profits in similar regimes): ${zoneList || "none"}
+- Feature weights (what drives this user's profit field — favor candidates whose thesis aligns): ${featList || "none"}
+- SCAR tickers (caused real losses for this user — STRONGLY avoid recycling): ${scarList || "none"}
+
+Rules:
+1. Prefer hot assets and synergy partners when they pass quality filters.
+2. Avoid scar tickers entirely unless thesis is fundamentally different from prior failure pattern.
+3. Do NOT over-concentrate the slate in hot assets — diversification still matters.
+4. If a hot asset is already held (HARD EXCLUSION above), DO NOT emit it; pick a non-held name with similar exposure instead.
+`;
+    }
+
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
     const candidateTools = [
       {
