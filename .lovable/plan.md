@@ -1,357 +1,215 @@
+## Goal
 
-# TWRD Integration — Entropylite Veracity Layer
+Repair the Outcome-Driven Gradient (ODG) so it stops emitting BUY/INVEST signals on desirable assets that go on to lose money. Today the engine is purely **post-trade** (it learns from PnL after the fact). It never asks: *"Even if this asset is great, is the trade survivable from here?"*
 
-Goal: every signal that currently feeds prediction, risk and scenarios is replaced by a **truth-weighted** signal `signal × T(x,t)`. Outputs gain explicit **Truth Confidence**, **Source Reliability**, and **Contradiction Risk**. Reflexivity gets a "False Consensus" guard. Sources self-calibrate via Bayesian feedback.
+We will convert ODG from a signal-confidence engine into an **outcome-path validated gatekeeper** that sits between signal detection and execution. Core principle baked into the code: **desirable asset ≠ desirable trade.**
 
 ---
 
-## 1. Architecture (text diagram)
+## Architecture (lite, no model training)
 
 ```text
-                          ┌──────────────────────────────────────────────┐
-                          │  RAW INGEST (existing edge functions)        │
-                          │  fetch-news │ sentiment-intel │ flow-intel   │
-                          │  institutional-flows │ macro │ geo │ polymkt │
-                          └───────────────┬──────────────────────────────┘
-                                          ▼
-                       ┌───────────────────────────────────────┐
-                       │  CLAIM EXTRACTOR (twrd/extract.ts)    │
-                       │  raw payload → Claim triples          │
-                       │  (subject, relation, object,          │
-                       │   source_id, ts, raw_text, domain)    │
-                       └───────────────┬───────────────────────┘
-                                       ▼
-                ┌────────────────────────────────────────────────┐
-                │  DOMAIN CLEANERS (twrd/cleaners/*)             │
-                │  financial │ news │ social │ geo │ scientific  │
-                │  → assigns π̂_min, π̂_max, sentence factuality   │
-                │  → bot/viral-cluster suppression               │
-                └───────────────┬────────────────────────────────┘
-                                ▼
-            ┌───────────────────────────────────────────────────┐
-            │  TRUTH ENGINE (twrd/truth.ts) — pure functions    │
-            │  S = α/(α+β)   A = 1−Π(1−θ_i)   D = e^(−λΔt)      │
-            │  B = δ·b̂        C = ε·max T(x') over contradictors │
-            │  T(x,t) = σ(w1S+w2A+w3D−w4B−w5C+b)                │
-            └───────────────┬───────────────────────────────────┘
-                            ▼
-        ┌───────────────────────────────────────────────────────┐
-        │  REALITY STORE (Supabase: twrd_* tables)              │
-        │  twrd_sources(α,β) │ twrd_claims(T,α,β,decay,valid_*) │
-        │  twrd_contradictions │ twrd_feedback │ twrd_weights   │
-        │  versioned, never overwritten, decayed on read        │
-        └───────────────┬───────────────────────────────────────┘
-                        ▼
-   ┌──────────────────────────────────────────────────────────────────┐
-   │  VERACITY GATE (twrd/gate.ts) — single helper used everywhere    │
-   │   weighted(signal) = signal.value * T(x,t)                       │
-   │   meta: { T, S, A, contradictionRisk, falseConsensus }           │
-   └─────┬─────────────┬──────────────┬──────────────┬────────────────┘
-         ▼             ▼              ▼              ▼
-   prediction-*    scenarios     risk-intel     regime-detect
-   (analyze-     (causal-       (adds Truth    (truth-weighted
-    stock,        effects,       Risk; cuts     macro signals
-    desirable-    monte-carlo)   size when      replace raw)
-    assets)                      T<θ)
-                            ▲
-                            │
-   ┌────────────────────────┴────────────────────────────────────────┐
-   │  REFLEXIVITY DEFENSE (reflexivity-engine + twrd guard)          │
-   │  if A↑ AND H(sources)↓ AND C↑ → flag FALSE_CONSENSUS            │
-   │  → reduce position size, delay trade, add hedge weight          │
-   └─────────────────────────────────────────────────────────────────┘
-                            ▲
-                            │
-   ┌────────────────────────┴────────────────────────────────────────┐
-   │  FEEDBACK LOOP (twrd-feedback edge fn, nightly cron)            │
-   │  outcome y∈{0,1} → update (α_s,β_s)                             │
-   │  → SGD step on (w1..w5,b) against logistic loss                 │
-   └─────────────────────────────────────────────────────────────────┘
+[ Signal Detection ]   <-- existing: profitField, desirableZones, intelligenceSignals
+        |
+        v
+[ Trade Validation Pipeline ]   <-- NEW
+   1. Reflexivity Filter         (crowding / liquidity trap)
+   2. Outcome Path Simulator     (3 paths: favorable / drift / adverse)
+   3. Drawdown Gate              (hard kill switch, vol-scaled)
+   4. Entry Timing Engine        (micro-confirmation triggers)
+   5. Scar Memory Lookup         (penalize repeat failure patterns)
+        |
+   pass / reject + reason
+        v
+[ Execution Trigger ]   <-- only fires on pass + confirmed entry
+        |
+   on-trade hooks:
+   - CROWN-lite micro-hedge on adverse-path detection
+   - On loss → write Scar
 ```
+
+Signal detection stays where it is. Validation is a new, pure module. Existing intelligence signals get a `validation` block and only `INVEST/SCALE_UP/PAIR` types of urgency `high` may set `executable: true`.
 
 ---
 
-## 2. Modular code structure
+## Redefined ODG formula
 
+Old gradient (signal direction):
 ```text
-supabase/functions/_shared/twrd/
-  types.ts            // Claim, Source, TruthScore, FailureFlag, Triple
-  extract.ts          // payload → Claim[]
-  cleaners/
-    financial.ts      // π̂ ∈ [0.10, 0.90]
-    news.ts           // π̂ ∈ [0.20, 0.85] + sentence factuality
-    social.ts         // π̂ ∈ [0.05, 0.50] + bot/viral cluster
-    geopolitical.ts   // π̂ ∈ [0.00, 0.80]
-    scientific.ts     // π̂ ∈ [0.10, 0.75]
-    index.ts          // dispatch by domain
-  truth.ts            // S, A, D, B, C, T (pure)
-  store.ts            // Supabase reads/writes; decay-on-read
-  gate.ts             // veracityGate(signals) → weighted + meta
-  failureGuards.ts    // false-consensus, adversarial-spike, stale, overfit
-  feedback.ts         // Beta posterior + SGD on weights
-
-supabase/functions/twrd-ingest/index.ts     // HTTP: cleaners→TRUTH→store
-supabase/functions/twrd-feedback/index.ts   // HTTP/cron: outcomes→learn
-supabase/functions/twrd-query/index.ts      // HTTP: read truth-weighted view
-
-src/hooks/useTruthWeightedSignals.ts        // client gate for hooks
-src/components/twrd/TruthBadge.tsx          // T%, contradiction icon
-src/components/twrd/VeracityPanel.tsx       // sources, contradictions, decay
+G_old(asset) = bias(asset) · Σ w_i · feature_i
 ```
+
+New gradient (probability of profitable execution path within bounded drawdown):
+```text
+G_new(asset) =  bias(asset)
+              · P_favorable
+              · (1 - P_adverse)            # reflexive-loss penalty
+              · payoff_asymmetry           # E[gain]/E[loss]
+              · timeliness                 # exp(-τ_to_profit / horizon)
+              · (1 - crowding)             # reflexivity discount
+              · scar_factor                # 1 − historical_failure_rate(pattern)
+
+Reject if:
+   P_adverse > 0.30
+   OR expected_drawdown_pct > drawdown_budget(vol)
+   OR crowding > 0.75 AND liquidity_thin
+   OR scar_factor < 0.4
+```
+
+`drawdown_budget(vol) = clamp(0.6 · realized_vol_5d · √horizon_days, 1.5%, 8%)` per position.
 
 ---
 
-## 3. Database schema (new migration)
+## New module: `src/lib/odg-validator.ts`
+
+Pure, deterministic, no network calls. Inputs are already in memory (history entries, regime, vix, momentum, sentiment).
+
+```ts
+export interface PathSimResult {
+  path: 'favorable' | 'drift' | 'adverse';
+  probability: number;
+  expectedReturnPct: number;
+  maxDrawdownPct: number;
+  timeToProfitDays: number;
+  reflexTriggers: string[];
+}
+
+export interface ValidationResult {
+  executable: boolean;
+  rejectReasons: string[];          // e.g. ['adverse_p>0.30', 'drawdown_gate', 'crowded_signal']
+  paths: PathSimResult[];
+  pAdverse: number;
+  expectedDrawdownPct: number;
+  drawdownBudgetPct: number;
+  crowding: number;                 // 0..1
+  reflexivityScore: number;         // 0..1, higher = more self-defeating
+  scarFactor: number;
+  entryConfirmed: boolean;
+  microHedge: { enabled: boolean; instrument: string; trigger: string } | null;
+  gNew: number;                     // redefined gradient value
+}
+
+export function validateTrade(input: {
+  ticker: string;
+  signalType: IntelligenceSignal['type'];
+  features: { momentum: number; vol: number; sentiment: number };
+  regime: string;
+  vix?: number;
+  history: ProfitFieldEntry[];      // from useOutcomeGradient
+  scarMemory: ScarRecord[];         // new, see below
+  liquidityProxy?: number;          // 0..1, thin..deep
+  crowdingProxy?: number;           // 0..1 from sentiment dispersion
+}): ValidationResult
+```
+
+### Path simulator (lite, closed-form, no MC loop)
+Three paths with regime-tilted priors:
+- `favorable`: P = 0.35 · regimeTilt(bull), expReturn = +1.5σ, maxDD = 0.4σ
+- `drift`:     P = 0.40, expReturn = 0, maxDD = 0.7σ
+- `adverse`:   P = 0.25 + crowding·0.15 + (vix>22?0.10:0), expReturn = -1.2σ, maxDD = 1.4σ
+
+Where σ = realized 5-day vol from history (or VIX/√52 fallback). Probabilities normalized to sum to 1.
+
+### Reflexivity filter
+- `crowding = clamp(|sentiment| · momentum_alignment, 0, 1)`
+- `liquidity_thin = liquidityProxy < 0.3` (default false if absent)
+- `reflexivityScore = crowding · liquidity_thin_factor`
+- Reject when `reflexivityScore > 0.6` for `INVEST/SCALE_UP`.
+
+### Drawdown gate
+Hard kill switch — non-negotiable. Computed before timing.
+
+### Entry Timing Engine
+Three micro-confirmations (boolean each, need ≥2):
+- `momentum_aligned`: sign(momentum_now) == sign(signal_direction)
+- `vol_contraction_to_expansion`: vol_now > vol_5d_avg AND vol_5d_avg < vol_20d_avg
+- `liquidity_absorption`: liquidityProxy >= 0.5
+
+If signal fires but timing not confirmed → `executable=false, rejectReasons=['await_confirmation']`. UI shows ARMED state instead of EXECUTABLE.
+
+### Scar Memory
+New table + new hook. After every losing trade we capture the *pattern*, not just PnL.
+
+---
+
+## New table: `scar_memory` (Lovable Cloud migration)
 
 ```sql
-create table twrd_sources (
-  id text primary key,                 -- e.g. "yahoo", "reuters", "twitter:user"
-  domain text not null,                -- financial|news|social|geo|scientific
-  alpha numeric not null default 5,    -- π0=0.5, n0=10
-  beta  numeric not null default 5,
-  updated_at timestamptz not null default now()
-);
-
-create table twrd_claims (
+create table public.scar_memory (
   id uuid primary key default gen_random_uuid(),
-  subject text not null, relation text not null, object text not null,
-  domain text not null,
-  truth_score numeric not null,        -- T(x,t) at write time
-  alpha numeric not null, beta numeric not null,
-  decay_rate numeric not null,         -- λ_d
-  valid_from timestamptz not null default now(),
-  valid_until timestamptz,             -- null = open
-  evidence jsonb not null default '[]'::jsonb, -- [{source_id, raw_text, ts}]
-  superseded_by uuid references twrd_claims(id),
+  user_id uuid not null,
+  ticker text not null,
+  signal_type text not null,
+  regime text not null,
+  vol_bucket text not null,              -- 'low'|'mid'|'high'|'crisis'
+  sentiment_bucket text not null,        -- 'neg'|'neu'|'pos'
+  momentum_bucket text not null,
+  failure_pattern text not null,         -- e.g. 'adverse_reflex','timing_premature','liquidity_trap'
+  realized_pnl_pct numeric not null,
   created_at timestamptz not null default now()
 );
-create index on twrd_claims (subject, relation);
-create index on twrd_claims (domain, valid_from desc);
-
-create table twrd_contradictions (
-  claim_a uuid references twrd_claims(id) on delete cascade,
-  claim_b uuid references twrd_claims(id) on delete cascade,
-  detected_at timestamptz not null default now(),
-  primary key (claim_a, claim_b)
-);
-
-create table twrd_feedback (
-  id uuid primary key default gen_random_uuid(),
-  claim_id uuid references twrd_claims(id) on delete cascade,
-  outcome smallint not null check (outcome in (0,1)),
-  observed_at timestamptz not null default now()
-);
-
-create table twrd_weights (
-  id smallint primary key default 1 check (id = 1),  -- single row
-  w1 numeric not null default 1.2,  -- S
-  w2 numeric not null default 1.0,  -- A
-  w3 numeric not null default 0.8,  -- D
-  w4 numeric not null default 1.1,  -- B
-  w5 numeric not null default 1.3,  -- C
-  b  numeric not null default -0.5,
-  updated_at timestamptz not null default now()
-);
+alter table public.scar_memory enable row level security;
+create policy "scar_select_own" on public.scar_memory for select to authenticated using (auth.uid() = user_id);
+create policy "scar_insert_own" on public.scar_memory for insert to authenticated with check (auth.uid() = user_id);
+create policy "scar_delete_own" on public.scar_memory for delete to authenticated using (auth.uid() = user_id);
+create index scar_lookup on public.scar_memory (user_id, ticker, regime, vol_bucket);
 ```
 
-RLS: `twrd_sources`, `twrd_claims`, `twrd_contradictions`, `twrd_weights` → public read, service-role write. `twrd_feedback` → authenticated insert/select on own (`user_id` added if user-scoped).
+`scar_factor = 1 - min(0.6, similar_failures / max(5, similar_total))`. Clamped so it can only depress, never inflate, the gradient.
 
 ---
 
-## 4. Core TRUTH engine (production code)
+## Integration changes
 
-```ts
-// supabase/functions/_shared/twrd/truth.ts
-export const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
+### `src/hooks/useOutcomeGradient.ts`
+- Add `scarMemory` state hydrated from `scar_memory` table on auth.
+- Inside `ingestTrade`: if `pnlPct < 0`, derive `failure_pattern` from features + most recent validation (stored in localStorage briefly) and insert a scar row.
+- Add `validateSignal(signal): ValidationResult` returned from the hook — thin wrapper around `validateTrade()`.
+- Decorate every entry of `intelligenceSignals` with `validation: ValidationResult`. Sort `executable` first, then by `gNew`.
+- Replace the current "fallback starter signal" path with a clearly-tagged `ARMED, awaiting confirmation` card so we never auto-suggest weak trades.
 
-// S — Beta posterior mean
-export const sourceCredibility = (alpha: number, beta: number) =>
-  alpha / (alpha + beta);
+### `src/components/sandbox/OutcomeGradientDashboard.tsx`
+- Each signal card gets:
+  - `EXECUTABLE` badge (gain) or `ARMED` (warning) or `BLOCKED` (loss) with reason tags.
+  - 3-path strip: favorable / drift / adverse with probability bars and expected DD.
+  - Drawdown gate readout: `DD budget 3.2% · expected 4.1% → BLOCKED`.
+  - Reflexivity meter (0..100).
+  - Scar count if pattern previously failed: `Scar: 3 prior failures in this regime`.
+- Add a new top-row metric: `Block Rate (last 20)` so the user sees the gate is actually filtering.
 
-// A — Noisy-OR; thetas already deduped by ownership/fingerprint upstream
-export const agreement = (thetas: number[]) =>
-  1 - thetas.reduce((p, t) => p * (1 - Math.max(0, Math.min(1, t))), 1);
+### `src/components/DesirableAssets.tsx`
+- Where it currently calls `getAssetBoost`, also call `validateSignal` and:
+  - hide the BUY CTA when `!executable`,
+  - show `BLOCKED — <top reason>` chip,
+  - or `ARMED — waiting on <missing confirmation>`.
+- This is the primary user-visible fix for the "desirable but loss-making" complaint.
 
-// D — exponential decay; lambda derived from domain half-life
-export const decay = (deltaSeconds: number, halfLifeSeconds: number) =>
-  Math.exp(-(Math.LN2 / halfLifeSeconds) * deltaSeconds);
-
-// B — bias penalty; bHat ∈ [0,1] from cleaner classifier
-export const biasPenalty = (bHat: number, delta = 0.5) =>
-  delta * Math.max(0, Math.min(1, bHat));
-
-// C — contradiction penalty; max T over contradictors already in store
-export const contradictionPenalty = (maxContradictorT: number, eps = 0.6) =>
-  eps * Math.max(0, Math.min(1, maxContradictorT));
-
-export interface TruthFactors { S: number; A: number; D: number; B: number; C: number; }
-export interface Weights { w1:number; w2:number; w3:number; w4:number; w5:number; b:number; }
-
-export const truthScore = (f: TruthFactors, w: Weights): number =>
-  sigmoid(w.w1*f.S + w.w2*f.A + w.w3*f.D - w.w4*f.B - w.w5*f.C + w.b);
-
-// Streaming-friendly: incremental update when a new corroborating source arrives.
-// A_new = 1 - (1 - A_old)(1 - theta_new)
-export const updateAgreement = (Aold: number, thetaNew: number) =>
-  1 - (1 - Aold) * (1 - thetaNew);
-```
-
-Failure guards (`failureGuards.ts`):
-
-```ts
-import { agreement } from "./truth.ts";
-
-// Shannon entropy of source distribution (normalised 0..1)
-export const sourceEntropy = (counts: number[]): number => {
-  const n = counts.reduce((a,b)=>a+b,0);
-  if (!n) return 0;
-  const H = -counts.reduce((s,c)=> c? s + (c/n)*Math.log2(c/n) : s, 0);
-  const Hmax = Math.log2(counts.length || 1) || 1;
-  return H / Hmax;
-};
-
-export interface Guards {
-  falseConsensus: boolean;   // high A, low entropy, rising C
-  adversarialSpike: boolean; // velocity > 10x baseline OR many <30d sources
-  staleFact: boolean;        // D < 0.2
-  overfitDrift: boolean;     // calibration error trending up
-}
-```
+### CROWN-lite micro-hedge (in-component, no new function)
+On the dashboard, after a position is marked executable and `pAdverse > 0.20`, show `Auto-Hedge` toggle. When enabled and ODG later detects adverse-path conditions on the live signal (sentiment flip + vol expansion), surface a `HEDGE NOW` action card (no auto-execution — surfacing only, since we don't auto-trade).
 
 ---
 
-## 5. Veracity Gate — how every existing engine consumes TWRD
+## Files to create / change
 
-```ts
-// supabase/functions/_shared/twrd/gate.ts
-export interface RawSignal {
-  id: string; value: number;            // signed strength, -1..+1 or any scale
-  claim: { subject: string; relation: string; object: string };
-  domain: "financial"|"news"|"social"|"geo"|"scientific";
-}
-export interface WeightedSignal extends RawSignal {
-  T: number; S: number; A: number;
-  contradictionRisk: number;           // = C in [0,1]
-  falseConsensus: boolean;
-  weighted: number;                     // = value * T
-}
-export async function veracityGate(signals: RawSignal[]): Promise<WeightedSignal[]> { /* … */ }
-```
+Create:
+- `src/lib/odg-validator.ts` — pure validator, path sim, reflexivity, drawdown gate, timing.
+- `src/lib/odg-scar.ts` — failure-pattern classifier + scar lookup helpers.
+- Migration: `scar_memory` table + RLS.
 
-### Integration hooks
+Change:
+- `src/hooks/useOutcomeGradient.ts` — wire scar hydration, decorate signals, expose `validateSignal`, write scars on losses.
+- `src/components/sandbox/OutcomeGradientDashboard.tsx` — render validation block per signal, block-rate metric.
+- `src/components/DesirableAssets.tsx` — gate the BUY CTA on `executable`.
+- `src/components/TradeJournal.tsx` — when logging a loss, call scar writer.
 
-| Existing module | Change |
-|---|---|
-| `supabase/functions/analyze-stock/index.ts` | Wrap fundamentals/news inputs with `veracityGate`. Pass `weightedInput = signal * T` into the prompt; reject inputs with `T < 0.35`. |
-| `supabase/functions/desirable-assets/index.ts` | Each AI candidate's evidence triples scored. Veto candidates whose median evidence `T < 0.5`. Surface `truthConfidence` per pick. |
-| `supabase/functions/causal-effects/index.ts` | Every scenario node carries `truthConfidence` of its trigger fact. Final scenario probability = `P(event) × min(T of preconditions)`. |
-| `supabase/functions/risk-intelligence/index.ts` | New term **Truth Risk** = `1 − meanT(portfolio_signals)`. If `T < 0.4` → cut position size by `(0.4 − T)/0.4`, raise hedge weight proportionally. |
-| `supabase/functions/macro-intelligence/index.ts` + regime hook | Aggregate truth-weighted macro signals; regime classifier uses `Σ wᵢ·T(xᵢ)·signalᵢ` not raw. |
-| `supabase/functions/reflexivity-engine/index.ts` | Add fourth component `veracity` to the consensus fusion; if `falseConsensus=true`, override `shiftETA.label = "FALSE CONSENSUS"` and force position-size cut downstream. |
-| `useReflexivity.ts`, `useAIIntelligence.ts`, `RiskDashboard.tsx`, `Recommendation.tsx` | Surface `T%`, source count, contradiction badge via `TruthBadge`. |
+No edge-function changes required — validation is fully client-side and deterministic, fitting the lightweight constraint.
 
 ---
 
-## 6. Reflexivity Defense (the critical guard)
+## Acceptance criteria
 
-In `reflexivity-engine/index.ts`, after `deriveConsensus`:
-
-```ts
-const sourceCounts = bucketSourcesByDomain(input);   // [news, social, flow, ...]
-const H = sourceEntropy(sourceCounts);
-const A = consensusAgreementFromTWRD(input);          // mean A across active claims
-const Crisk = meanContradictionRisk(input);
-
-const falseConsensus = A > 0.85 && H < 0.35 && Crisk > 0.25;
-if (falseConsensus) {
-  shiftETA.label = "FALSE CONSENSUS";
-  shiftETA.probability = Math.max(shiftETA.probability, 70);
-  // emit to risk-intel: sizeMult = 0.5, hedgeWeight += 0.15, tradeDelaySec = 900
-}
-```
-
----
-
-## 7. Feedback loop (self-correction)
-
-`supabase/functions/twrd-feedback/index.ts` — POST `{ claim_id, outcome }`:
-
-1. Insert into `twrd_feedback`.
-2. For each source on that claim: `outcome=1 → α+=1` else `β+=1`.
-3. Online SGD step on weights using logistic loss:
-   ```
-   p = σ(w·x + b);  g = (p − y)
-   wᵢ ← wᵢ − η · g · xᵢ;  b ← b − η · g
-   project wᵢ ≥ 0.01, clip ‖w‖∞ ≤ 5
-   ```
-4. Persist to `twrd_weights`. `η = 0.01` with decay.
-
-Triggered (a) live from trade close events in `useSellNotifications`/`lodger_trades`, (b) nightly cron over `user_analysis_history` outcomes vs current price.
-
----
-
-## 8. Output upgrade — every recommendation now carries
-
-```json
-{
-  "scenario": "AAPL breakout into earnings",
-  "probability": 0.62,
-  "truthConfidence": 0.78,
-  "sourceReliability": { "mean_theta": 0.71, "k_independent": 4 },
-  "contradictionRisk": 0.18,
-  "falseConsensus": false,
-  "guards": { "stale": false, "adversarialSpike": false }
-}
-```
-
-Rendered by `TruthBadge` and `VeracityPanel` on `Recommendation`, `DesirableAssets`, `RiskDashboard`, `ReflexivityEngine`, `CausalEffectsEngine`.
-
----
-
-## 9. Failure-mode guards (always-on)
-
-| Guard | Detection | Action |
-|---|---|---|
-| False consensus | `A>0.85 ∧ H<0.35 ∧ C>0.25` | `T *= 0.6`, flag UI, cut size |
-| Adversarial spike | claim velocity > 10× baseline OR > 60% sources <30d old | quarantine until secondary review; `T` capped at 0.25 |
-| Stale fact | `D < 0.2` | flag, force re-ingest before use |
-| Overfitting | rolling Brier score worsening 5 cycles | freeze weight updates, widen `η` reset |
-
-Each guard pushes a row to a future `twrd_alerts` table for the dashboard.
-
----
-
-## 10. Example end-to-end flow
-
-```text
-1. fetch-news returns: "Reuters: Apple to acquire Pixelmator" (ts=T0, source=reuters)
-2. extract → claim ⟨AAPL, acquires, Pixelmator⟩, domain=financial
-3. financial cleaner → π̂ = 0.85 (named acquirer + named target + named outlet)
-4. store lookup → 1 corroborating claim from "9to5mac" (θ=0.55)
-   → S = θ_reuters = 0.86;  A = 1 − (1−0.86)(1−0.55) = 0.937
-   → D = e^(−ln2/(7d) · 1h) ≈ 0.996;  B = 0.5·0.10 = 0.05;  C = 0
-   → T = σ(1.2·.86 + 1·.937 + .8·.996 − 1.1·.05 − 1.3·0 − 0.5) ≈ 0.86
-5. write twrd_claims row, T=0.86; no contradictions
-6. analyze-stock(AAPL) ingests recommendation signal value=+0.6 (bullish M&A)
-   → veracityGate → weighted = 0.6 · 0.86 = 0.516
-   → reflexivity sees A=0.937 but H(sources)=0.62 → no false consensus
-7. risk-intelligence: Truth Risk = 1 − 0.86 = 0.14 → no size cut
-8. Recommendation renders: BUY AAPL, conviction 62%, TruthConfidence 86%,
-   Sources 2 (Reuters, 9to5mac), Contradiction risk 0%
-9. T+3d outcome = deal confirmed → twrd-feedback POST {claim_id, outcome:1}
-   → α_reuters += 1; α_9to5mac += 1; SGD nudges w2 (agreement) up slightly
-```
-
----
-
-## 11. Implementation order (build phases)
-
-1. Migration: `twrd_sources`, `twrd_claims`, `twrd_contradictions`, `twrd_feedback`, `twrd_weights` + seed source priors.
-2. `_shared/twrd/{types,truth,failureGuards,store,gate,cleaners/*,extract}.ts`.
-3. Edge functions: `twrd-ingest`, `twrd-query`, `twrd-feedback`.
-4. Wire `veracityGate` into `analyze-stock`, `desirable-assets`, `causal-effects`, `risk-intelligence`, `macro-intelligence`, `reflexivity-engine` (one PR per function, behind a `TWRD_ENABLED` flag for safe rollout).
-5. UI: `TruthBadge`, `VeracityPanel`; mount in `Recommendation`, `DesirableAssets`, `RiskDashboard`, `ReflexivityEngine`, `CausalEffectsEngine`.
-6. Feedback wiring: `useSellNotifications` and a nightly `twrd-feedback` cron over `user_analysis_history`.
-7. Memory file `mem://features/platform-modules/twrd-veracity-layer` documenting the contract.
-
-After approval I switch to default mode and build phases 1→7.
+1. A signal on a desirable asset with `pAdverse > 0.30` renders as `BLOCKED` with the reason chip, and the Desirable Assets BUY CTA is hidden.
+2. The dashboard shows a non-zero block rate within a few signals of normal usage.
+3. After two losing trades on the same `(ticker, regime, vol_bucket)` pattern, the third matching signal's `scar_factor` ≤ 0.6 and the signal degrades to `ARMED` or `BLOCKED`.
+4. Drawdown gate cannot be bypassed by raising confidence — it is checked before the gradient score is even computed.
+5. Existing tests still pass; no edge functions touched.

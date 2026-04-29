@@ -334,6 +334,48 @@ export type Database = {
         }
         Relationships: []
       }
+      scar_memory: {
+        Row: {
+          created_at: string
+          failure_pattern: string
+          id: string
+          momentum_bucket: string
+          realized_pnl_pct: number
+          regime: string
+          sentiment_bucket: string
+          signal_type: string
+          ticker: string
+          user_id: string
+          vol_bucket: string
+        }
+        Insert: {
+          created_at?: string
+          failure_pattern: string
+          id?: string
+          momentum_bucket: string
+          realized_pnl_pct?: number
+          regime: string
+          sentiment_bucket: string
+          signal_type: string
+          ticker: string
+          user_id: string
+          vol_bucket: string
+        }
+        Update: {
+          created_at?: string
+          failure_pattern?: string
+          id?: string
+          momentum_bucket?: string
+          realized_pnl_pct?: number
+          regime?: string
+          sentiment_bucket?: string
+          signal_type?: string
+          ticker?: string
+          user_id?: string
+          vol_bucket?: string
+        }
+        Relationships: []
+      }
       statarb_outcomes: {
         Row: {
           actual_outcome: string
