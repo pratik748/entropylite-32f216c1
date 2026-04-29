@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { fetchMacroCalendar } from "../_shared/liveData.ts";
+import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -643,6 +643,34 @@ function normalizeSectorPreference(value: string): string {
   if (["infrastructure", "industrials"].includes(normalized)) return "industrials";
   if (["metals", "materials"].includes(normalized)) return "materials";
   return normalized;
+}
+
+function summarizeRejects(rejectReasons: Record<string, number>) {
+  const labels: Record<string, string> = {
+    F0_no_price_history: "lacked usable price history",
+    F0_thin_history: "had too little trading history",
+    F1_already_held: "were already in your portfolio",
+    F1_previous_repeat: "were repeats from recent refreshes",
+    F1b_sell_or_highrisk: "conflicted with existing sell or high-risk warnings",
+    F1b_avoided_sector: "fell into sectors the system is avoiding",
+    F2_target_below_price: "had targets below live price",
+    F3_illiquid: "failed the liquidity bar",
+    F3_microcap_or_small: "were niche small or micro-cap names",
+    F3_loss_maker: "were loss-making businesses",
+    F3_weak_quality: "had weak quality or shrinking fundamentals",
+    F4_no_upside_extreme_risk: "had poor upside versus extreme risk",
+  };
+
+  const ranked = Object.entries(rejectReasons)
+    .filter(([key, count]) => count > 0 && key !== "tier_relaxed")
+    .sort((a, b) => b[1] - a[1]);
+
+  const rejectSummary = ranked.slice(0, 3).map(([key, count]) => `${count} ${labels[key] || key}`);
+  const rejectHeadline = ranked[0]
+    ? `Most rejected names ${labels[ranked[0][0]] || "failed screening"}`
+    : "No candidate cleared the screening rules";
+
+  return { rejectSummary, rejectHeadline };
 }
 
 // Deterministic fallback candidate builder removed by design.
