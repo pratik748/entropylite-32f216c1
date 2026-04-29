@@ -1,6 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocalStorage } from "./useLocalStorage";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  validateTrade,
+  classifyFailure,
+  bucketsFor,
+  type ScarRecord,
+  type ValidationResult,
+  type SignalKind,
+} from "@/lib/odg-validator";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -71,6 +79,7 @@ export interface IntelligenceSignal {
   reasoning: string;
   assets: string[];
   confidence: number;
+  validation?: ValidationResult;
 }
 
 export interface ShadowState {
