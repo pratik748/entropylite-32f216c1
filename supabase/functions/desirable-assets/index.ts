@@ -762,6 +762,27 @@ serve(async (req) => {
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
     const preferredSectors: string[] | undefined = body.preferredSectors;
 
+    // ── ODGS — Outcome Density Gradient System (client-supplied) ──
+    // The user's own learned profit field. Past trades teach the engine
+    // which assets, regimes, and synergies have been profitable for THIS
+    // user. We surface that to the AI and use it as a reranker on the
+    // server. Never overrides hard quant filters; only tilts selection.
+    const odgs = body.odgs && typeof body.odgs === "object" ? body.odgs : null;
+    const odgsHotMap = new Map<string, number>();
+    const odgsColdMap = new Map<string, number>();
+    const odgsScarSet = new Set<string>();
+    if (odgs) {
+      for (const h of (odgs.hotAssets || [])) {
+        if (h?.ticker) odgsHotMap.set(String(h.ticker).toUpperCase(), Number(h.bias) || 1);
+      }
+      for (const c of (odgs.coldAssets || [])) {
+        if (c?.ticker) odgsColdMap.set(String(c.ticker).toUpperCase(), Number(c.bias) || 1);
+      }
+      for (const t of (odgs.scarTickers || [])) {
+        if (t) odgsScarSet.add(String(t).toUpperCase());
+      }
+    }
+
     const regionInfo = CURRENCY_TO_REGION[baseCurrency];
     const isUSUser = !regionInfo || baseCurrency === "USD";
     const seed = Math.floor(Math.random() * 99999);
