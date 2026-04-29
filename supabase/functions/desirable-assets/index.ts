@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, callAIParallel } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { fetchMacroCalendar } from "../_shared/liveData.ts";
+import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -645,6 +645,34 @@ function normalizeSectorPreference(value: string): string {
   return normalized;
 }
 
+function summarizeRejects(rejectReasons: Record<string, number>) {
+  const labels: Record<string, string> = {
+    F0_no_price_history: "lacked usable price history",
+    F0_thin_history: "had too little trading history",
+    F1_already_held: "were already in your portfolio",
+    F1_previous_repeat: "were repeats from recent refreshes",
+    F1b_sell_or_highrisk: "conflicted with existing sell or high-risk warnings",
+    F1b_avoided_sector: "fell into sectors the system is avoiding",
+    F2_target_below_price: "had targets below live price",
+    F3_illiquid: "failed the liquidity bar",
+    F3_microcap_or_small: "were niche small or micro-cap names",
+    F3_loss_maker: "were loss-making businesses",
+    F3_weak_quality: "had weak quality or shrinking fundamentals",
+    F4_no_upside_extreme_risk: "had poor upside versus extreme risk",
+  };
+
+  const ranked = Object.entries(rejectReasons)
+    .filter(([key, count]) => count > 0 && key !== "tier_relaxed")
+    .sort((a, b) => b[1] - a[1]);
+
+  const rejectSummary = ranked.slice(0, 3).map(([key, count]) => `${count} ${labels[key] || key}`);
+  const rejectHeadline = ranked[0]
+    ? `Most rejected names ${labels[ranked[0][0]] || "failed screening"}`
+    : "No candidate cleared the screening rules";
+
+  return { rejectSummary, rejectHeadline };
+}
+
 // Deterministic fallback candidate builder removed by design.
 
 // ── Main serve ─────────────────────────────────────────────────────
@@ -819,7 +847,7 @@ ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. E
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
 
-Create 8-10 recommendations that prioritize:
+    Create 8-10 recommendations that prioritize:
 1) Diversified opportunity sources across sectors, strategies, and factor exposures
 2) Positive earnings momentum + heavy institutional participation
 3) Price trend confirmation (above key moving averages) without chasing crowded correlation clusters
@@ -828,8 +856,8 @@ Create 8-10 recommendations that prioritize:
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
-- ABSOLUTELY NO obscure, unheard-of, microcap, penny, meme, or low-liquidity names
-- ABSOLUTELY NO deteriorating fundamentals or broken charts
+    - ABSOLUTELY NO obscure, unheard-of, microcap, small-cap, penny, meme, or low-liquidity names unless the user explicitly asked for small caps
+    - ABSOLUTELY NO loss-making businesses, deteriorating fundamentals, or broken charts
 - Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
 - Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
 - Prefer names with >$3B market cap and strong liquidity; allow liquid mid-caps when they materially improve diversification
@@ -1020,6 +1048,7 @@ Return via the tool call only.`,
     }
 
     const scored: ScoredRec[] = [];
+    const previousTickerSet = new Set(previousTickers.map((t) => String(t).toUpperCase()));
 
     // Deterministic-rescue scored builder removed by design.
 
@@ -1028,8 +1057,8 @@ Return via the tool call only.`,
     const bumpReject = (k: string) => { rejectReasons[k] = (rejectReasons[k] || 0) + 1; };
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
-      if (!td) { noData++; continue; }
-      if (td.closes.length < 20) { thinData++; continue; }
+      if (!td) { noData++; bumpReject("F0_no_price_history"); continue; }
+      if (td.closes.length < 20) { thinData++; bumpReject("F0_thin_history"); continue; }
 
       const returns = logReturns(td.closes);
       const sr = sharpeRatio(returns);
@@ -1085,6 +1114,7 @@ Return via the tool call only.`,
 
       // F1: Skip portfolio holdings
       if (portfolioTickers.includes(rec.ticker)) { bumpReject("F1_already_held"); continue; }
+      if (previousTickerSet.has(rec.ticker)) { filtered++; bumpReject("F1_previous_repeat"); continue; }
 
       // F1b: Cross-module veto — never contradict Stock Analysis & Risk verdicts.
       // Reject any candidate whose ticker is on the Sell/high-risk list or whose
@@ -1110,7 +1140,26 @@ Return via the tool call only.`,
       // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold.
       const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
       if (!isHedge && dollarVolume < minDollarVol) { filtered++; bumpReject("F3_illiquid"); continue; }
-      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; bumpReject("F3_microcap"); continue; }
+      if (!isHedge && ["micro", "small"].includes(String(rec.marketCap || "").toLowerCase())) { filtered++; bumpReject("F3_microcap_or_small"); continue; }
+
+      const fundamentals = isHedge ? null : await fetchYahooSummary(rec.ticker);
+      const profitMarginPct = fundamentals?.profitMargins != null ? fundamentals.profitMargins * 100 : null;
+      const roePct = fundamentals?.returnOnEquity != null ? fundamentals.returnOnEquity * 100 : null;
+      const earningsGrowthPct = fundamentals?.earningsGrowth != null ? fundamentals.earningsGrowth * 100 : null;
+      const revenueGrowthPct = fundamentals?.revenueGrowth != null ? fundamentals.revenueGrowth * 100 : null;
+      const analystView = String(fundamentals?.recommendationKey || "").toLowerCase();
+      const fundamentalSector = String(fundamentals?.sector || rec.sector || "").trim();
+
+      if (!isHedge && profitMarginPct != null && profitMarginPct < 0) { filtered++; bumpReject("F3_loss_maker"); continue; }
+      if (!isHedge) {
+        const weakQuality = [
+          roePct != null && roePct < 6,
+          earningsGrowthPct != null && earningsGrowthPct < -5,
+          revenueGrowthPct != null && revenueGrowthPct < -4,
+          analystView === "underperform" || analystView === "sell",
+        ].filter(Boolean).length;
+        if (weakQuality >= 2) { filtered++; bumpReject("F3_weak_quality"); continue; }
+      }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
@@ -1231,6 +1280,8 @@ Return via the tool call only.`,
         sentimentArticleCount: 0,
       });
     }
+
+    const { rejectSummary, rejectHeadline } = summarizeRejects(rejectReasons);
 
     if (scored.length === 0) {
       repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — no deterministic rescue (by design)`);
@@ -1598,6 +1649,8 @@ Return via the tool call only.`,
       baseCurrency,
       candidatesGenerated: candidates.length,
       candidatesPassed: enriched.length,
+      rejectHeadline,
+      rejectSummary,
       autoRepaired: repairTrail.length > 0,
       repairTrail,
       timestamp: Date.now(),
@@ -1634,6 +1687,8 @@ Return via the tool call only.`,
       regimeType: "transition",
       candidatesGenerated: 0,
       candidatesPassed: 0,
+      rejectHeadline: "Live feed hiccupped during screening",
+      rejectSummary: [],
       autoRepaired: true,
       softFailure: true,
       repairTrail: [...repairTrail, `top-level crash: ${String(error?.message || error).slice(0, 140)}`],
