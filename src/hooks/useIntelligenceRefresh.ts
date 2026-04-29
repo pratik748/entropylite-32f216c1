@@ -2,12 +2,19 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { flushAllCaches } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 
-const DEBOUNCE_MS = 10_000; // ignore refocus within 10s of last refresh
+// Refocus debounce raised to 5 min. Previous 10s window caused a refresh
+// stampede every time the tab came back from background, which timed out
+// heavy modules like Desirable Assets and made the app feel "crashed".
+const DEBOUNCE_MS = 5 * 60_000;
+// Only treat a return-to-foreground as a refresh trigger if the tab was
+// hidden long enough to plausibly have stale data.
+const MIN_HIDDEN_MS = 60_000;
 
 export function useIntelligenceRefresh() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const lastRefresh = useRef(0);
+  const hiddenSince = useRef<number | null>(null);
   const toastRef = useRef<ReturnType<typeof toast> | null>(null);
 
   const triggerRefresh = useCallback(() => {
@@ -43,19 +50,27 @@ export function useIntelligenceRefresh() {
     triggerRefresh();
 
     const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenSince.current = Date.now();
+        return;
+      }
       if (document.visibilityState === "visible") {
+        const hiddenFor = hiddenSince.current ? Date.now() - hiddenSince.current : 0;
+        hiddenSince.current = null;
+        // Skip refresh on quick tab-switches or backgrounding — avoids
+        // hammering edge functions every time the user alt-tabs.
+        if (hiddenFor < MIN_HIDDEN_MS) return;
         triggerRefresh();
       }
     };
 
-    const onFocus = () => triggerRefresh();
+    // Window focus alone is too noisy (fires on devtools toggle, popup close,
+    // etc.). Rely on visibilitychange + the manual refresh button instead.
 
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("focus", onFocus);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("focus", onFocus);
     };
   }, [triggerRefresh]);
 
