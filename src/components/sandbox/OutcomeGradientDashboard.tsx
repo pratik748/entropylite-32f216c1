@@ -108,7 +108,7 @@ const OutcomeGradientDashboard = () => {
               { label: "Decay Factor", value: safetyStatus.decayFactor.toFixed(2), color: "text-muted-foreground" },
               { label: "Hot Zones", value: safetyStatus.diversificationCount.toString(), color: safetyStatus.diversificationCount >= 5 ? "text-gain" : "text-warning" },
               { label: "5-Trade PnL", value: `${safetyStatus.rollingPnl5 >= 0 ? "+" : ""}${safetyStatus.rollingPnl5.toFixed(2)}%`, color: safetyStatus.rollingPnl5 >= 0 ? "text-gain" : "text-loss" },
-              { label: "Status", value: safetyStatus.rollbackTriggered ? "ROLLBACK" : "ACTIVE", color: safetyStatus.rollbackTriggered ? "text-loss" : "text-gain" },
+              { label: "Block Rate", value: `${blockRate.toFixed(0)}%`, color: blockRate >= 30 ? "text-gain" : blockRate >= 10 ? "text-warning" : "text-muted-foreground" },
             ].map(m => (
               <div key={m.label} className="rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center">
                 <p className="text-[8px] uppercase tracking-wider text-muted-foreground">{m.label}</p>
