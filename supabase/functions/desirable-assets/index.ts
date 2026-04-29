@@ -1022,6 +1022,8 @@ Return via the tool call only.`,
     // Deterministic-rescue scored builder removed by design.
 
     let noData = 0, thinData = 0, filtered = 0;
+    const rejectReasons: Record<string, number> = {};
+    const bumpReject = (k: string) => { rejectReasons[k] = (rejectReasons[k] || 0) + 1; };
     for (const rec of candidates) {
       const td = tickerData[rec.ticker];
       if (!td) { noData++; continue; }
@@ -1080,7 +1082,7 @@ Return via the tool call only.`,
       ));
 
       // F1: Skip portfolio holdings
-      if (portfolioTickers.includes(rec.ticker)) continue;
+      if (portfolioTickers.includes(rec.ticker)) { bumpReject("F1_already_held"); continue; }
 
       // F1b: Cross-module veto — never contradict Stock Analysis & Risk verdicts.
       // Reject any candidate whose ticker is on the Sell/high-risk list or whose
@@ -1088,23 +1090,25 @@ Return via the tool call only.`,
       const recTickerUpper = String(rec.ticker || "").toUpperCase();
       if (sellTickers.includes(recTickerUpper) || highRiskTickers.includes(recTickerUpper)) {
         filtered++;
+        bumpReject("F1b_sell_or_highrisk");
         continue;
       }
       const recSectorLower = String(rec.sector || "").toLowerCase().trim();
       if (recSectorLower && avoidSectorsLower.some((s) => recSectorLower.includes(s) || s.includes(recSectorLower))) {
         filtered++;
+        bumpReject("F1b_avoided_sector");
         continue;
       }
 
       // F2: Target must be above current price
-      if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; continue; }
+      if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; bumpReject("F2_target_below_price"); continue; }
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
       // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold.
       const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
-      if (!isHedge && dollarVolume < minDollarVol) { filtered++; continue; }
-      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; continue; }
+      if (!isHedge && dollarVolume < minDollarVol) { filtered++; bumpReject("F3_illiquid"); continue; }
+      if (!isHedge && String(rec.marketCap || "").toLowerCase() === "micro") { filtered++; bumpReject("F3_microcap"); continue; }
 
       // ── MONTE CARLO MINI-SIM (5000 paths, 60 days) ──
       const mu60 = mean(returns);
@@ -1129,13 +1133,16 @@ Return via the tool call only.`,
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
 
-      // F4: Avoid weak upside profiles
-      if (!isHedge && expectedUpsidePct < 2) { filtered++; continue; }
-      // Risk composite gate relaxed: only reject extreme-risk names (>=78), not merely
-      // elevated. In a volatile India regime, 60+ is normal for liquid mid/large caps.
-      if (!isHedge && riskCompositeScore >= 78) { filtered++; continue; }
+      // F4: Hard floor — only reject if BOTH upside is essentially zero AND risk is extreme.
+      // Otherwise we let it into the "relaxed" tier so the panel never goes empty when valid
+      // tickers are flowing through with real prices and history.
+      if (!isHedge && expectedUpsidePct < -2 && riskCompositeScore >= 85) {
+        filtered++; bumpReject("F4_no_upside_extreme_risk"); continue;
+      }
 
-      // Two-tier pass logic: strict (high quality) or balanced (acceptable). Anything below = drop.
+      // Three-tier pass logic: strict / balanced / relaxed. We never silently drop a candidate
+      // that survived F1–F4 — the worst outcome is "relaxed" so the user always sees the real
+      // best-of-what-the-market-offered today, with the tier honestly displayed.
       const strictPass = isHedge || (
         sr >= 0.15 &&
         mdd <= 35 &&
@@ -1161,8 +1168,8 @@ Return via the tool call only.`,
         momentum20d > -10
       );
 
-      if (!strictPass && !balancedPass) { filtered++; continue; }
-      const filterTier: FilterTier = strictPass ? "strict" : "balanced";
+      const filterTier: FilterTier = strictPass ? "strict" : balancedPass ? "balanced" : "relaxed";
+      if (filterTier === "relaxed") bumpReject("tier_relaxed");
 
       // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
