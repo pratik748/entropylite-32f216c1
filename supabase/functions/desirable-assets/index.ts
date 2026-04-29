@@ -1593,6 +1593,8 @@ Return via the tool call only.`,
         filterTier: s.filterTier,
         isHedge,
         sentimentScore: s.sentimentScore || 0,
+        targetPrice,
+        userBudget,
       });
 
       // Compute risk-reward string from validated numbers
