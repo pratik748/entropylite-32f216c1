@@ -1,215 +1,100 @@
-## Goal
+## Plan
 
-Repair the Outcome-Driven Gradient (ODG) so it stops emitting BUY/INVEST signals on desirable assets that go on to lose money. Today the engine is purely **post-trade** (it learns from PnL after the fact). It never asks: *"Even if this asset is great, is the trade survivable from here?"*
+I’ll harden the Desirable Assets pipeline so it stops producing the failure mode you saw:
 
-We will convert ODG from a signal-confidence engine into an **outcome-path validated gatekeeper** that sits between signal detection and execution. Core principle baked into the code: **desirable asset ≠ desirable trade.**
+“Most rejected names were already in your portfolio. 1 had targets below live price. 1 lacked usable price history.”
 
----
+The goal is to prevent the system from surfacing a low-quality empty result when the AI proposes duplicates, stale targets, or untradeable names.
 
-## Architecture (lite, no model training)
+### What I’ll change
 
+1. Strengthen candidate generation so duplicates are much less likely
+- Rewrite the Desirable Assets prompt to treat current holdings and recent recommendations as hard exclusions with replacement required.
+- Add an explicit instruction that the model must keep generating alternatives until it has enough non-held, non-repeat, price-verifiable candidates.
+- Emphasize “desirable asset != desirable recommendation if already owned or structurally invalid.”
+
+2. Add a server-side refill pass after first-round rejections
+- Keep the first AI pass.
+- If too many candidates are rejected for being already held, repeated, or structurally broken, run a second targeted AI pass using the actual reject reasons.
+- Feed the rejected ticker list back into the model and request replacements only.
+- Merge, dedupe, and re-score the refill candidates before selection.
+
+3. Stop over-penalizing stale target prices
+- Replace the current hard reject for `target below live price` with a repair-first rule.
+- If a candidate has valid history and live price but an outdated target, recompute target/entry/stop from the quant layer instead of throwing the name away immediately.
+- Only reject if the recomputed trade still has no positive upside or violates risk rules.
+
+4. Make anti-repeat behavior smarter instead of permanently hostile
+- Change `previousTickers` from a broad hard ban to a scoped recent-memory rule with TTL / windowing.
+- Keep it effective enough to avoid spammy repeats, but not so strict that it starves the engine.
+- On explicit manual refresh, use a stronger “get me alternatives now” mode instead of reusing a stale exclusion stack forever.
+
+5. Improve the empty-state behavior on the client
+- Replace the current blunt error banner with a clearer state:
+  - what was rejected,
+  - whether the system attempted refill/replacement,
+  - whether another pass is still possible.
+- Make manual refresh trigger the stronger regeneration mode.
+- Avoid showing the same discouraging message if the backend can self-repair first.
+
+6. Preserve portfolio awareness without letting it kill the module
+- Keep the current rule that held names cannot be recommended.
+- Keep cross-module vetoes for sell/high-risk conflicts.
+- But ensure the module escalates to “replacement search” rather than settling for an empty result when portfolio overlap is the dominant reject reason.
+
+### Expected result
+
+After this change, Desirable Assets should:
+- avoid recommending assets already in the portfolio,
+- avoid recycled recent picks unless intentionally allowed,
+- repair stale target/entry math instead of rejecting too early,
+- fetch substitutes when the first pass is contaminated,
+- return a usable recommendation set far more often,
+- stop showing this same rejection message as the primary outcome.
+
+## Technical details
+
+### Files to update
+- `supabase/functions/desirable-assets/index.ts`
+  - strengthen prompt
+  - add replacement/refill generation pass
+  - relax F2 into repair-first logic
+  - scope anti-repeat memory more intelligently
+  - return richer metadata about refill attempts
+- `src/components/DesirableAssets.tsx`
+  - adjust refresh behavior / client messaging
+  - optionally version the local cache keys if needed so stale exclusion state does not poison new runs
+
+### Proposed pipeline shape
 ```text
-[ Signal Detection ]   <-- existing: profitField, desirableZones, intelligenceSignals
-        |
-        v
-[ Trade Validation Pipeline ]   <-- NEW
-   1. Reflexivity Filter         (crowding / liquidity trap)
-   2. Outcome Path Simulator     (3 paths: favorable / drift / adverse)
-   3. Drawdown Gate              (hard kill switch, vol-scaled)
-   4. Entry Timing Engine        (micro-confirmation triggers)
-   5. Scar Memory Lookup         (penalize repeat failure patterns)
-        |
-   pass / reject + reason
-        v
-[ Execution Trigger ]   <-- only fires on pass + confirmed entry
-        |
-   on-trade hooks:
-   - CROWN-lite micro-hedge on adverse-path detection
-   - On loss → write Scar
+AI candidate pass
+  -> dedupe
+  -> live price/history check
+  -> hard rejects (held, no data, true invalids)
+  -> repair pass for stale target/entry/stop
+  -> if survivor count too low:
+       targeted refill AI pass using reject reasons + banned tickers
+  -> merge + dedupe + score
+  -> final diversified selection
+  -> client render
 ```
 
-Signal detection stays where it is. Validation is a new, pure module. Existing intelligence signals get a `validation` block and only `INVEST/SCALE_UP/PAIR` types of urgency `high` may set `executable: true`.
+### Specific rule changes
+- Keep as hard rejects:
+  - already in portfolio
+  - recent repeat within scoped window
+  - no usable history after retry
+  - illiquidity / weak quality / explicit cross-module veto
+- Convert from hard reject to repair-first:
+  - target below live price
+  - malformed entry zone / stop
+- Trigger refill pass when either is true:
+  - survivor count below minimum threshold
+  - overlap rejects dominate the reject mix
 
----
+### Notes
+- No heavy model training needed.
+- No database schema change is required for this fix.
+- This stays lightweight and prompt + rules driven.
 
-## Redefined ODG formula
-
-Old gradient (signal direction):
-```text
-G_old(asset) = bias(asset) · Σ w_i · feature_i
-```
-
-New gradient (probability of profitable execution path within bounded drawdown):
-```text
-G_new(asset) =  bias(asset)
-              · P_favorable
-              · (1 - P_adverse)            # reflexive-loss penalty
-              · payoff_asymmetry           # E[gain]/E[loss]
-              · timeliness                 # exp(-τ_to_profit / horizon)
-              · (1 - crowding)             # reflexivity discount
-              · scar_factor                # 1 − historical_failure_rate(pattern)
-
-Reject if:
-   P_adverse > 0.30
-   OR expected_drawdown_pct > drawdown_budget(vol)
-   OR crowding > 0.75 AND liquidity_thin
-   OR scar_factor < 0.4
-```
-
-`drawdown_budget(vol) = clamp(0.6 · realized_vol_5d · √horizon_days, 1.5%, 8%)` per position.
-
----
-
-## New module: `src/lib/odg-validator.ts`
-
-Pure, deterministic, no network calls. Inputs are already in memory (history entries, regime, vix, momentum, sentiment).
-
-```ts
-export interface PathSimResult {
-  path: 'favorable' | 'drift' | 'adverse';
-  probability: number;
-  expectedReturnPct: number;
-  maxDrawdownPct: number;
-  timeToProfitDays: number;
-  reflexTriggers: string[];
-}
-
-export interface ValidationResult {
-  executable: boolean;
-  rejectReasons: string[];          // e.g. ['adverse_p>0.30', 'drawdown_gate', 'crowded_signal']
-  paths: PathSimResult[];
-  pAdverse: number;
-  expectedDrawdownPct: number;
-  drawdownBudgetPct: number;
-  crowding: number;                 // 0..1
-  reflexivityScore: number;         // 0..1, higher = more self-defeating
-  scarFactor: number;
-  entryConfirmed: boolean;
-  microHedge: { enabled: boolean; instrument: string; trigger: string } | null;
-  gNew: number;                     // redefined gradient value
-}
-
-export function validateTrade(input: {
-  ticker: string;
-  signalType: IntelligenceSignal['type'];
-  features: { momentum: number; vol: number; sentiment: number };
-  regime: string;
-  vix?: number;
-  history: ProfitFieldEntry[];      // from useOutcomeGradient
-  scarMemory: ScarRecord[];         // new, see below
-  liquidityProxy?: number;          // 0..1, thin..deep
-  crowdingProxy?: number;           // 0..1 from sentiment dispersion
-}): ValidationResult
-```
-
-### Path simulator (lite, closed-form, no MC loop)
-Three paths with regime-tilted priors:
-- `favorable`: P = 0.35 · regimeTilt(bull), expReturn = +1.5σ, maxDD = 0.4σ
-- `drift`:     P = 0.40, expReturn = 0, maxDD = 0.7σ
-- `adverse`:   P = 0.25 + crowding·0.15 + (vix>22?0.10:0), expReturn = -1.2σ, maxDD = 1.4σ
-
-Where σ = realized 5-day vol from history (or VIX/√52 fallback). Probabilities normalized to sum to 1.
-
-### Reflexivity filter
-- `crowding = clamp(|sentiment| · momentum_alignment, 0, 1)`
-- `liquidity_thin = liquidityProxy < 0.3` (default false if absent)
-- `reflexivityScore = crowding · liquidity_thin_factor`
-- Reject when `reflexivityScore > 0.6` for `INVEST/SCALE_UP`.
-
-### Drawdown gate
-Hard kill switch — non-negotiable. Computed before timing.
-
-### Entry Timing Engine
-Three micro-confirmations (boolean each, need ≥2):
-- `momentum_aligned`: sign(momentum_now) == sign(signal_direction)
-- `vol_contraction_to_expansion`: vol_now > vol_5d_avg AND vol_5d_avg < vol_20d_avg
-- `liquidity_absorption`: liquidityProxy >= 0.5
-
-If signal fires but timing not confirmed → `executable=false, rejectReasons=['await_confirmation']`. UI shows ARMED state instead of EXECUTABLE.
-
-### Scar Memory
-New table + new hook. After every losing trade we capture the *pattern*, not just PnL.
-
----
-
-## New table: `scar_memory` (Lovable Cloud migration)
-
-```sql
-create table public.scar_memory (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  ticker text not null,
-  signal_type text not null,
-  regime text not null,
-  vol_bucket text not null,              -- 'low'|'mid'|'high'|'crisis'
-  sentiment_bucket text not null,        -- 'neg'|'neu'|'pos'
-  momentum_bucket text not null,
-  failure_pattern text not null,         -- e.g. 'adverse_reflex','timing_premature','liquidity_trap'
-  realized_pnl_pct numeric not null,
-  created_at timestamptz not null default now()
-);
-alter table public.scar_memory enable row level security;
-create policy "scar_select_own" on public.scar_memory for select to authenticated using (auth.uid() = user_id);
-create policy "scar_insert_own" on public.scar_memory for insert to authenticated with check (auth.uid() = user_id);
-create policy "scar_delete_own" on public.scar_memory for delete to authenticated using (auth.uid() = user_id);
-create index scar_lookup on public.scar_memory (user_id, ticker, regime, vol_bucket);
-```
-
-`scar_factor = 1 - min(0.6, similar_failures / max(5, similar_total))`. Clamped so it can only depress, never inflate, the gradient.
-
----
-
-## Integration changes
-
-### `src/hooks/useOutcomeGradient.ts`
-- Add `scarMemory` state hydrated from `scar_memory` table on auth.
-- Inside `ingestTrade`: if `pnlPct < 0`, derive `failure_pattern` from features + most recent validation (stored in localStorage briefly) and insert a scar row.
-- Add `validateSignal(signal): ValidationResult` returned from the hook — thin wrapper around `validateTrade()`.
-- Decorate every entry of `intelligenceSignals` with `validation: ValidationResult`. Sort `executable` first, then by `gNew`.
-- Replace the current "fallback starter signal" path with a clearly-tagged `ARMED, awaiting confirmation` card so we never auto-suggest weak trades.
-
-### `src/components/sandbox/OutcomeGradientDashboard.tsx`
-- Each signal card gets:
-  - `EXECUTABLE` badge (gain) or `ARMED` (warning) or `BLOCKED` (loss) with reason tags.
-  - 3-path strip: favorable / drift / adverse with probability bars and expected DD.
-  - Drawdown gate readout: `DD budget 3.2% · expected 4.1% → BLOCKED`.
-  - Reflexivity meter (0..100).
-  - Scar count if pattern previously failed: `Scar: 3 prior failures in this regime`.
-- Add a new top-row metric: `Block Rate (last 20)` so the user sees the gate is actually filtering.
-
-### `src/components/DesirableAssets.tsx`
-- Where it currently calls `getAssetBoost`, also call `validateSignal` and:
-  - hide the BUY CTA when `!executable`,
-  - show `BLOCKED — <top reason>` chip,
-  - or `ARMED — waiting on <missing confirmation>`.
-- This is the primary user-visible fix for the "desirable but loss-making" complaint.
-
-### CROWN-lite micro-hedge (in-component, no new function)
-On the dashboard, after a position is marked executable and `pAdverse > 0.20`, show `Auto-Hedge` toggle. When enabled and ODG later detects adverse-path conditions on the live signal (sentiment flip + vol expansion), surface a `HEDGE NOW` action card (no auto-execution — surfacing only, since we don't auto-trade).
-
----
-
-## Files to create / change
-
-Create:
-- `src/lib/odg-validator.ts` — pure validator, path sim, reflexivity, drawdown gate, timing.
-- `src/lib/odg-scar.ts` — failure-pattern classifier + scar lookup helpers.
-- Migration: `scar_memory` table + RLS.
-
-Change:
-- `src/hooks/useOutcomeGradient.ts` — wire scar hydration, decorate signals, expose `validateSignal`, write scars on losses.
-- `src/components/sandbox/OutcomeGradientDashboard.tsx` — render validation block per signal, block-rate metric.
-- `src/components/DesirableAssets.tsx` — gate the BUY CTA on `executable`.
-- `src/components/TradeJournal.tsx` — when logging a loss, call scar writer.
-
-No edge-function changes required — validation is fully client-side and deterministic, fitting the lightweight constraint.
-
----
-
-## Acceptance criteria
-
-1. A signal on a desirable asset with `pAdverse > 0.30` renders as `BLOCKED` with the reason chip, and the Desirable Assets BUY CTA is hidden.
-2. The dashboard shows a non-zero block rate within a few signals of normal usage.
-3. After two losing trades on the same `(ticker, regime, vol_bucket)` pattern, the third matching signal's `scar_factor` ≤ 0.6 and the signal degrades to `ARMED` or `BLOCKED`.
-4. Drawdown gate cannot be bypassed by raising confidence — it is checked before the gradient score is even computed.
-5. Existing tests still pass; no edge functions touched.
+If you approve, I’ll implement the hardening directly in the Desirable Assets edge function and UI so this failure mode stops recurring.

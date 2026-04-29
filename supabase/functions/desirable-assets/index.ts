@@ -700,7 +700,8 @@ function summarizeRejects(rejectReasons: Record<string, number>) {
     F1_previous_repeat: "were repeats from recent refreshes",
     F1b_sell_or_highrisk: "conflicted with existing sell or high-risk warnings",
     F1b_avoided_sector: "fell into sectors the system is avoiding",
-    F2_target_below_price: "had targets below live price",
+    F2_target_below_price: "had targets below live price (target auto-recomputed)",
+    F2_invalid_target: "had structurally invalid target prices",
     F3_illiquid: "failed the liquidity bar",
     F3_microcap_or_small: "were niche small or micro-cap names",
     F3_loss_maker: "were loss-making businesses",
@@ -786,8 +787,23 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
         : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
     // Anti-repeat instruction
-    const antiRepeatBlock = previousTickers.length > 0
-      ? `\n## ANTI-REPEAT RULE:\nDo NOT recommend ANY of these tickers (previously recommended): ${previousTickers.join(", ")}. Pick COMPLETELY DIFFERENT assets.\n`
+    // Scoped anti-repeat: only the most recent slate is treated as a soft avoid.
+    // We deliberately don't broadcast a 30-deep ban list to the model — that
+    // starves the engine and was the root cause of the "Most rejected names
+    // were already in your portfolio" failure mode the user kept hitting.
+    const recentBan = previousTickers.slice(-12);
+    const antiRepeatBlock = recentBan.length > 0
+      ? `\n## ANTI-REPEAT (soft):\nAvoid recycling these tickers from the most recent slate unless they are clearly the best available pick today: ${recentBan.join(", ")}. Prefer fresh, equally-liquid alternatives.\n`
+      : "";
+
+    // HARD portfolio exclusion: anything the user already owns is NOT a
+    // recommendation candidate, full stop. The model frequently ignored a
+    // soft mention buried in the prompt — promoting this to its own block
+    // with explicit replacement language fixes the "6 already in portfolio"
+    // collapse.
+    const heldTickersUpper = portfolioTickers.map((t) => String(t).toUpperCase());
+    const hardExclusionBlock = heldTickersUpper.length > 0
+      ? `\n## HARD EXCLUSION — DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list — keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
       : "";
 
     // ── STAGE 1: AI candidate generation + deterministic reliability fallback ──
@@ -884,11 +900,13 @@ QUALITY MANDATE:
 - Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
 - Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
 - Use exact tickers supported by Yahoo Finance.
+- NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
+- Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${crossModuleBlock}${antiRepeatBlock}${macroBlock}
+${hardExclusionBlock}${crossModuleBlock}${antiRepeatBlock}${macroBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
@@ -975,6 +993,65 @@ Return via the tool call only.`,
 
     candidates = dedupeCandidates(candidates).slice(0, 28);
     console.log(`desirable-assets: AI returned ${candidates.length} picks (no fallback substitution)`);
+
+    // ── STAGE 1B: Refill pass if first AI pass is contaminated by held/repeat names ──
+    // The dominant failure mode was the AI emitting names the user already owns or
+    // names we just recommended. Detect that BEFORE the expensive Yahoo / Monte Carlo
+    // stage and ask the model for replacements with the explicit exclusion list.
+    try {
+      const heldSetUpper = new Set(portfolioTickers.map((t) => String(t).toUpperCase()));
+      const recentSetUpper = new Set(previousTickers.map((t) => String(t).toUpperCase()));
+      const contaminated = candidates.filter((c: any) => {
+        const t = String(c?.ticker || "").toUpperCase();
+        return heldSetUpper.has(t) || recentSetUpper.has(t);
+      });
+      const cleanCount = candidates.length - contaminated.length;
+      const needsRefill = candidates.length > 0 && (cleanCount < 6 || contaminated.length / candidates.length >= 0.4);
+      if (needsRefill) {
+        repairLog(`Stage 1B refill: ${contaminated.length}/${candidates.length} candidates collided with held/recent — requesting replacements`);
+        const bannedList = [
+          ...heldSetUpper,
+          ...Array.from(recentSetUpper).slice(-12),
+          ...contaminated.map((c: any) => String(c?.ticker || "").toUpperCase()),
+        ];
+        const uniqueBanned = Array.from(new Set(bannedList)).filter(Boolean);
+        const refillOpts = {
+          systemPrompt: `You are an institutional quant PM emitting REPLACEMENT picks only.
+The previous slate was rejected because too many names were already in the user's portfolio or were recently shown.
+You MUST return at least 8 NEW, liquid, tradeable names that are NOT on the banned list, with realistic targets ABOVE the live price.
+Output only the tool call. No markdown.${indiaMode ? " India-only listings (.NS / .BO)." : ""}`,
+          userPrompt: `[SEED:${seed + 1}] REPLACEMENT REQUEST.
+Banned tickers (do NOT emit any of these): ${uniqueBanned.join(", ") || "none"}.
+${preferredAssetTypes?.length ? `Preferred asset types: ${preferredAssetTypes.join(", ")}.\n` : ""}${preferredSectors?.length ? `Preferred sectors: ${preferredSectors.join(", ")}.\n` : ""}${userBudget ? `User budget: ${baseCurrency} ${userBudget.toLocaleString()}. Size positions for this budget.\n` : ""}Home-market rule: ${homeMarketRule}
+Return 8-10 replacement recommendations via the tool call only. Each must have entryZone, targetPrice (> live price), stopLoss, hedgingStrategy, and a concrete catalyst.`,
+          tools: candidateTools,
+          toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
+          maxTokens: 2400,
+          temperature: 0.55,
+        };
+        const refillResults = await callAIParallel(refillOpts);
+        const refillCandidates: any[] = [];
+        for (const result of refillResults) {
+          const p = safeParseJSON(result.text);
+          const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+          refillCandidates.push(...recs);
+        }
+        // Drop any refill candidate that is itself on the banned list.
+        const refillClean = refillCandidates.filter((c: any) => {
+          const t = String(c?.ticker || "").toUpperCase();
+          return t && !heldSetUpper.has(t) && !recentSetUpper.has(t);
+        });
+        // Keep originally-clean candidates plus refill output.
+        const originallyClean = candidates.filter((c: any) => {
+          const t = String(c?.ticker || "").toUpperCase();
+          return !heldSetUpper.has(t) && !recentSetUpper.has(t);
+        });
+        candidates = dedupeCandidates([...originallyClean, ...refillClean]).slice(0, 32);
+        repairLog(`Stage 1B refill produced ${refillClean.length} clean replacements; merged total=${candidates.length}`);
+      }
+    } catch (refillErr) {
+      console.warn("desirable-assets refill pass failed:", (refillErr as Error).message);
+    }
 
     // No fallback. If AI produced nothing usable, return an honest empty set.
     if (candidates.length === 0) {
@@ -1179,8 +1256,16 @@ Return via the tool call only.`,
         continue;
       }
 
-      // F2: Target must be above current price
-      if (rec.targetPrice > 0 && td.price && rec.targetPrice < td.price * 0.95) { filtered++; bumpReject("F2_target_below_price"); continue; }
+      // F2: Target must be above current price.
+      // Repair-first: if the AI's target is stale (below live price), don't throw the
+      // name away — clear the field so the downstream quant layer recomputes a fresh
+      // target from volatility / 52w range. Only reject if the AI handed us something
+      // structurally absurd (e.g. negative or zero target with no recoverable signal).
+      if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) {
+        rec.targetPrice = 0; // signal to enrichment stage to recompute
+        rec.entryZone = null; // let enrichment re-derive entry zone too
+      }
+      if (rec.targetPrice && rec.targetPrice < 0) { filtered++; bumpReject("F2_invalid_target"); continue; }
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;

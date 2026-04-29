@@ -94,8 +94,8 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v5";
-const DA_PREV_TICKERS_KEY = "da_previous_tickers";
+const DA_CACHE_KEY = "da_recommendations_v6";
+const DA_PREV_TICKERS_KEY = "da_previous_tickers_v2";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
 
 function getPreviousTickers(): string[] {
@@ -107,8 +107,11 @@ function getPreviousTickers(): string[] {
 
 function savePreviousTickers(tickers: string[]) {
   try {
-    // Keep last 30 tickers to prevent repeats across refreshes
-    localStorage.setItem(DA_PREV_TICKERS_KEY, JSON.stringify(tickers.slice(-30)));
+    // Keep only the last slate (max 12) as a soft-avoid hint. A larger memory
+    // was starving the AI and producing the "6 already in your portfolio"
+    // collapse: the model exhausted its diverse alternatives and fell back
+    // to held names. Backend treats this as a soft hint, not a hard ban.
+    localStorage.setItem(DA_PREV_TICKERS_KEY, JSON.stringify(tickers.slice(-12)));
   } catch { /* ignore */ }
 }
 
@@ -329,7 +332,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             portfolioValue: totalValue || 100000,
             baseCurrency,
             indiaMode: baseCurrency === "INR",
-            previousTickers: getPreviousTickers(),
+            // On manual force-refresh, drop the recent-slate memory entirely
+            // so the engine isn't fighting two exclusion lists at once.
+            previousTickers: forceRefresh ? [] : getPreviousTickers(),
             userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
@@ -373,13 +378,21 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
           setRecommendations([]);
           setLastFetch(Date.now());
+          // Clear stale exclusion memory — it's almost certainly part of why
+          // we got an empty set. Next refresh starts from a clean slate.
+          try { localStorage.removeItem(DA_PREV_TICKERS_KEY); } catch { /* ignore */ }
           const gen = data.candidatesGenerated || 0;
           const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
             ? ` ${data.rejectSummary.join(". ")}.`
             : "";
+          const refillTried = Array.isArray(data.repairTrail)
+            && data.repairTrail.some((s: string) => typeof s === "string" && s.toLowerCase().includes("refill"));
+          const refillNote = refillTried
+            ? " Replacement search was attempted but didn't return enough fresh names."
+            : "";
           setError(
             gen > 0
-              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}`
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry — the next pass will start with a fresh exclusion window.`
               : "No setups generated this cycle. Try again or adjust filters.",
           );
           retryCount.current = 0;
@@ -396,7 +409,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       
       // Save tickers for anti-repeat on next refresh
       const newTickers = data.recommendations.map((r: any) => r.ticker);
-      savePreviousTickers([...getPreviousTickers(), ...newTickers]);
+      // Replace, don't append — the recent-slate memory is a single window.
+      savePreviousTickers(newTickers);
       
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
