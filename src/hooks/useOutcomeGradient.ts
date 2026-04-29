@@ -1,6 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocalStorage } from "./useLocalStorage";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  validateTrade,
+  classifyFailure,
+  bucketsFor,
+  type ScarRecord,
+  type ValidationResult,
+  type SignalKind,
+} from "@/lib/odg-validator";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -71,6 +79,7 @@ export interface IntelligenceSignal {
   reasoning: string;
   assets: string[];
   confidence: number;
+  validation?: ValidationResult;
 }
 
 export interface ShadowState {
@@ -154,6 +163,7 @@ export function useOutcomeGradient() {
   const [updateCounter, setUpdateCounter] = useLocalStorage<number>("odgs-update-counter", 0);
   const [userId, setUserId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [scarMemory, setScarMemory] = useLocalStorage<ScarRecord[]>("odgs-scar-memory", []);
   const recentLocalIds = useRef<Set<string>>(new Set());
 
   // ─── Auth + Cloud Hydration ────────────────────────
@@ -193,6 +203,17 @@ export function useOutcomeGradient() {
           generation: g.generation || 0,
         });
       }
+
+      // Pull scar memory
+      const { data: scars } = await supabase
+        .from("scar_memory")
+        .select("ticker, signal_type, regime, vol_bucket, sentiment_bucket, momentum_bucket, failure_pattern, realized_pnl_pct")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (!cancelled && scars) {
+        setScarMemory(scars as any);
+      }
+
       if (!cancelled) setHydrated(true);
     })();
 
@@ -231,7 +252,31 @@ export function useOutcomeGradient() {
       });
       if (error) console.warn("ODGS ledger persist failed:", error.message);
     }
-  }, [userId, setEntries, setUpdateCounter]);
+
+    // Scar Memory: capture pattern of losing trades
+    if (trade.pnlPct < 0) {
+      const pattern = classifyFailure(trade.features, trade.pnlPct, trade.features.regime);
+      const buckets = bucketsFor(trade.features);
+      const scar: ScarRecord = {
+        ticker: trade.asset,
+        signal_type: trade.source || "manual",
+        regime: trade.features.regime || "unknown",
+        vol_bucket: buckets.vol_bucket,
+        sentiment_bucket: buckets.sentiment_bucket,
+        momentum_bucket: buckets.momentum_bucket,
+        failure_pattern: pattern,
+        realized_pnl_pct: trade.pnlPct,
+      };
+      setScarMemory(prev => [scar, ...prev].slice(0, 500));
+      if (userId) {
+        const { error: scarErr } = await supabase.from("scar_memory").insert({
+          user_id: userId,
+          ...scar,
+        });
+        if (scarErr) console.warn("ODGS scar persist failed:", scarErr.message);
+      }
+    }
+  }, [userId, setEntries, setUpdateCounter, setScarMemory]);
 
   // ─── Persist gradient state to cloud ───────────────
   const persistGradient = useCallback(async (g: GradientVector) => {
@@ -614,10 +659,59 @@ export function useOutcomeGradient() {
     }
 
     const urgencyOrder = { high: 0, medium: 1, low: 2 };
-    return signals
-      .sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence)
+    const validated = signals.map((sig): IntelligenceSignal => {
+      const primary = sig.assets[0];
+      const recentForAsset = entries.find(e => e.asset === primary) || entries[0];
+      const features = recentForAsset?.features ?? { momentum: 0, vol: 0, sentiment: 0, regime: "unknown" };
+      const bias = gradient.assetBiases[primary] || 1.0;
+      const validation = validateTrade({
+        ticker: primary,
+        signalType: sig.type as SignalKind,
+        features: {
+          momentum: features.momentum,
+          vol: features.vol,
+          sentiment: features.sentiment,
+        },
+        regime: features.regime || "unknown",
+        history: entries,
+        scarMemory,
+        bias,
+      });
+      return { ...sig, validation };
+    });
+    return validated
+      .sort((a, b) => {
+        const aExec = a.validation?.executable ? 0 : 1;
+        const bExec = b.validation?.executable ? 0 : 1;
+        if (aExec !== bExec) return aExec - bExec;
+        const aG = a.validation?.gNew ?? 0;
+        const bG = b.validation?.gNew ?? 0;
+        if (aG !== bG) return bG - aG;
+        return urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || b.confidence - a.confidence;
+      })
       .slice(0, 12);
-  }, [entries, profitField, desirableZones, combinationScores, gradient, shadowComparison]);
+  }, [entries, profitField, desirableZones, combinationScores, gradient, shadowComparison, scarMemory]);
+
+  // ─── Validation utilities ────────────────────────
+
+  const validateSignal = useCallback(
+    (input: { ticker: string; signalType: SignalKind; features?: { momentum: number; vol: number; sentiment: number }; regime?: string }): ValidationResult => {
+      const recentForAsset = entries.find(e => e.asset === input.ticker);
+      const features = input.features ?? (recentForAsset?.features ?? { momentum: 0, vol: 0, sentiment: 0 });
+      const regime = input.regime ?? recentForAsset?.features.regime ?? "unknown";
+      const bias = gradient.assetBiases[input.ticker] || 1.0;
+      return validateTrade({
+        ticker: input.ticker,
+        signalType: input.signalType,
+        features,
+        regime,
+        history: entries,
+        scarMemory,
+        bias,
+      });
+    },
+    [entries, gradient, scarMemory],
+  );
 
   // ─── Clear ─────────────────────────────────────────
 
@@ -641,6 +735,13 @@ export function useOutcomeGradient() {
     shadowComparison,
     allocationHistory,
     intelligenceSignals,
+    scarMemory,
+    blockRate: intelligenceSignals.length
+      ? (intelligenceSignals.filter(s => s.validation && !s.validation.executable).length /
+          intelligenceSignals.length) *
+        100
+      : 0,
+    validateSignal,
     ingestTrade,
     computeAndApplyGradient,
     getAssetBoost,

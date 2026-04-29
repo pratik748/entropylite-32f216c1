@@ -210,7 +210,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { getAssetBoost } = useOutcomeGradient();
+  const { getAssetBoost, validateSignal } = useOutcomeGradient();
   const existingTickers = stocks.map(s => s.ticker);
 
   // Needs & Constraints state
@@ -664,6 +664,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const boostedAlloc = Math.max(1, Math.round((rec.suggestedQty || 1) * odgs.allocMult));
           const disagreement = rec.riskVerdict === "high";
 
+          // ── ODG outcome-path validation: desirable asset != desirable trade ──
+          const validation = validateSignal({
+            ticker: rec.ticker,
+            signalType: "invest",
+            features: {
+              momentum: rec.momentum20d ?? 0,
+              vol: rec.volatility ?? 0,
+              sentiment: rec.sentimentScore ?? 0,
+            },
+            regime: regimeType || "unknown",
+          });
+          const tradeBlocked = !validation.executable;
+
           return (
             <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
               {/* Header row */}
@@ -702,7 +715,22 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                       <AlertTriangle className="h-2.5 w-2.5" /> RISK CONFLICT
                     </span>
                   )}
-                  
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                      validation.status === "EXECUTABLE"
+                        ? "bg-gain/10 text-gain"
+                        : validation.status === "ARMED"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-loss/10 text-loss"
+                    }`}
+                    title={`Adverse ${(validation.pAdverse * 100).toFixed(0)}% · DD ${validation.expectedDrawdownPct.toFixed(1)}% / budget ${validation.drawdownBudgetPct.toFixed(1)}%`}
+                  >
+                    {validation.status === "EXECUTABLE"
+                      ? "✓ ODG OK"
+                      : validation.status === "ARMED"
+                      ? `⏸ ARMED · ${validation.confirmationsMissing[0]?.replace(/_/g, " ") || "wait"}`
+                      : `✕ BLOCKED · ${validation.topReason}`}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {/* Quant Score badge */}
@@ -897,11 +925,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   <Button
                   size="sm"
                   variant={justAdded ? "secondary" : "default"}
-                  disabled={alreadyOwned || justAdded}
+                  disabled={alreadyOwned || justAdded || tradeBlocked}
+                  title={tradeBlocked ? `ODG gate: ${validation.topReason}` : undefined}
                     onClick={() => handleAdd({ ...rec, suggestedQty: boostedAlloc, positionValue: price * boostedAlloc })}
                   className="h-7 gap-1 text-[10px]"
                 >
-                  {justAdded ? "Added ✓" : alreadyOwned ? "Owned" : <><Plus className="h-3 w-3" /> Add</>}
+                  {justAdded
+                    ? "Added ✓"
+                    : alreadyOwned
+                    ? "Owned"
+                    : tradeBlocked
+                    ? validation.status === "ARMED"
+                      ? "Armed"
+                      : "Blocked"
+                    : <><Plus className="h-3 w-3" /> Add</>}
                 </Button>
               </div>
             </div>

@@ -31,7 +31,7 @@ const OutcomeGradientDashboard = () => {
   const {
     entries, profitField, desirableZones, combinationScores,
     gradient, safetyStatus, shadowComparison, allocationHistory,
-    intelligenceSignals,
+    intelligenceSignals, blockRate,
     computeAndApplyGradient, clearAll, totalTrades, generation,
   } = useOutcomeGradient();
 
@@ -108,7 +108,7 @@ const OutcomeGradientDashboard = () => {
               { label: "Decay Factor", value: safetyStatus.decayFactor.toFixed(2), color: "text-muted-foreground" },
               { label: "Hot Zones", value: safetyStatus.diversificationCount.toString(), color: safetyStatus.diversificationCount >= 5 ? "text-gain" : "text-warning" },
               { label: "5-Trade PnL", value: `${safetyStatus.rollingPnl5 >= 0 ? "+" : ""}${safetyStatus.rollingPnl5.toFixed(2)}%`, color: safetyStatus.rollingPnl5 >= 0 ? "text-gain" : "text-loss" },
-              { label: "Status", value: safetyStatus.rollbackTriggered ? "ROLLBACK" : "ACTIVE", color: safetyStatus.rollbackTriggered ? "text-loss" : "text-gain" },
+              { label: "Block Rate", value: `${blockRate.toFixed(0)}%`, color: blockRate >= 30 ? "text-gain" : blockRate >= 10 ? "text-warning" : "text-muted-foreground" },
             ].map(m => (
               <div key={m.label} className="rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center">
                 <p className="text-[8px] uppercase tracking-wider text-muted-foreground">{m.label}</p>
@@ -162,6 +162,19 @@ const OutcomeGradientDashboard = () => {
                             }`}>
                               {sig.urgency.toUpperCase()}
                             </Badge>
+                            {sig.validation && (
+                              <Badge
+                                variant="outline"
+                                className={`text-[8px] px-1.5 py-0 font-mono ${
+                                  sig.validation.status === "EXECUTABLE" ? "text-gain border-gain/30" :
+                                  sig.validation.status === "ARMED" ? "text-warning border-warning/30" :
+                                  "text-loss border-loss/30"
+                                }`}
+                                title={sig.validation.rejectReasons.join(", ")}
+                              >
+                                {sig.validation.status}
+                              </Badge>
+                            )}
                             <span className="text-[9px] font-mono text-muted-foreground ml-auto">
                               {sig.confidence}% conf
                             </span>
@@ -175,6 +188,54 @@ const OutcomeGradientDashboard = () => {
                               </span>
                             ))}
                           </div>
+                          {sig.validation && (
+                            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[9px] font-mono">
+                              {sig.validation.paths.map(p => (
+                                <div
+                                  key={p.path}
+                                  className={`rounded border px-1.5 py-1 ${
+                                    p.path === "favorable" ? "border-gain/20 bg-gain/5" :
+                                    p.path === "drift" ? "border-border bg-muted/10" :
+                                    "border-loss/20 bg-loss/5"
+                                  }`}
+                                >
+                                  <p className="text-[8px] uppercase text-muted-foreground tracking-wider">{p.path}</p>
+                                  <p className="text-foreground font-bold">{(p.probability * 100).toFixed(0)}%</p>
+                                  <p className="text-muted-foreground">DD {p.maxDrawdownPct.toFixed(1)}%</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {sig.validation && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[9px] font-mono text-muted-foreground">
+                              <span title="Drawdown gate">
+                                DD: <span className={sig.validation.expectedDrawdownPct > sig.validation.drawdownBudgetPct ? "text-loss" : "text-foreground"}>
+                                  {sig.validation.expectedDrawdownPct.toFixed(1)}%
+                                </span> / {sig.validation.drawdownBudgetPct.toFixed(1)}%
+                              </span>
+                              <span>Reflex: <span className={sig.validation.reflexivityScore > 0.6 ? "text-loss" : "text-foreground"}>
+                                {(sig.validation.reflexivityScore * 100).toFixed(0)}
+                              </span></span>
+                              {sig.validation.scarSimilarFailures > 0 && (
+                                <span className="text-warning">Scar: {sig.validation.scarSimilarFailures}× prior fail</span>
+                              )}
+                              <span className="ml-auto">G<sub>new</sub>: <span className="text-foreground">{sig.validation.gNew.toFixed(3)}</span></span>
+                            </div>
+                          )}
+                          {sig.validation && sig.validation.rejectReasons.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {sig.validation.rejectReasons.map(r => (
+                                <span key={r} className="rounded bg-loss/10 text-loss px-1.5 py-0.5 text-[8px] font-mono">
+                                  {r.replace(/_/g, " ")}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {sig.validation?.microHedge?.enabled && (
+                            <div className="mt-1 rounded bg-warning/5 border border-warning/20 px-2 py-1 text-[9px] text-warning font-mono">
+                              CROWN-lite: micro-hedge armed — trigger on {sig.validation.microHedge.trigger.replace(/_/g, " ")}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
