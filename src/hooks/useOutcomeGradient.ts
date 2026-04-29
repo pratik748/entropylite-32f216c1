@@ -163,6 +163,7 @@ export function useOutcomeGradient() {
   const [updateCounter, setUpdateCounter] = useLocalStorage<number>("odgs-update-counter", 0);
   const [userId, setUserId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [scarMemory, setScarMemory] = useLocalStorage<ScarRecord[]>("odgs-scar-memory", []);
   const recentLocalIds = useRef<Set<string>>(new Set());
 
   // ─── Auth + Cloud Hydration ────────────────────────
