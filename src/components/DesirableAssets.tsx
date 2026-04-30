@@ -584,8 +584,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
           <span className="text-[10px] text-muted-foreground ml-1">
-            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
-              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon)
+              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedHorizon ? (HORIZONS.find(h => h.key === selectedHorizon)?.label || selectedHorizon) : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
               : "Set your preferences"}
           </span>
           <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
@@ -643,6 +643,30 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     }`}
                   >
                     {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Time Horizon */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="h-3 w-3" /> Time Horizon
+                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">— filters picks to match how long you'll hold</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {HORIZONS.map((h) => (
+                  <button
+                    key={h.key}
+                    onClick={() => setSelectedHorizon(selectedHorizon === h.key ? "" : h.key)}
+                    title={h.hint}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedHorizon === h.key
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {h.label} <span className="opacity-60">· {h.hint}</span>
                   </button>
                 ))}
               </div>
