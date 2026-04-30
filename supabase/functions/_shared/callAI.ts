@@ -37,6 +37,10 @@ const GEMINI_HEAVY_MODEL = "gemini-2.5-pro";
 const GEMINI_FAST_MODEL = "gemini-2.5-flash-lite";
 const LOVABLE_GATEWAY_DEFAULT_MODEL = "openai/gpt-5-mini";
 
+// Models on the Lovable Gateway / OpenAI side that REJECT `max_tokens`
+// and require `max_completion_tokens` instead.
+const COMPLETION_TOKENS_MODELS = /^(openai\/)?(gpt-5|gpt-5\.|o1|o3|o4)/i;
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
