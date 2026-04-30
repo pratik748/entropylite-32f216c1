@@ -973,6 +973,23 @@ Rules:
       }
     } catch (e) { console.warn("Macro calendar fetch failed:", (e as Error).message); }
 
+    // Real-time web context (Google Search grounding) — fetch fresh market
+    // narrative the model can't know from its training cutoff. Silent on failure.
+    let webBlock = "";
+    try {
+      const region = indiaMode ? "India NSE BSE Nifty Sensex" : (regionInfo?.region || "global markets");
+      const horizonHint = preferredHorizon === "intraday"
+        ? "intraday momentum, pre-market movers, breaking news, options flow"
+        : preferredHorizon === "short_term"
+          ? "this week's catalysts, earnings calendar, technical breakouts"
+          : preferredHorizon === "long_term"
+            ? "structural themes, secular growth, multi-year compounders, ETF flows"
+            : "1-3 month catalysts, earnings, sector rotation";
+      const sectorHint = preferredSectors?.length ? ` in ${preferredSectors.join(", ")}` : "";
+      const query = `Latest ${region} stock market news, top movers, and trade ideas${sectorHint} — focus on ${horizonHint}. Today's date: ${new Date().toISOString().split("T")[0]}.`;
+      webBlock = await fetchLiveWebContext(query, 8);
+    } catch (e) { console.warn("Live web context failed:", (e as Error).message); }
+
     try {
       const aiOpts = {
         systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and evidence-backed portfolio fit.
