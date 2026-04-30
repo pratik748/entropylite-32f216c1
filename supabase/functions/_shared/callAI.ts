@@ -414,6 +414,81 @@ function parseGatewayResponse(data: any, opts: CallAIOptions, reportedProvider?:
 
 const RETRY_DELAYS = [0, 1500];
 
+/**
+ * Direct Mistral API caller — used as a real fallback when Gemini is rate-limited.
+ * Free-tier friendly. No tool-calling support here (only text + JSON mode).
+ */
+async function callMistralDirect(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const key = Deno.env.get("MISTRAL_API_KEY");
+  if (!key) throw new Error("MISTRAL_API_KEY not set");
+
+  const model = "mistral-large-latest";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const body: Record<string, any> = {
+    model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
+  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+}
+
+/**
+ * Direct Cloudflare Workers AI caller — second free-tier fallback.
+ */
+async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  if (!accountId || !apiToken) throw new Error("CLOUDFLARE creds not set");
+
+  const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const body: Record<string, any> = {
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Cloudflare ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.result?.response;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Cloudflare response");
+  return { text: stripThinkingBlocks(text), provider: reported || "cloudflare" };
+}
+
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   // Choose model: heavy reasoning for big requests, default flash otherwise.
   const tokens = opts.maxTokens ?? 8192;
