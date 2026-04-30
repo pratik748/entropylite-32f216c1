@@ -457,3 +457,34 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   console.log(`callAIParallel → ${successes.length}/3 Gemini variants succeeded`);
   return successes;
 }
+
+/**
+ * Fetch real-time web context using Gemini's Google Search grounding.
+ * Use this BEFORE a tool-using AI call to inject fresh news / prices / events
+ * into the prompt (since Gemini disallows function tools + search in one call).
+ *
+ * Returns a short bulleted snippet block ready to drop into a userPrompt,
+ * or an empty string on any failure (silent — never blocks the host engine).
+ */
+export async function fetchLiveWebContext(query: string, maxBullets = 6): Promise<string> {
+  if (!query || query.trim().length < 3) return "";
+  try {
+    const res = await callGemini({
+      systemPrompt:
+        "You are a real-time market news fetcher. Use Google Search to find the LATEST (last 24-72 hours) factual headlines and data points relevant to the query. Output ONLY a tight bulleted list, max " +
+        maxBullets +
+        " bullets. Each bullet: one factual fact + source domain in parentheses. No analysis, no opinions, no preamble.",
+      userPrompt: `Search the web RIGHT NOW for the latest information on:\n\n${query}\n\nReturn only freshly-sourced facts from the past 72 hours where possible. Include dates if available. No commentary.`,
+      maxTokens: 800,
+      temperature: 0.1,
+      useWebSearch: true,
+      skipHardening: true,
+    }, GEMINI_FAST_MODEL, "gemini");
+    const txt = (res.text || "").trim();
+    if (!txt) return "";
+    return `\n## LIVE WEB CONTEXT (Google Search, fetched ${new Date().toISOString()})\n${txt}\n`;
+  } catch (e) {
+    console.warn("fetchLiveWebContext failed (silent):", (e as Error).message);
+    return "";
+  }
+}
