@@ -200,9 +200,25 @@ const IndexContent = () => {
 
   const analyzeStock = useCallback(
     async (stockId: string, ticker: string, buyPrice: number, quantity: number) => {
-      setStocks((prev) => prev.map((s) => (s.id === stockId ? { ...s, isLoading: true, analysis: null } : s)));
+      // Preserve the stock's existing Direct Profit context (if any) across
+      // the analysis-in-progress wipe, then forward it to the edge function
+      // so the deeper view stays consistent with the original entry decision.
+      let directProfitContext: any = null;
+      setStocks((prev) =>
+        prev.map((s) => {
+          if (s.id !== stockId) return s;
+          directProfitContext = s.analysis?.directProfitContext ?? null;
+          return {
+            ...s,
+            isLoading: true,
+            analysis: directProfitContext ? { directProfitContext } : null,
+          };
+        }),
+      );
       try {
-        const { data, error } = await governedInvoke("analyze-stock", { body: { ticker, buyPrice, quantity } });
+        const { data, error } = await governedInvoke("analyze-stock", {
+          body: { ticker, buyPrice, quantity, directProfitContext },
+        });
         if (error) throw error;
         const analysisData = { ...data, ticker, buyPrice, quantity };
         setStocks((prev) =>
