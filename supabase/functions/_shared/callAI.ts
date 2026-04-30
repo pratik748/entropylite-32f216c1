@@ -530,6 +530,18 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
   catch (e) { lastError = e; }
 
+  // Real multi-vendor fallback chain when Gemini is exhausted.
+  // Skip non-tool providers if the caller needs function calling.
+  const needsTools = !!(opts.tools && opts.tools.length > 0);
+
+  if (!needsTools) {
+    try { return await callMistralDirect(opts, opts.provider || reported); }
+    catch (e) { lastError = e; console.warn("Mistral fallback failed:", (e as any)?.message || e); }
+
+    try { return await callCloudflareDirect(opts, opts.provider || reported); }
+    catch (e) { lastError = e; console.warn("Cloudflare fallback failed:", (e as any)?.message || e); }
+  }
+
   try {
     return await callLovableGateway(opts, undefined, opts.provider || reported);
   } catch (e) {
@@ -584,10 +596,16 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       try { return [await callGemini(opts, m, "gemini")]; }
       catch { /* try next */ }
     }
+    // Real fallbacks before erroring out.
+    const needsTools = !!(opts.tools && opts.tools.length > 0);
+    if (!needsTools) {
+      try { return [await callMistralDirect(opts, "mistral")]; } catch { /* next */ }
+      try { return [await callCloudflareDirect(opts, "cloudflare")]; } catch { /* next */ }
+    }
     try {
       return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
     } catch { /* fall through */ }
-    throw new Error("callAIParallel: all Gemini variants failed");
+    throw new Error("callAIParallel: all providers failed (Gemini + Mistral + Cloudflare + Gateway)");
   }
 
   console.log(`callAIParallel → ${successes.length}/3 Gemini variants succeeded`);
