@@ -6,7 +6,7 @@ export interface HistoryEntry {
   id: string;
   ticker: string;
   timestamp: number;
-  suggestion: "Hold" | "Add" | "Exit";
+  suggestion: "Hold" | "Add" | "Exit" | "Skip";
   currentPrice: number;
   buyPrice: number;
   confidence: number;

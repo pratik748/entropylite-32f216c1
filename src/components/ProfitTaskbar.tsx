@@ -6,7 +6,7 @@ interface ProfitTaskbarProps {
   currentPrice: number;
   buyPrice: number;
   quantity: number;
-  suggestion: "Hold" | "Add" | "Exit";
+  suggestion: "Hold" | "Add" | "Exit" | "Skip";
   confidence: number;
   bullRange: [number, number];
   bearRange: [number, number];
