@@ -144,7 +144,17 @@ function normalizeTradeResult(value: any): TradeResult | null {
   };
 }
 
-const DirectProfitMode = () => {
+interface DirectProfitModeProps {
+  /**
+   * Called when a trade is added so the host (dashboard) can mirror the position
+   * into the main cloud portfolio with an auto-optimized quantity.
+   */
+  onAddToMainPortfolio?: (ticker: string, buyPrice: number, quantity: number) => void;
+  /** Total portfolio value in base currency, used to size the position via fixed-fractional risk. */
+  portfolioValueBase?: number;
+}
+
+const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectProfitModeProps = {}) => {
   const [ticker, setTicker] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TradeResult | null>(null);
