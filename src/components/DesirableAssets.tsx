@@ -509,6 +509,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       setRecommendations(cached.recommendations);
       setMarketCondition(cached.marketCondition || "");
       setRegimeType(cached.regimeType || "");
+      setLiveWebContext(cached.liveWebContext || "");
       setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
       setLastFetch(cached.timestamp);
       setHasSearched(true);
