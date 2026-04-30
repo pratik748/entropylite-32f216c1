@@ -489,66 +489,97 @@ async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["pr
   return { text: stripThinkingBlocks(text), provider: reported || "cloudflare" };
 }
 
-export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  // Choose model: heavy reasoning for big requests, default flash otherwise.
-  const tokens = opts.maxTokens ?? 8192;
-  const preferredModel =
-    opts.model ||
-    (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
+/**
+ * Direct Groq caller — extremely fast inference, third free-tier provider.
+ */
+async function callGroqDirect(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const key = Deno.env.get("GROQ_API_KEY");
+  if (!key) throw new Error("GROQ_API_KEY not set");
 
+  const model = "llama-3.3-70b-versatile";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const body: Record<string, any> = {
+    model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8000),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 45000 : 25000;
+  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Groq ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Groq response");
+  return { text: stripThinkingBlocks(text), provider: reported || "groq" };
+}
+
+/**
+ * Race all non-gateway providers in parallel, return the first successful result.
+ * Gateway (Lovable AI Gateway) is only invoked if every direct provider fails.
+ * For tool-calling requests, only Gemini supports function declarations here,
+ * so the parallel fan-out is skipped and Gemini is tried directly.
+ */
+async function raceProviders(opts: CallAIOptions): Promise<AIResult> {
   const reported: AIResult["provider"] =
     opts.provider && opts.provider !== "gemini" ? opts.provider : "gemini";
+  const needsTools = !!(opts.tools && opts.tools.length > 0);
 
-  let lastError: any;
-  for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
-    if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-    try {
-      return await callGemini(opts, preferredModel, reported);
-    } catch (err: any) {
-      lastError = err;
-      if (err.status === 401 || err.status === 403 || err.name === "AbortError") break;
-      if (err.status === 429) {
-        // backoff then try a lighter model
-        await new Promise(r => setTimeout(r, 2000));
-        try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
-        catch (e) { lastError = e; }
-        break;
-      }
-      if (err.status >= 500 && err.status < 600) continue;
-      break;
+  if (needsTools) {
+    // Function-calling path: Gemini → Gateway only.
+    const tokens = opts.maxTokens ?? 8192;
+    const preferredModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
+    try { return await callGemini(opts, preferredModel, reported); } catch (e) {
+      try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); } catch {}
+      return await callLovableGateway(opts, undefined, opts.provider || reported);
     }
   }
 
-  // Final fallback: try the other tier model.
+  // Parallel race across direct providers (Mistral + Cloudflare + Groq + Gemini flash).
+  const tokens = opts.maxTokens ?? 8192;
+  const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
+
+  const candidates: Array<{ name: string; run: () => Promise<AIResult> }> = [
+    { name: "mistral",    run: () => callMistralDirect(opts, opts.provider || "mistral") },
+    { name: "cloudflare", run: () => callCloudflareDirect(opts, opts.provider || "cloudflare") },
+    { name: "groq",       run: () => callGroqDirect(opts, opts.provider || "groq") },
+    { name: "gemini",     run: () => callGemini(opts, geminiModel, reported) },
+  ];
+
+  const errors: string[] = [];
+  // Promise.any returns the first fulfilled; rejects only if ALL reject.
   try {
-    const fallbackModel =
-      preferredModel === GEMINI_HEAVY_MODEL ? GEMINI_DEFAULT_MODEL : GEMINI_HEAVY_MODEL;
-    return await callGemini(opts, fallbackModel, reported);
-  } catch (e) {
-    lastError = e;
-  }
-  try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
-  catch (e) { lastError = e; }
-
-  // Real multi-vendor fallback chain when Gemini is exhausted.
-  // Skip non-tool providers if the caller needs function calling.
-  const needsTools = !!(opts.tools && opts.tools.length > 0);
-
-  if (!needsTools) {
-    try { return await callMistralDirect(opts, opts.provider || reported); }
-    catch (e) { lastError = e; console.warn("Mistral fallback failed:", (e as any)?.message || e); }
-
-    try { return await callCloudflareDirect(opts, opts.provider || reported); }
-    catch (e) { lastError = e; console.warn("Cloudflare fallback failed:", (e as any)?.message || e); }
-  }
-
-  try {
+    return await Promise.any(
+      candidates.map(c =>
+        c.run().catch((e: any) => {
+          const msg = `${c.name}: ${e?.message || e}`;
+          errors.push(msg);
+          console.warn("raceProviders →", msg);
+          throw e;
+        })
+      )
+    );
+  } catch {
+    console.warn("raceProviders → all direct providers failed:", errors.join(" | "));
+    // Last-resort: Lovable Gateway.
     return await callLovableGateway(opts, undefined, opts.provider || reported);
-  } catch (e) {
-    lastError = e;
   }
+}
 
-  throw lastError;
+export async function callAI(opts: CallAIOptions): Promise<AIResult> {
+  return await raceProviders(opts);
 }
 
 /**
@@ -556,60 +587,55 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
  * Returns all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing 3 Gemini variants in parallel (flash + pro + flash-lite)");
+  console.log("callAIParallel → firing Mistral + Cloudflare + Groq + Gemini in parallel (Gateway last-resort)");
 
-  const baseTemp = opts.temperature ?? 0.35;
+  const needsTools = !!(opts.tools && opts.tools.length > 0);
+  const tokens = opts.maxTokens ?? 8192;
+  const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
 
-  const promises = [
-    callGemini({ ...opts, temperature: baseTemp }, GEMINI_DEFAULT_MODEL, "gemini")
-      .then(r => ({ ...r, provider: "gemini" as const }))
-      .catch((err) => {
-        console.warn("callAIParallel → gemini-2.5-flash failed:", err.message || err);
-        return null;
-      }),
-    callGemini({ ...opts, temperature: Math.min(0.6, baseTemp + 0.1) }, GEMINI_HEAVY_MODEL, "gemini")
-      .then(r => ({ ...r, provider: "gemini" as const }))
-      .catch((err) => {
-        console.warn("callAIParallel → gemini-2.5-pro failed:", err.message || err);
-        return null;
-      }),
-    callGemini({ ...opts, temperature: Math.max(0.1, baseTemp - 0.05) }, GEMINI_FAST_MODEL, "gemini")
-      .then(r => ({ ...r, provider: "gemini" as const }))
-      .catch((err) => {
-        console.warn("callAIParallel → gemini-2.5-flash-lite failed:", err.message || err);
-        return null;
-      }),
+  if (needsTools) {
+    // Tool-calling: only Gemini supports it in our setup.
+    try { return [await callGemini(opts, geminiModel, "gemini")]; }
+    catch {
+      try { return [await callGemini(opts, GEMINI_FAST_MODEL, "gemini")]; }
+      catch {
+        return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
+      }
+    }
+  }
+
+  const tasks = [
+    callMistralDirect(opts, "mistral").catch((e) => {
+      console.warn("callAIParallel → mistral failed:", e?.message || e); return null;
+    }),
+    callCloudflareDirect(opts, "cloudflare").catch((e) => {
+      console.warn("callAIParallel → cloudflare failed:", e?.message || e); return null;
+    }),
+    callGroqDirect(opts, "groq").catch((e) => {
+      console.warn("callAIParallel → groq failed:", e?.message || e); return null;
+    }),
+    callGemini(opts, geminiModel, "gemini").catch((e) => {
+      console.warn("callAIParallel → gemini failed:", e?.message || e); return null;
+    }),
   ];
 
   const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 55000));
-  const results = await Promise.allSettled(
-    promises.map(p => Promise.race([p, timeoutPromise]))
-  );
+  const settled = await Promise.allSettled(tasks.map(p => Promise.race([p, timeoutPromise])));
 
   const successes: AIResult[] = [];
-  for (const r of results) {
+  for (const r of settled) {
     if (r.status === "fulfilled" && r.value) successes.push(r.value);
   }
 
-  if (successes.length === 0) {
-    for (const m of [GEMINI_DEFAULT_MODEL, GEMINI_FAST_MODEL, GEMINI_HEAVY_MODEL]) {
-      try { return [await callGemini(opts, m, "gemini")]; }
-      catch { /* try next */ }
-    }
-    // Real fallbacks before erroring out.
-    const needsTools = !!(opts.tools && opts.tools.length > 0);
-    if (!needsTools) {
-      try { return [await callMistralDirect(opts, "mistral")]; } catch { /* next */ }
-      try { return [await callCloudflareDirect(opts, "cloudflare")]; } catch { /* next */ }
-    }
-    try {
-      return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
-    } catch { /* fall through */ }
-    throw new Error("callAIParallel: all providers failed (Gemini + Mistral + Cloudflare + Gateway)");
+  if (successes.length > 0) {
+    console.log(`callAIParallel → ${successes.length}/4 direct providers succeeded`);
+    return successes;
   }
 
-  console.log(`callAIParallel → ${successes.length}/3 Gemini variants succeeded`);
-  return successes;
+  // Last-resort: Lovable Gateway.
+  console.warn("callAIParallel → all 4 direct providers failed, trying Lovable Gateway");
+  try { return [await callLovableGateway(opts, undefined, opts.provider || "mistral")]; }
+  catch { throw new Error("callAIParallel: all providers failed (Mistral + Cloudflare + Groq + Gemini + Gateway)"); }
 }
 
 /**
