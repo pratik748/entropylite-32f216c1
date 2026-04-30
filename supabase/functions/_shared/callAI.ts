@@ -15,6 +15,15 @@ interface CallAIOptions {
   provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   jsonMode?: boolean;
   skipHardening?: boolean;
+  /**
+   * When true, enable Gemini's built-in Google Search grounding so the model
+   * fetches real-time web context (news, prices, filings) before responding.
+   * Note: Gemini API does NOT allow `googleSearch` and `functionDeclarations`
+   * in the same request. If `tools` are also passed, web search is skipped
+   * and the request falls back to function-calling. For tool-using engines,
+   * use `fetchLiveWebContext()` separately and inject snippets into the prompt.
+   */
+  useWebSearch?: boolean;
 }
 
 interface AIResult {
@@ -225,6 +234,9 @@ async function callGemini(
         };
       }
     }
+  } else if (opts.useWebSearch) {
+    // Real-time grounding via Google Search. Mutually exclusive with function calls.
+    body.tools = [{ googleSearch: {} }];
   }
 
   const tokens = opts.maxTokens ?? 8192;
