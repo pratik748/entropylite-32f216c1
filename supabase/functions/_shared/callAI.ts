@@ -484,8 +484,23 @@ async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["pr
     throw { status: res.status, message: `Cloudflare ${res.status}: ${errBody.slice(0, 200)}` };
   }
   const data = await res.json();
-  const text = data?.result?.response;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Cloudflare response");
+  // Cloudflare returns different shapes per model:
+  //   { result: { response: "..." } }                          (older llama)
+  //   { result: { response: { ... } } }                        (some 70B variants)
+  //   { result: { choices: [{ message: { content: "..." } }] }} (OpenAI-compat)
+  let text: string | undefined;
+  const r = data?.result;
+  if (typeof r?.response === "string") text = r.response;
+  else if (r?.response && typeof r.response === "object") {
+    text = r.response.content || r.response.text || JSON.stringify(r.response);
+  } else if (Array.isArray(r?.choices) && r.choices[0]?.message?.content) {
+    text = r.choices[0].message.content;
+  } else if (typeof data?.response === "string") {
+    text = data.response;
+  }
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error(`Empty Cloudflare response: ${JSON.stringify(data).slice(0, 200)}`);
+  }
   return { text: stripThinkingBlocks(text), provider: reported || "cloudflare" };
 }
 
