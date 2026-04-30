@@ -195,6 +195,48 @@ function toolsToGemini(tools: any[]): any[] {
     }));
 }
 
+/**
+ * Build a tiny placeholder JSON example from a JSON-schema fragment.
+ * Used to give non-tool-calling providers (Mistral / CF / Groq) a concrete
+ * shape to imitate. Arrays are emitted with ONE example item (the model expands).
+ */
+function buildJsonSkeleton(schema: any, depth = 0): any {
+  if (!schema || typeof schema !== "object" || depth > 6) return null;
+  let type: any = schema.type;
+  if (Array.isArray(type)) type = type.find((t) => t !== "null") || type[0];
+
+  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+
+  switch (type) {
+    case "string":
+      return schema.description ? `<${String(schema.description).slice(0, 40)}>` : "<string>";
+    case "number":
+    case "integer":
+      return 0;
+    case "boolean":
+      return false;
+    case "array": {
+      const item = buildJsonSkeleton(schema.items, depth + 1);
+      return item === null ? [] : [item];
+    }
+    case "object":
+    default: {
+      const out: Record<string, any> = {};
+      const props = schema.properties || {};
+      const required: string[] = Array.isArray(schema.required) ? schema.required : [];
+      // Emit required props first; then a couple of optional hints if room.
+      const keys = [
+        ...required.filter((k) => k in props),
+        ...Object.keys(props).filter((k) => !required.includes(k)).slice(0, 4),
+      ];
+      for (const k of keys) {
+        out[k] = buildJsonSkeleton(props[k], depth + 1);
+      }
+      return out;
+    }
+  }
+}
+
 async function callGemini(
   opts: CallAIOptions,
   modelOverride?: string,
