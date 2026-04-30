@@ -744,6 +744,18 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
+      {/* Live Web Pulse — Real-time Google Search grounding */}
+      {liveWebContext && liveWebContext.trim().length > 30 && (
+        <div className="rounded-xl border border-gain/20 bg-gain/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-3.5 w-3.5 text-gain animate-pulse" />
+            <span className="text-[10px] font-bold text-gain uppercase tracking-wider">Live Web Pulse</span>
+            <span className="text-[9px] text-muted-foreground">· Real-time Google Search grounding</span>
+          </div>
+          <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground font-sans">{liveWebContext.replace(/^\s*## LIVE WEB CONTEXT[^\n]*\n/, "").trim()}</pre>
+        </div>
+      )}
+
       {/* Cards */}
       <div className="grid gap-4 md:grid-cols-2">
         {recommendations.map((rec, i) => {
