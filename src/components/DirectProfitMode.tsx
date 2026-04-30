@@ -402,7 +402,16 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         baseCurrency,
       });
       if (optimizedQty >= 1) {
-        onAddToMainPortfolio(activeTicker, entryPrice, optimizedQty);
+        onAddToMainPortfolio(activeTicker, entryPrice, optimizedQty, {
+          action: result.action,
+          confidence: result.confidence,
+          entryLow: result.entryLow,
+          entryHigh: result.entryHigh,
+          targetPrice: result.targetPrice,
+          stopLoss: result.stopLoss,
+          currency: itemCurrency,
+          currentPrice: livePrice ?? result.currentPrice,
+        });
       }
     }
   };
