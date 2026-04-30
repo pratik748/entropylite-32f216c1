@@ -538,13 +538,7 @@ async function raceProviders(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
 
   if (needsTools) {
-    // Function-calling path: Gemini → Gateway only.
-    const tokens = opts.maxTokens ?? 8192;
-    const preferredModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
-    try { return await callGemini(opts, preferredModel, reported); } catch (e) {
-      try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); } catch {}
-      return await callLovableGateway(opts, undefined, opts.provider || reported);
-    }
+    return await raceWithToolFallback(opts, reported);
   }
 
   // Parallel race across direct providers (Mistral + Cloudflare + Groq + Gemini flash).
@@ -576,6 +570,84 @@ async function raceProviders(opts: CallAIOptions): Promise<AIResult> {
     // Last-resort: Lovable Gateway.
     return await callLovableGateway(opts, undefined, opts.provider || reported);
   }
+}
+
+/**
+ * Tool-calling race: try Gemini (only direct provider that supports function
+ * declarations). If it fails, transform the request into a JSON-mode prompt
+ * and race Mistral/Cloudflare/Groq. Their JSON text response is wrapped back
+ * into a synthetic toolCall so callers don't have to branch.
+ */
+async function raceWithToolFallback(opts: CallAIOptions, reported: AIResult["provider"]): Promise<AIResult> {
+  const tokens = opts.maxTokens ?? 8192;
+  const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
+
+  // Race Gemini variants (only one that natively supports function-calling).
+  const geminiTasks = [
+    callGemini(opts, geminiModel, reported).catch((e) => {
+      console.warn("raceWithToolFallback → gemini-primary failed:", e?.message || e); return null;
+    }),
+    callGemini(opts, GEMINI_FAST_MODEL, reported).catch((e) => {
+      console.warn("raceWithToolFallback → gemini-lite failed:", e?.message || e); return null;
+    }),
+  ];
+  const timeoutP = new Promise<null>(r => setTimeout(() => r(null), 30000));
+  const settled = await Promise.allSettled(geminiTasks.map(p => Promise.race([p, timeoutP])));
+  for (const s of settled) {
+    if (s.status === "fulfilled" && s.value) return s.value as AIResult;
+  }
+
+  // Gemini exhausted — synthesise a JSON-mode prompt for Mistral/Cloudflare/Groq.
+  const forcedToolName =
+    typeof opts.toolChoice === "object" && opts.toolChoice?.function?.name
+      ? opts.toolChoice.function.name
+      : (opts.tools![0]?.function?.name || "respond");
+  const toolDef = opts.tools!.find((t: any) => t?.function?.name === forcedToolName) || opts.tools![0];
+  const schemaHint = toolDef?.function?.parameters
+    ? `\n\nReturn ONLY a single JSON object matching this schema (no prose, no markdown):\n${JSON.stringify(toolDef.function.parameters)}`
+    : "\n\nReturn ONLY a single JSON object. No prose.";
+
+  const fallbackOpts: CallAIOptions = {
+    ...opts,
+    tools: undefined,
+    toolChoice: undefined,
+    jsonMode: true,
+    userPrompt: `${opts.userPrompt}${schemaHint}`,
+  };
+
+  const wrapAsToolCall = (r: AIResult): AIResult => {
+    if (r.toolCall) return r;
+    return {
+      ...r,
+      toolCall: {
+        id: `synth_${Date.now()}`,
+        type: "function",
+        function: { name: forcedToolName, arguments: r.text },
+      },
+    };
+  };
+
+  const directTasks = [
+    callMistralDirect(fallbackOpts, "mistral").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → mistral failed:", e?.message || e); return null;
+    }),
+    callCloudflareDirect(fallbackOpts, "cloudflare").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → cloudflare failed:", e?.message || e); return null;
+    }),
+    callGroqDirect(fallbackOpts, "groq").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → groq failed:", e?.message || e); return null;
+    }),
+  ];
+  const directSettled = await Promise.allSettled(
+    directTasks.map(p => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 35000))]))
+  );
+  for (const s of directSettled) {
+    if (s.status === "fulfilled" && s.value) return s.value as AIResult;
+  }
+
+  // Last-resort: Lovable Gateway with original tools.
+  console.warn("raceWithToolFallback → all direct providers failed, trying Lovable Gateway");
+  return await callLovableGateway(opts, undefined, opts.provider || reported);
 }
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
