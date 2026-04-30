@@ -317,15 +317,32 @@ const IndexContent = () => {
         <div className="flex-1 min-h-0 overflow-auto">
           <DirectProfitMode
             portfolioValueBase={portfolioValueBase}
-            onAddToMainPortfolio={(ticker, buyPrice, quantity) => {
+            onAddToMainPortfolio={(ticker, buyPrice, quantity, dpCtx) => {
               const normalizedTicker = normalizeUserTicker(ticker);
               if (!normalizedTicker) return;
+              // Stash the Direct Profit context on the stock as a stub
+              // analysis. When dashboard analysis runs, this context is
+              // forwarded to analyze-stock so the deeper view stays
+              // consistent (no contradictory BUY vs Exit verdicts).
+              const dpStub = {
+                directProfitContext: dpCtx,
+                currentPrice: dpCtx.currentPrice,
+                currency: dpCtx.currency,
+              };
               setStocks((prev) => {
                 const existing = prev.find((s) => s.ticker === normalizedTicker);
                 if (existing) {
-                  // Update sizing only — DO NOT clobber an existing analysis
                   return prev.map((s) =>
-                    s.id === existing.id ? { ...s, buyPrice, quantity } : s,
+                    s.id === existing.id
+                      ? {
+                          ...s,
+                          buyPrice,
+                          quantity,
+                          analysis: s.analysis
+                            ? { ...s.analysis, directProfitContext: dpCtx }
+                            : dpStub,
+                        }
+                      : s,
                   );
                 }
                 return [
@@ -336,6 +353,7 @@ const IndexContent = () => {
                     buyPrice,
                     quantity,
                     isLoading: false,
+                    analysis: dpStub,
                   },
                 ];
               });
