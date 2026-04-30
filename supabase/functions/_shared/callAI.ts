@@ -118,12 +118,66 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  * Convert OpenAI-style tools to Gemini function declarations.
  */
 function toolsToGemini(tools: any[]): any[] {
+  const normalizeSchema = (schema: any): any => {
+    if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+
+    const allowedKeys = new Set([
+      "type",
+      "format",
+      "description",
+      "nullable",
+      "enum",
+      "properties",
+      "items",
+      "required",
+    ]);
+
+    const next: Record<string, any> = {};
+    for (const [key, value] of Object.entries(schema)) {
+      if (!allowedKeys.has(key) && key !== "type") continue;
+
+      if (key === "type" && Array.isArray(value)) {
+        const typed = value.filter((v) => typeof v === "string");
+        const nonNull = typed.find((v) => v !== "null");
+        if (nonNull) next.type = nonNull;
+        if (typed.includes("null")) next.nullable = true;
+        continue;
+      }
+
+      if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+        next.properties = Object.fromEntries(
+          Object.entries(value).map(([propName, propSchema]) => [propName, normalizeSchema(propSchema)])
+        );
+        continue;
+      }
+
+      if (key === "items") {
+        next.items = normalizeSchema(value);
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        next[key] = value.map((item) => normalizeSchema(item));
+        continue;
+      }
+
+      if (value && typeof value === "object") {
+        next[key] = normalizeSchema(value);
+        continue;
+      }
+
+      next[key] = value;
+    }
+
+    return next;
+  };
+
   return tools
     .filter((t) => t?.type === "function" && t.function)
     .map((t) => ({
       name: t.function.name,
       description: t.function.description || "",
-      parameters: t.function.parameters || { type: "object", properties: {} },
+      parameters: normalizeSchema(t.function.parameters || { type: "object", properties: {} }),
     }));
 }
 
@@ -233,6 +287,58 @@ async function callGemini(
   return { text: stripThinkingBlocks(raw), provider };
 }
 
+async function callLovableGateway(
+  opts: CallAIOptions,
+  modelOverride?: string,
+  reportedProvider?: AIResult["provider"]
+): Promise<AIResult> {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) throw new Error("LOVABLE_API_KEY not set");
+
+  const model = modelOverride || opts.model || "mistral-medium-2508";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const timeout = (opts.maxTokens ?? 8192) > 4000 ? 55000 : 30000;
+
+  const body: Record<string, any> = {
+    model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxTokens ?? 8192,
+  };
+
+  if (opts.jsonMode) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${lovableKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error("Empty gateway response content");
+  }
+
+  return {
+    text: stripThinkingBlocks(text),
+    provider: reportedProvider || opts.provider || "mistral",
+  };
+}
+
 const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
@@ -275,6 +381,12 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   }
   try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
   catch (e) { lastError = e; }
+
+  try {
+    return await callLovableGateway(opts, undefined, opts.provider || reported);
+  } catch (e) {
+    lastError = e;
+  }
 
   throw lastError;
 }
@@ -324,6 +436,9 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       try { return [await callGemini(opts, m, "gemini")]; }
       catch { /* try next */ }
     }
+    try {
+      return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
+    } catch { /* fall through */ }
     throw new Error("callAIParallel: all Gemini variants failed");
   }
 
