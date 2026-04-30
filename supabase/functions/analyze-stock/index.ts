@@ -359,6 +359,20 @@ serve(async (req) => {
     const ticker = normalizeTickerInput(requestedTicker);
     const buyPrice = Number(rawBody.buyPrice);
     const quantity = Number(rawBody.quantity);
+    // Optional Direct Profit context. When the position originated from the
+    // Direct Profit module the dashboard passes its trade plan here so this
+    // function can produce a CONSISTENT view (same action family, same target
+    // and stop levels) instead of contradicting it.
+    const dpCtx: {
+      action?: "BUY" | "SELL" | "WAIT";
+      confidence?: number;
+      entryLow?: number;
+      entryHigh?: number;
+      targetPrice?: number;
+      stopLoss?: number;
+    } | null = rawBody.directProfitContext && typeof rawBody.directProfitContext === "object"
+      ? rawBody.directProfitContext
+      : null;
 
     if (!ticker || !Number.isFinite(buyPrice) || !Number.isFinite(quantity) || buyPrice <= 0 || quantity <= 0) {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), {
@@ -573,6 +587,27 @@ serve(async (req) => {
       suggestion = "Hold";
     }
 
+    // ── CONSISTENCY GUARD: reconcile with Direct Profit verdict ──
+    // The Direct Profit module already produced an actionable trade plan when
+    // this position was opened from there. Dashboard analysis is a deeper view
+    // — it should never directly contradict the entry decision. We allow it
+    // to refine (BUY → Add/Hold) but not flip (BUY → Exit) unless the data
+    // coverage is solid AND the structural signal is overwhelmingly negative.
+    if (dpCtx?.action) {
+      const dpAction = dpCtx.action;
+      const overwhelmingNeg = signal <= -4 && dataCoverage >= 4;
+      const overwhelmingPos = signal >= 4 && dataCoverage >= 4 && rrRatio >= 1.5;
+      if (dpAction === "BUY" && suggestion === "Exit" && !overwhelmingNeg) {
+        suggestion = "Hold";
+      }
+      if (dpAction === "SELL" && suggestion === "Add" && !overwhelmingPos) {
+        suggestion = "Hold";
+      }
+      if (dpAction === "WAIT" && suggestion === "Add" && !overwhelmingPos) {
+        suggestion = "Skip";
+      }
+    }
+
     const confidence = clamp(
       Math.round(38 + dataCoverage * 6 + Math.abs(signal) * 5 + (trend === "sideways" ? -4 : 0) - Math.max(0, riskScore - 60) * 0.15 + (rrRatio >= 1.5 ? 4 : 0)),
       35,
@@ -674,6 +709,18 @@ serve(async (req) => {
       // is unavailable or the model returned nothing. UI can render this as
       // a "Live Web Pulse" panel.
       liveWebContext: webContext || "",
+      // Mirror back the Direct Profit context so the UI can render both
+      // verdicts side-by-side and prove they are consistent.
+      directProfitContext: dpCtx
+        ? {
+            action: dpCtx.action,
+            confidence: dpCtx.confidence,
+            entryLow: dpCtx.entryLow,
+            entryHigh: dpCtx.entryHigh,
+            targetPrice: dpCtx.targetPrice,
+            stopLoss: dpCtx.stopLoss,
+          }
+        : null,
     };
 
     return new Response(JSON.stringify(analysis), {
