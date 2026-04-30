@@ -201,6 +201,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
   const [regimeType, setRegimeType] = useState("");
+  const [liveWebContext, setLiveWebContext] = useState("");
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
