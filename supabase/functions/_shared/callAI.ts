@@ -35,6 +35,7 @@ interface AIResult {
 const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 const GEMINI_HEAVY_MODEL = "gemini-2.5-pro";
 const GEMINI_FAST_MODEL = "gemini-2.5-flash-lite";
+const LOVABLE_GATEWAY_DEFAULT_MODEL = "openai/gpt-5-mini";
 
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
@@ -307,7 +308,7 @@ async function callLovableGateway(
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (!lovableKey) throw new Error("LOVABLE_API_KEY not set");
 
-  const model = modelOverride || opts.model || "mistral-medium-2508";
+  const model = modelOverride || opts.model || LOVABLE_GATEWAY_DEFAULT_MODEL;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const timeout = (opts.maxTokens ?? 8192) > 4000 ? 55000 : 30000;
 
@@ -321,7 +322,12 @@ async function callLovableGateway(
     max_tokens: opts.maxTokens ?? 8192,
   };
 
-  if (opts.jsonMode) {
+  if (opts.tools && opts.tools.length > 0) {
+    body.tools = opts.tools;
+    body.tool_choice = opts.toolChoice || "auto";
+  }
+
+  if (opts.jsonMode && !(opts.tools && opts.tools.length > 0)) {
     body.response_format = { type: "json_object" };
   }
 
@@ -340,7 +346,32 @@ async function callLovableGateway(
   }
 
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
+  const message = data?.choices?.[0]?.message;
+  const toolCall = Array.isArray(message?.tool_calls) ? message.tool_calls[0] : null;
+  if (toolCall?.function?.name) {
+    const args = typeof toolCall.function.arguments === "string"
+      ? toolCall.function.arguments
+      : JSON.stringify(toolCall.function.arguments || {});
+
+    return {
+      text: stripThinkingBlocks(args),
+      provider: reportedProvider || opts.provider || "mistral",
+      toolCall: {
+        id: toolCall.id || `gateway_${Date.now()}`,
+        type: "function",
+        function: {
+          name: toolCall.function.name,
+          arguments: args,
+        },
+      },
+    };
+  }
+
+  const text = Array.isArray(message?.content)
+    ? message.content
+        .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+        .join("")
+    : message?.content;
   if (typeof text !== "string" || !text.trim()) {
     throw new Error("Empty gateway response content");
   }
