@@ -670,6 +670,10 @@ serve(async (req) => {
         sessions: returns.length,
         source: bars?.source || "spot-only",
       },
+      // Real-time web grounding (Google Search). Empty string when grounding
+      // is unavailable or the model returned nothing. UI can render this as
+      // a "Live Web Pulse" panel.
+      liveWebContext: webContext || "",
     };
 
     return new Response(JSON.stringify(analysis), {
