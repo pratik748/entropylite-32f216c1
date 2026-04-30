@@ -294,19 +294,40 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const addToPortfolio = () => {
     if (!result || !activeTicker || result.action === "WAIT") return;
     const exists = portfolio.some((p) => p.ticker === activeTicker);
-    if (exists) return;
-    const item: PortfolioItem = {
-      ticker: activeTicker,
-      action: result.action,
-      entryPrice: (result.entryLow + result.entryHigh) / 2,
-      targetPrice: result.targetPrice,
-      stopLoss: result.stopLoss,
-      currentPrice: livePrice ?? result.currentPrice,
-      currency: resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD"),
-      addedAt: Date.now(),
-    };
-    setPortfolio((prev) => [item, ...prev]);
+    const entryPrice = (result.entryLow + result.entryHigh) / 2;
+    const itemCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD");
+
+    if (!exists) {
+      const item: PortfolioItem = {
+        ticker: activeTicker,
+        action: result.action,
+        entryPrice,
+        targetPrice: result.targetPrice,
+        stopLoss: result.stopLoss,
+        currentPrice: livePrice ?? result.currentPrice,
+        currency: itemCurrency,
+        addedAt: Date.now(),
+      };
+      setPortfolio((prev) => [item, ...prev]);
+    }
     setAdded(true);
+
+    // ── Auto-optimized mirror into main dashboard portfolio ──
+    if (onAddToMainPortfolio) {
+      const optimizedQty = computeOptimalQuantity({
+        entryPrice,
+        stopLoss: result.stopLoss,
+        confidence: result.confidence,
+        kellyFraction: result.riskMetrics?.kellyFraction,
+        currency: itemCurrency,
+        portfolioValueBase,
+        convertToBase,
+        baseCurrency,
+      });
+      if (optimizedQty >= 1) {
+        onAddToMainPortfolio(activeTicker, entryPrice, optimizedQty);
+      }
+    }
   };
 
   const removeFromPortfolio = (symbol: string) => {
