@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, callAIParallel } from "../_shared/callAI.ts";
+import { callAI, callAIParallel, fetchLiveWebContext } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
@@ -973,6 +973,23 @@ Rules:
       }
     } catch (e) { console.warn("Macro calendar fetch failed:", (e as Error).message); }
 
+    // Real-time web context (Google Search grounding) — fetch fresh market
+    // narrative the model can't know from its training cutoff. Silent on failure.
+    let webBlock = "";
+    try {
+      const region = indiaMode ? "India NSE BSE Nifty Sensex" : (regionInfo?.region || "global markets");
+      const horizonHint = preferredHorizon === "intraday"
+        ? "intraday momentum, pre-market movers, breaking news, options flow"
+        : preferredHorizon === "short_term"
+          ? "this week's catalysts, earnings calendar, technical breakouts"
+          : preferredHorizon === "long_term"
+            ? "structural themes, secular growth, multi-year compounders, ETF flows"
+            : "1-3 month catalysts, earnings, sector rotation";
+      const sectorHint = preferredSectors?.length ? ` in ${preferredSectors.join(", ")}` : "";
+      const query = `Latest ${region} stock market news, top movers, and trade ideas${sectorHint} — focus on ${horizonHint}. Today's date: ${new Date().toISOString().split("T")[0]}.`;
+      webBlock = await fetchLiveWebContext(query, 8);
+    } catch (e) { console.warn("Live web context failed:", (e as Error).message); }
+
     try {
       const aiOpts = {
         systemPrompt: `You are an institutional quant PM. Output only liquid, tradeable assets with strict risk controls and evidence-backed portfolio fit.
@@ -984,11 +1001,12 @@ QUALITY MANDATE:
 - Use exact tickers supported by Yahoo Finance.
 - NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
 - Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
+- WHEN A "LIVE WEB CONTEXT" BLOCK IS PROVIDED: anchor at least 50% of your picks to facts in that block (recent earnings, breaking news, sector flows). Cite the catalyst from the live block in the catalyst field. Do NOT ignore fresh real-world events.
 - Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${hardExclusionBlock}${crossModuleBlock}${odgsBlock}${antiRepeatBlock}${macroBlock}
+${hardExclusionBlock}${crossModuleBlock}${odgsBlock}${antiRepeatBlock}${macroBlock}${webBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
@@ -1939,6 +1957,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       rejectSummary,
       autoRepaired: repairTrail.length > 0,
       repairTrail,
+      // Real-time grounding (Google Search) included in this generation cycle.
+      // Empty when grounding was unavailable.
+      liveWebContext: webBlock || "",
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },

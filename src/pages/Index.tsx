@@ -388,6 +388,7 @@ const IndexContent = () => {
                           macroFactors={analysis.macroFactors}
                           verdict={analysis.verdict}
                           hedgeStrategy={analysis.hedgeStrategy}
+                          liveWebContext={(analysis as any).liveWebContext}
                         />
                         <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
                         <CompanyIntelligence ticker={analysis.ticker} />
@@ -483,6 +484,7 @@ const IndexContent = () => {
                                     macroFactors={analysis.macroFactors}
                                     verdict={analysis.verdict}
                                     hedgeStrategy={analysis.hedgeStrategy}
+                          liveWebContext={(analysis as any).liveWebContext}
                                   />
                                 </div>
                               </>

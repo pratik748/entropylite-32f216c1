@@ -201,6 +201,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [marketCondition, setMarketCondition] = useState("");
   const [regimeType, setRegimeType] = useState("");
+  const [liveWebContext, setLiveWebContext] = useState("");
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -253,6 +254,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         setRecommendations(cached.recommendations || []);
         setMarketCondition(cached.marketCondition || "");
         setRegimeType(cached.regimeType || "");
+        setLiveWebContext(cached.liveWebContext || "");
         setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
         setLastFetch(cached.timestamp);
         setLoading(false);
@@ -459,6 +461,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         recommendations: data.recommendations,
         marketCondition: data.marketCondition || "",
         regimeType: data.regimeType || "",
+        liveWebContext: data.liveWebContext || "",
         candidatesGenerated: data.candidatesGenerated || 0,
         candidatesPassed: data.candidatesPassed || 0,
       };
@@ -470,6 +473,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
+      setLiveWebContext(data.liveWebContext || "");
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       
       setCachedDA(payload);
@@ -505,6 +509,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       setRecommendations(cached.recommendations);
       setMarketCondition(cached.marketCondition || "");
       setRegimeType(cached.regimeType || "");
+      setLiveWebContext(cached.liveWebContext || "");
       setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
       setLastFetch(cached.timestamp);
       setHasSearched(true);
@@ -736,6 +741,18 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Market Assessment</span>
           </div>
           <p className="text-sm text-foreground">{marketCondition}</p>
+        </div>
+      )}
+
+      {/* Live Web Pulse — Real-time Google Search grounding */}
+      {liveWebContext && liveWebContext.trim().length > 30 && (
+        <div className="rounded-xl border border-gain/20 bg-gain/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-3.5 w-3.5 text-gain animate-pulse" />
+            <span className="text-[10px] font-bold text-gain uppercase tracking-wider">Live Web Pulse</span>
+            <span className="text-[9px] text-muted-foreground">· Real-time Google Search grounding</span>
+          </div>
+          <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground font-sans">{liveWebContext.replace(/^\s*## LIVE WEB CONTEXT[^\n]*\n/, "").trim()}</pre>
         </div>
       )}
 

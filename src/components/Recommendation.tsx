@@ -1,4 +1,4 @@
-import { Brain, Shield, Target, Globe } from "lucide-react";
+import { Brain, Shield, Target, Globe, Radio } from "lucide-react";
 import { cleanAIText } from "@/lib/utils";
 import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
 
@@ -10,9 +10,10 @@ interface RecommendationProps {
   macroFactors: string[];
   verdict?: string;
   hedgeStrategy?: string;
+  liveWebContext?: string;
 }
 
-const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, macroFactors, verdict, hedgeStrategy }: RecommendationProps) => {
+const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, macroFactors, verdict, hedgeStrategy, liveWebContext }: RecommendationProps) => {
   const config = getScenarioConfig(suggestion);
 
   return (
@@ -83,6 +84,17 @@ const Recommendation = ({ summary, suggestion, confidence, confidenceReasoning, 
         <div className="mb-5">
           <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Confidence Reasoning</p>
           <p className="text-sm leading-relaxed text-secondary-foreground italic">{cleanAIText(confidenceReasoning)}</p>
+        </div>
+      )}
+
+      {liveWebContext && liveWebContext.trim().length > 20 && (
+        <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Radio className="h-4 w-4 text-primary animate-pulse" />
+            <p className="text-[10px] uppercase tracking-widest font-bold text-primary">Live Web Pulse</p>
+            <span className="text-[9px] text-muted-foreground">· Real-time Google Search grounding</span>
+          </div>
+          <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-secondary-foreground font-sans">{cleanAIText(liveWebContext).replace(/^## LIVE WEB CONTEXT[^\n]*\n/, "").trim()}</pre>
         </div>
       )}
 
