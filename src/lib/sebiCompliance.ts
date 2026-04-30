@@ -8,6 +8,7 @@ export const SCENARIO_LABELS: Record<string, { label: string; fullLabel: string;
   Hold: { label: "OBSERVE", fullLabel: "Neutral Scenario", color: "text-warning", bg: "bg-warning/10", border: "border-warning/20" },
   Add: { label: "UPSIDE", fullLabel: "High-Probability Upside", color: "text-gain", bg: "bg-gain/10", border: "border-gain/20" },
   Exit: { label: "DOWNSIDE", fullLabel: "High-Probability Downside", color: "text-loss", bg: "bg-loss/10", border: "border-loss/20" },
+  Skip: { label: "NO EDGE", fullLabel: "No Actionable Edge — Sit Out", color: "text-muted-foreground", bg: "bg-muted/20", border: "border-muted-foreground/20" },
 };
 
 export function getScenarioConfig(suggestion: string) {

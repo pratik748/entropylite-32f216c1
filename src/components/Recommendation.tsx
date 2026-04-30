@@ -4,7 +4,7 @@ import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
 
 interface RecommendationProps {
   summary: string;
-  suggestion: "Hold" | "Add" | "Exit";
+  suggestion: "Hold" | "Add" | "Exit" | "Skip";
   confidence: number;
   confidenceReasoning?: string;
   macroFactors: string[];
