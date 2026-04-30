@@ -620,26 +620,59 @@ async function raceWithToolFallback(opts: CallAIOptions, reported: AIResult["pro
       ? opts.toolChoice.function.name
       : (opts.tools![0]?.function?.name || "respond");
   const toolDef = opts.tools!.find((t: any) => t?.function?.name === forcedToolName) || opts.tools![0];
-  const schemaHint = toolDef?.function?.parameters
-    ? `\n\nReturn ONLY a single JSON object matching this schema (no prose, no markdown):\n${JSON.stringify(toolDef.function.parameters)}`
-    : "\n\nReturn ONLY a single JSON object. No prose.";
+  const params = toolDef?.function?.parameters;
+  const skeleton = params ? buildJsonSkeleton(params) : null;
+  const requiredFieldsLine = params?.required?.length
+    ? `Top-level REQUIRED keys: ${params.required.join(", ")}.`
+    : "";
+  const arrayFieldName = params?.properties
+    ? Object.entries(params.properties).find(([_, v]: any) => v?.type === "array")?.[0]
+    : undefined;
+  const arrayHint = arrayFieldName
+    ? `If you would otherwise return a top-level JSON array, wrap it as { "${arrayFieldName}": [...] } instead.`
+    : "";
+  const schemaHint = skeleton
+    ? `\n\n=== OUTPUT FORMAT (STRICT) ===
+Return EXACTLY one JSON object. No prose. No markdown fences. No comments.
+${requiredFieldsLine}
+${arrayHint}
+Use this exact shape (replace placeholder values, keep all keys, never invent new top-level keys):
+${JSON.stringify(skeleton, null, 2)}
+Rules:
+- Every required string field must be a non-empty string.
+- Every numeric field must be a finite number, never null, never a string.
+- Enum fields must use ONLY the listed values.
+- If a field is unknown, OMIT it (do not write null/empty) unless it is required.`
+    : "\n\nReturn ONLY a single JSON object. No prose, no markdown.";
 
+  // Bump tokens for fallback so a complex schema (e.g. 8-12 recommendations) actually fits.
+  const fallbackTokens = Math.max(opts.maxTokens ?? 4096, 6000);
   const fallbackOpts: CallAIOptions = {
     ...opts,
     tools: undefined,
     toolChoice: undefined,
     jsonMode: true,
+    maxTokens: fallbackTokens,
     userPrompt: `${opts.userPrompt}${schemaHint}`,
   };
 
   const wrapAsToolCall = (r: AIResult): AIResult => {
     if (r.toolCall) return r;
+    // Normalise: if model returned a bare array, wrap it under the array field name.
+    let argText = r.text;
+    if (arrayFieldName) {
+      const trimmed = (r.text || "").trim().replace(/^```json?\s*/i, "").replace(/```\s*$/i, "").trim();
+      if (trimmed.startsWith("[")) {
+        argText = `{"${arrayFieldName}": ${trimmed}}`;
+      }
+    }
     return {
       ...r,
+      text: argText,
       toolCall: {
         id: `synth_${Date.now()}`,
         type: "function",
-        function: { name: forcedToolName, arguments: r.text },
+        function: { name: forcedToolName, arguments: argText },
       },
     };
   };
