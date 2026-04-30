@@ -666,14 +666,8 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
 
   if (needsTools) {
-    // Tool-calling: only Gemini supports it in our setup.
-    try { return [await callGemini(opts, geminiModel, "gemini")]; }
-    catch {
-      try { return [await callGemini(opts, GEMINI_FAST_MODEL, "gemini")]; }
-      catch {
-        return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
-      }
-    }
+    // Tool-calling: race Gemini, then JSON-mode fallback to Mistral/Cloudflare/Groq.
+    return [await raceWithToolFallback(opts, "gemini")];
   }
 
   const tasks = [
