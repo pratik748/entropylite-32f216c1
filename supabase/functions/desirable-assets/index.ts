@@ -1100,9 +1100,13 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         const refillResults = await callAIParallel(refillOpts);
         const refillCandidates: any[] = [];
         for (const result of refillResults) {
-          const p = safeParseJSON(result.text);
-          const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
-          refillCandidates.push(...recs);
+          try {
+            const p = safeParseJSON(result.text);
+            const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+            refillCandidates.push(...recs);
+          } catch (parseErr) {
+            console.warn(`desirable-assets refill: ${result.provider} parse failed:`, (parseErr as Error).message);
+          }
         }
         // Drop any refill candidate that is itself on the banned list.
         const refillClean = refillCandidates.filter((c: any) => {
