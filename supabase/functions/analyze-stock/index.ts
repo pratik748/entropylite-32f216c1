@@ -426,9 +426,17 @@ serve(async (req) => {
       });
     }
 
-    const [bars, bundle] = await Promise.all([
+    // Run historical bars, the live data bundle, AND the real-time Google
+    // Search grounded web context in parallel. Web context is best-effort —
+    // if it fails we still produce a full analysis from the deterministic
+    // pipeline.
+    const [bars, bundle, webContext] = await Promise.all([
       fetchHistoricalBars(ticker),
       fetchTickerLiveBundle(ticker, isIndian),
+      fetchLiveWebContext(
+        `${ticker} stock latest news, earnings, analyst ratings, price catalysts in past 72 hours${isIndian ? " NSE BSE India" : ""}`,
+        5,
+      ).catch(() => ""),
     ]);
 
     const closes = bars?.closes || [currentPrice];
