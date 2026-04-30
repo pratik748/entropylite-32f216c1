@@ -241,6 +241,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [selectedHorizon, setSelectedHorizon] = useState<string>("");
   const [showConstraints, setShowConstraints] = useState(true);
 
+  const hasActiveFilters = Boolean(
+    budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon,
+  );
+  const isHonestEmptyState = Boolean(
+    error &&
+    recommendations.length === 0 &&
+    (/none cleared the screening rules|no setups generated this cycle/i.test(error) || stats.generated > 0),
+  );
+  const errorTitle = isHonestEmptyState ? "No clean setups right now" : "Feed interrupted";
+  const errorDetail = isHonestEmptyState
+    ? "The engine ran, but today’s candidates failed risk, repeat, or horizon checks."
+    : "Live intelligence did not complete cleanly, so nothing was shown as a fake fallback.";
+
   const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
     const next = new Set(set);
     if (next.has(value)) next.delete(value); else next.add(value);
@@ -692,13 +705,42 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
       {/* Error Banner */}
       {error && recommendations.length === 0 && (
-        <div className="rounded-xl border border-loss/20 bg-loss/5 p-4 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-loss flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-foreground">{error}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Click refresh to try again</p>
+        <div className={`rounded-xl border p-4 ${isHonestEmptyState ? "border-warning/20 bg-warning/5" : "border-loss/20 bg-loss/5"}`}>
+          <div className="flex items-start gap-3">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${isHonestEmptyState ? "bg-warning/10" : "bg-loss/10"}`}>
+              {isHonestEmptyState ? <Ban className="h-4 w-4 text-warning flex-shrink-0" /> : <AlertTriangle className="h-4 w-4 text-loss flex-shrink-0" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">{errorTitle}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-mono ${isHonestEmptyState ? "bg-warning/10 text-warning" : "bg-loss/10 text-loss"}`}>
+                  {isHonestEmptyState ? "HONEST EMPTY" : "LIVE FAILURE"}
+                </span>
+                {selectedHorizon && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-mono text-primary">
+                    {HORIZONS.find((h) => h.key === selectedHorizon)?.label || selectedHorizon}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{errorDetail}</p>
+              <p className="mt-2 text-sm text-foreground">{error}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground font-mono">
+                <span className="rounded-full bg-surface-2 px-2 py-1">Generated {stats.generated}</span>
+                <span className="rounded-full bg-surface-2 px-2 py-1">Passed {stats.passed}</span>
+                <span className="rounded-full bg-surface-2 px-2 py-1">Filters {hasActiveFilters ? "custom" : "default"}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button size="sm" variant={isHonestEmptyState ? "secondary" : "outline"} onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}>
+                Retry live
+              </Button>
+              {hasActiveFilters && (
+                <Button size="sm" variant="ghost" onClick={() => { setBudget(""); setSelectedAssetTypes(new Set()); setSelectedSectors(new Set()); setSelectedHorizon(""); }}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
           </div>
-          <Button size="sm" variant="outline" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }} className="ml-auto">Retry</Button>
         </div>
       )}
 
