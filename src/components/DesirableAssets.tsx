@@ -354,6 +354,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+            preferredHorizon: selectedHorizon || undefined,
             // ODGS — Outcome Density Gradient System signals. Lets the AI
             // pick names the user's own learned profit field already favours
             // and avoid scarred patterns. Only sent when there's enough
@@ -404,6 +405,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
             selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
             selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
+            selectedHorizon || "any-horizon",
           ].join("|"),
         }),
       });
