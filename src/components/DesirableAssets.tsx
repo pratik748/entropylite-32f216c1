@@ -954,7 +954,25 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   <div>
                     <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
                     <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
-                    <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || ","}</p>
+                    {(() => {
+                      const hc = rec.horizonClass;
+                      const cls = hc === "intraday" ? "bg-red-500/10 text-red-400 border-red-500/20"
+                        : hc === "short_term" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        : hc === "medium_term" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        : hc === "long_term" ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        : "bg-muted/30 text-muted-foreground border-border";
+                      const label = hc === "intraday" ? "INTRADAY"
+                        : hc === "short_term" ? "SHORT-TERM"
+                        : hc === "medium_term" ? "MID-TERM"
+                        : hc === "long_term" ? "LONG-TERM"
+                        : "HORIZON";
+                      return (
+                        <span className={`inline-flex items-center gap-1 mt-0.5 px-1.5 py-[1px] rounded-full border text-[8px] font-mono font-bold ${cls}`} title={`Hold window: ${rec.timeHorizon || "n/a"}`}>
+                          <Clock className="h-2 w-2" />
+                          {label} · {rec.timeHorizon || "n/a"}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <Sparkline data={rec.closes || []} />
