@@ -118,12 +118,53 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
  * Convert OpenAI-style tools to Gemini function declarations.
  */
 function toolsToGemini(tools: any[]): any[] {
+  const normalizeSchema = (schema: any): any => {
+    if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+
+    const next: Record<string, any> = {};
+    for (const [key, value] of Object.entries(schema)) {
+      if (key === "type" && Array.isArray(value)) {
+        const typed = value.filter((v) => typeof v === "string");
+        const nonNull = typed.find((v) => v !== "null");
+        if (nonNull) next.type = nonNull;
+        if (typed.includes("null")) next.nullable = true;
+        continue;
+      }
+
+      if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+        next.properties = Object.fromEntries(
+          Object.entries(value).map(([propName, propSchema]) => [propName, normalizeSchema(propSchema)])
+        );
+        continue;
+      }
+
+      if (key === "items") {
+        next.items = normalizeSchema(value);
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        next[key] = value.map((item) => normalizeSchema(item));
+        continue;
+      }
+
+      if (value && typeof value === "object") {
+        next[key] = normalizeSchema(value);
+        continue;
+      }
+
+      next[key] = value;
+    }
+
+    return next;
+  };
+
   return tools
     .filter((t) => t?.type === "function" && t.function)
     .map((t) => ({
       name: t.function.name,
       description: t.function.description || "",
-      parameters: t.function.parameters || { type: "object", properties: {} },
+      parameters: normalizeSchema(t.function.parameters || { type: "object", properties: {} }),
     }));
 }
 
