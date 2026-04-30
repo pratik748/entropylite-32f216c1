@@ -761,6 +761,14 @@ serve(async (req) => {
     const userBudget: number | undefined = body.userBudget;
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
     const preferredSectors: string[] | undefined = body.preferredSectors;
+    const preferredHorizon: string | undefined = (body.preferredHorizon || "").toString().toLowerCase() || undefined;
+    // Allowed: intraday | short_term | medium_term | long_term
+    const HORIZON_LABEL: Record<string, string> = {
+      intraday: "Intraday (same-day, hours)",
+      short_term: "Short-term (1 day – 4 weeks)",
+      medium_term: "Medium-term (1 – 6 months)",
+      long_term: "Long-term (6 months+)",
+    };
 
     // ── ODGS — Outcome Density Gradient System (client-supplied) ──
     // The user's own learned profit field. Past trades teach the engine
