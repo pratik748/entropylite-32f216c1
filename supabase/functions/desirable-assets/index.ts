@@ -1001,14 +1001,18 @@ Return via the tool call only.`,
       console.log(`desirable-assets: ${parallelResults.length} parallel AI responses received`);
 
       for (const result of parallelResults) {
-        const p = safeParseJSON(result.text);
-        const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
-        console.log(`desirable-assets: ${result.provider} returned ${recs.length} candidates`);
-        if (!parsed.marketCondition && p?.marketCondition) {
-          parsed.marketCondition = p.marketCondition;
-          parsed.regimeType = p.regimeType || "transition";
+        try {
+          const p = safeParseJSON(result.text);
+          const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+          console.log(`desirable-assets: ${result.provider} returned ${recs.length} candidates`);
+          if (!parsed.marketCondition && p?.marketCondition) {
+            parsed.marketCondition = p.marketCondition;
+            parsed.regimeType = p.regimeType || "transition";
+          }
+          candidates.push(...recs);
+        } catch (parseErr) {
+          console.warn(`desirable-assets: ${result.provider} JSON parse failed, skipping:`, (parseErr as Error).message);
         }
-        candidates.push(...recs);
       }
       candidates = dedupeCandidates(candidates);
       console.log(`desirable-assets Stage 1 done, seed: ${seed}, merged candidates: ${candidates.length}`);
@@ -1024,13 +1028,17 @@ Return via the tool call only.`,
           };
           const retryResults = await callAIParallel(retryOpts);
           for (const result of retryResults) {
-            const p = safeParseJSON(result.text);
-            const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
-            if (!parsed.marketCondition && p?.marketCondition) {
-              parsed.marketCondition = p.marketCondition;
-              parsed.regimeType = p.regimeType || "transition";
+            try {
+              const p = safeParseJSON(result.text);
+              const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+              if (!parsed.marketCondition && p?.marketCondition) {
+                parsed.marketCondition = p.marketCondition;
+                parsed.regimeType = p.regimeType || "transition";
+              }
+              candidates.push(...recs);
+            } catch (parseErr) {
+              console.warn(`desirable-assets retry: ${result.provider} parse failed:`, (parseErr as Error).message);
             }
-            candidates.push(...recs);
           }
           candidates = dedupeCandidates(candidates);
           console.log(`desirable-assets retry returned ${candidates.length} candidates`);
@@ -1092,9 +1100,13 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         const refillResults = await callAIParallel(refillOpts);
         const refillCandidates: any[] = [];
         for (const result of refillResults) {
-          const p = safeParseJSON(result.text);
-          const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
-          refillCandidates.push(...recs);
+          try {
+            const p = safeParseJSON(result.text);
+            const recs = Array.isArray(p?.recommendations) ? p.recommendations : [];
+            refillCandidates.push(...recs);
+          } catch (parseErr) {
+            console.warn(`desirable-assets refill: ${result.provider} parse failed:`, (parseErr as Error).message);
+          }
         }
         // Drop any refill candidate that is itself on the banned list.
         const refillClean = refillCandidates.filter((c: any) => {
