@@ -121,8 +121,21 @@ function toolsToGemini(tools: any[]): any[] {
   const normalizeSchema = (schema: any): any => {
     if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
 
+    const allowedKeys = new Set([
+      "type",
+      "format",
+      "description",
+      "nullable",
+      "enum",
+      "properties",
+      "items",
+      "required",
+    ]);
+
     const next: Record<string, any> = {};
     for (const [key, value] of Object.entries(schema)) {
+      if (!allowedKeys.has(key) && key !== "type") continue;
+
       if (key === "type" && Array.isArray(value)) {
         const typed = value.filter((v) => typeof v === "string");
         const nonNull = typed.find((v) => v !== "null");
