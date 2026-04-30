@@ -64,6 +64,7 @@ interface Recommendation {
   portfolioFit?: string;
   riskVerdict?: "low" | "medium" | "high";
   riskCompositeScore?: number;
+  horizonClass?: "intraday" | "short_term" | "medium_term" | "long_term";
 }
 
 interface Props {
@@ -228,8 +229,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [budget, setBudget] = useState("");
   const ASSET_TYPES = ["Stocks", "ETFs", "Mutual Funds", "Bonds", "Commodities", "Crypto"] as const;
   const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
+  const HORIZONS = [
+    { key: "intraday", label: "Intraday", hint: "Same-day, hours" },
+    { key: "short_term", label: "Short-term", hint: "1d – 4 weeks" },
+    { key: "medium_term", label: "Medium-term", hint: "1 – 6 months" },
+    { key: "long_term", label: "Long-term", hint: "6 months+" },
+  ] as const;
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [selectedHorizon, setSelectedHorizon] = useState<string>("");
   const [showConstraints, setShowConstraints] = useState(true);
 
   const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
