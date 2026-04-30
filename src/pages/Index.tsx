@@ -302,10 +302,30 @@ const IndexContent = () => {
           <DirectProfitMode
             portfolioValueBase={portfolioValueBase}
             onAddToMainPortfolio={(ticker, buyPrice, quantity) => {
-              handleAnalyze(ticker, buyPrice, quantity);
+              const normalizedTicker = normalizeUserTicker(ticker);
+              if (!normalizedTicker) return;
+              setStocks((prev) => {
+                const existing = prev.find((s) => s.ticker === normalizedTicker);
+                if (existing) {
+                  // Update sizing only — DO NOT clobber an existing analysis
+                  return prev.map((s) =>
+                    s.id === existing.id ? { ...s, buyPrice, quantity } : s,
+                  );
+                }
+                return [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    ticker: normalizedTicker,
+                    buyPrice,
+                    quantity,
+                    isLoading: false,
+                  },
+                ];
+              });
               toast({
                 title: "Added to Dashboard Portfolio",
-                description: `${ticker} • qty ${quantity} @ ${buyPrice.toFixed(2)} (auto-optimized)`,
+                description: `${normalizedTicker} • qty ${quantity} @ ${buyPrice.toFixed(2)} — open Dashboard to run full analysis`,
               });
             }}
           />
