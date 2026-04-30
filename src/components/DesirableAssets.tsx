@@ -64,6 +64,7 @@ interface Recommendation {
   portfolioFit?: string;
   riskVerdict?: "low" | "medium" | "high";
   riskCompositeScore?: number;
+  horizonClass?: "intraday" | "short_term" | "medium_term" | "long_term";
 }
 
 interface Props {
@@ -228,8 +229,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [budget, setBudget] = useState("");
   const ASSET_TYPES = ["Stocks", "ETFs", "Mutual Funds", "Bonds", "Commodities", "Crypto"] as const;
   const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
+  const HORIZONS = [
+    { key: "intraday", label: "Intraday", hint: "Same-day, hours" },
+    { key: "short_term", label: "Short-term", hint: "1d – 4 weeks" },
+    { key: "medium_term", label: "Medium-term", hint: "1 – 6 months" },
+    { key: "long_term", label: "Long-term", hint: "6 months+" },
+  ] as const;
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [selectedHorizon, setSelectedHorizon] = useState<string>("");
   const [showConstraints, setShowConstraints] = useState(true);
 
   const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
@@ -346,6 +354,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+            preferredHorizon: selectedHorizon || undefined,
             // ODGS — Outcome Density Gradient System signals. Lets the AI
             // pick names the user's own learned profit field already favours
             // and avoid scarred patterns. Only sent when there's enough
@@ -396,6 +405,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
             selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
             selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
+            selectedHorizon || "any-horizon",
           ].join("|"),
         }),
       });
@@ -483,7 +493,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         progressTimer.current = null;
       }
     }
-  }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors]);
+  }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
 
   // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
@@ -574,8 +584,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
           <span className="text-[10px] text-muted-foreground ml-1">
-            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0) 
-              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
+            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon)
+              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedHorizon ? (HORIZONS.find(h => h.key === selectedHorizon)?.label || selectedHorizon) : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
               : "Set your preferences"}
           </span>
           <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
@@ -633,6 +643,30 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     }`}
                   >
                     {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Time Horizon */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="h-3 w-3" /> Time Horizon
+                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">— filters picks to match how long you'll hold</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {HORIZONS.map((h) => (
+                  <button
+                    key={h.key}
+                    onClick={() => setSelectedHorizon(selectedHorizon === h.key ? "" : h.key)}
+                    title={h.hint}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      selectedHorizon === h.key
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {h.label} <span className="opacity-60">· {h.hint}</span>
                   </button>
                 ))}
               </div>
@@ -920,7 +954,25 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   <div>
                     <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
                     <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
-                    <p className="text-[9px] text-muted-foreground">{rec.timeHorizon || ","}</p>
+                    {(() => {
+                      const hc = rec.horizonClass;
+                      const cls = hc === "intraday" ? "bg-red-500/10 text-red-400 border-red-500/20"
+                        : hc === "short_term" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        : hc === "medium_term" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        : hc === "long_term" ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        : "bg-muted/30 text-muted-foreground border-border";
+                      const label = hc === "intraday" ? "INTRADAY"
+                        : hc === "short_term" ? "SHORT-TERM"
+                        : hc === "medium_term" ? "MID-TERM"
+                        : hc === "long_term" ? "LONG-TERM"
+                        : "HORIZON";
+                      return (
+                        <span className={`inline-flex items-center gap-1 mt-0.5 px-1.5 py-[1px] rounded-full border text-[8px] font-mono font-bold ${cls}`} title={`Hold window: ${rec.timeHorizon || "n/a"}`}>
+                          <Clock className="h-2 w-2" />
+                          {label} · {rec.timeHorizon || "n/a"}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <Sparkline data={rec.closes || []} />

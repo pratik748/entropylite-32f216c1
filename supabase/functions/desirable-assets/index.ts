@@ -623,6 +623,18 @@ function normalizeCandidate(rec: any): any | null {
     targetPrice: Number(rec?.targetPrice) || 0,
     stopLoss: Number(rec?.stopLoss) || 0,
     timeHorizon: String(rec?.timeHorizon || "3M"),
+    horizonClass: (() => {
+      const allowed = ["intraday", "short_term", "medium_term", "long_term"];
+      const raw = String(rec?.horizonClass || "").toLowerCase().replace(/[-\s]/g, "_");
+      if (allowed.includes(raw)) return raw;
+      // Infer from timeHorizon string if AI omitted it
+      const th = String(rec?.timeHorizon || "").toLowerCase();
+      if (/intraday|hour|same.?day|^[0-9]+h$/.test(th)) return "intraday";
+      if (/^1d$|^[1-9]d$|week|^[1-4]w$/.test(th)) return "short_term";
+      if (/^[1-6]m$|month/.test(th)) return "medium_term";
+      if (/year|yr|^[7-9]m$|^1[0-2]m$|6m\+|long/.test(th)) return "long_term";
+      return "medium_term";
+    })(),
     suggestedQty: Math.max(1, Math.round(Number(rec?.suggestedQty) || 1)),
     confidence: Math.max(1, Math.min(99, Math.round(Number(rec?.confidence) || 60))),
     thesis: String(rec?.thesis || ""),
@@ -761,6 +773,14 @@ serve(async (req) => {
     const userBudget: number | undefined = body.userBudget;
     const preferredAssetTypes: string[] | undefined = body.preferredAssetTypes;
     const preferredSectors: string[] | undefined = body.preferredSectors;
+    const preferredHorizon: string | undefined = (body.preferredHorizon || "").toString().toLowerCase() || undefined;
+    // Allowed: intraday | short_term | medium_term | long_term
+    const HORIZON_LABEL: Record<string, string> = {
+      intraday: "Intraday (same-day, hours)",
+      short_term: "Short-term (1 day – 4 weeks)",
+      medium_term: "Medium-term (1 – 6 months)",
+      long_term: "Long-term (6 months+)",
+    };
 
     // ── ODGS — Outcome Density Gradient System (client-supplied) ──
     // The user's own learned profit field. Past trades teach the engine
@@ -895,6 +915,7 @@ Rules:
                     targetPrice: { type: "number" },
                     stopLoss: { type: "number" },
                     timeHorizon: { type: "string" },
+                    horizonClass: { type: "string", enum: ["intraday", "short_term", "medium_term", "long_term"], description: "Classify the trade horizon: intraday=same day, short_term=days to 4 weeks, medium_term=1-6 months, long_term=6 months+. MUST match the timeHorizon string." },
                     suggestedQty: { type: "number" },
                     confidence: { type: "number" },
                     thesis: { type: "string" },
@@ -918,6 +939,7 @@ Rules:
                     "exchange",
                     "currency",
                     "timeHorizon",
+                    "horizonClass",
                     "confidence",
                     "thesis",
                     "catalyst",
@@ -971,6 +993,7 @@ Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
+${preferredHorizon ? `\n## TIME HORIZON LOCK — HARD CONSTRAINT\nUser is trading on a **${HORIZON_LABEL[preferredHorizon] || preferredHorizon}** horizon. Every single recommendation MUST be appropriate for this hold window:\n- intraday → liquid, high-volume names with intraday catalysts (earnings same day, breakouts, momentum continuation, options-flow targets). NO long-term thesis plays. timeHorizon must be in hours/1D.\n- short_term → swing setups with a catalyst within 4 weeks (technical breakout, near-term event, momentum). timeHorizon "1W" to "4W".\n- medium_term → 1-6 month thesis with concrete catalyst (earnings cycle, product launch, sector rotation). timeHorizon "1M" to "6M".\n- long_term → fundamental compounders, structural growth stories, ETFs/MFs for SIP-style holding. timeHorizon "6M+" to "2Y+". Avoid event-driven swing trades.\nSet horizonClass="${preferredHorizon}" on EVERY recommendation. Reject candidates that don't fit the horizon — do not pad the slate with mismatched ideas.\n` : `\nFor each pick, classify horizonClass honestly as one of: intraday | short_term | medium_term | long_term, and make timeHorizon match (e.g. "1D", "2W", "3M", "1Y").\n`}
 
     Create 8-10 recommendations that prioritize:
 1) Diversified opportunity sources across sectors, strategies, and factor exposures
@@ -1326,6 +1349,18 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         filtered++;
         bumpReject("F1b_avoided_sector");
         continue;
+      }
+
+      // F1c: Horizon lock — when the user picks a horizon, every recommendation
+      // must match. Mismatched ideas are misleading (a "long-term compounder"
+      // shown to an intraday trader is fraud-adjacent).
+      if (preferredHorizon) {
+        const recHorizon = String(rec.horizonClass || "").toLowerCase();
+        if (recHorizon && recHorizon !== preferredHorizon) {
+          filtered++;
+          bumpReject(`F1c_horizon_mismatch_${recHorizon}`);
+          continue;
+        }
       }
 
       // F2: Target must be above current price.
