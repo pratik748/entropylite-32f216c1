@@ -3,6 +3,7 @@
  * Handles markdown fences, trailing commas, truncated output, and unbalanced brackets.
  */
 export function safeParseJSON(raw: string): any {
+  if (raw == null || typeof raw !== "string" || raw.trim() === "") return null;
   // 1. Try direct parse
   try {
     return JSON.parse(raw);
@@ -18,7 +19,10 @@ export function safeParseJSON(raw: string): any {
 
   // 3. Find JSON boundaries
   const jsonStart = cleaned.search(/[\{\[]/);
-  if (jsonStart === -1) throw new Error("No JSON found in AI response");
+  if (jsonStart === -1) {
+    console.warn("safeParseJSON: no JSON brace/bracket found in response");
+    return null;
+  }
   cleaned = cleaned.substring(jsonStart);
 
   // 4. Find matching closing brace/bracket by depth
@@ -118,8 +122,7 @@ export function safeParseJSON(raw: string): any {
     return JSON.parse(cleaned);
   } catch (finalErr) {
     // Last resort: try to extract at least partial data
-    console.error("safeParseJSON final failure, attempting line-by-line repair");
-    console.error("First 500 chars:", cleaned.slice(0, 500));
-    throw finalErr;
+    console.warn("safeParseJSON final failure, returning null. First 300 chars:", cleaned.slice(0, 300));
+    return null;
   }
 }
