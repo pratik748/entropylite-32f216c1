@@ -435,7 +435,7 @@ async function callMistralDirect(opts: CallAIOptions, reported?: AIResult["provi
   };
   if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -472,7 +472,7 @@ async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["pr
     max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
   };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
@@ -511,7 +511,7 @@ async function callGroqDirect(opts: CallAIOptions, reported?: AIResult["provider
   };
   if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 45000 : 25000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 60000 : 40000;
   const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
