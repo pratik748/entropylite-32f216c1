@@ -526,9 +526,46 @@ serve(async (req) => {
       news.length > 0,
     ].filter(Boolean).length;
 
-    const suggestion = signal >= 2 ? "Add" : signal <= -2 ? "Exit" : "Hold";
+    // ---- Entry-price-aware adjustments ----
+    const pnlPct = ((currentPrice - buyPrice) / buyPrice) * 100;
+    // If holder is deeply underwater AND structure is broken, lean Exit
+    if (pnlPct < -15 && trend !== "bullish") signal -= 2;
+    // If holder is meaningfully in profit but structure decays, take profit (Exit-leaning)
+    if (pnlPct > 25 && trend === "bearish") signal -= 1;
+    // Mean-reversion penalty: chasing 52w highs without a fresh breakout
+    if (posIn52w > 85 && rsi14 > 70) signal -= 2;
+    // Distance from support vs resistance — must have asymmetric upside to "Add"
+    const upsideToResistance = ((resistance - currentPrice) / currentPrice) * 100;
+    const downsideToSupport = ((currentPrice - support) / currentPrice) * 100;
+    const rrRatio = downsideToSupport > 0.5 ? upsideToResistance / downsideToSupport : 0;
+    if (rrRatio < 1.0) signal -= 1;        // poor R:R kills longs
+    if (rrRatio >= 2.0) signal += 1;        // strong R:R rewards longs
+
+    // ---- Probability-weighted expected return (drift-adjusted) ----
+    const muDaily = mean(returns);
+    const expReturn21d = (muDaily * 21 - 0.5 * sigmaDaily * sigmaDaily * 21) * 100; // log-drift approx in %
+    if (expReturn21d > 2) signal += 1;
+    if (expReturn21d < -2) signal -= 1;
+
+    // ---- Stricter thresholds + new "Skip" bucket when edge is absent ----
+    // Add: needs +3 confluences AND R:R >= 1.5 AND not stretched
+    // Exit: needs -3 confluences OR (deeply underwater + bearish)
+    // Skip: low data coverage OR conflicting signals near zero
+    let suggestion: "Add" | "Exit" | "Hold" | "Skip";
+    if (dataCoverage <= 2) {
+      suggestion = "Skip";
+    } else if (signal >= 3 && rrRatio >= 1.5 && posIn52w < 90) {
+      suggestion = "Add";
+    } else if (signal <= -3 || (pnlPct < -20 && trend === "bearish")) {
+      suggestion = "Exit";
+    } else if (Math.abs(signal) <= 1 && rrRatio < 1.5) {
+      suggestion = "Skip";
+    } else {
+      suggestion = "Hold";
+    }
+
     const confidence = clamp(
-      Math.round(38 + dataCoverage * 6 + Math.abs(signal) * 5 + (trend === "sideways" ? -4 : 0) - Math.max(0, riskScore - 60) * 0.15),
+      Math.round(38 + dataCoverage * 6 + Math.abs(signal) * 5 + (trend === "sideways" ? -4 : 0) - Math.max(0, riskScore - 60) * 0.15 + (rrRatio >= 1.5 ? 4 : 0)),
       35,
       86,
     );
@@ -542,12 +579,14 @@ serve(async (req) => {
     ];
 
     const verdict = suggestion === "Add"
-      ? `${ticker} still has a constructive base while holding ${currency} ${round(support)} support, with upside distribution centred toward ${currency} ${bullRange[1]}.`
+      ? `${ticker} offers asymmetric upside: R:R ${rrRatio.toFixed(1)}:1 to ${currency} ${round(resistance)} with invalidation at ${currency} ${round(support)}. 21d drift modeled at ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%.`
       : suggestion === "Exit"
-        ? `${ticker} is trading with deteriorating structure, and downside distribution remains open toward ${currency} ${bearRange[0]} if ${currency} ${round(support)} fails.`
-        : `${ticker} is in a balanced regime, with the highest-probability path still inside ${currency} ${neutralRange[0]} to ${currency} ${neutralRange[1]} until a cleaner break develops.`;
+        ? `${ticker} fails the edge test: ${pnlPct < -15 ? `position is ${round(pnlPct, 1)}% underwater, ` : ""}structure is ${trend}, and downside path opens to ${currency} ${bearRange[0]}. Defend the book.`
+        : suggestion === "Skip"
+          ? `${ticker} shows NO ACTIONABLE EDGE right now — R:R ${rrRatio.toFixed(1)}:1 (need ≥1.5), signal score ${signal}, drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%. Sitting out is the trade.`
+          : `${ticker} is range-bound between ${currency} ${neutralRange[0]} and ${currency} ${neutralRange[1]}. Hold existing exposure but do not add until R:R or trend improves.`;
 
-    const confidenceReasoning = `Confidence is ${confidence}% because data coverage is ${dataCoverage}/5, trend is ${trend}, realized Sharpe is ${round(realizedSharpe, 2)}, and composite risk is ${riskScore}/100.`;
+    const confidenceReasoning = `Confidence is ${confidence}% — data coverage ${dataCoverage}/5, trend ${trend}, R:R ${rrRatio.toFixed(1)}:1, 21d drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%, position ${round(pnlPct, 1)}% from entry, composite risk ${riskScore}/100.`;
 
     const summary = [
       `${ticker} is trading at ${currency} ${round(currentPrice)} versus your entry at ${currency} ${round(buyPrice)}, with ${round(changePct, 2)}% day change and ${round(annualizedVol, 1)}% annualized realized volatility from the last ${returns.length} sessions.` ,
