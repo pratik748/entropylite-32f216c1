@@ -593,7 +593,7 @@ async function raceWithToolFallback(opts: CallAIOptions, reported: AIResult["pro
       console.warn("raceWithToolFallback → gemini-lite failed:", e?.message || e); return null;
     }),
   ];
-  const timeoutP = new Promise<null>(r => setTimeout(() => r(null), 30000));
+  const timeoutP = new Promise<null>(r => setTimeout(() => r(null), 25000));
   const settled = await Promise.allSettled(geminiTasks.map(p => Promise.race([p, timeoutP])));
   for (const s of settled) {
     if (s.status === "fulfilled" && s.value) return s.value as AIResult;
@@ -641,7 +641,7 @@ async function raceWithToolFallback(opts: CallAIOptions, reported: AIResult["pro
     }),
   ];
   const directSettled = await Promise.allSettled(
-    directTasks.map(p => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 35000))]))
+    directTasks.map(p => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 75000))]))
   );
   for (const s of directSettled) {
     if (s.status === "fulfilled" && s.value) return s.value as AIResult;
