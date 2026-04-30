@@ -20,9 +20,9 @@ export default function PublicNav() {
 
   return (
     <nav className="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-black/[0.06]">
-      <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
+      <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-20">
         <button onClick={() => navigate("/")} className="flex items-center">
-          <img src={entropyLogoFull} alt="Entropy Lite" className="h-9 object-contain" />
+          <img src={entropyLogoFull} alt="Entropy Lite" className="h-12 sm:h-14 object-contain" />
         </button>
 
         {/* Desktop nav */}
