@@ -496,7 +496,9 @@ async function callGroqDirect(opts: CallAIOptions, reported?: AIResult["provider
   const key = Deno.env.get("GROQ_API_KEY");
   if (!key) throw new Error("GROQ_API_KEY not set");
 
-  const model = "llama-3.3-70b-versatile";
+  // Free-tier model that's enabled by default. `llama-3.3-70b-versatile`
+  // requires manual project-level enablement.
+  const model = opts.model && opts.model.startsWith("llama-") ? opts.model : "llama-3.1-8b-instant";
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const body: Record<string, any> = {
     model,
