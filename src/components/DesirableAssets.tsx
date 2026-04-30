@@ -254,6 +254,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         setRecommendations(cached.recommendations || []);
         setMarketCondition(cached.marketCondition || "");
         setRegimeType(cached.regimeType || "");
+        setLiveWebContext(cached.liveWebContext || "");
         setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
         setLastFetch(cached.timestamp);
         setLoading(false);
@@ -460,6 +461,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         recommendations: data.recommendations,
         marketCondition: data.marketCondition || "",
         regimeType: data.regimeType || "",
+        liveWebContext: data.liveWebContext || "",
         candidatesGenerated: data.candidatesGenerated || 0,
         candidatesPassed: data.candidatesPassed || 0,
       };
@@ -471,6 +473,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       
       setMarketCondition(data.marketCondition || "");
       setRegimeType(data.regimeType || "");
+      setLiveWebContext(data.liveWebContext || "");
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       
       setCachedDA(payload);
