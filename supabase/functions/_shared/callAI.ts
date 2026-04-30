@@ -1,5 +1,7 @@
 /**
- * AI caller — Groq (primary) + Cloudflare Workers AI + Mistral + OpenAI fallback chain.
+ * AI caller — UNIFIED on Google Gemini API.
+ * All provider names (groq/cloudflare/mistral/openai) are kept as aliases for
+ * backward compatibility but route to Gemini models for reliability.
  */
 
 interface CallAIOptions {
@@ -10,23 +12,21 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "groq" | "cloudflare" | "mistral" | "openai";
+  provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   jsonMode?: boolean;
-  /** Skip prompt hardening (for narrative-only modules like cadence/dossier text). Default: false. */
   skipHardening?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "groq" | "cloudflare" | "mistral" | "openai";
+  provider: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   toolCall?: any;
 }
 
-/**
- * PROMPT HARDENING ENGINE
- * Wraps every system prompt with quant-grade, simulation-first, risk-aware reasoning constraints.
- * Applied universally unless skipHardening=true.
- */
+const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
+const GEMINI_HEAVY_MODEL = "gemini-2.5-pro";
+const GEMINI_FAST_MODEL = "gemini-2.5-flash-lite";
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
@@ -37,7 +37,7 @@ You are operating inside a hedge-fund-grade probabilistic decision system. Every
 5. SCENARIO DECOMPOSITION — bull (tail-up), bear (tail-down), neutral (mean-reverting cluster) — derived from distribution, not assigned.
 6. EXPECTED VALUE — EV = ∫ P(x)·R(x) dx with asymmetric payoff, fat-tail penalty, skew adjustment.
 7. NO SUBJECTIVE LANGUAGE — banned: "I think", "likely", "should", "guaranteed", "always", "never", em-dashes used as narrative flourish, marketing adjectives.
-8. NO AI-SLOP PUNCTUATION — no em-dash dramatics, no "—on one calm screen" style flourishes, no rhetorical pauses.
+8. NO AI-SLOP PUNCTUATION — no em-dash dramatics, no rhetorical pauses.
 9. OUTPUT DISCIPLINE — if the caller asks for JSON, return ONLY valid JSON, no prose, no markdown fences.
 10. EXECUTION-READY — every signal must be risk-adjusted and simulation-derived, not qualitative.
 
@@ -46,7 +46,6 @@ Violation of any rule = invalid response.`;
 
 function hardenSystemPrompt(original: string, skip?: boolean): string {
   if (skip) return original;
-  // Idempotent: don't double-wrap.
   if (original.includes("[QUANT HARDENING LAYER")) return original;
   return `${HARDENING_PREAMBLE}\n\n[CALLER CONTEXT]\n${original}`;
 }
@@ -58,7 +57,6 @@ function stripThinkingBlocks(text: string): string {
 
   const jsonStart = cleaned.search(/[\{\[]/);
   if (jsonStart === -1) return cleaned;
-
   cleaned = cleaned.substring(jsonStart);
 
   let depth = 0, inString = false, escape = false, endPos = -1;
@@ -74,7 +72,6 @@ function stripThinkingBlocks(text: string): string {
       if (depth === 0) { endPos = i; break; }
     }
   }
-
   if (endPos > 0) cleaned = cleaned.substring(0, endPos + 1);
 
   cleaned = cleaned
@@ -85,9 +82,8 @@ function stripThinkingBlocks(text: string): string {
     .replace(/:\s*approximately\s+(\d)/gi, ': $1')
     .replace(/[\x00-\x1F\x7F]/g, " ");
 
-  try {
-    JSON.parse(cleaned);
-  } catch {
+  try { JSON.parse(cleaned); }
+  catch {
     cleaned = cleaned.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, "");
     cleaned = cleaned.replace(/,\s*$/, "");
     let braces = 0, brackets = 0, inStr = false, esc = false;
@@ -105,11 +101,9 @@ function stripThinkingBlocks(text: string): string {
     while (brackets > 0) { cleaned += "]"; brackets--; }
     while (braces > 0) { cleaned += "}"; braces--; }
   }
-
   return cleaned;
 }
 
-/** Fetch with AbortController timeout */
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -120,328 +114,187 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-async function callGroq(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("GROQ_API_KEY");
-  if (!apiKey) throw new Error("GROQ_API_KEY not set");
-
-  // Locked to llama-3.1-8b-instant per project policy.
-  const model = "llama-3.1-8b-instant";
-
-  const body: any = {
-    model,
-    messages: [
-      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
-  };
-
-  if (opts.tools) {
-    body.tools = opts.tools;
-    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
-  }
-
-  if (opts.jsonMode) {
-    body.response_format = { type: "json_object" };
-  }
-
-  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 45000 : 20000;
-  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Groq error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Groq ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  if (!choice) throw new Error("Empty Groq response");
-
-  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
-    const toolCall = choice.message.tool_calls[0];
-    return {
-      text: typeof toolCall.function?.arguments === "string"
-        ? toolCall.function.arguments
-        : JSON.stringify(toolCall.function?.arguments),
-      provider: "groq",
-      toolCall,
-    };
-  }
-
-  const raw = (choice.message?.content || "").trim();
-  if (!raw) throw new Error("Empty Groq response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "groq" };
+/**
+ * Convert OpenAI-style tools to Gemini function declarations.
+ */
+function toolsToGemini(tools: any[]): any[] {
+  return tools
+    .filter((t) => t?.type === "function" && t.function)
+    .map((t) => ({
+      name: t.function.name,
+      description: t.function.description || "",
+      parameters: t.function.parameters || { type: "object", properties: {} },
+    }));
 }
 
-async function callCloudflare(opts: CallAIOptions): Promise<AIResult> {
-  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
-  if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID not set");
-  if (!apiToken) throw new Error("CLOUDFLARE_API_TOKEN not set");
+async function callGemini(
+  opts: CallAIOptions,
+  modelOverride?: string,
+  reportedProvider?: AIResult["provider"]
+): Promise<AIResult> {
+  const apiKey = Deno.env.get("GOOGLE_GEMINI_KEY") || Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("GOOGLE_GEMINI_KEY not set");
 
-  const model = opts.model || "@cf/meta/llama-4-scout-17b-16e-instruct";
+  const model = modelOverride || opts.model || GEMINI_DEFAULT_MODEL;
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
 
   const body: any = {
-    messages: [
-      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
-      { role: "user", content: opts.userPrompt },
+    systemInstruction: { parts: [{ text: systemText }] },
+    contents: [
+      { role: "user", parts: [{ text: opts.userPrompt }] },
     ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
+    generationConfig: {
+      temperature: opts.temperature ?? 0.6,
+      maxOutputTokens: opts.maxTokens ?? 8192,
+    },
   };
 
-  if (opts.tools) {
-    body.tools = opts.tools;
-    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  if (opts.jsonMode) {
+    body.generationConfig.responseMimeType = "application/json";
   }
 
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  if (opts.tools && opts.tools.length > 0) {
+    const fns = toolsToGemini(opts.tools);
+    if (fns.length > 0) {
+      body.tools = [{ functionDeclarations: fns }];
+      if (opts.toolChoice) {
+        const forcedName =
+          typeof opts.toolChoice === "object" && opts.toolChoice?.function?.name
+            ? opts.toolChoice.function.name
+            : null;
+        body.toolConfig = {
+          functionCallingConfig: forcedName
+            ? { mode: "ANY", allowedFunctionNames: [forcedName] }
+            : { mode: "AUTO" },
+        };
+      }
+    }
+  }
 
-  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 30000;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const tokens = opts.maxTokens ?? 8192;
+  const timeout = tokens > 8000 ? 55000 : tokens > 2000 ? 45000 : 25000;
+
   const res = await fetchWithTimeout(url, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
-    console.error(`Cloudflare AI error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Cloudflare ${res.status}: ${errBody.slice(0, 200)}` };
+    console.error(`Gemini error ${res.status} (${model}):`, errBody.slice(0, 300));
+    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
   }
 
   const data = await res.json();
-  const result = data.result;
-  if (!result) throw new Error("Empty Cloudflare AI response");
+  const candidate = data.candidates?.[0];
+  if (!candidate) throw new Error("Empty Gemini response");
 
-  if (result.tool_calls && result.tool_calls.length > 0) {
-    const toolCall = result.tool_calls[0];
-    return {
-      text: typeof toolCall.function?.arguments === "string"
-        ? toolCall.function.arguments
-        : JSON.stringify(toolCall.function?.arguments),
-      provider: "cloudflare",
-      toolCall,
-    };
+  const parts = candidate.content?.parts || [];
+  const provider = reportedProvider || "gemini";
+
+  // Function call?
+  for (const p of parts) {
+    if (p.functionCall) {
+      const argsObj = p.functionCall.args || {};
+      return {
+        text: JSON.stringify(argsObj),
+        provider,
+        toolCall: {
+          id: `gemini_${Date.now()}`,
+          type: "function",
+          function: {
+            name: p.functionCall.name,
+            arguments: JSON.stringify(argsObj),
+          },
+        },
+      };
+    }
   }
 
-  let raw: string;
-  if (typeof result.response === "string") {
-    raw = result.response.trim();
-  } else if (typeof result.content === "string") {
-    raw = result.content.trim();
-  } else if (result.response != null) {
-    raw = JSON.stringify(result.response);
-  } else if (result.content != null) {
-    raw = JSON.stringify(result.content);
-  } else {
-    throw new Error("Empty Cloudflare AI response content");
-  }
-  if (!raw) throw new Error("Empty Cloudflare AI response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "cloudflare" };
+  const raw = parts.map((p: any) => p.text || "").join("").trim();
+  if (!raw) throw new Error("Empty Gemini response content");
+  return { text: stripThinkingBlocks(raw), provider };
 }
 
-async function callMistral(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("MISTRAL_API_KEY");
-  if (!apiKey) throw new Error("MISTRAL_API_KEY not set");
-
-  const model = "mistral-medium-latest";
-
-  const body: any = {
-    model,
-    messages: [
-      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
-  };
-
-  if (opts.tools) {
-    body.tools = opts.tools;
-    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
-  }
-
-  if (opts.jsonMode) {
-    body.response_format = { type: "json_object" };
-  }
-
-  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 25000;
-  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Mistral error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  if (!choice) throw new Error("Empty Mistral response");
-
-  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
-    const toolCall = choice.message.tool_calls[0];
-    return {
-      text: typeof toolCall.function?.arguments === "string"
-        ? toolCall.function.arguments
-        : JSON.stringify(toolCall.function?.arguments),
-      provider: "mistral",
-      toolCall,
-    };
-  }
-
-  const raw = (choice.message?.content || "").trim();
-  if (!raw) throw new Error("Empty Mistral response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "mistral" };
-}
-
-async function callOpenAI(opts: CallAIOptions): Promise<AIResult> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-
-  const model = "gpt-4o-mini";
-
-  const body: any = {
-    model,
-    messages: [
-      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
-  };
-
-  if (opts.tools) {
-    body.tools = opts.tools;
-    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
-  }
-
-  if (opts.jsonMode) {
-    body.response_format = { type: "json_object" };
-  }
-
-  const timeout = opts.maxTokens && opts.maxTokens > 8000 ? 55000 : opts.maxTokens && opts.maxTokens > 2000 ? 50000 : 25000;
-  const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`OpenAI error ${res.status}:`, errBody.slice(0, 300));
-    throw { status: res.status, message: `OpenAI ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  if (!choice) throw new Error("Empty OpenAI response");
-
-  if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
-    const toolCall = choice.message.tool_calls[0];
-    return {
-      text: typeof toolCall.function?.arguments === "string"
-        ? toolCall.function.arguments
-        : JSON.stringify(toolCall.function?.arguments),
-      provider: "openai",
-      toolCall,
-    };
-  }
-
-  const raw = (choice.message?.content || "").trim();
-  if (!raw) throw new Error("Empty OpenAI response content");
-  const text = stripThinkingBlocks(raw);
-  return { text, provider: "openai" };
-}
-
-// Optimized: 2 attempts max, instant 429 fallback
 const RETRY_DELAYS = [0, 1500];
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
-  const provider = opts.provider || "mistral";
+  // Choose model: heavy reasoning for big requests, default flash otherwise.
+  const tokens = opts.maxTokens ?? 8192;
+  const preferredModel =
+    opts.model ||
+    (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
 
-  // Default chain: Mistral (paid, reliable) → Groq → Cloudflare → OpenAI.
-  // Mistral leads because Groq free tier (6k TPM) and Cloudflare free tier
-  // (10k neurons/day) get exhausted on heavy load.
-  if (provider === "mistral" || provider === "groq" || provider === "cloudflare") {
-    let lastError: any;
+  const reported: AIResult["provider"] =
+    opts.provider && opts.provider !== "gemini" ? opts.provider : "gemini";
 
-    // Primary: Mistral with one retry on 5xx.
-    for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
-      if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-      try {
-        return await callMistral(opts);
-      } catch (err: any) {
-        lastError = err;
-        if (err.status === 429 || err.status === 401 || err.status === 403 || err.name === "AbortError") break;
-        if (err.status >= 500 && err.status < 600) continue;
+  let lastError: any;
+  for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
+    if (RETRY_DELAYS[attempt] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+    try {
+      return await callGemini(opts, preferredModel, reported);
+    } catch (err: any) {
+      lastError = err;
+      if (err.status === 401 || err.status === 403 || err.name === "AbortError") break;
+      if (err.status === 429) {
+        // backoff then try a lighter model
+        await new Promise(r => setTimeout(r, 2000));
+        try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
+        catch (e) { lastError = e; }
         break;
       }
+      if (err.status >= 500 && err.status < 600) continue;
+      break;
     }
-
-    // Fallbacks in order — try free tiers, then OpenAI.
-    try { return await callGroq(opts); } catch (e) { lastError = e; }
-    try { return await callCloudflare(opts); } catch (e) { lastError = e; }
-    try { return await callOpenAI(opts); } catch (e) { lastError = e; }
-    throw lastError;
   }
 
-  if (provider === "openai") return await callOpenAI(opts);
-  return await callMistral(opts);
+  // Final fallback: try the other tier model.
+  try {
+    const fallbackModel =
+      preferredModel === GEMINI_HEAVY_MODEL ? GEMINI_DEFAULT_MODEL : GEMINI_HEAVY_MODEL;
+    return await callGemini(opts, fallbackModel, reported);
+  } catch (e) {
+    lastError = e;
+  }
+  try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
+  catch (e) { lastError = e; }
+
+  throw lastError;
 }
 
 /**
- * Fire Cloudflare + Mistral in parallel (lighter), return all successful results.
+ * Fire multiple Gemini variants in parallel for diversity (replaces multi-vendor parallel).
+ * Returns all successful results.
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
-  console.log("callAIParallel → firing Groq + Cloudflare + Mistral + OpenAI simultaneously");
+  console.log("callAIParallel → firing 3 Gemini variants in parallel (flash + pro + flash-lite)");
+
+  const baseTemp = opts.temperature ?? 0.35;
 
   const promises = [
-    callGroq(opts).then(r => ({ ...r, provider: "groq" as const })).catch((err) => {
-      console.warn("callAIParallel → Groq failed:", err.message || err);
-      return null;
-    }),
-    callCloudflare(opts).then(r => ({ ...r, provider: "cloudflare" as const })).catch((err) => {
-      console.warn("callAIParallel → Cloudflare failed:", err.message || err);
-      return null;
-    }),
-    callMistral({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.1) }).then(r => ({ ...r, provider: "mistral" as const })).catch((err) => {
-      console.warn("callAIParallel → Mistral failed:", err.message || err);
-      return null;
-    }),
-    callOpenAI({ ...opts, temperature: Math.min(0.5, (opts.temperature ?? 0.35) + 0.05) }).then(r => ({ ...r, provider: "openai" as const })).catch((err) => {
-      console.warn("callAIParallel → OpenAI failed:", err.message || err);
-      return null;
-    }),
+    callGemini({ ...opts, temperature: baseTemp }, GEMINI_DEFAULT_MODEL, "gemini")
+      .then(r => ({ ...r, provider: "gemini" as const }))
+      .catch((err) => {
+        console.warn("callAIParallel → gemini-2.5-flash failed:", err.message || err);
+        return null;
+      }),
+    callGemini({ ...opts, temperature: Math.min(0.6, baseTemp + 0.1) }, GEMINI_HEAVY_MODEL, "gemini")
+      .then(r => ({ ...r, provider: "gemini" as const }))
+      .catch((err) => {
+        console.warn("callAIParallel → gemini-2.5-pro failed:", err.message || err);
+        return null;
+      }),
+    callGemini({ ...opts, temperature: Math.max(0.1, baseTemp - 0.05) }, GEMINI_FAST_MODEL, "gemini")
+      .then(r => ({ ...r, provider: "gemini" as const }))
+      .catch((err) => {
+        console.warn("callAIParallel → gemini-2.5-flash-lite failed:", err.message || err);
+        return null;
+      }),
   ];
 
   const timeoutPromise = new Promise<null>(r => setTimeout(() => r(null), 55000));
-  
   const results = await Promise.allSettled(
     promises.map(p => Promise.race([p, timeoutPromise]))
   );
@@ -452,16 +305,13 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   }
 
   if (successes.length === 0) {
-    // Sequential final attempts
-    for (const fn of [callGroq, callCloudflare, callMistral, callOpenAI]) {
-      try {
-        const result = await fn(opts);
-        return [result];
-      } catch { /* try next */ }
+    for (const m of [GEMINI_DEFAULT_MODEL, GEMINI_FAST_MODEL, GEMINI_HEAVY_MODEL]) {
+      try { return [await callGemini(opts, m, "gemini")]; }
+      catch { /* try next */ }
     }
-    throw new Error("callAIParallel: all providers failed");
+    throw new Error("callAIParallel: all Gemini variants failed");
   }
 
-  console.log(`callAIParallel → ${successes.length}/4 providers succeeded`);
+  console.log(`callAIParallel → ${successes.length}/3 Gemini variants succeeded`);
   return successes;
 }
