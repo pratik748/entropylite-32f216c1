@@ -446,6 +446,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           // Honest empty: backend ran cleanly but no candidate cleared the screening rules.
           setMarketCondition(data.marketCondition || "");
           setRegimeType(data.regimeType || "");
+          setLiveWebContext(data.liveWebContext || "");
           setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
           setRecommendations([]);
           setLastFetch(Date.now());
@@ -496,6 +497,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       retryCount.current = 0;
     } catch (e: any) {
       console.error("Desirable assets error:", e);
+      setAutoRepaired(false);
+      setRepairNote(null);
       setError(e.message || "Failed to load recommendations");
       if (retryCount.current < MAX_RETRIES && !e.message?.includes("credits")) {
         retryCount.current++;
@@ -741,6 +744,19 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {error && recommendations.length > 0 && (
+        <div className="rounded-xl border border-warning/20 bg-warning/5 p-3 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground">Live refresh failed — showing last good results.</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{error}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}>
+            Retry live
+          </Button>
         </div>
       )}
 
