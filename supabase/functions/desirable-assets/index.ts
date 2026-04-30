@@ -1957,6 +1957,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       rejectSummary,
       autoRepaired: repairTrail.length > 0,
       repairTrail,
+      // Real-time grounding (Google Search) included in this generation cycle.
+      // Empty when grounding was unavailable.
+      liveWebContext: webBlock || "",
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
