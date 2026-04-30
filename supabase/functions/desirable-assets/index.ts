@@ -1351,6 +1351,18 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         continue;
       }
 
+      // F1c: Horizon lock — when the user picks a horizon, every recommendation
+      // must match. Mismatched ideas are misleading (a "long-term compounder"
+      // shown to an intraday trader is fraud-adjacent).
+      if (preferredHorizon) {
+        const recHorizon = String(rec.horizonClass || "").toLowerCase();
+        if (recHorizon && recHorizon !== preferredHorizon) {
+          filtered++;
+          bumpReject(`F1c_horizon_mismatch_${recHorizon}`);
+          continue;
+        }
+      }
+
       // F2: Target must be above current price.
       // Repair-first: if the AI's target is stale (below live price), don't throw the
       // name away — clear the field so the downstream quant layer recomputes a fresh
