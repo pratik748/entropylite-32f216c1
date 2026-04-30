@@ -207,7 +207,26 @@ interface DirectProfitModeProps {
    * Called when a trade is added so the host (dashboard) can mirror the position
    * into the main cloud portfolio with an auto-optimized quantity.
    */
-  onAddToMainPortfolio?: (ticker: string, buyPrice: number, quantity: number) => void;
+  onAddToMainPortfolio?: (
+    ticker: string,
+    buyPrice: number,
+    quantity: number,
+    /**
+     * Direct Profit trade plan — passed through to the dashboard so deeper
+     * analysis (analyze-stock) can stay consistent with the entry decision
+     * instead of contradicting it.
+     */
+    directProfitContext: {
+      action: "BUY" | "SELL" | "WAIT";
+      confidence: number;
+      entryLow: number;
+      entryHigh: number;
+      targetPrice: number;
+      stopLoss: number;
+      currency?: string;
+      currentPrice: number;
+    },
+  ) => void;
   /** Total portfolio value in base currency, used to size the position via fixed-fractional risk. */
   portfolioValueBase?: number;
 }
