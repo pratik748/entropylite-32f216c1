@@ -1005,7 +1005,7 @@ QUALITY MANDATE:
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
-${hardExclusionBlock}${crossModuleBlock}${odgsBlock}${antiRepeatBlock}${macroBlock}
+${hardExclusionBlock}${crossModuleBlock}${odgsBlock}${antiRepeatBlock}${macroBlock}${webBlock}
 Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
