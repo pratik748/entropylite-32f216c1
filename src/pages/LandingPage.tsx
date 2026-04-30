@@ -87,7 +87,7 @@ export default function LandingPage() {
           <img
             src={entropyLogoFull}
             alt="Entropy Lite"
-            className="h-14 sm:h-28 object-contain mx-auto mb-6 sm:mb-8"
+            className="h-20 sm:h-36 lg:h-40 object-contain mx-auto mb-6 sm:mb-8"
             loading="eager"
           />
 
