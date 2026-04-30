@@ -323,8 +323,17 @@ async function callLovableGateway(
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
   };
+
+  // Newer OpenAI reasoning models (gpt-5*, o1/o3/o4) reject `max_tokens`.
+  const tokenCap = opts.maxTokens ?? 8192;
+  if (COMPLETION_TOKENS_MODELS.test(model)) {
+    body.max_completion_tokens = tokenCap;
+    // gpt-5 family also rejects custom temperature on some endpoints.
+    delete body.temperature;
+  } else {
+    body.max_tokens = tokenCap;
+  }
 
   if (opts.tools && opts.tools.length > 0) {
     body.tools = opts.tools;
@@ -346,10 +355,27 @@ async function callLovableGateway(
 
   if (!res.ok) {
     const errBody = await res.text();
+    // Auto-retry once with `max_tokens` swapped if the gateway complains.
+    if (res.status === 400 && /max_tokens/i.test(errBody) && body.max_tokens) {
+      delete body.max_tokens;
+      body.max_completion_tokens = tokenCap;
+      const retry = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+      if (retry.ok) return parseGatewayResponse(await retry.json(), opts, reportedProvider);
+      const retryBody = await retry.text();
+      throw { status: retry.status, message: `Gateway retry ${retry.status}: ${retryBody.slice(0, 200)}` };
+    }
     throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
   }
 
   const data = await res.json();
+  return parseGatewayResponse(data, opts, reportedProvider);
+}
+
+function parseGatewayResponse(data: any, opts: CallAIOptions, reportedProvider?: AIResult["provider"]): AIResult {
   const message = data?.choices?.[0]?.message;
   const toolCall = Array.isArray(message?.tool_calls) ? message.tool_calls[0] : null;
   if (toolCall?.function?.name) {
