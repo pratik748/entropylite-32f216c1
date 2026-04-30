@@ -623,6 +623,18 @@ function normalizeCandidate(rec: any): any | null {
     targetPrice: Number(rec?.targetPrice) || 0,
     stopLoss: Number(rec?.stopLoss) || 0,
     timeHorizon: String(rec?.timeHorizon || "3M"),
+    horizonClass: (() => {
+      const allowed = ["intraday", "short_term", "medium_term", "long_term"];
+      const raw = String(rec?.horizonClass || "").toLowerCase().replace(/[-\s]/g, "_");
+      if (allowed.includes(raw)) return raw;
+      // Infer from timeHorizon string if AI omitted it
+      const th = String(rec?.timeHorizon || "").toLowerCase();
+      if (/intraday|hour|same.?day|^[0-9]+h$/.test(th)) return "intraday";
+      if (/^1d$|^[1-9]d$|week|^[1-4]w$/.test(th)) return "short_term";
+      if (/^[1-6]m$|month/.test(th)) return "medium_term";
+      if (/year|yr|^[7-9]m$|^1[0-2]m$|6m\+|long/.test(th)) return "long_term";
+      return "medium_term";
+    })(),
     suggestedQty: Math.max(1, Math.round(Number(rec?.suggestedQty) || 1)),
     confidence: Math.max(1, Math.min(99, Math.round(Number(rec?.confidence) || 60))),
     thesis: String(rec?.thesis || ""),
