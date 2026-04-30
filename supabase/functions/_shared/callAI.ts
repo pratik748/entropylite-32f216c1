@@ -435,7 +435,7 @@ async function callMistralDirect(opts: CallAIOptions, reported?: AIResult["provi
   };
   if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -472,7 +472,7 @@ async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["pr
     max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
   };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
@@ -484,8 +484,23 @@ async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["pr
     throw { status: res.status, message: `Cloudflare ${res.status}: ${errBody.slice(0, 200)}` };
   }
   const data = await res.json();
-  const text = data?.result?.response;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Cloudflare response");
+  // Cloudflare returns different shapes per model:
+  //   { result: { response: "..." } }                          (older llama)
+  //   { result: { response: { ... } } }                        (some 70B variants)
+  //   { result: { choices: [{ message: { content: "..." } }] }} (OpenAI-compat)
+  let text: string | undefined;
+  const r = data?.result;
+  if (typeof r?.response === "string") text = r.response;
+  else if (r?.response && typeof r.response === "object") {
+    text = r.response.content || r.response.text || JSON.stringify(r.response);
+  } else if (Array.isArray(r?.choices) && r.choices[0]?.message?.content) {
+    text = r.choices[0].message.content;
+  } else if (typeof data?.response === "string") {
+    text = data.response;
+  }
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error(`Empty Cloudflare response: ${JSON.stringify(data).slice(0, 200)}`);
+  }
   return { text: stripThinkingBlocks(text), provider: reported || "cloudflare" };
 }
 
@@ -496,7 +511,9 @@ async function callGroqDirect(opts: CallAIOptions, reported?: AIResult["provider
   const key = Deno.env.get("GROQ_API_KEY");
   if (!key) throw new Error("GROQ_API_KEY not set");
 
-  const model = "llama-3.3-70b-versatile";
+  // Free-tier model that's enabled by default. `llama-3.3-70b-versatile`
+  // requires manual project-level enablement.
+  const model = opts.model && opts.model.startsWith("llama-") ? opts.model : "llama-3.1-8b-instant";
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const body: Record<string, any> = {
     model,
@@ -509,7 +526,7 @@ async function callGroqDirect(opts: CallAIOptions, reported?: AIResult["provider
   };
   if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 45000 : 25000;
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 60000 : 40000;
   const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -538,13 +555,7 @@ async function raceProviders(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
 
   if (needsTools) {
-    // Function-calling path: Gemini → Gateway only.
-    const tokens = opts.maxTokens ?? 8192;
-    const preferredModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
-    try { return await callGemini(opts, preferredModel, reported); } catch (e) {
-      try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); } catch {}
-      return await callLovableGateway(opts, undefined, opts.provider || reported);
-    }
+    return await raceWithToolFallback(opts, reported);
   }
 
   // Parallel race across direct providers (Mistral + Cloudflare + Groq + Gemini flash).
@@ -578,6 +589,84 @@ async function raceProviders(opts: CallAIOptions): Promise<AIResult> {
   }
 }
 
+/**
+ * Tool-calling race: try Gemini (only direct provider that supports function
+ * declarations). If it fails, transform the request into a JSON-mode prompt
+ * and race Mistral/Cloudflare/Groq. Their JSON text response is wrapped back
+ * into a synthetic toolCall so callers don't have to branch.
+ */
+async function raceWithToolFallback(opts: CallAIOptions, reported: AIResult["provider"]): Promise<AIResult> {
+  const tokens = opts.maxTokens ?? 8192;
+  const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
+
+  // Race Gemini variants (only one that natively supports function-calling).
+  const geminiTasks = [
+    callGemini(opts, geminiModel, reported).catch((e) => {
+      console.warn("raceWithToolFallback → gemini-primary failed:", e?.message || e); return null;
+    }),
+    callGemini(opts, GEMINI_FAST_MODEL, reported).catch((e) => {
+      console.warn("raceWithToolFallback → gemini-lite failed:", e?.message || e); return null;
+    }),
+  ];
+  const timeoutP = new Promise<null>(r => setTimeout(() => r(null), 25000));
+  const settled = await Promise.allSettled(geminiTasks.map(p => Promise.race([p, timeoutP])));
+  for (const s of settled) {
+    if (s.status === "fulfilled" && s.value) return s.value as AIResult;
+  }
+
+  // Gemini exhausted — synthesise a JSON-mode prompt for Mistral/Cloudflare/Groq.
+  const forcedToolName =
+    typeof opts.toolChoice === "object" && opts.toolChoice?.function?.name
+      ? opts.toolChoice.function.name
+      : (opts.tools![0]?.function?.name || "respond");
+  const toolDef = opts.tools!.find((t: any) => t?.function?.name === forcedToolName) || opts.tools![0];
+  const schemaHint = toolDef?.function?.parameters
+    ? `\n\nReturn ONLY a single JSON object matching this schema (no prose, no markdown):\n${JSON.stringify(toolDef.function.parameters)}`
+    : "\n\nReturn ONLY a single JSON object. No prose.";
+
+  const fallbackOpts: CallAIOptions = {
+    ...opts,
+    tools: undefined,
+    toolChoice: undefined,
+    jsonMode: true,
+    userPrompt: `${opts.userPrompt}${schemaHint}`,
+  };
+
+  const wrapAsToolCall = (r: AIResult): AIResult => {
+    if (r.toolCall) return r;
+    return {
+      ...r,
+      toolCall: {
+        id: `synth_${Date.now()}`,
+        type: "function",
+        function: { name: forcedToolName, arguments: r.text },
+      },
+    };
+  };
+
+  const directTasks = [
+    callMistralDirect(fallbackOpts, "mistral").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → mistral failed:", e?.message || e); return null;
+    }),
+    callCloudflareDirect(fallbackOpts, "cloudflare").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → cloudflare failed:", e?.message || e); return null;
+    }),
+    callGroqDirect(fallbackOpts, "groq").then(wrapAsToolCall).catch((e) => {
+      console.warn("raceWithToolFallback → groq failed:", e?.message || e); return null;
+    }),
+  ];
+  const directSettled = await Promise.allSettled(
+    directTasks.map(p => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 75000))]))
+  );
+  for (const s of directSettled) {
+    if (s.status === "fulfilled" && s.value) return s.value as AIResult;
+  }
+
+  // Last-resort: Lovable Gateway with original tools.
+  console.warn("raceWithToolFallback → all direct providers failed, trying Lovable Gateway");
+  return await callLovableGateway(opts, undefined, opts.provider || reported);
+}
+
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   return await raceProviders(opts);
 }
@@ -594,14 +683,8 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
   const geminiModel = opts.model || (tokens >= 8000 ? GEMINI_HEAVY_MODEL : GEMINI_DEFAULT_MODEL);
 
   if (needsTools) {
-    // Tool-calling: only Gemini supports it in our setup.
-    try { return [await callGemini(opts, geminiModel, "gemini")]; }
-    catch {
-      try { return [await callGemini(opts, GEMINI_FAST_MODEL, "gemini")]; }
-      catch {
-        return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
-      }
-    }
+    // Tool-calling: race Gemini, then JSON-mode fallback to Mistral/Cloudflare/Groq.
+    return [await raceWithToolFallback(opts, "gemini")];
   }
 
   const tasks = [
