@@ -99,6 +99,64 @@ function savePortfolio(items: PortfolioItem[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
+/**
+ * Auto-optimize position size using fixed-fractional risk + Kelly + confidence.
+ *
+ *   risk_budget_base  = 1% of portfolio value (fallback: $10k notional / ₹500k for INR)
+ *   kelly_scale       = clamp(kelly, 0.10, 1.0)   — half-Kelly–style cap
+ *   confidence_scale  = max(0.5, confidence/100)  — never under 50% of base sizing
+ *   per_share_risk    = |entry − stop|
+ *   qty               = floor(risk_budget_native × kelly × conf / per_share_risk)
+ *
+ * Falls back to a sane notional if any input is missing (e.g. no live stop).
+ */
+function computeOptimalQuantity(opts: {
+  entryPrice: number;
+  stopLoss: number;
+  confidence: number;
+  kellyFraction?: number;
+  currency: string;
+  portfolioValueBase?: number;
+  convertToBase: (v: number, ccy: string) => number;
+  baseCurrency: string;
+}): number {
+  const { entryPrice, stopLoss, confidence, kellyFraction, currency, portfolioValueBase, convertToBase, baseCurrency } = opts;
+  if (!Number.isFinite(entryPrice) || entryPrice <= 0) return 0;
+
+  // Notional risk budget in *base* currency
+  const fallbackNotionalBase = baseCurrency === "INR" ? 500_000 : 10_000;
+  const portfolioBase = portfolioValueBase && portfolioValueBase > 0 ? portfolioValueBase : fallbackNotionalBase;
+  const riskPctOfPortfolio = 0.01; // 1% per trade — institutional default
+  const riskBudgetBase = portfolioBase * riskPctOfPortfolio;
+
+  // Convert risk budget to the asset's native currency (1 unit base → x native)
+  // We do this by inverting convertToBase: native = base / convertToBase(1, native)
+  const oneNativeInBase = convertToBase(1, currency) || 1;
+  const riskBudgetNative = riskBudgetBase / oneNativeInBase;
+
+  // Per-share risk
+  const perShareRisk = Math.abs(entryPrice - (Number.isFinite(stopLoss) && stopLoss > 0 ? stopLoss : entryPrice * 0.95));
+  if (perShareRisk <= 0) {
+    // No usable stop — size by 5% notional / entry
+    return Math.max(1, Math.floor((portfolioBase * 0.05) / oneNativeInBase / entryPrice));
+  }
+
+  // Scale by Kelly + confidence
+  const kelly = kellyFraction !== undefined && Number.isFinite(kellyFraction)
+    ? Math.max(0.1, Math.min(1, kellyFraction))
+    : 0.5;
+  const confScale = Math.max(0.5, Math.min(1, confidence / 100));
+
+  const rawQty = (riskBudgetNative * kelly * confScale) / perShareRisk;
+
+  // Cap at 20% of portfolio value in the position to avoid over-allocation
+  const maxNotionalNative = (portfolioBase * 0.2) / oneNativeInBase;
+  const maxQtyByNotional = Math.floor(maxNotionalNative / entryPrice);
+
+  const qty = Math.min(rawQty, maxQtyByNotional);
+  return Math.max(1, Math.floor(qty));
+}
+
 function isTradeResult(value: any): value is TradeResult {
   return Boolean(
     value &&
@@ -144,7 +202,17 @@ function normalizeTradeResult(value: any): TradeResult | null {
   };
 }
 
-const DirectProfitMode = () => {
+interface DirectProfitModeProps {
+  /**
+   * Called when a trade is added so the host (dashboard) can mirror the position
+   * into the main cloud portfolio with an auto-optimized quantity.
+   */
+  onAddToMainPortfolio?: (ticker: string, buyPrice: number, quantity: number) => void;
+  /** Total portfolio value in base currency, used to size the position via fixed-fractional risk. */
+  portfolioValueBase?: number;
+}
+
+const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectProfitModeProps = {}) => {
   const [ticker, setTicker] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TradeResult | null>(null);
@@ -284,19 +352,40 @@ const DirectProfitMode = () => {
   const addToPortfolio = () => {
     if (!result || !activeTicker || result.action === "WAIT") return;
     const exists = portfolio.some((p) => p.ticker === activeTicker);
-    if (exists) return;
-    const item: PortfolioItem = {
-      ticker: activeTicker,
-      action: result.action,
-      entryPrice: (result.entryLow + result.entryHigh) / 2,
-      targetPrice: result.targetPrice,
-      stopLoss: result.stopLoss,
-      currentPrice: livePrice ?? result.currentPrice,
-      currency: resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD"),
-      addedAt: Date.now(),
-    };
-    setPortfolio((prev) => [item, ...prev]);
+    const entryPrice = (result.entryLow + result.entryHigh) / 2;
+    const itemCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD");
+
+    if (!exists) {
+      const item: PortfolioItem = {
+        ticker: activeTicker,
+        action: result.action,
+        entryPrice,
+        targetPrice: result.targetPrice,
+        stopLoss: result.stopLoss,
+        currentPrice: livePrice ?? result.currentPrice,
+        currency: itemCurrency,
+        addedAt: Date.now(),
+      };
+      setPortfolio((prev) => [item, ...prev]);
+    }
     setAdded(true);
+
+    // ── Auto-optimized mirror into main dashboard portfolio ──
+    if (onAddToMainPortfolio) {
+      const optimizedQty = computeOptimalQuantity({
+        entryPrice,
+        stopLoss: result.stopLoss,
+        confidence: result.confidence,
+        kellyFraction: result.riskMetrics?.kellyFraction,
+        currency: itemCurrency,
+        portfolioValueBase,
+        convertToBase,
+        baseCurrency,
+      });
+      if (optimizedQty >= 1) {
+        onAddToMainPortfolio(activeTicker, entryPrice, optimizedQty);
+      }
+    }
   };
 
   const removeFromPortfolio = (symbol: string) => {

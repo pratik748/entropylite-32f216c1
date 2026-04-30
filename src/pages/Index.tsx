@@ -45,7 +45,7 @@ import { toast } from "@/hooks/use-toast";
 import { normalizeUserTicker } from "@/lib/ticker";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { FXProvider } from "@/hooks/useFX";
+import { FXProvider, useFX } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
@@ -79,6 +79,16 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
+  const { convertToBase } = useFX();
+
+  // Live total portfolio value in base currency (used for risk-budgeted position sizing)
+  const portfolioValueBase = useMemo(() => {
+    return stocks.reduce((sum, s) => {
+      if (!s.analysis?.currentPrice) return sum;
+      const ccy = s.analysis.currency || "USD";
+      return sum + convertToBase(s.analysis.currentPrice * s.quantity, ccy);
+    }, 0);
+  }, [stocks, convertToBase]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
@@ -289,7 +299,16 @@ const IndexContent = () => {
       {/* Direct Profit Mode, replaces entire UI */}
       {directProfitMode ? (
         <div className="flex-1 min-h-0 overflow-auto">
-          <DirectProfitMode />
+          <DirectProfitMode
+            portfolioValueBase={portfolioValueBase}
+            onAddToMainPortfolio={(ticker, buyPrice, quantity) => {
+              handleAnalyze(ticker, buyPrice, quantity);
+              toast({
+                title: "Added to Dashboard Portfolio",
+                description: `${ticker} • qty ${quantity} @ ${buyPrice.toFixed(2)} (auto-optimized)`,
+              });
+            }}
+          />
         </div>
       ) : (
         <>
