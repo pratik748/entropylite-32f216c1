@@ -132,9 +132,11 @@ async function callGemini(
   modelOverride?: string,
   reportedProvider?: AIResult["provider"]
 ): Promise<AIResult> {
-  const apiKey = Deno.env.get("GOOGLE_GEMINI_KEY") || Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("GOOGLE_GEMINI_KEY not set");
+  const primaryKey = Deno.env.get("GOOGLE_GEMINI_KEY") || Deno.env.get("GEMINI_API_KEY");
+  const fallbackKey = Deno.env.get("GOOGLE_GEMINI_KEY_2");
+  if (!primaryKey && !fallbackKey) throw new Error("GOOGLE_GEMINI_KEY not set");
 
+  const keys = [primaryKey, fallbackKey].filter((k): k is string => !!k);
   const model = modelOverride || opts.model || GEMINI_DEFAULT_MODEL;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
 
@@ -171,21 +173,34 @@ async function callGemini(
     }
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const tokens = opts.maxTokens ?? 8192;
   const timeout = tokens > 8000 ? 55000 : tokens > 2000 ? 45000 : 25000;
 
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    console.error(`Gemini error ${res.status} (${model}):`, errBody.slice(0, 300));
-    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
+  let res: Response | null = null;
+  let lastErr: any = null;
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${k}`;
+    try {
+      const r = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+      if (r.ok) { res = r; break; }
+      const errBody = await r.text();
+      const isQuota = r.status === 429 || r.status === 403 || /quota|exhaust|exceed/i.test(errBody);
+      console.error(`Gemini key#${i + 1} error ${r.status} (${model}):`, errBody.slice(0, 200));
+      lastErr = { status: r.status, message: `Gemini ${r.status}: ${errBody.slice(0, 200)}` };
+      if (isQuota && i < keys.length - 1) continue; // try next key
+      throw lastErr;
+    } catch (e: any) {
+      lastErr = e;
+      if (i < keys.length - 1 && (e?.status === 429 || e?.status === 403)) continue;
+      if (i === keys.length - 1) throw e;
+    }
   }
+  if (!res) throw lastErr || new Error("Gemini: all keys failed");
 
   const data = await res.json();
   const candidate = data.candidates?.[0];
