@@ -37,6 +37,10 @@ const GEMINI_HEAVY_MODEL = "gemini-2.5-pro";
 const GEMINI_FAST_MODEL = "gemini-2.5-flash-lite";
 const LOVABLE_GATEWAY_DEFAULT_MODEL = "openai/gpt-5-mini";
 
+// Models on the Lovable Gateway / OpenAI side that REJECT `max_tokens`
+// and require `max_completion_tokens` instead.
+const COMPLETION_TOKENS_MODELS = /^(openai\/)?(gpt-5|gpt-5\.|o1|o3|o4)/i;
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
@@ -319,8 +323,17 @@ async function callLovableGateway(
       { role: "user", content: opts.userPrompt },
     ],
     temperature: opts.temperature ?? 0.6,
-    max_tokens: opts.maxTokens ?? 8192,
   };
+
+  // Newer OpenAI reasoning models (gpt-5*, o1/o3/o4) reject `max_tokens`.
+  const tokenCap = opts.maxTokens ?? 8192;
+  if (COMPLETION_TOKENS_MODELS.test(model)) {
+    body.max_completion_tokens = tokenCap;
+    // gpt-5 family also rejects custom temperature on some endpoints.
+    delete body.temperature;
+  } else {
+    body.max_tokens = tokenCap;
+  }
 
   if (opts.tools && opts.tools.length > 0) {
     body.tools = opts.tools;
@@ -342,10 +355,27 @@ async function callLovableGateway(
 
   if (!res.ok) {
     const errBody = await res.text();
+    // Auto-retry once with `max_tokens` swapped if the gateway complains.
+    if (res.status === 400 && /max_tokens/i.test(errBody) && body.max_tokens) {
+      delete body.max_tokens;
+      body.max_completion_tokens = tokenCap;
+      const retry = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+      if (retry.ok) return parseGatewayResponse(await retry.json(), opts, reportedProvider);
+      const retryBody = await retry.text();
+      throw { status: retry.status, message: `Gateway retry ${retry.status}: ${retryBody.slice(0, 200)}` };
+    }
     throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
   }
 
   const data = await res.json();
+  return parseGatewayResponse(data, opts, reportedProvider);
+}
+
+function parseGatewayResponse(data: any, opts: CallAIOptions, reportedProvider?: AIResult["provider"]): AIResult {
   const message = data?.choices?.[0]?.message;
   const toolCall = Array.isArray(message?.tool_calls) ? message.tool_calls[0] : null;
   if (toolCall?.function?.name) {
@@ -383,6 +413,81 @@ async function callLovableGateway(
 }
 
 const RETRY_DELAYS = [0, 1500];
+
+/**
+ * Direct Mistral API caller — used as a real fallback when Gemini is rate-limited.
+ * Free-tier friendly. No tool-calling support here (only text + JSON mode).
+ */
+async function callMistralDirect(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const key = Deno.env.get("MISTRAL_API_KEY");
+  if (!key) throw new Error("MISTRAL_API_KEY not set");
+
+  const model = "mistral-large-latest";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const body: Record<string, any> = {
+    model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
+  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+}
+
+/**
+ * Direct Cloudflare Workers AI caller — second free-tier fallback.
+ */
+async function callCloudflareDirect(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  if (!accountId || !apiToken) throw new Error("CLOUDFLARE creds not set");
+
+  const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const body: Record<string, any> = {
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 50000 : 30000;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Cloudflare ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.result?.response;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Cloudflare response");
+  return { text: stripThinkingBlocks(text), provider: reported || "cloudflare" };
+}
 
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   // Choose model: heavy reasoning for big requests, default flash otherwise.
@@ -424,6 +529,18 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   }
   try { return await callGemini(opts, GEMINI_FAST_MODEL, reported); }
   catch (e) { lastError = e; }
+
+  // Real multi-vendor fallback chain when Gemini is exhausted.
+  // Skip non-tool providers if the caller needs function calling.
+  const needsTools = !!(opts.tools && opts.tools.length > 0);
+
+  if (!needsTools) {
+    try { return await callMistralDirect(opts, opts.provider || reported); }
+    catch (e) { lastError = e; console.warn("Mistral fallback failed:", (e as any)?.message || e); }
+
+    try { return await callCloudflareDirect(opts, opts.provider || reported); }
+    catch (e) { lastError = e; console.warn("Cloudflare fallback failed:", (e as any)?.message || e); }
+  }
 
   try {
     return await callLovableGateway(opts, undefined, opts.provider || reported);
@@ -479,10 +596,16 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
       try { return [await callGemini(opts, m, "gemini")]; }
       catch { /* try next */ }
     }
+    // Real fallbacks before erroring out.
+    const needsTools = !!(opts.tools && opts.tools.length > 0);
+    if (!needsTools) {
+      try { return [await callMistralDirect(opts, "mistral")]; } catch { /* next */ }
+      try { return [await callCloudflareDirect(opts, "cloudflare")]; } catch { /* next */ }
+    }
     try {
       return [await callLovableGateway(opts, undefined, opts.provider || "mistral")];
     } catch { /* fall through */ }
-    throw new Error("callAIParallel: all Gemini variants failed");
+    throw new Error("callAIParallel: all providers failed (Gemini + Mistral + Cloudflare + Gateway)");
   }
 
   console.log(`callAIParallel → ${successes.length}/3 Gemini variants succeeded`);
