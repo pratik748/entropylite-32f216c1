@@ -1396,10 +1396,22 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       // shown to an intraday trader is fraud-adjacent).
       if (preferredHorizon) {
         const recHorizon = String(rec.horizonClass || "").toLowerCase();
-        if (recHorizon && recHorizon !== preferredHorizon) {
+        // Adjacency-tolerant horizon match. Reject only when the gap is too
+        // wide (e.g. user wants intraday but AI returned long_term). Adjacent
+        // buckets (short_term ↔ medium_term, medium_term ↔ long_term) are
+        // coerced to the user's choice instead of dropped, otherwise a single
+        // AI labeling drift wipes out the entire slate.
+        const order = ["intraday", "short_term", "medium_term", "long_term"];
+        const ui = order.indexOf(preferredHorizon);
+        const ri = order.indexOf(recHorizon);
+        if (recHorizon && ui >= 0 && ri >= 0 && Math.abs(ui - ri) >= 2) {
           filtered++;
           bumpReject(`F1c_horizon_mismatch_${recHorizon}`);
           continue;
+        }
+        // Coerce to the requested horizon so downstream UI is consistent.
+        if (recHorizon && recHorizon !== preferredHorizon) {
+          rec.horizonClass = preferredHorizon;
         }
       }
 
