@@ -264,6 +264,13 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const recognitionRef = useRef<any>(null);
   const portfolioTickersRef = useRef<string[]>([]);
   const { indiaMode, baseCurrency, convertToBase } = useFX();
+  const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
+
+  useEffect(() => {
+    if (activeTicker && !loading) {
+      fetchHistorical([activeTicker], "3mo");
+    }
+  }, [activeTicker, loading, fetchHistorical]);
 
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
