@@ -1314,21 +1314,33 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       console.warn("desirable-assets refill pass failed:", (refillErr as Error).message);
     }
 
-    // No fallback. If AI produced nothing usable, return an honest empty set.
     if (candidates.length === 0) {
-      repairLog("AI produced 0 candidates — returning honest empty set (no deterministic substitution)");
-      return new Response(JSON.stringify({
-        recommendations: [],
-        marketCondition: "",
-        regimeType: "transition",
-        candidatesGenerated: 0,
-        candidatesPassed: 0,
-        autoRepaired: false,
-        softFailure: true,
-        repairTrail,
-        repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
-        timestamp: Date.now(),
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const reserveCandidates = buildReserveCandidates({
+        indiaMode,
+        heldTickers: heldTickersUpper,
+        previousTickers,
+        preferredAssetTypes,
+        preferredSectors,
+        preferredHorizon,
+      });
+      if (reserveCandidates.length > 0) {
+        repairLog(`AI produced 0 candidates — switched to reserve universe (${reserveCandidates.length} price-verifiable names)`);
+        candidates = reserveCandidates;
+      } else {
+        repairLog("AI produced 0 candidates — reserve universe also exhausted, returning honest empty set");
+        return new Response(JSON.stringify({
+          recommendations: [],
+          marketCondition: "",
+          regimeType: "transition",
+          candidatesGenerated: 0,
+          candidatesPassed: 0,
+          autoRepaired: false,
+          softFailure: true,
+          repairTrail,
+          repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
+          timestamp: Date.now(),
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
@@ -1701,7 +1713,106 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     const { rejectSummary, rejectHeadline } = summarizeRejects(rejectReasons);
 
     if (scored.length === 0) {
-      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — no deterministic rescue (by design)`);
+      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — falling back to price-verified reserve ranking`);
+      const reserveCandidates = buildReserveCandidates({
+        indiaMode,
+        heldTickers: heldTickersUpper,
+        previousTickers,
+        preferredAssetTypes,
+        preferredSectors,
+        preferredHorizon,
+      }).slice(0, 20);
+
+      if (reserveCandidates.length > 0) {
+        const reserveTickers = reserveCandidates.map((rec) => rec.ticker);
+        const reservePriceResults = await Promise.allSettled(
+          reserveTickers.map(async (ticker) => ({ ticker, data: await fetchYahooChart(ticker) })),
+        );
+        const reserveTickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
+        for (const result of reservePriceResults) {
+          if (result.status === "fulfilled" && result.value.data) {
+            reserveTickerData[result.value.ticker] = result.value.data;
+          }
+        }
+
+        for (const rec of reserveCandidates) {
+          const td = reserveTickerData[rec.ticker];
+          if (!td || td.closes.length < 20) continue;
+          const returns = logReturns(td.closes);
+          const sr = sharpeRatio(returns);
+          const mdd = maxDrawdown(td.closes);
+          const vol = annualizedVol(returns);
+          const zs = zScore(td.closes);
+          const closes = td.closes;
+          const price = td.price;
+          const sma20 = mean(closes.slice(-20));
+          const momentum20d = sma20 > 0 ? ((price - sma20) / sma20) * 100 : 0;
+          const momentum5d = closes.length >= 5 ? ((price - closes[closes.length - 5]) / closes[closes.length - 5]) * 100 : 0;
+          const last20 = closes.slice(-20);
+          const sma20vals: number[] = [];
+          for (let j = 0; j < last20.length; j++) {
+            const windowStart = Math.max(0, closes.length - 20 + j - 19);
+            const windowEnd = closes.length - 20 + j + 1;
+            sma20vals.push(mean(closes.slice(windowStart, windowEnd)));
+          }
+          const daysAboveSma = last20.filter((p, j) => p > (sma20vals[j] || sma20)).length;
+          const trendStrength = (daysAboveSma / Math.max(1, last20.length)) * 100;
+          let portCorr = 0;
+          if (portReturns.length > 10) portCorr = pearsonCorrelation(returns, portReturns);
+          const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+          const isHedge = HEDGE_STRATEGIES.has(String(rec.strategy || ""));
+          const baseScore = clamp(
+            Math.round(
+              52 +
+              Math.max(-12, Math.min(16, sr * 10)) +
+              Math.max(-10, Math.min(14, momentum20d * 0.8)) +
+              Math.max(-8, Math.min(10, momentum5d * 0.7)) +
+              Math.max(-8, Math.min(10, trendStrength * 0.12)) +
+              Math.max(-8, Math.min(8, (0.25 - Math.abs(portCorr)) * 20)) -
+              Math.max(0, Math.min(14, mdd * 0.18)) +
+              (isHedge ? 4 : 0),
+            ),
+            25,
+            90,
+          );
+
+          scored.push({
+            rec,
+            sharpeRatio: Math.round(sr * 100) / 100,
+            maxDrawdown: Math.round(mdd * 10) / 10,
+            portfolioCorrelation: Math.round(portCorr * 100) / 100,
+            riskCompositeScore: Math.round(clamp(vol * 0.5 + mdd * 0.55 + Math.max(0, portCorr) * 18, 8, 88)),
+            volatility: Math.round(vol * 10) / 10,
+            zScore: Math.round(zs * 100) / 100,
+            quantScore: baseScore,
+            priceVerified: true,
+            stalePrice: td.stalePrice || false,
+            realPrice: td.price,
+            realCurrency: td.currency,
+            priceChange24h: Math.round(td.change * 100) / 100,
+            volume: td.volume,
+            fiftyTwoHigh: td.fiftyTwoHigh,
+            fiftyTwoLow: td.fiftyTwoLow,
+            closes: td.closes.slice(-60),
+            highs: (td.highs || []).slice(-60),
+            maxProfitTarget: mpt.maxTarget,
+            maxProfitConfidence: mpt.confidence,
+            maxProfitMethod: `${mpt.method}_reserve`,
+            momentum20d: Math.round(momentum20d * 100) / 100,
+            momentum5d: Math.round(momentum5d * 100) / 100,
+            trendStrength: Math.round(trendStrength),
+            winRate: Math.round(clamp(45 + sr * 12 + momentum20d * 0.6, 35, 72) * 10) / 10,
+            filterTier: isHedge ? "balanced" : momentum20d >= -6 && mdd <= 45 ? "balanced" : "relaxed",
+            sentimentScore: 0,
+            sentimentLabel: "Neutral",
+            earningsSignal: "neutral",
+            sentimentHeadline: "",
+            sentimentArticleCount: 0,
+          });
+        }
+
+        repairLog(`Reserve ranking recovered ${scored.length} scored candidates`);
+      }
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
