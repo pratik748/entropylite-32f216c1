@@ -803,8 +803,18 @@ serve(async (req) => {
       }
     }
 
-    const regionInfo = CURRENCY_TO_REGION[baseCurrency];
-    const isUSUser = !regionInfo || baseCurrency === "USD";
+    // CRITICAL: indiaMode is the user's EXPLICIT scope toggle. When OFF, the
+    // user wants international/global assets even if their BASE display currency
+    // is INR (or any other non-USD). Base currency is for display/conversion
+    // only — it must NEVER force regional asset selection on its own. Only
+    // honour the currency→region mapping when indiaMode is OFF AND the user
+    // hasn't selected USD (i.e. they explicitly live in that currency zone AND
+    // didn't toggle India). For INR specifically, treat as global when indiaMode
+    // is off — INR users routinely want US/global ideas when the toggle is off.
+    const rawRegionInfo = CURRENCY_TO_REGION[baseCurrency];
+    const treatAsGlobal = !indiaMode && (baseCurrency === "USD" || baseCurrency === "INR");
+    const regionInfo = treatAsGlobal ? undefined : rawRegionInfo;
+    const isUSUser = !regionInfo || baseCurrency === "USD" || treatAsGlobal;
     const seed = Math.floor(Math.random() * 99999);
     // Reliability-first: avoid Cloudflare free-tier neuron exhaustion loops.
     const effectiveProvider = provider === "cloudflare" ? "cloudflare" : "mistral";
