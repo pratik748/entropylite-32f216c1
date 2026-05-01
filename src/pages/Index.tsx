@@ -261,6 +261,25 @@ const IndexContent = () => {
     }
   };
 
+  // Auto-hydrate stocks that were added with only a Direct Profit stub.
+  // The stub lacks bullRange/suggestion/keyRisks etc., so the dashboard
+  // detail panes (MonteCarloChart, RiskIndicator, Recommendation, …) would
+  // crash on undefined fields. When such a stock becomes active, kick off a
+  // full analyze-stock run so the analysis object is fully populated.
+  const hydratingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeStock) return;
+    if (activeStock.isLoading) return;
+    const a: any = activeStock.analysis;
+    if (!a) return;
+    const isStub = a.bullRange == null || a.suggestion == null;
+    if (!isStub) return;
+    if (hydratingRef.current.has(activeStock.id)) return;
+    hydratingRef.current.add(activeStock.id);
+    analyzeStock(activeStock.id, activeStock.ticker, activeStock.buyPrice, activeStock.quantity)
+      .finally(() => hydratingRef.current.delete(activeStock.id));
+  }, [activeStock?.id, activeStock?.analysis, activeStock?.isLoading, analyzeStock]);
+
   const handleRemoveStock = (id: string) => {
     const stock = stocks.find((s) => s.id === id);
     // Ingest closed position into ODGS Profit Gradient
