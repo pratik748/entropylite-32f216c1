@@ -1108,6 +1108,18 @@ Return via the tool call only.`,
         return t.endsWith(".NS") || t.endsWith(".BO");
       });
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
+    } else {
+      // INVERSE HARD FILTER: when India mode is OFF the user wants global / non-India
+      // ideas. Strip .NS / .BO so we don't leak Indian tickers into international slates
+      // just because the model latched onto INR-base context.
+      const before = candidates.length;
+      candidates = candidates.filter((c: any) => {
+        const t = String(c?.ticker || "").toUpperCase();
+        return !t.endsWith(".NS") && !t.endsWith(".BO");
+      });
+      if (candidates.length !== before) {
+        console.log(`desirable-assets non-India hard-filter: stripped ${before - candidates.length} Indian tickers (indiaMode=off)`);
+      }
     }
 
     candidates = dedupeCandidates(candidates).slice(0, 28);
