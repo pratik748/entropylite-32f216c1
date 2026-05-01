@@ -968,9 +968,13 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
     // We deliberately don't broadcast a 30-deep ban list to the model — that
     // starves the engine and was the root cause of the "Most rejected names
     // were already in your portfolio" failure mode the user kept hitting.
-    const recentBan = previousTickers.slice(-12);
+    // HARD anti-repeat: the user complained that the same names keep coming
+    // back. Treat the last 40 surfaced tickers as a no-fly list, not a "soft
+    // avoid". The model is then forced to genuinely re-screen the universe
+    // instead of resurfacing yesterday's slate.
+    const recentBan = previousTickers.slice(-40);
     const antiRepeatBlock = recentBan.length > 0
-      ? `\n## ANTI-REPEAT (soft):\nAvoid recycling these tickers from the most recent slate unless they are clearly the best available pick today: ${recentBan.join(", ")}. Prefer fresh, equally-liquid alternatives.\n`
+      ? `\n## ANTI-REPEAT (HARD CONSTRAINT):\nThe user has already been shown these tickers recently. DO NOT re-emit ANY of them in this response — pick genuinely different names from the live universe: ${recentBan.join(", ")}.\nIf you would otherwise pick one of these, replace it with a fresh, equally-liquid alternative grounded in the LIVE WEB CONTEXT block below.\n`
       : "";
 
     // HARD portfolio exclusion: anything the user already owns is NOT a
@@ -1170,7 +1174,11 @@ Return via the tool call only.`,
         tools: candidateTools,
         toolChoice: { type: "function", function: { name: "emit_desirable_assets" } },
         maxTokens: 2800,
-        temperature: 0.35,
+        // Higher temperature + a fresh per-call seed forces real exploration
+        // across the universe instead of always converging on the same
+        // training-set favourites. Combined with the live web context this
+        // is what stops the "same stocks every time" failure.
+        temperature: 0.85,
       };
 
       // Fire BOTH providers in parallel for 2x candidate power
