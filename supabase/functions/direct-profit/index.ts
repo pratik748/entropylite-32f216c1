@@ -711,6 +711,59 @@ Deno.serve(async (req) => {
     const riskMetrics = computeRiskMetrics(snap, tech, vix);
     const clankSignals = detectClankSignals(snap, tech, vix);
 
+    // ── INTELLIGENCE CONSENSUS ──────────────────────────────────────────
+    // Call the dashboard's analyze-stock function FIRST so Direct Profit's
+    // verdict is anchored on the same multi-factor intelligence summary the
+    // user sees when they open the stock in the dashboard. This guarantees
+    // the two views can no longer contradict each other.
+    let intelSummary: any = null;
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const authHeader = req.headers.get("authorization");
+      if (supabaseUrl && authHeader) {
+        const intelRes = await fetch(`${supabaseUrl}/functions/v1/analyze-stock`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+            apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+          },
+          // We pass the live price as buyPrice so analyze-stock's
+          // entry-price-aware adjustments treat this as a fresh decision
+          // (no pre-existing P&L bias). Quantity is a sentinel 1.
+          body: JSON.stringify({
+            ticker: resolvedTicker,
+            buyPrice: snap.currentPrice,
+            quantity: 1,
+          }),
+        });
+        if (intelRes.ok) {
+          intelSummary = await intelRes.json();
+        } else {
+          console.warn(`direct-profit: intelligence call failed ${intelRes.status}`);
+        }
+      }
+    } catch (e) {
+      console.warn("direct-profit: intelligence call threw", (e as Error).message);
+    }
+
+    const intelContext = intelSummary
+      ? `\n\nINTELLIGENCE CONSENSUS (dashboard analyze-stock — MUST anchor your action):\n` +
+        `- Suggestion: ${intelSummary.suggestion} (${intelSummary.confidence}% conf)\n` +
+        `- Verdict: ${intelSummary.verdict}\n` +
+        `- Trend: ${intelSummary.technicals?.trend} | RSI: ${intelSummary.technicals?.rsi} | Regime: ${intelSummary.regime}\n` +
+        `- Risk Score: ${intelSummary.riskScore}/100 (${intelSummary.riskLevel})\n` +
+        `- Bull Range: ${currencySymbol}${intelSummary.bullRange?.[0]}-${currencySymbol}${intelSummary.bullRange?.[1]}\n` +
+        `- Bear Range: ${currencySymbol}${intelSummary.bearRange?.[0]}-${currencySymbol}${intelSummary.bearRange?.[1]}\n` +
+        `- Sentiment: ${intelSummary.overallSentiment} | News pressure: ${intelSummary.totalPressure}%\n` +
+        `- Key Risks: ${(intelSummary.keyRisks || []).slice(0, 3).join(" | ")}\n` +
+        `RULES:\n` +
+        `• If suggestion is "Exit" → action MUST be SELL or WAIT (never BUY).\n` +
+        `• If suggestion is "Add" → action MUST be BUY or WAIT (never SELL).\n` +
+        `• If suggestion is "Hold" or "Skip" → action MUST be WAIT unless your own data is overwhelming.\n` +
+        `• Your verdict text must NOT contradict the intelligence verdict.`
+      : "";
+
     console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix} | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 
     const quantContext = isIndian
