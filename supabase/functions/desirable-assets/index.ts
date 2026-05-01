@@ -803,8 +803,18 @@ serve(async (req) => {
       }
     }
 
-    const regionInfo = CURRENCY_TO_REGION[baseCurrency];
-    const isUSUser = !regionInfo || baseCurrency === "USD";
+    // CRITICAL: indiaMode is the user's EXPLICIT scope toggle. When OFF, the
+    // user wants international/global assets even if their BASE display currency
+    // is INR (or any other non-USD). Base currency is for display/conversion
+    // only — it must NEVER force regional asset selection on its own. Only
+    // honour the currency→region mapping when indiaMode is OFF AND the user
+    // hasn't selected USD (i.e. they explicitly live in that currency zone AND
+    // didn't toggle India). For INR specifically, treat as global when indiaMode
+    // is off — INR users routinely want US/global ideas when the toggle is off.
+    const rawRegionInfo = CURRENCY_TO_REGION[baseCurrency];
+    const treatAsGlobal = !indiaMode && (baseCurrency === "USD" || baseCurrency === "INR");
+    const regionInfo = treatAsGlobal ? undefined : rawRegionInfo;
+    const isUSUser = !regionInfo || baseCurrency === "USD" || treatAsGlobal;
     const seed = Math.floor(Math.random() * 99999);
     // Reliability-first: avoid Cloudflare free-tier neuron exhaustion loops.
     const effectiveProvider = provider === "cloudflare" ? "cloudflare" : "mistral";
@@ -1098,6 +1108,18 @@ Return via the tool call only.`,
         return t.endsWith(".NS") || t.endsWith(".BO");
       });
       console.log(`desirable-assets India hard-filter: ${candidates.length} Indian AI candidates survived`);
+    } else {
+      // INVERSE HARD FILTER: when India mode is OFF the user wants global / non-India
+      // ideas. Strip .NS / .BO so we don't leak Indian tickers into international slates
+      // just because the model latched onto INR-base context.
+      const before = candidates.length;
+      candidates = candidates.filter((c: any) => {
+        const t = String(c?.ticker || "").toUpperCase();
+        return !t.endsWith(".NS") && !t.endsWith(".BO");
+      });
+      if (candidates.length !== before) {
+        console.log(`desirable-assets non-India hard-filter: stripped ${before - candidates.length} Indian tickers (indiaMode=off)`);
+      }
     }
 
     candidates = dedupeCandidates(candidates).slice(0, 28);

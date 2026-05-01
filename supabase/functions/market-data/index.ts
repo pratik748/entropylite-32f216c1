@@ -171,6 +171,7 @@ serve(async (req) => {
     const realSilver = silverData?.price || 0;
 
     let aiMacro: any = null;
+    let aiProviderUsed: string | undefined;
     try {
       const regionCtx = getRegionContext(region === "All" ? "US" : region);
       
@@ -179,6 +180,18 @@ serve(async (req) => {
         ? indexData
         : indexData.filter((i: any) => i?.region === region || region === "All");
       const indexSummary = relevantIndices.slice(0, 5).map((i: any) => `${i?.name}: ${i?.changePct?.toFixed(2)}%`).join(", ");
+
+      // Resolve a CONCRETE label for the prompt — never literally pass "All" into
+      // the JSON template (the model treats "All" as ambiguous and often returns
+      // empty keyEvents/outlook).
+      const focusLabel = region === "All" ? "global" : region;
+      const fxLine = region === "India"
+        ? `USD/INR: ${realUsdInr.toFixed(2)}`
+        : region === "Europe"
+          ? `EUR/USD: ${realEurUsd.toFixed(4)}, GBP/USD: ${realGbpUsd.toFixed(4)}`
+          : region === "Asia"
+            ? `USD/JPY proxy via DXY (n/a here)`
+            : `DXY/USD majors: EUR/USD ${realEurUsd.toFixed(4)}, GBP/USD ${realGbpUsd.toFixed(4)}`;
 
       const result = await callAI({
         provider,
@@ -189,35 +202,41 @@ REASONING FRAMEWORK:
 2. moodScore (-100 to +100) must be a quantitative read: weight VIX (40%), index breadth (30%), commodities/FX risk-on signal (30%).
 3. fiiFlow / diiFlow: directional + magnitude phrase ("FII +$1.2bn 5d net buy", "DII -$400m profit-taking"). Plausible scale for the region.
 4. topMovers: 3–5 names ACTUALLY relevant to the region — not US mega-caps when region=India.
-5. keyEvents: 3 items happening THIS WEEK that matter for the region (central bank, earnings, geopolitical).
-6. outlook: 3 sentences — current regime, next-week catalysts, asymmetric risk.
+5. keyEvents: EXACTLY 3 concrete items happening THIS WEEK that matter for the region (central bank meeting, major earnings print, scheduled macro release, geopolitical event). Never leave this empty — if uncertain, use the most likely scheduled events for the current week (FOMC minutes, CPI, NFP, RBI MPC, ECB, major mega-cap earnings, OPEC, etc.).
+6. outlook: EXACTLY 3 sentences — (i) current regime read, (ii) next-week catalysts, (iii) asymmetric risk. Never empty.
 7. sectorRotation: name the rotation explicitly ("Defensives bid, semis bleed", "Banks lead on rate-cut bets").
 8. riskAppetite: 1 sentence, defended by the data.
 
-VOICE: trading-desk concise, no hedging, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON.`,
-        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus}.
+VOICE: trading-desk concise, no hedging, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON — every field populated, no nulls, no empty arrays.`,
+        userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus} (label: ${focusLabel}).
 
-Key data: ${indexSummary}, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${regionCtx.currency}: ${region === "India" ? realUsdInr.toFixed(2) : region === "Europe" ? realEurUsd.toFixed(4) : "N/A"}
+Key data: ${indexSummary}, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${fxLine}
 
 Focus your analysis on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
 {
   "marketMood": "<Bullish|Bearish|Neutral|Cautious|Risk-Off>",
   "moodScore": <-100 to 100>,
-  "fiiFlow": "<direction and magnitude for ${region === "All" ? "global" : region} markets>",
+  "fiiFlow": "<direction and magnitude for ${focusLabel} markets>",
   "diiFlow": "<direction and magnitude>",
-  "topMovers": [{"name": "<stock/index relevant to ${region === "All" ? "global" : region}>", "change": <% number>}],
-  "keyEvents": ["<event1 relevant to ${region === "All" ? "global" : region}>", "<event2>", "<event3>"],
-  "outlook": "<3 sentence ${region === "All" ? "global" : region} market outlook>",
-  "sectorRotation": "<inflows vs outflows for ${region === "All" ? "global" : region}>",
+  "topMovers": [{"name": "<stock/index relevant to ${focusLabel}>", "change": <% number>}],
+  "keyEvents": ["<event1 this week — ${focusLabel}>", "<event2 this week>", "<event3 this week>"],
+  "outlook": "<3-sentence ${focusLabel} market outlook — regime, catalysts, asymmetric risk>",
+  "sectorRotation": "<inflows vs outflows for ${focusLabel}>",
   "riskAppetite": "<1 sentence>"
-}`,
+}
+
+ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 sentences. Do not return empty arrays or empty strings.`,
         maxTokens: 800,
         temperature: 0.3,
         provider,
       });
 
-      console.log(`market-data used provider: ${result.provider}, region: ${region}`);
+      console.log(`market-data used provider: ${result.provider}, region: ${region}, indiaMode: ${indiaMode}`);
+      aiProviderUsed = result.provider;
       aiMacro = safeParseJSON(result.text);
+      if (!aiMacro?.keyEvents?.length || !aiMacro?.outlook) {
+        console.warn(`market-data: AI returned incomplete macro (events=${aiMacro?.keyEvents?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}) — provider=${result.provider}`);
+      }
     } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {
@@ -232,6 +251,7 @@ Focus your analysis on ${regionCtx.indices} and ${regionCtx.centralBank} policy.
       outlook: aiMacro?.outlook || "",
       sectorRotation: aiMacro?.sectorRotation || "",
       riskAppetite: aiMacro?.riskAppetite || "",
+      aiProvider: aiProviderUsed,
     };
 
     return new Response(JSON.stringify({ indices: indexData, sectors: sectorData, macro, timestamp: Date.now() }), {

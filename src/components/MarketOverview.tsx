@@ -42,6 +42,7 @@ interface MarketData {
     outlook: string;
     sectorRotation?: string;
     riskAppetite?: string;
+    aiProvider?: string;
   } | null;
   timestamp?: number;
 }
@@ -222,14 +223,23 @@ const MarketOverview = () => {
           </div>
 
           <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Key Events & Outlook</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Key Events & Outlook</h3>
+              {data.macro.aiProvider && (
+                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70 px-1.5 py-0.5 rounded border border-border/60">
+                  AI: {data.macro.aiProvider}
+                </span>
+              )}
+            </div>
             <div className="space-y-2 mb-4">
-              {data.macro.keyEvents?.map((event, i) => (
+              {(data.macro.keyEvents && data.macro.keyEvents.length > 0) ? data.macro.keyEvents.map((event, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
                   <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary/50" />
                   {event}
                 </div>
-              ))}
+              )) : (
+                <div className="text-xs text-muted-foreground/70 italic">No scheduled events parsed — refresh in a few seconds.</div>
+              )}
             </div>
             {data.macro.outlook && (
               <div className="rounded-lg bg-surface-2 p-3">
