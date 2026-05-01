@@ -72,6 +72,18 @@ interface TradeResult {
   riskMetrics?: RiskMetrics;
   clankSignals?: ClankSignal[];
   newsHeadlines?: string[];
+  intelligence?: {
+    suggestion?: "Add" | "Hold" | "Exit" | "Skip";
+    confidence?: number;
+    verdict?: string;
+    trend?: string;
+    regime?: string;
+    riskScore?: number;
+    riskLevel?: string;
+    bullRange?: [number, number];
+    bearRange?: [number, number];
+    sentiment?: number;
+  };
 }
 
 interface PortfolioItem {
@@ -199,6 +211,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     riskMetrics: value.riskMetrics || undefined,
     clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
     newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
+    intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
   };
 }
 
