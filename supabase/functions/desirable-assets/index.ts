@@ -1256,6 +1256,16 @@ Return via the tool call only.`,
       }
     }
 
+    // HARD anti-repeat enforcement: drop any candidate that matches the
+    // recent ban list, regardless of how good the model thinks it is.
+    const recentBanSet = new Set(previousTickers.slice(-40).map((t) => String(t).toUpperCase()));
+    if (recentBanSet.size > 0) {
+      const before = candidates.length;
+      candidates = candidates.filter((c: any) => !recentBanSet.has(String(c?.ticker || "").toUpperCase()));
+      if (candidates.length !== before) {
+        console.log(`desirable-assets anti-repeat hard-filter: stripped ${before - candidates.length} repeat tickers`);
+      }
+    }
     candidates = dedupeCandidates(candidates).slice(0, 28);
     console.log(`desirable-assets: AI returned ${candidates.length} picks (no fallback substitution)`);
 
