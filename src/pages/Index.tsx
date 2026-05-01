@@ -129,7 +129,14 @@ const IndexContent = () => {
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
-  const analysis = activeStock?.analysis ?? null;
+  const rawAnalysis = activeStock?.analysis ?? null;
+  // A "stub" analysis (e.g. a Direct Profit context placeholder) is missing
+  // the fields the dashboard panes require. Treat it as "no analysis yet"
+  // so we render the loading / empty state instead of crashing on
+  // undefined.bullRange.map / undefined.toFixed in child components.
+  const analysisIsStub = !!rawAnalysis && ((rawAnalysis as any).bullRange == null || (rawAnalysis as any).suggestion == null);
+  const analysis = analysisIsStub ? null : rawAnalysis;
+  const effectiveLoading = isLoading || analysisIsStub;
   const showMobileDashboardDock = isMobile && activeTab === "dashboard";
 
   // Real-time price subscription
