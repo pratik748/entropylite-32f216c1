@@ -129,7 +129,14 @@ const IndexContent = () => {
 
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
-  const analysis = activeStock?.analysis ?? null;
+  const rawAnalysis = activeStock?.analysis ?? null;
+  // A "stub" analysis (e.g. a Direct Profit context placeholder) is missing
+  // the fields the dashboard panes require. Treat it as "no analysis yet"
+  // so we render the loading / empty state instead of crashing on
+  // undefined.bullRange.map / undefined.toFixed in child components.
+  const analysisIsStub = !!rawAnalysis && ((rawAnalysis as any).bullRange == null || (rawAnalysis as any).suggestion == null);
+  const analysis = analysisIsStub ? null : rawAnalysis;
+  const effectiveLoading = isLoading || analysisIsStub;
   const showMobileDashboardDock = isMobile && activeTab === "dashboard";
 
   // Real-time price subscription
@@ -260,6 +267,25 @@ const IndexContent = () => {
       analyzeStock(newId, normalizedTicker, buyPrice, quantity);
     }
   };
+
+  // Auto-hydrate stocks that were added with only a Direct Profit stub.
+  // The stub lacks bullRange/suggestion/keyRisks etc., so the dashboard
+  // detail panes (MonteCarloChart, RiskIndicator, Recommendation, …) would
+  // crash on undefined fields. When such a stock becomes active, kick off a
+  // full analyze-stock run so the analysis object is fully populated.
+  const hydratingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeStock) return;
+    if (activeStock.isLoading) return;
+    const a: any = activeStock.analysis;
+    if (!a) return;
+    const isStub = a.bullRange == null || a.suggestion == null;
+    if (!isStub) return;
+    if (hydratingRef.current.has(activeStock.id)) return;
+    hydratingRef.current.add(activeStock.id);
+    analyzeStock(activeStock.id, activeStock.ticker, activeStock.buyPrice, activeStock.quantity)
+      .finally(() => hydratingRef.current.delete(activeStock.id));
+  }, [activeStock?.id, activeStock?.analysis, activeStock?.isLoading, analyzeStock]);
 
   const handleRemoveStock = (id: string) => {
     const stock = stocks.find((s) => s.id === id);
@@ -425,8 +451,8 @@ const IndexContent = () => {
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
                     <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-                    {isLoading && <LoadingState />}
-                    {analysis && !isLoading && (
+                    {effectiveLoading && <LoadingState />}
+                    {analysis && !effectiveLoading && (
                       <>
                         <StockSummary
                           ticker={analysis.ticker}
@@ -508,7 +534,7 @@ const IndexContent = () => {
                         {/* Top center: Main analysis */}
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
-                            {!isLoading && !analysis && (
+                            {!effectiveLoading && !analysis && (
                               <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
                                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
                                   <Activity className="h-7 w-7 text-primary" />
@@ -520,8 +546,8 @@ const IndexContent = () => {
                                 </p>
                               </div>
                             )}
-                            {isLoading && <LoadingState />}
-                            {analysis && !isLoading && (
+                            {effectiveLoading && <LoadingState />}
+                            {analysis && !effectiveLoading && (
                               <>
                                 <StockSummary
                                   ticker={analysis.ticker}
