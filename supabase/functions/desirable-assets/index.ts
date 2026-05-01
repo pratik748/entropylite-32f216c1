@@ -1315,20 +1315,10 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     if (candidates.length === 0) {
-      const reserveCandidates = buildReserveCandidates({
-        indiaMode,
-        heldTickers: heldTickersUpper,
-        previousTickers,
-        preferredAssetTypes,
-        preferredSectors,
-        preferredHorizon,
-      });
-      if (reserveCandidates.length > 0) {
-        repairLog(`AI produced 0 candidates — switched to reserve universe (${reserveCandidates.length} price-verifiable names)`);
-        candidates = reserveCandidates;
-      } else {
-        repairLog("AI produced 0 candidates — reserve universe also exhausted, returning honest empty set");
-        return new Response(JSON.stringify({
+      // No reserve fallback — user explicitly demanded real AI + real-time
+      // recommendations only. Return honest empty so the UI prompts a retry.
+      repairLog("AI produced 0 candidates — returning honest empty (no reserve fallback per user policy)");
+      return new Response(JSON.stringify({
           recommendations: [],
           marketCondition: "",
           regimeType: "transition",
@@ -1337,10 +1327,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           autoRepaired: false,
           softFailure: true,
           repairTrail,
-          repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
+          repairMessage: "Live AI returned no usable picks this cycle. Retry in a moment for fresh real-time analysis.",
           timestamp: Date.now(),
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
