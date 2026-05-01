@@ -36,6 +36,17 @@ interface AIResult {
 const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
 const MISTRAL_FAST_MODEL = "mistral-small-latest";
 
+// Per-isolate round-robin cursor across Mistral keys. Persists for the
+// lifetime of the edge worker, so consecutive calls within the same warm
+// instance alternate keys and split load roughly 50/50.
+let __mistralKeyCursor = 0;
+function pickKeyIndex(total: number): number {
+  if (total <= 1) return 0;
+  const i = __mistralKeyCursor % total;
+  __mistralKeyCursor = (__mistralKeyCursor + 1) % 1_000_000;
+  return i;
+}
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
@@ -205,13 +216,20 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const primary = Deno.env.get("MISTRAL_API_KEY");
   const secondary = Deno.env.get("MISTRAL_API_KEY_2");
-  const keys: Array<{ key: string; label: string }> = [];
-  if (primary) keys.push({ key: primary, label: "primary" });
-  if (secondary) keys.push({ key: secondary, label: "secondary" });
-  if (keys.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2)");
+  const available: Array<{ key: string; label: string }> = [];
+  if (primary) available.push({ key: primary, label: "primary" });
+  if (secondary) available.push({ key: secondary, label: "secondary" });
+  if (available.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2)");
+
+  // Round-robin load balance across keys so each carries ~half the traffic.
+  // Counter is per-isolate; on Mistral 429/5xx we rotate to the other key
+  // immediately so the user never sees a rate-limit failure when the other
+  // key still has quota.
+  const idx = pickKeyIndex(available.length);
+  const ordered = available.slice(idx).concat(available.slice(0, idx));
 
   let lastErr: any = null;
-  for (const { key, label } of keys) {
+  for (const { key, label } of ordered) {
     try {
       return await callMistralWithKey(opts, key, reported);
     } catch (e: any) {
