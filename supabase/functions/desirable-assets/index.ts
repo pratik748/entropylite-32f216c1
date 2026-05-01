@@ -816,8 +816,8 @@ serve(async (req) => {
     const regionInfo = treatAsGlobal ? undefined : rawRegionInfo;
     const isUSUser = !regionInfo || baseCurrency === "USD" || treatAsGlobal;
     const seed = Math.floor(Math.random() * 99999);
-    // Reliability-first: avoid Cloudflare free-tier neuron exhaustion loops.
-    const effectiveProvider = provider === "cloudflare" ? "cloudflare" : "mistral";
+    // Mistral-only — single source of truth for AI calls.
+    const effectiveProvider = "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
