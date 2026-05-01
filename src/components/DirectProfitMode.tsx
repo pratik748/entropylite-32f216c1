@@ -707,6 +707,33 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
             )}
 
+            {/* Intelligence Consensus */}
+            {result.intelligence?.suggestion && (
+              <div className="border-b border-border p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+                    <Gauge className="h-3.5 w-3.5 text-primary" />
+                    Intelligence Consensus
+                  </div>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                    result.intelligence.suggestion === "Add" ? "border-gain text-gain" :
+                    result.intelligence.suggestion === "Exit" ? "border-loss text-loss" :
+                    "border-border text-muted-foreground"
+                  }`}>
+                    {result.intelligence.suggestion.toUpperCase()} · {result.intelligence.confidence ?? "—"}%
+                  </span>
+                </div>
+                {result.intelligence.verdict && (
+                  <p className="text-xs text-muted-foreground leading-relaxed">{result.intelligence.verdict}</p>
+                )}
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                  <div>Trend: <span className="text-foreground font-mono">{result.intelligence.trend || "—"}</span></div>
+                  <div>Regime: <span className="text-foreground font-mono">{result.intelligence.regime || "—"}</span></div>
+                  <div>Risk: <span className="text-foreground font-mono">{result.intelligence.riskScore ?? "—"}/100</span></div>
+                </div>
+              </div>
+            )}
+
             {/* Protection */}
             <div className="border-b border-border p-4">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
