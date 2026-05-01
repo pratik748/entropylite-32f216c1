@@ -82,7 +82,7 @@ JSON schema:
     });
 
     const data = safeParseJSON(result.text);
-    return new Response(JSON.stringify({ ...data, timestamp: Date.now(), provider: "cloudflare" }), {
+    return new Response(JSON.stringify({ ...data, timestamp: Date.now(), provider: "mistral" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

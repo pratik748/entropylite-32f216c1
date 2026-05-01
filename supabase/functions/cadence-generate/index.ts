@@ -209,9 +209,9 @@ Output ONLY the JSON. No markdown fences, no commentary.`;
 }
 
 async function generateResearch(topic: string, discipline: string): Promise<{ entry: any; providersUsed: string[] }> {
-  console.log(`[research] Firing 2 fast providers (Cloudflare + Mistral) for: ${topic}`);
-  // Race only Cloudflare + Mistral to stay well under the 60s edge timeout.
-  // OpenAI is reserved as a single-shot fallback if both fail.
+  console.log(`[research] Firing 2 Mistral drafts (key1 + key2 fallback) for: ${topic}`);
+  // Mistral-only: fire two drafts at different temperatures for diversity.
+  // callAI() already handles MISTRAL_API_KEY → MISTRAL_API_KEY_2 failover.
   const racePromises = [
     callAI({
       systemPrompt: RESEARCH_SYSTEM,
@@ -219,42 +219,25 @@ async function generateResearch(topic: string, discipline: string): Promise<{ en
       jsonMode: true,
       temperature: 0.45,
       maxTokens: 4000,
-      provider: "cloudflare",
-    }).then(r => ({ ...r, provider: "cloudflare" as const })).catch(e => {
-      console.warn("[research] Cloudflare failed:", (e as Error).message);
+      provider: "mistral",
+    }).then(r => ({ ...r, provider: "mistral" as const })).catch(e => {
+      console.warn("[research] Mistral draft A failed:", (e as Error).message);
       return null;
     }),
     callAI({
       systemPrompt: RESEARCH_SYSTEM,
       userPrompt: researchPrompt(topic, discipline),
       jsonMode: true,
-      temperature: 0.5,
+      temperature: 0.6,
       maxTokens: 4000,
       provider: "mistral",
     }).then(r => ({ ...r, provider: "mistral" as const })).catch(e => {
-      console.warn("[research] Mistral failed:", (e as Error).message);
+      console.warn("[research] Mistral draft B failed:", (e as Error).message);
       return null;
     }),
   ];
   const settled = await Promise.all(racePromises);
-  let draftResults = settled.filter((r): r is NonNullable<typeof r> => r !== null);
-
-  if (draftResults.length === 0) {
-    console.warn("[research] Both fast providers failed — falling back to OpenAI single-shot");
-    try {
-      const fallback = await callAI({
-        systemPrompt: RESEARCH_SYSTEM,
-        userPrompt: researchPrompt(topic, discipline),
-        jsonMode: true,
-        temperature: 0.45,
-        maxTokens: 4000,
-        provider: "openai",
-      });
-      draftResults = [{ ...fallback, provider: "openai" as const }];
-    } catch (e) {
-      console.error("[research] OpenAI fallback also failed:", (e as Error).message);
-    }
-  }
+  const draftResults = settled.filter((r): r is NonNullable<typeof r> => r !== null);
 
   const validDrafts: Array<{ provider: string; data: any }> = [];
   for (const r of draftResults) {
@@ -324,52 +307,10 @@ async function generateResearch(topic: string, discipline: string): Promise<{ en
 
 // ---------------- diagram generation (nano-banana) ----------------
 
-async function generateDiagram(topic: string, caption: string): Promise<string | null> {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!lovableKey) {
-    console.warn("[diagram] LOVABLE_API_KEY not set — skipping diagram");
-    return null;
-  }
-
-  const prompt = `A clean, minimal, editorial-grade conceptual diagram illustrating "${topic}" for a quantitative finance research note.
-
-Style: thin black line art on a pure off-white (#FAFAFA) background. Inspired by The Economist info-graphics, Edward Tufte, and academic textbook figures. NO color except subtle black and one grey accent. NO 3D. NO photorealism. NO text labels except clean monospace annotations where strictly needed.
-
-Subject: ${caption}
-
-Composition: centered, generous whitespace, technically precise. Looks like it belongs in a Journal of Portfolio Management paper or a Bloomberg terminal screenshot. Refined, restrained, intellectual.
-
-Aspect ratio: 16:9 landscape.`;
-
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn(`[diagram] gateway ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      return null;
-    }
-    const data = await res.json();
-    const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!url) {
-      console.warn("[diagram] no image in response");
-      return null;
-    }
-    return url; // data:image/png;base64,...
-  } catch (e) {
-    console.warn("[diagram] generation failed:", (e as Error).message);
-    return null;
-  }
+async function generateDiagram(_topic: string, _caption: string): Promise<string | null> {
+  // Image generation removed — Mistral has no image-generation endpoint.
+  // Cadence entries render without a diagram (UI handles null gracefully).
+  return null;
 }
 
 // ---------------- helpers ----------------
