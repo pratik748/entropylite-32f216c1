@@ -20,14 +20,18 @@ import {
   RefreshCw,
   Gauge,
   Newspaper,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 import { cleanAIText } from "@/lib/utils";
+import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 
 interface RiskMetrics {
   var95: number;
@@ -260,6 +264,13 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const recognitionRef = useRef<any>(null);
   const portfolioTickersRef = useRef<string[]>([]);
   const { indiaMode, baseCurrency, convertToBase } = useFX();
+  const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
+
+  useEffect(() => {
+    if (activeTicker && !loading) {
+      fetchHistorical([activeTicker], "3mo");
+    }
+  }, [activeTicker, loading, fetchHistorical]);
 
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
@@ -580,25 +591,26 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
         {result && !loading && (
           <div className="glass-panel rounded-xl overflow-hidden animate-fade-in">
-            {/* Action Header */}
-            <div className={`border-b ${actionBg} p-5 text-center`}>
-              <div className={`text-4xl font-black tracking-tight ${actionColor}`}>{result.action}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence, {" "}
-                <span className="font-bold text-foreground">{result.confidence}%</span>
+            {/* ── BIG ACTION HEADER ── */}
+            <div className={`border-b ${actionBg} p-6 text-center`}>
+              <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-1">{activeTicker}</div>
+              <div className={`text-6xl font-black tracking-tight leading-none ${actionColor}`}>{result.action}</div>
+              <div className="mt-3 text-base text-muted-foreground">
+                {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence{" "}
+                <span className="font-bold text-foreground text-lg">{result.confidence}%</span>
               </div>
-              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
-                <span className="font-mono font-semibold text-foreground">
+              <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+                <span className="inline-block h-2 w-2 rounded-full bg-gain animate-pulse" />
+                <span className="font-mono font-bold text-foreground text-lg">
                   {cs}{displayedActivePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 {convertedActivePrice !== null && (
-                  <span className="text-[10px]">≈ {formatCurrency(convertedActivePrice, baseCurrency)}</span>
-                )}
-                {lastPriceUpdate > 0 && (
-                  <span className="text-[10px]">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</span>
+                  <span className="text-[11px] text-muted-foreground">≈ {formatCurrency(convertedActivePrice, baseCurrency)}</span>
                 )}
               </div>
+              {lastPriceUpdate > 0 && (
+                <div className="mt-1 text-[10px] text-muted-foreground/60">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</div>
+              )}
               {result.fallback && (
                 <div className="mt-2 text-[11px] text-muted-foreground">
                   Running on resilient rules fallback while live AI consensus is unavailable.
@@ -606,225 +618,225 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               )}
             </div>
 
-            {/* Trade Plan */}
-            <div className="border-b border-border p-4 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
+            {/* ── PRICE CHART ── */}
+            {historicalPrices[activeTicker]?.closes?.length > 0 && (
+              <div className="border-b border-border p-3 bg-surface-2/30">
+                <div className="flex items-center justify-between px-1 mb-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">3M Price</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">{historicalPrices[activeTicker].closes.length} pts</span>
+                </div>
+                <div className="h-32 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={historicalPrices[activeTicker].closes.map((c, i) => ({ i, price: c }))}>
+                      <defs>
+                        <linearGradient id="dpChartFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <YAxis hide domain={["auto", "auto"]} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", fontSize: 11 }}
+                        labelFormatter={() => ""}
+                        formatter={(v: any) => [`${cs}${Number(v).toFixed(2)}`, "Price"]}
+                      />
+                      <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={1.5} fill="url(#dpChartFill)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* ── TRADE PLAN (always visible) ── */}
+            <div className="border-b border-border p-4 space-y-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
                 Trade Plan
               </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm font-mono">
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Entry Range</span>
-                  <span className="text-foreground font-semibold text-right">{cs}{result.entryLow.toLocaleString()} – {cs}{result.entryHigh.toLocaleString()}</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Entry</div>
+                  <div className="text-base font-bold font-mono text-foreground mt-0.5">{cs}{result.entryLow.toLocaleString()}–{cs}{result.entryHigh.toLocaleString()}</div>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Target</span>
-                  <span className="text-gain font-semibold text-right">{cs}{result.targetPrice.toLocaleString()}</span>
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Timeframe</div>
+                  <div className="text-base font-bold font-mono text-foreground mt-0.5 flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{result.timeframe}</div>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Stop Loss</span>
-                  <span className="text-loss font-semibold text-right">{cs}{result.stopLoss.toLocaleString()}</span>
+                <div className="rounded-lg bg-gain/5 border border-gain/20 p-3">
+                  <div className="text-[10px] uppercase text-gain/80 tracking-wider">Target</div>
+                  <div className="text-base font-bold font-mono text-gain mt-0.5">{cs}{result.targetPrice.toLocaleString()}</div>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Timeframe</span>
-                  <span className="text-foreground font-semibold flex items-center gap-1 text-right"><Clock className="h-3 w-3" />{result.timeframe}</span>
+                <div className="rounded-lg bg-loss/5 border border-loss/20 p-3">
+                  <div className="text-[10px] uppercase text-loss/80 tracking-wider">Stop Loss</div>
+                  <div className="text-base font-bold font-mono text-loss mt-0.5">{cs}{result.stopLoss.toLocaleString()}</div>
                 </div>
               </div>
             </div>
 
-            {/* Risk Metrics Panel */}
-            {rm && (
-              <div className="border-b border-border p-4 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                  <Gauge className="h-3.5 w-3.5 text-primary" />
-                  Risk Intelligence
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center">
-                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.var95}</div>
-                    <div className="text-[9px] text-muted-foreground">VaR 95%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.cvar95}</div>
-                    <div className="text-[9px] text-muted-foreground">CVaR 95%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-sm font-bold font-mono ${rm.sharpeRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sharpeRatio}</div>
-                    <div className="text-[9px] text-muted-foreground">Sharpe</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-sm font-bold font-mono ${rm.sortinoRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sortinoRatio}</div>
-                    <div className="text-[9px] text-muted-foreground">Sortino</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2 mt-1">
-                  <div className="text-center">
-                    <div className="text-sm font-bold font-mono text-loss">{rm.maxDrawdown}%</div>
-                    <div className="text-[9px] text-muted-foreground">Max DD</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-bold font-mono text-foreground">{rm.betaEstimate}</div>
-                    <div className="text-[9px] text-muted-foreground">Beta</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-bold font-mono text-loss">{cs}{rm.var99}</div>
-                    <div className="text-[9px] text-muted-foreground">VaR 99%</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-sm font-bold font-mono ${rm.kellyFraction > 0 ? "text-gain" : "text-muted-foreground"}`}>{(rm.kellyFraction * 100).toFixed(0)}%</div>
-                    <div className="text-[9px] text-muted-foreground">Kelly</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* CLANK Structural Alerts */}
-            {clank.length > 0 && (
-              <div className="border-b border-border p-4 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                  <AlertTriangle className="h-3.5 w-3.5 text-loss" />
-                  Structural Constraints (CLANK)
-                </div>
-                <div className="space-y-1.5">
-                  {clank.map((s) => (
-                    <div key={s.id} className={`rounded-lg px-3 py-2 text-xs border ${
-                      s.severity === "CRITICAL" ? "border-loss/40 bg-loss/5" :
-                      s.severity === "HIGH" ? "border-loss/25 bg-loss/5" :
-                      "border-border bg-muted/10"
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                          s.severity === "CRITICAL" ? "bg-loss/20 text-loss" :
-                          s.severity === "HIGH" ? "bg-loss/15 text-loss" :
-                          "bg-muted/30 text-muted-foreground"
-                        }`}>{s.severity}</span>
-                        <span className="font-semibold text-foreground">{s.label}</span>
-                      </div>
-                      <p className="mt-1 text-muted-foreground">{s.description}</p>
+            {/* ── COLLAPSIBLE: more details ── */}
+            <Collapsible>
+              <CollapsibleTrigger className="w-full flex items-center justify-between p-4 text-sm font-semibold text-foreground hover:bg-surface-2/40 transition-colors group border-b border-border">
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  More details
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                {/* Direction */}
+                <div className="border-b border-border p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      {dirIcon}
+                      <span className="text-base font-bold text-foreground">{result.direction}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Intelligence Consensus */}
-            {result.intelligence?.suggestion && (
-              <div className="border-b border-border p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                    <Gauge className="h-3.5 w-3.5 text-primary" />
-                    Intelligence Consensus
+                    <span className="text-xs text-muted-foreground italic text-right">{result.directionReason}</span>
                   </div>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    result.intelligence.suggestion === "Add" ? "border-gain text-gain" :
-                    result.intelligence.suggestion === "Exit" ? "border-loss text-loss" :
-                    "border-border text-muted-foreground"
-                  }`}>
-                    {result.intelligence.suggestion.toUpperCase()} · {result.intelligence.confidence ?? "—"}%
-                  </span>
                 </div>
-                {result.intelligence.verdict && (
-                  <p className="text-xs text-muted-foreground leading-relaxed">{result.intelligence.verdict}</p>
-                )}
-                <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
-                  <div>Trend: <span className="text-foreground font-mono">{result.intelligence.trend || "—"}</span></div>
-                  <div>Regime: <span className="text-foreground font-mono">{result.intelligence.regime || "—"}</span></div>
-                  <div>Risk: <span className="text-foreground font-mono">{result.intelligence.riskScore ?? "—"}/100</span></div>
-                </div>
-              </div>
-            )}
 
-            {/* Protection */}
-            <div className="border-b border-border p-4">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
-                <Shield className="h-3.5 w-3.5 text-primary" />
-                Protection
-              </div>
-              <p className="text-sm text-muted-foreground">{result.protection}</p>
-            </div>
+                {/* Protection */}
+                <div className="border-b border-border p-4">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1.5">
+                    <Shield className="h-3.5 w-3.5 text-primary" />
+                    Protection
+                  </div>
+                  <p className="text-sm text-muted-foreground">{result.protection}</p>
+                </div>
 
-            {/* Direction */}
-            <div className="border-b border-border p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  {dirIcon}
-                  <span className="text-lg font-bold text-foreground">{result.direction}</span>
+                {/* News Sentiment */}
+                <div className="border-b border-border p-4 space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span>🟢</span><span className="text-foreground">{result.positiveNews}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span>🔴</span><span className="text-foreground">{result.negativeNews}</span>
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground italic text-right">{result.directionReason}</span>
-              </div>
-            </div>
 
-            {/* Quant Signals */}
-            {(result.quantScore !== undefined || result.riskRewardRatio !== undefined) && (
-              <div className="border-b border-border p-4 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                  <BarChart3 className="h-3.5 w-3.5 text-primary" />
-                  Quant Signals
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  {result.quantScore !== undefined && (
-                    <div className="text-center">
-                      <div className={`text-lg font-bold ${result.quantScore >= 70 ? "text-gain" : result.quantScore >= 40 ? "text-foreground" : "text-loss"}`}>
-                        {result.quantScore}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">Quant Score</div>
+                {/* Quant Signals */}
+                {(result.quantScore !== undefined || result.riskRewardRatio !== undefined) && (
+                  <div className="border-b border-border p-4 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                      <BarChart3 className="h-3.5 w-3.5 text-primary" /> Quant Signals
                     </div>
-                  )}
-                  {result.riskRewardRatio !== undefined && result.riskRewardRatio > 0 && (
-                    <div className="text-center">
-                      <div className={`text-lg font-bold ${result.riskRewardRatio >= 2 ? "text-gain" : "text-loss"}`}>
-                        {result.riskRewardRatio.toFixed(1)}:1
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">Risk/Reward</div>
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      {result.quantScore !== undefined && (
+                        <div className="text-center">
+                          <div className={`text-lg font-bold ${result.quantScore >= 70 ? "text-gain" : result.quantScore >= 40 ? "text-foreground" : "text-loss"}`}>{result.quantScore}</div>
+                          <div className="text-[10px] text-muted-foreground">Quant Score</div>
+                        </div>
+                      )}
+                      {result.riskRewardRatio !== undefined && result.riskRewardRatio > 0 && (
+                        <div className="text-center">
+                          <div className={`text-lg font-bold ${result.riskRewardRatio >= 2 ? "text-gain" : "text-loss"}`}>{result.riskRewardRatio.toFixed(1)}:1</div>
+                          <div className="text-[10px] text-muted-foreground">Risk/Reward</div>
+                        </div>
+                      )}
+                      {result.volatilityRegime && (
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Activity className={`h-3.5 w-3.5 ${result.volatilityRegime === "HIGH" ? "text-loss" : result.volatilityRegime === "LOW" ? "text-gain" : "text-muted-foreground"}`} />
+                            <span className="text-sm font-bold text-foreground">{result.volatilityRegime}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">Volatility</div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {result.volatilityRegime && (
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Activity className={`h-3.5 w-3.5 ${result.volatilityRegime === "HIGH" ? "text-loss" : result.volatilityRegime === "LOW" ? "text-gain" : "text-muted-foreground"}`} />
-                        <span className="text-sm font-bold text-foreground">{result.volatilityRegime}</span>
+                    {result.consensus && result.providersUsed && result.providersUsed > 1 && (
+                      <div className="text-center text-[10px] text-muted-foreground mt-1">
+                        {result.consensus === "UNANIMOUS" ? "✓ All engines agree" : result.consensus === "MAJORITY" ? "⚡ Majority consensus" : "⚠ Split signal"} ({result.providersUsed} engines)
                       </div>
-                      <div className="text-[10px] text-muted-foreground">Volatility</div>
-                    </div>
-                  )}
-                </div>
-                {result.consensus && result.providersUsed && result.providersUsed > 1 && (
-                  <div className="text-center text-[10px] text-muted-foreground mt-1">
-                    {result.consensus === "UNANIMOUS" ? "✓ All engines agree" : result.consensus === "MAJORITY" ? "⚡ Majority consensus" : "⚠ Split signal"} ({result.providersUsed} engines)
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* News Headlines */}
-            {news.length > 0 && (
-              <div className="border-b border-border p-4 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider">
-                  <Newspaper className="h-3.5 w-3.5 text-primary" />
-                  Live News
-                </div>
-                <div className="space-y-1">
-                  {news.map((headline, i) => (
-                    <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary font-mono shrink-0">{i + 1}.</span>
-                      <span>{headline}</span>
+                {/* Risk Metrics */}
+                {rm && (
+                  <div className="border-b border-border p-4 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                      <Gauge className="h-3.5 w-3.5 text-primary" /> Risk Intelligence
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="text-center"><div className="text-sm font-bold font-mono text-loss">{cs}{rm.var95}</div><div className="text-[9px] text-muted-foreground">VaR 95%</div></div>
+                      <div className="text-center"><div className="text-sm font-bold font-mono text-loss">{cs}{rm.cvar95}</div><div className="text-[9px] text-muted-foreground">CVaR 95%</div></div>
+                      <div className="text-center"><div className={`text-sm font-bold font-mono ${rm.sharpeRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sharpeRatio}</div><div className="text-[9px] text-muted-foreground">Sharpe</div></div>
+                      <div className="text-center"><div className={`text-sm font-bold font-mono ${rm.sortinoRatio >= 0 ? "text-gain" : "text-loss"}`}>{rm.sortinoRatio}</div><div className="text-[9px] text-muted-foreground">Sortino</div></div>
+                      <div className="text-center"><div className="text-sm font-bold font-mono text-loss">{rm.maxDrawdown}%</div><div className="text-[9px] text-muted-foreground">Max DD</div></div>
+                      <div className="text-center"><div className="text-sm font-bold font-mono text-foreground">{rm.betaEstimate}</div><div className="text-[9px] text-muted-foreground">Beta</div></div>
+                      <div className="text-center"><div className="text-sm font-bold font-mono text-loss">{cs}{rm.var99}</div><div className="text-[9px] text-muted-foreground">VaR 99%</div></div>
+                      <div className="text-center"><div className={`text-sm font-bold font-mono ${rm.kellyFraction > 0 ? "text-gain" : "text-muted-foreground"}`}>{(rm.kellyFraction * 100).toFixed(0)}%</div><div className="text-[9px] text-muted-foreground">Kelly</div></div>
+                    </div>
+                  </div>
+                )}
 
-            {/* News Sentiment */}
-            <div className="border-b border-border p-4 space-y-1.5">
-              <div className="flex items-center gap-2 text-sm">
-                <span>🟢</span>
-                <span className="text-foreground">{result.positiveNews}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span>🔴</span>
-                <span className="text-foreground">{result.negativeNews}</span>
-              </div>
-            </div>
+                {/* CLANK */}
+                {clank.length > 0 && (
+                  <div className="border-b border-border p-4 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                      <AlertTriangle className="h-3.5 w-3.5 text-loss" /> Structural Constraints
+                    </div>
+                    <div className="space-y-1.5">
+                      {clank.map((s) => (
+                        <div key={s.id} className={`rounded-lg px-3 py-2 text-xs border ${
+                          s.severity === "CRITICAL" ? "border-loss/40 bg-loss/5" :
+                          s.severity === "HIGH" ? "border-loss/25 bg-loss/5" : "border-border bg-muted/10"
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              s.severity === "CRITICAL" ? "bg-loss/20 text-loss" :
+                              s.severity === "HIGH" ? "bg-loss/15 text-loss" : "bg-muted/30 text-muted-foreground"
+                            }`}>{s.severity}</span>
+                            <span className="font-semibold text-foreground">{s.label}</span>
+                          </div>
+                          <p className="mt-1 text-muted-foreground">{s.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Intelligence Consensus */}
+                {result.intelligence?.suggestion && (
+                  <div className="border-b border-border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                        <Gauge className="h-3.5 w-3.5 text-primary" /> Intelligence Consensus
+                      </div>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        result.intelligence.suggestion === "Add" ? "border-gain text-gain" :
+                        result.intelligence.suggestion === "Exit" ? "border-loss text-loss" :
+                        "border-border text-muted-foreground"
+                      }`}>
+                        {result.intelligence.suggestion.toUpperCase()} · {result.intelligence.confidence ?? "—"}%
+                      </span>
+                    </div>
+                    {result.intelligence.verdict && <p className="text-xs text-muted-foreground leading-relaxed">{result.intelligence.verdict}</p>}
+                    <div className="grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                      <div>Trend: <span className="text-foreground font-mono">{result.intelligence.trend || "—"}</span></div>
+                      <div>Regime: <span className="text-foreground font-mono">{result.intelligence.regime || "—"}</span></div>
+                      <div>Risk: <span className="text-foreground font-mono">{result.intelligence.riskScore ?? "—"}/100</span></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* News */}
+                {news.length > 0 && (
+                  <div className="border-b border-border p-4 space-y-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                      <Newspaper className="h-3.5 w-3.5 text-primary" /> Live News
+                    </div>
+                    <div className="space-y-1">
+                      {news.map((headline, i) => (
+                        <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                          <span className="text-primary font-mono shrink-0">{i + 1}.</span>
+                          <span>{headline}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Actions */}
             <div className="border-t border-border p-3 flex items-center justify-between">
