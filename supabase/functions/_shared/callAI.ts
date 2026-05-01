@@ -36,6 +36,17 @@ interface AIResult {
 const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
 const MISTRAL_FAST_MODEL = "mistral-small-latest";
 
+// Per-isolate round-robin cursor across Mistral keys. Persists for the
+// lifetime of the edge worker, so consecutive calls within the same warm
+// instance alternate keys and split load roughly 50/50.
+let __mistralKeyCursor = 0;
+function pickKeyIndex(total: number): number {
+  if (total <= 1) return 0;
+  const i = __mistralKeyCursor % total;
+  __mistralKeyCursor = (__mistralKeyCursor + 1) % 1_000_000;
+  return i;
+}
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
