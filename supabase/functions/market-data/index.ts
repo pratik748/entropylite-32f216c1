@@ -171,6 +171,7 @@ serve(async (req) => {
     const realSilver = silverData?.price || 0;
 
     let aiMacro: any = null;
+    let aiProviderUsed: string | undefined;
     try {
       const regionCtx = getRegionContext(region === "All" ? "US" : region);
       
@@ -231,6 +232,7 @@ ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 se
       });
 
       console.log(`market-data used provider: ${result.provider}, region: ${region}, indiaMode: ${indiaMode}`);
+      aiProviderUsed = result.provider;
       aiMacro = safeParseJSON(result.text);
       if (!aiMacro?.keyEvents?.length || !aiMacro?.outlook) {
         console.warn(`market-data: AI returned incomplete macro (events=${aiMacro?.keyEvents?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}) — provider=${result.provider}`);
@@ -249,7 +251,7 @@ ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 se
       outlook: aiMacro?.outlook || "",
       sectorRotation: aiMacro?.sectorRotation || "",
       riskAppetite: aiMacro?.riskAppetite || "",
-      aiProvider: (aiMacro && (globalThis as any).__lastProvider) || undefined,
+      aiProvider: aiProviderUsed,
     };
 
     return new Response(JSON.stringify({ indices: indexData, sectors: sectorData, macro, timestamp: Date.now() }), {
