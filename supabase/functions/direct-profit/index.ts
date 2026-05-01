@@ -721,26 +721,36 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
       const authHeader = req.headers.get("authorization");
       if (supabaseUrl && authHeader) {
-        const intelRes = await fetch(`${supabaseUrl}/functions/v1/analyze-stock`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authHeader,
-            apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
-          },
-          // We pass the live price as buyPrice so analyze-stock's
-          // entry-price-aware adjustments treat this as a fresh decision
-          // (no pre-existing P&L bias). Quantity is a sentinel 1.
-          body: JSON.stringify({
-            ticker: resolvedTicker,
-            buyPrice: snap.currentPrice,
-            quantity: 1,
-          }),
-        });
-        if (intelRes.ok) {
-          intelSummary = await intelRes.json();
-        } else {
-          console.warn(`direct-profit: intelligence call failed ${intelRes.status}`);
+        // Hard timeout so a slow/rate-limited analyze-stock can never
+        // bring down the Direct Profit response. 25s leaves ~35s budget
+        // for our own Mistral call within the edge function deadline.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 25000);
+        try {
+          const intelRes = await fetch(`${supabaseUrl}/functions/v1/analyze-stock`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: authHeader,
+              apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+            },
+            body: JSON.stringify({
+              ticker: resolvedTicker,
+              buyPrice: snap.currentPrice,
+              quantity: 1,
+            }),
+            signal: ctrl.signal,
+          });
+          if (intelRes.ok) {
+            intelSummary = await intelRes.json();
+          } else {
+            await intelRes.text().catch(() => "");
+            console.warn(`direct-profit: intelligence call failed ${intelRes.status}`);
+          }
+        } catch (e) {
+          console.warn(`direct-profit: intelligence call aborted/failed: ${(e as Error).message}`);
+        } finally {
+          clearTimeout(timer);
         }
       }
     } catch (e) {
