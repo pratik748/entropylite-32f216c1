@@ -451,8 +451,8 @@ const IndexContent = () => {
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
                     <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-                    {isLoading && <LoadingState />}
-                    {analysis && !isLoading && (
+                    {effectiveLoading && <LoadingState />}
+                    {analysis && !effectiveLoading && (
                       <>
                         <StockSummary
                           ticker={analysis.ticker}
@@ -534,7 +534,7 @@ const IndexContent = () => {
                         {/* Top center: Main analysis */}
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
-                            {!isLoading && !analysis && (
+                            {!effectiveLoading && !analysis && (
                               <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
                                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
                                   <Activity className="h-7 w-7 text-primary" />
@@ -546,8 +546,8 @@ const IndexContent = () => {
                                 </p>
                               </div>
                             )}
-                            {isLoading && <LoadingState />}
-                            {analysis && !isLoading && (
+                            {effectiveLoading && <LoadingState />}
+                            {analysis && !effectiveLoading && (
                               <>
                                 <StockSummary
                                   ticker={analysis.ticker}
