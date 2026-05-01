@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Shield, AlertTriangle, Zap, Brain } from "lucide-react";
 import ClankEngine from "@/components/risk/ClankEngine";
-import { useAIProvider } from "@/hooks/useAIProvider";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
@@ -160,7 +159,6 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
 
   const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
   const [riskTab, setRiskTab] = useState<"analytics" | "clank">("analytics");
-  const { provider, toggle } = useAIProvider();
 
   const CORR_LABELS = analyzed.length > 0 
     ? analyzed.map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
@@ -226,18 +224,6 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
             <span>{t.label}</span>
           </button>
         ))}
-        {/* Secret AI Provider Toggle, cycles M → C → L (Mistral / Cloudflare / Llama-Groq) */}
-        <button
-          onClick={toggle}
-          title={`AI provider: ${provider}`}
-          className="ml-auto flex items-center gap-1 px-2 py-1 rounded border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer select-none"
-        >
-          <span className={`text-[9px] font-mono font-bold ${provider === "mistral" ? "text-primary" : "text-muted-foreground/40"}`}>M</span>
-          <span className="text-[9px] text-muted-foreground/30">/</span>
-          <span className={`text-[9px] font-mono font-bold ${provider === "cloudflare" ? "text-primary" : "text-muted-foreground/40"}`}>C</span>
-          <span className="text-[9px] text-muted-foreground/30">/</span>
-          <span className={`text-[9px] font-mono font-bold ${provider === "groq" ? "text-primary" : "text-muted-foreground/40"}`}>L</span>
-        </button>
       </div>
 
       {riskTab === "clank" && <ClankEngine stocks={stocks} />}
