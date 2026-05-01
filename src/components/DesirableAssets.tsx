@@ -471,6 +471,13 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           return;
         }
 
+      if (data.autoRepaired && Array.isArray(data.repairTrail)) {
+        const reserveRecovered = data.repairTrail.some((s: string) => /reserve universe|reserve ranking/i.test(String(s)));
+        if (reserveRecovered) {
+          setRepairNote("Live AI slate was thin, so the engine switched to a price-verified reserve ranking to keep the board populated.");
+        }
+      }
+
       const payload = {
         recommendations: data.recommendations,
         marketCondition: data.marketCondition || "",

@@ -733,7 +733,133 @@ function summarizeRejects(rejectReasons: Record<string, number>) {
   return { rejectSummary, rejectHeadline };
 }
 
-// Deterministic fallback candidate builder removed by design.
+type ReserveTemplate = {
+  ticker: string;
+  name: string;
+  assetClass: string;
+  exchange: string;
+  currency: string;
+  sector: string;
+  strategy: string;
+  marketCap: "mega" | "large" | "mid" | "small" | "micro";
+  tags?: string[];
+};
+
+const GLOBAL_RESERVE_UNIVERSE: ReserveTemplate[] = [
+  { ticker: "MSFT", name: "Microsoft", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["platform", "ai", "quality"] },
+  { ticker: "GOOGL", name: "Alphabet", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Communication", strategy: "equity", marketCap: "mega", tags: ["search", "cloud", "ads"] },
+  { ticker: "AMZN", name: "Amazon", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Consumer Discretionary", strategy: "equity", marketCap: "mega", tags: ["cloud", "consumer", "logistics"] },
+  { ticker: "META", name: "Meta Platforms", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Communication", strategy: "momentum", marketCap: "mega", tags: ["ads", "ai", "platform"] },
+  { ticker: "JPM", name: "JPMorgan Chase", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["banking", "quality"] },
+  { ticker: "V", name: "Visa", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["payments", "compounder"] },
+  { ticker: "LLY", name: "Eli Lilly", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Healthcare", strategy: "momentum", marketCap: "mega", tags: ["healthcare", "growth"] },
+  { ticker: "JNJ", name: "Johnson & Johnson", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Healthcare", strategy: "equity", marketCap: "mega", tags: ["defensive", "quality"] },
+  { ticker: "XOM", name: "Exxon Mobil", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Energy", strategy: "equity", marketCap: "mega", tags: ["cashflow", "energy"] },
+  { ticker: "CAT", name: "Caterpillar", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Industrials", strategy: "equity", marketCap: "large", tags: ["infrastructure", "cyclical"] },
+  { ticker: "WMT", name: "Walmart", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Consumer Staples", strategy: "equity", marketCap: "mega", tags: ["defensive", "retail"] },
+  { ticker: "COST", name: "Costco", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Consumer Staples", strategy: "equity", marketCap: "large", tags: ["membership", "quality"] },
+  { ticker: "NEE", name: "NextEra Energy", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Utilities", strategy: "equity", marketCap: "large", tags: ["utility", "defensive"] },
+  { ticker: "SPY", name: "SPDR S&P 500 ETF", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Index", strategy: "sector_hedge", marketCap: "mega", tags: ["index", "liquid", "core"] },
+  { ticker: "QQQ", name: "Invesco QQQ Trust", assetClass: "ETF", exchange: "NASDAQ", currency: "USD", sector: "Technology", strategy: "momentum", marketCap: "mega", tags: ["nasdaq", "growth", "liquid"] },
+  { ticker: "XLF", name: "Financial Select Sector SPDR", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Financials", strategy: "sector_hedge", marketCap: "large", tags: ["financials", "sector"] },
+  { ticker: "XLV", name: "Health Care Select Sector SPDR", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Healthcare", strategy: "sector_hedge", marketCap: "large", tags: ["healthcare", "sector"] },
+  { ticker: "GLD", name: "SPDR Gold Shares", assetClass: "Commodity", exchange: "NYSEARCA", currency: "USD", sector: "Commodities", strategy: "correlation_hedge", marketCap: "large", tags: ["gold", "hedge", "safe_haven"] },
+  { ticker: "TLT", name: "iShares 20+ Year Treasury Bond ETF", assetClass: "Bond", exchange: "NASDAQ", currency: "USD", sector: "Hedge", strategy: "correlation_hedge", marketCap: "large", tags: ["bond", "duration", "hedge"] },
+  { ticker: "BTC-USD", name: "Bitcoin", assetClass: "Crypto", exchange: "CRYPTO", currency: "USD", sector: "Commodities", strategy: "momentum", marketCap: "mega", tags: ["crypto", "high_beta"] },
+];
+
+const INDIA_RESERVE_UNIVERSE: ReserveTemplate[] = [
+  { ticker: "RELIANCE.NS", name: "Reliance Industries", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Energy", strategy: "equity", marketCap: "mega", tags: ["energy", "platform"] },
+  { ticker: "HDFCBANK.NS", name: "HDFC Bank", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["banking", "quality"] },
+  { ticker: "ICICIBANK.NS", name: "ICICI Bank", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "momentum", marketCap: "mega", tags: ["banking", "momentum"] },
+  { ticker: "INFY.NS", name: "Infosys", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["it", "export"] },
+  { ticker: "TCS.NS", name: "Tata Consultancy Services", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["it", "quality"] },
+  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Communication", strategy: "momentum", marketCap: "mega", tags: ["telecom", "growth"] },
+  { ticker: "LT.NS", name: "Larsen & Toubro", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Industrials", strategy: "equity", marketCap: "large", tags: ["infra", "capex"] },
+  { ticker: "SUNPHARMA.NS", name: "Sun Pharmaceutical", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Healthcare", strategy: "equity", marketCap: "large", tags: ["pharma", "defensive"] },
+  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Staples", strategy: "equity", marketCap: "mega", tags: ["fmcg", "defensive"] },
+  { ticker: "ITC.NS", name: "ITC", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Staples", strategy: "equity", marketCap: "large", tags: ["cashflow", "defensive"] },
+  { ticker: "MARUTI.NS", name: "Maruti Suzuki", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Discretionary", strategy: "equity", marketCap: "large", tags: ["auto", "consumer"] },
+  { ticker: "TATAMOTORS.NS", name: "Tata Motors", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Discretionary", strategy: "momentum", marketCap: "large", tags: ["auto", "cyclical"] },
+  { ticker: "NTPC.NS", name: "NTPC", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Utilities", strategy: "equity", marketCap: "large", tags: ["utility", "defensive"] },
+  { ticker: "ASIANPAINT.NS", name: "Asian Paints", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Materials", strategy: "equity", marketCap: "large", tags: ["consumer", "quality"] },
+  { ticker: "ULTRACEMCO.NS", name: "UltraTech Cement", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Materials", strategy: "equity", marketCap: "large", tags: ["cement", "infra"] },
+  { ticker: "NIFTYBEES.NS", name: "Nippon India ETF Nifty 50 BeES", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Index", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "index", "core"] },
+  { ticker: "BANKBEES.NS", name: "Nippon India ETF Bank BeES", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "banking"] },
+  { ticker: "ITBEES.NS", name: "Nippon India ETF Nifty IT", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "technology"] },
+  { ticker: "GOLDBEES.NS", name: "Nippon India ETF Gold BeES", assetClass: "Commodity", exchange: "NSE", currency: "INR", sector: "Commodities", strategy: "correlation_hedge", marketCap: "large", tags: ["gold", "hedge"] },
+  { ticker: "SILVERBEES.NS", name: "Nippon India Silver ETF", assetClass: "Commodity", exchange: "NSE", currency: "INR", sector: "Commodities", strategy: "correlation_hedge", marketCap: "mid", tags: ["silver", "hedge"] },
+];
+
+function resolveReserveHorizon(preferredHorizon?: string) {
+  switch (preferredHorizon) {
+    case "intraday":
+      return { horizonClass: "intraday", timeHorizon: "1D", riskProfile: ["aggressive", "short_term"] };
+    case "short_term":
+      return { horizonClass: "short_term", timeHorizon: "2W", riskProfile: ["short_term"] };
+    case "long_term":
+      return { horizonClass: "long_term", timeHorizon: "12M", riskProfile: ["long_term"] };
+    case "medium_term":
+    default:
+      return { horizonClass: "medium_term", timeHorizon: "3M", riskProfile: ["medium_term"] };
+  }
+}
+
+function buildReserveCandidates(params: {
+  indiaMode: boolean;
+  heldTickers: string[];
+  previousTickers: string[];
+  preferredAssetTypes?: string[];
+  preferredSectors?: string[];
+  preferredHorizon?: string;
+}): any[] {
+  const universe = params.indiaMode ? INDIA_RESERVE_UNIVERSE : GLOBAL_RESERVE_UNIVERSE;
+  const banned = new Set([...params.heldTickers, ...params.previousTickers].map((t) => String(t).toUpperCase()));
+  const preferredAssetSet = new Set((params.preferredAssetTypes || []).map(normalizeAssetType));
+  const preferredSectorSet = new Set((params.preferredSectors || []).map(normalizeSectorPreference));
+  const horizon = resolveReserveHorizon(params.preferredHorizon);
+
+  const ranked = universe
+    .filter((template) => !banned.has(template.ticker.toUpperCase()))
+    .map((template) => {
+      const assetKey = normalizeAssetType(template.assetClass);
+      const sectorKey = normalizeSectorPreference(template.sector);
+      let score = 0;
+      if (preferredAssetSet.size > 0) score += preferredAssetSet.has(assetKey) ? 4 : -1;
+      if (preferredSectorSet.size > 0) score += preferredSectorSet.has(sectorKey) ? 4 : -0.5;
+      if (template.marketCap === "mega") score += 1;
+      if (template.assetClass === "ETF") score += 0.4;
+      if (HEDGE_STRATEGIES.has(template.strategy)) score += 0.25;
+      return { template, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const preferredSlice = ranked.filter((item) => item.score >= 0);
+  const ordered = (preferredSlice.length >= 8 ? preferredSlice : ranked)
+    .map(({ template }) => normalizeCandidate({
+      ...template,
+      currentEstPrice: 0,
+      entryZone: [0, 0],
+      targetPrice: 0,
+      stopLoss: 0,
+      timeHorizon: horizon.timeHorizon,
+      horizonClass: horizon.horizonClass,
+      suggestedQty: 1,
+      confidence: 58,
+      thesis: "",
+      catalyst: "",
+      hedgingStrategy: "",
+      riskReward: "1:2.0",
+      riskProfile: horizon.riskProfile,
+      pairedInstrument: null,
+      pairedStructure: null,
+      capitalEfficiency: 1,
+      correlationToPortfolio: HEDGE_STRATEGIES.has(template.strategy) ? "negative" : "low",
+    }))
+    .filter(Boolean);
+
+  return ordered;
+}
 
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
@@ -1188,21 +1314,33 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       console.warn("desirable-assets refill pass failed:", (refillErr as Error).message);
     }
 
-    // No fallback. If AI produced nothing usable, return an honest empty set.
     if (candidates.length === 0) {
-      repairLog("AI produced 0 candidates — returning honest empty set (no deterministic substitution)");
-      return new Response(JSON.stringify({
-        recommendations: [],
-        marketCondition: "",
-        regimeType: "transition",
-        candidatesGenerated: 0,
-        candidatesPassed: 0,
-        autoRepaired: false,
-        softFailure: true,
-        repairTrail,
-        repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
-        timestamp: Date.now(),
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const reserveCandidates = buildReserveCandidates({
+        indiaMode,
+        heldTickers: heldTickersUpper,
+        previousTickers,
+        preferredAssetTypes,
+        preferredSectors,
+        preferredHorizon,
+      });
+      if (reserveCandidates.length > 0) {
+        repairLog(`AI produced 0 candidates — switched to reserve universe (${reserveCandidates.length} price-verifiable names)`);
+        candidates = reserveCandidates;
+      } else {
+        repairLog("AI produced 0 candidates — reserve universe also exhausted, returning honest empty set");
+        return new Response(JSON.stringify({
+          recommendations: [],
+          marketCondition: "",
+          regimeType: "transition",
+          candidatesGenerated: 0,
+          candidatesPassed: 0,
+          autoRepaired: false,
+          softFailure: true,
+          repairTrail,
+          repairMessage: "No assets passed the live AI generation step. Retry in a moment.",
+          timestamp: Date.now(),
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
@@ -1575,7 +1713,106 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     const { rejectSummary, rejectHeadline } = summarizeRejects(rejectReasons);
 
     if (scored.length === 0) {
-      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — no deterministic rescue (by design)`);
+      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — falling back to price-verified reserve ranking`);
+      const reserveCandidates = buildReserveCandidates({
+        indiaMode,
+        heldTickers: heldTickersUpper,
+        previousTickers,
+        preferredAssetTypes,
+        preferredSectors,
+        preferredHorizon,
+      }).slice(0, 20);
+
+      if (reserveCandidates.length > 0) {
+        const reserveTickers = reserveCandidates.map((rec) => rec.ticker);
+        const reservePriceResults = await Promise.allSettled(
+          reserveTickers.map(async (ticker) => ({ ticker, data: await fetchYahooChart(ticker) })),
+        );
+        const reserveTickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
+        for (const result of reservePriceResults) {
+          if (result.status === "fulfilled" && result.value.data) {
+            reserveTickerData[result.value.ticker] = result.value.data;
+          }
+        }
+
+        for (const rec of reserveCandidates) {
+          const td = reserveTickerData[rec.ticker];
+          if (!td || td.closes.length < 20) continue;
+          const returns = logReturns(td.closes);
+          const sr = sharpeRatio(returns);
+          const mdd = maxDrawdown(td.closes);
+          const vol = annualizedVol(returns);
+          const zs = zScore(td.closes);
+          const closes = td.closes;
+          const price = td.price;
+          const sma20 = mean(closes.slice(-20));
+          const momentum20d = sma20 > 0 ? ((price - sma20) / sma20) * 100 : 0;
+          const momentum5d = closes.length >= 5 ? ((price - closes[closes.length - 5]) / closes[closes.length - 5]) * 100 : 0;
+          const last20 = closes.slice(-20);
+          const sma20vals: number[] = [];
+          for (let j = 0; j < last20.length; j++) {
+            const windowStart = Math.max(0, closes.length - 20 + j - 19);
+            const windowEnd = closes.length - 20 + j + 1;
+            sma20vals.push(mean(closes.slice(windowStart, windowEnd)));
+          }
+          const daysAboveSma = last20.filter((p, j) => p > (sma20vals[j] || sma20)).length;
+          const trendStrength = (daysAboveSma / Math.max(1, last20.length)) * 100;
+          let portCorr = 0;
+          if (portReturns.length > 10) portCorr = pearsonCorrelation(returns, portReturns);
+          const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
+          const isHedge = HEDGE_STRATEGIES.has(String(rec.strategy || ""));
+          const baseScore = clamp(
+            Math.round(
+              52 +
+              Math.max(-12, Math.min(16, sr * 10)) +
+              Math.max(-10, Math.min(14, momentum20d * 0.8)) +
+              Math.max(-8, Math.min(10, momentum5d * 0.7)) +
+              Math.max(-8, Math.min(10, trendStrength * 0.12)) +
+              Math.max(-8, Math.min(8, (0.25 - Math.abs(portCorr)) * 20)) -
+              Math.max(0, Math.min(14, mdd * 0.18)) +
+              (isHedge ? 4 : 0),
+            ),
+            25,
+            90,
+          );
+
+          scored.push({
+            rec,
+            sharpeRatio: Math.round(sr * 100) / 100,
+            maxDrawdown: Math.round(mdd * 10) / 10,
+            portfolioCorrelation: Math.round(portCorr * 100) / 100,
+            riskCompositeScore: Math.round(clamp(vol * 0.5 + mdd * 0.55 + Math.max(0, portCorr) * 18, 8, 88)),
+            volatility: Math.round(vol * 10) / 10,
+            zScore: Math.round(zs * 100) / 100,
+            quantScore: baseScore,
+            priceVerified: true,
+            stalePrice: td.stalePrice || false,
+            realPrice: td.price,
+            realCurrency: td.currency,
+            priceChange24h: Math.round(td.change * 100) / 100,
+            volume: td.volume,
+            fiftyTwoHigh: td.fiftyTwoHigh,
+            fiftyTwoLow: td.fiftyTwoLow,
+            closes: td.closes.slice(-60),
+            highs: (td.highs || []).slice(-60),
+            maxProfitTarget: mpt.maxTarget,
+            maxProfitConfidence: mpt.confidence,
+            maxProfitMethod: `${mpt.method}_reserve`,
+            momentum20d: Math.round(momentum20d * 100) / 100,
+            momentum5d: Math.round(momentum5d * 100) / 100,
+            trendStrength: Math.round(trendStrength),
+            winRate: Math.round(clamp(45 + sr * 12 + momentum20d * 0.6, 35, 72) * 10) / 10,
+            filterTier: isHedge ? "balanced" : momentum20d >= -6 && mdd <= 45 ? "balanced" : "relaxed",
+            sentimentScore: 0,
+            sentimentLabel: "Neutral",
+            earningsSignal: "neutral",
+            sentimentHeadline: "",
+            sentimentArticleCount: 0,
+          });
+        }
+
+        repairLog(`Reserve ranking recovered ${scored.length} scored candidates`);
+      }
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
