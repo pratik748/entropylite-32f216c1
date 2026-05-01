@@ -205,13 +205,20 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const primary = Deno.env.get("MISTRAL_API_KEY");
   const secondary = Deno.env.get("MISTRAL_API_KEY_2");
-  const keys: Array<{ key: string; label: string }> = [];
-  if (primary) keys.push({ key: primary, label: "primary" });
-  if (secondary) keys.push({ key: secondary, label: "secondary" });
-  if (keys.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2)");
+  const available: Array<{ key: string; label: string }> = [];
+  if (primary) available.push({ key: primary, label: "primary" });
+  if (secondary) available.push({ key: secondary, label: "secondary" });
+  if (available.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2)");
+
+  // Round-robin load balance across keys so each carries ~half the traffic.
+  // Counter is per-isolate; on Mistral 429/5xx we rotate to the other key
+  // immediately so the user never sees a rate-limit failure when the other
+  // key still has quota.
+  const idx = pickKeyIndex(available.length);
+  const ordered = available.slice(idx).concat(available.slice(0, idx));
 
   let lastErr: any = null;
-  for (const { key, label } of keys) {
+  for (const { key, label } of ordered) {
     try {
       return await callMistralWithKey(opts, key, reported);
     } catch (e: any) {
