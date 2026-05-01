@@ -4,7 +4,6 @@ import {
   Activity, TrendingUp, Layers, Radio, GitBranch, ScatterChart, Dna, LineChart, Flame,
 } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
-import { useAIProvider } from "@/hooks/useAIProvider";
 import StrategyLab from "./StrategyLab";
 import MonteCarloEngine from "./MonteCarloEngine";
 import AftermathMatrix from "./AftermathMatrix";
