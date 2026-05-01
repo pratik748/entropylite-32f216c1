@@ -20,14 +20,18 @@ import {
   RefreshCw,
   Gauge,
   Newspaper,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 import { cleanAIText } from "@/lib/utils";
+import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 
 interface RiskMetrics {
   var95: number;
