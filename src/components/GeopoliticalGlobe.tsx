@@ -11,6 +11,7 @@ import EventFeed from "@/components/geopolitical/EventFeed";
 import { useGeoEvents, type ScoredGeoEvent } from "@/hooks/useGeoEvents";
 import IntelStack from "@/components/geopolitical/IntelStack";
 import { useTacticalMovement } from "@/hooks/useTacticalMovement";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -167,7 +168,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
       <IntelligenceBrief data={data} />
 
       {viewMode === "map" && (
-        <div className="relative" style={{ minHeight: 380 }}>
+        <div className="relative space-y-2">
           {/* Floating Layer Toggles */}
           <div className="absolute top-2 left-2 z-[1000]">
             <button
@@ -188,58 +189,60 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             )}
           </div>
 
-          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[260px_1fr_320px]" style={{ minHeight: 540 }}>
-            <div className="hidden lg:block" style={{ minHeight: 460, maxHeight: 600 }}>
+          {/* Map: full-width, plotted with live news markers */}
+          <div
+            className="glass-panel rounded-xl overflow-hidden relative w-full"
+            style={{ height: "min(62vh, 560px)", minHeight: 360 }}
+          >
+            <GeopoliticalMap
+              data={data}
+              portfolioMarkers={portfolioMarkers}
+              onSelectConflict={setSelectedConflict}
+              visibleLayers={visibleLayers}
+              geoEvents={geoEvents as any}
+              selectedEventId={selectedEvent?.id || null}
+              onSelectEvent={(e) => setSelectedEvent(e as ScoredGeoEvent)}
+              ships={tactical?.ships}
+              planes={tactical?.planes}
+              chokepoints={tactical?.chokepoints}
+            />
+          </div>
+
+          {/* Live news under the map — tap any item to open causal cascade */}
+          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[1fr_320px]">
+            <div style={{ height: 420 }}>
               <EventFeed
                 events={geoEvents}
                 loading={eventsLoading}
                 lastTick={eventsLastTick}
                 error={eventsError}
                 selectedId={selectedEvent?.id}
-                onSelect={setSelectedEvent}
+                onSelect={(e) => setSelectedEvent(e)}
               />
             </div>
-            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 540 }}>
-              <GeopoliticalMap
+            <div className="hidden lg:block" style={{ height: 420 }}>
+              <ThreatFeed
                 data={data}
-                portfolioMarkers={portfolioMarkers}
+                selectedConflict={selectedConflict}
                 onSelectConflict={setSelectedConflict}
-                visibleLayers={visibleLayers}
-                geoEvents={geoEvents as any}
-                selectedEventId={selectedEvent?.id || null}
-                onSelectEvent={setSelectedEvent}
-                ships={tactical?.ships}
-                planes={tactical?.planes}
-                chokepoints={tactical?.chokepoints}
+                exposedTickers={exposedTickers}
               />
-            </div>
-            <div className="space-y-2" style={{ minHeight: 540 }}>
-              {selectedEvent ? (
-                <div style={{ height: 540 }}>
-                  <IntelStack
-                    event={selectedEvent}
-                    onClear={() => setSelectedEvent(null)}
-                    portfolioTickers={stocks.map(s => s.ticker)}
-                    tickerThreats={tickerThreats}
-                  />
-                </div>
-              ) : (
-                <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
-              )}
             </div>
           </div>
 
-          {/* Mobile: feed below map */}
-          <div className="lg:hidden mt-2" style={{ height: 320 }}>
-            <EventFeed
-              events={geoEvents}
-              loading={eventsLoading}
-              lastTick={eventsLastTick}
-              error={eventsError}
-              selectedId={selectedEvent?.id}
-              onSelect={setSelectedEvent}
-            />
-          </div>
+          {/* Causal cascade dialog */}
+          <Dialog open={!!selectedEvent} onOpenChange={(o) => !o && setSelectedEvent(null)}>
+            <DialogContent className="max-w-5xl w-[96vw] h-[88vh] p-0 overflow-hidden border-border bg-background">
+              {selectedEvent && (
+                <IntelStack
+                  event={selectedEvent}
+                  onClear={() => setSelectedEvent(null)}
+                  portfolioTickers={stocks.map((s) => s.ticker)}
+                  tickerThreats={tickerThreats}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
