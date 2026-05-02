@@ -105,7 +105,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
           <div className="min-w-0">
             <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye, Intelligence Map</h2>
             <p className="text-[8px] text-muted-foreground font-mono tracking-widest truncate">
-              LIVE 20s · {data.conflictEvents.length} CONFLICTS
+              LIVE 20s · {safeData.conflictEvents.length} CONFLICTS · {geoEvents.length} WIRE
               {exposedTickers.length > 0 && <span className="text-loss ml-1">⚠ {exposedTickers.length} EXPOSED</span>}
             </p>
           </div>
@@ -123,7 +123,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
         </div>
       </div>
 
-      <RiskStrip data={data} />
+      {data && <RiskStrip data={data} />}
 
       {/* Chokepoint Stress Strip */}
       {tactical?.chokepoints && tactical.chokepoints.length > 0 && (
@@ -169,7 +169,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
         </div>
       )}
 
-      <IntelligenceBrief data={data} />
+      {data && <IntelligenceBrief data={data} />}
 
       {viewMode === "map" && (
         <div className="relative space-y-2">
@@ -199,7 +199,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             style={{ height: "min(62vh, 560px)", minHeight: 360 }}
           >
             <GeopoliticalMap
-              data={data}
+              data={safeData}
               portfolioMarkers={portfolioMarkers}
               onSelectConflict={setSelectedConflict}
               visibleLayers={visibleLayers}
@@ -250,8 +250,14 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
         </div>
       )}
 
-      {viewMode === "threats" && <ThreatsView data={data} exposedTickers={exposedTickers} />}
-      {viewMode === "forex" && <ForexView data={data} />}
+      {viewMode === "threats" && data && <ThreatsView data={data} exposedTickers={exposedTickers} />}
+      {viewMode === "forex" && data && <ForexView data={data} />}
+      {viewMode !== "map" && !data && (
+        <div className="text-center py-12 text-xs text-muted-foreground">
+          Legacy intel summary paused (rate-limited). Live wire still active —
+          <Button variant="ghost" size="sm" onClick={() => onRefresh()} className="ml-1 h-6 text-xs">Retry</Button>
+        </div>
+      )}
     </div>
   );
 };
