@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { toPng } from "html-to-image";
 import { X, Twitter, MessageCircle, Download, Copy, Loader2, TrendingUp, Sparkles } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { exportNodeToPng } from "@/lib/exportImage";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 interface Props {
@@ -74,14 +74,9 @@ export default function ProofCard({ open, onClose, stock }: Props) {
     if (!cardRef.current) return null;
     setExporting(true);
     try {
-      const url = await toPng(cardRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: "#0a0a0a",
-      });
-      return url;
+      return await exportNodeToPng(cardRef.current, { backgroundColor: "#0a0a0a", pixelRatio: 2 });
     } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+      toast({ title: "Export failed", description: e?.message || "Try again", variant: "destructive" });
       return null;
     } finally {
       setExporting(false);
