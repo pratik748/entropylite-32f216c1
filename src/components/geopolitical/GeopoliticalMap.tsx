@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
+import "leaflet.heat";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -26,11 +27,29 @@ export interface MapData {
 
 interface PortfolioMarker { ticker: string; lat: number; lng: number; }
 
+export interface GeoEventMarker {
+  id: string;
+  title: string;
+  source: string;
+  ts: number;
+  loc: { lat: number; lng: number; place: string };
+  category: "military" | "economic" | "political" | "supply_chain" | "cyber";
+  severity: number;
+  market_relevance: number;
+  velocity: number;
+  decayedScore: number;
+  // Allow additional fields from upstream (e.g. ScoredGeoEvent)
+  [key: string]: unknown;
+}
+
 interface Props {
   data: MapData;
   portfolioMarkers: PortfolioMarker[];
   onSelectConflict?: (c: ConflictEvent) => void;
   visibleLayers: Record<string, boolean>;
+  geoEvents?: GeoEventMarker[];
+  selectedEventId?: string | null;
+  onSelectEvent?: (e: any) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -38,11 +57,20 @@ const TYPE_COLORS: Record<string, string> = {
   terrorism: "#ff1e1e", trade_war: "#ffe000", cyber: "#64c8ff", energy: "#ff9900",
 };
 
-export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConflict, visibleLayers }: Props) {
+const EVENT_COLORS: Record<string, string> = {
+  military: "#ef4444",
+  economic: "#f59e0b",
+  political: "#a855f7",
+  supply_chain: "#3b82f6",
+  cyber: "#22d3ee",
+};
+
+export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConflict, visibleLayers, geoEvents, selectedEventId, onSelectEvent }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const initRef = useRef(false);
   const layersRef = useRef<Record<string, L.LayerGroup>>({});
+  const heatRef = useRef<any>(null);
 
   // Init map once
   useEffect(() => {
@@ -60,7 +88,7 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
-    ["conflicts", "tradeHubs", "supplyChains", "entropy", "forex", "portfolio"].forEach(name => {
+    ["conflicts", "tradeHubs", "supplyChains", "entropy", "forex", "portfolio", "events"].forEach(name => {
       layersRef.current[name] = L.layerGroup().addTo(map);
     });
 
@@ -77,6 +105,7 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
       map.remove();
       mapRef.current = null;
       layersRef.current = {};
+      heatRef.current = null;
       initRef.current = false;
     };
   }, []);
@@ -182,6 +211,61 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
     }
   }, [data, portfolioMarkers, visibleLayers, onSelectConflict]);
 
+  // Live geo events layer + heat overlay (separate effect — high churn)
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const evLayer = layersRef.current.events;
+    if (!evLayer) return;
+
+    evLayer.clearLayers();
+    if (heatRef.current) {
+      map.removeLayer(heatRef.current);
+      heatRef.current = null;
+    }
+
+    if (visibleLayers.events === false || !geoEvents || geoEvents.length === 0) return;
+
+    // Markers
+    geoEvents.slice(0, 80).forEach(e => {
+      if (!e.loc || typeof e.loc.lat !== "number") return;
+      const color = EVENT_COLORS[e.category] || "#a855f7";
+      const r = 4 + e.decayedScore * 10;
+      const isSelected = selectedEventId === e.id;
+
+      L.circleMarker([e.loc.lat, e.loc.lng], {
+        radius: r + 6,
+        color, fillColor: color,
+        fillOpacity: 0.06, weight: isSelected ? 2 : 1, opacity: isSelected ? 0.9 : 0.35,
+        className: "geo-pulse-ring",
+      }).addTo(evLayer);
+
+      L.circleMarker([e.loc.lat, e.loc.lng], {
+        radius: r,
+        color, fillColor: color,
+        fillOpacity: 0.55, weight: isSelected ? 2.5 : 1.5, opacity: 0.95,
+      })
+        .bindTooltip(e.title.slice(0, 80), { direction: "top", className: "entropy-tooltip", offset: [0, -r] })
+        .on("click", () => onSelectEvent?.(e))
+        .addTo(evLayer);
+    });
+
+    // Heat layer (weighted by decayedScore)
+    const heatPoints = geoEvents
+      .filter(e => e.loc && typeof e.loc.lat === "number")
+      .map(e => [e.loc.lat, e.loc.lng, Math.min(1, e.decayedScore * 1.4)] as [number, number, number]);
+    if (heatPoints.length > 0) {
+      // @ts-ignore — leaflet.heat extends L
+      heatRef.current = L.heatLayer(heatPoints, {
+        radius: 28,
+        blur: 22,
+        minOpacity: 0.25,
+        maxZoom: 5,
+        gradient: { 0.2: "#3b82f6", 0.45: "#a855f7", 0.65: "#f59e0b", 0.85: "#ef4444" },
+      }).addTo(map);
+    }
+  }, [geoEvents, visibleLayers.events, selectedEventId, onSelectEvent]);
+
   // Fly-to on conflict select
   const flyTo = useCallback((lat: number, lng: number) => {
     mapRef.current?.flyTo([lat, lng], 5, { duration: 1 });
@@ -195,6 +279,7 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Conflict</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Entropy</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Hub</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> Live event</span>
         <span className="flex items-center gap-1 text-primary">◆ Portfolio</span>
       </div>
     </div>
