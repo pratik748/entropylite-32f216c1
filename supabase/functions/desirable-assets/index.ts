@@ -1878,17 +1878,19 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     // Then fill remaining by quantScore while enforcing sector/cap/correlation limits.
+    // Hard cap at 4 — fewer, higher-conviction names. Reduces AI load + timeouts and
+    // forces only top-tier picks to surface.
     for (const s of selectionPool) {
-      if (selected.length >= 12) break;
+      if (selected.length >= 4) break;
       if (passesDiversityGuards(s)) {
         registerSelection(s);
       }
     }
 
     // If guards were too strict, backfill only with the highest-scoring remaining names.
-    if (selected.length < Math.min(6, selectionPool.length)) {
+    if (selected.length < Math.min(4, selectionPool.length)) {
       for (const s of selectionPool) {
-        if (selected.length >= Math.min(8, selectionPool.length)) break;
+        if (selected.length >= Math.min(4, selectionPool.length)) break;
         if (!selectedTickers.has(s.rec.ticker)) {
           registerSelection(s);
         }
@@ -1897,8 +1899,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
 
     // Reliability backstop removed by design — no deterministic padding.
 
-    // Ensure hedge coverage exists in final set.
-    const minHedgeCount = portfolioTickers.length > 0 ? 2 : 1;
+    // Ensure hedge coverage exists in final set (capped slate of 4 → at most 1 hedge).
+    const minHedgeCount = portfolioTickers.length > 0 ? 1 : 0;
     let hedgeCount = selected.filter((s) => HEDGE_STRATEGIES.has(String(s.rec.strategy || ""))).length;
     if (hedgeCount < minHedgeCount) {
       const hedgePool = scored
@@ -1908,7 +1910,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       for (const hedgeCandidate of hedgePool) {
         if (hedgeCount >= minHedgeCount) break;
 
-        if (selected.length >= 12) {
+        if (selected.length >= 4) {
           let replaceIdx = -1;
           for (let i = selected.length - 1; i >= 0; i--) {
             if (!HEDGE_STRATEGIES.has(String(selected[i].rec.strategy || ""))) {
@@ -1931,7 +1933,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     if (selected.length === 0 && scored.length > 0) {
-      selected.push(...scored.slice(0, Math.min(8, scored.length)));
+      selected.push(...scored.slice(0, Math.min(4, scored.length)));
     }
 
     // Verify strategy diversity
