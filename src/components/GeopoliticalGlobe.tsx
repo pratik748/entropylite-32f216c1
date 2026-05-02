@@ -65,7 +65,20 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
 
   const toggleLayer = (key: string) => setVisibleLayers(prev => ({ ...prev, [key]: !prev[key] }));
 
-  if (loading && !data) {
+  // Soft-fail: if legacy geo summary is unavailable, still render the live map + feed.
+  const safeData: GeoData = data ?? {
+    conflictEvents: [],
+    tradeHubs: [],
+    supplyChains: [],
+    entropyZones: [],
+    forexStress: [],
+    threatScore: 0,
+    summary: "",
+    keyInsights: [],
+    portfolioImpact: { exposed: 0, hedged: 0, neutral: 0 },
+  } as any;
+
+  if (loading && !data && geoEvents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="relative">
@@ -73,15 +86,6 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
           <Loader2 className="h-16 w-16 animate-spin text-primary relative" />
         </div>
         <span className="text-sm text-muted-foreground font-mono">Initializing intelligence grid...</span>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="text-center py-20 text-muted-foreground">
-        Failed to load geopolitical data.
-        <Button variant="ghost" size="sm" onClick={() => onRefresh()} className="ml-2">Retry</Button>
       </div>
     );
   }
