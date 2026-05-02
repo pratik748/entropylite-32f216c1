@@ -43,7 +43,7 @@ export interface GeoEventMarker {
 }
 
 export interface TacticalShip { mmsi: string; lat: number; lng: number; sog?: number; cog?: number; name?: string; type?: string; }
-export interface TacticalPlane { icao24: string; callsign?: string; lat: number; lng: number; heading?: number; alt?: number; vel?: number; }
+export interface TacticalPlane { icao24: string; callsign?: string; lat: number; lng: number; heading?: number; alt?: number; vel?: number; origin?: string; }
 export interface TacticalChokepoint { name: string; lat: number; lng: number; ships: number; stoppedShips: number; planes: number; stress: number; delta: number; }
 
 interface Props {
