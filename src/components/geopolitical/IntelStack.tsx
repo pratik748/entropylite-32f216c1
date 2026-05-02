@@ -36,7 +36,7 @@ function deriveTradeSignal(e: ScoredGeoEvent): { stance: "Bullish" | "Bearish" |
 }
 
 export default function IntelStack({ event, onClear, portfolioTickers, tickerThreats }: Props) {
-  const [tab, setTab] = useState<"snapshot" | "causal">("snapshot");
+  const [tab, setTab] = useState<"snapshot" | "causal">("causal");
 
   const exposed = useMemo(() => {
     if (!event) return [];
