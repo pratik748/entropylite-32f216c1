@@ -68,15 +68,18 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   // Soft-fail: if legacy geo summary is unavailable, still render the live map + feed.
   const safeData: GeoData = data ?? {
     conflictEvents: [],
+    forexVolatility: [],
+    highEntropyZones: [],
     tradeHubs: [],
-    supplyChains: [],
-    entropyZones: [],
-    forexStress: [],
-    threatScore: 0,
-    summary: "",
-    keyInsights: [],
-    portfolioImpact: { exposed: 0, hedged: 0, neutral: 0 },
-  } as any;
+    supplyChainRisks: [],
+    globalRiskScore: 0,
+    regimeSignal: "stable",
+    capitalFlowDirection: "neutral",
+    safeHavenDemand: "normal",
+    intelligenceSummary: "",
+    keyThreats: [],
+    timestamp: Date.now(),
+  };
 
   if (loading && !data && geoEvents.length === 0) {
     return (
