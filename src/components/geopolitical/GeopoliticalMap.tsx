@@ -38,6 +38,8 @@ export interface GeoEventMarker {
   market_relevance: number;
   velocity: number;
   decayedScore: number;
+  // Allow additional fields from upstream (e.g. ScoredGeoEvent)
+  [key: string]: unknown;
 }
 
 interface Props {
@@ -47,7 +49,7 @@ interface Props {
   visibleLayers: Record<string, boolean>;
   geoEvents?: GeoEventMarker[];
   selectedEventId?: string | null;
-  onSelectEvent?: (e: GeoEventMarker) => void;
+  onSelectEvent?: (e: any) => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
