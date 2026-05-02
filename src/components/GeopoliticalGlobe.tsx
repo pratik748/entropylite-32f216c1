@@ -7,6 +7,8 @@ import GeopoliticalMap from "@/components/geopolitical/GeopoliticalMap";
 import type { ConflictEvent } from "@/components/geopolitical/GeopoliticalMap";
 import { RiskStrip, IntelligenceBrief, ThreatFeed, ThreatsView, ForexView } from "@/components/geopolitical/GeopoliticalPanels";
 import type { GeoData, TickerThreat } from "@/hooks/useGeoIntelligence";
+import EventFeed from "@/components/geopolitical/EventFeed";
+import { useGeoEvents, type ScoredGeoEvent } from "@/hooks/useGeoEvents";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -44,6 +46,8 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
     conflicts: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
   });
   const [showLayers, setShowLayers] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<ScoredGeoEvent | null>(null);
+  const { events: geoEvents, loading: eventsLoading, lastTick: eventsLastTick, error: eventsError } = useGeoEvents();
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -152,11 +156,33 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             )}
           </div>
 
-          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[1fr_280px]" style={{ minHeight: 380 }}>
-            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 380 }}>
+          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[260px_1fr_280px]" style={{ minHeight: 460 }}>
+            <div className="hidden lg:block" style={{ minHeight: 460, maxHeight: 600 }}>
+              <EventFeed
+                events={geoEvents}
+                loading={eventsLoading}
+                lastTick={eventsLastTick}
+                error={eventsError}
+                selectedId={selectedEvent?.id}
+                onSelect={setSelectedEvent}
+              />
+            </div>
+            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 460 }}>
               <GeopoliticalMap data={data} portfolioMarkers={portfolioMarkers} onSelectConflict={setSelectedConflict} visibleLayers={visibleLayers} />
             </div>
             <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
+          </div>
+
+          {/* Mobile: feed below map */}
+          <div className="lg:hidden mt-2" style={{ height: 320 }}>
+            <EventFeed
+              events={geoEvents}
+              loading={eventsLoading}
+              lastTick={eventsLastTick}
+              error={eventsError}
+              selectedId={selectedEvent?.id}
+              onSelect={setSelectedEvent}
+            />
           </div>
         </div>
       )}
