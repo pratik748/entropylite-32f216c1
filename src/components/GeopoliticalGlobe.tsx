@@ -9,6 +9,7 @@ import { RiskStrip, IntelligenceBrief, ThreatFeed, ThreatsView, ForexView } from
 import type { GeoData, TickerThreat } from "@/hooks/useGeoIntelligence";
 import EventFeed from "@/components/geopolitical/EventFeed";
 import { useGeoEvents, type ScoredGeoEvent } from "@/hooks/useGeoEvents";
+import IntelStack from "@/components/geopolitical/IntelStack";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -156,7 +157,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             )}
           </div>
 
-          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[260px_1fr_280px]" style={{ minHeight: 460 }}>
+          <div className="grid gap-2 grid-cols-1 lg:grid-cols-[260px_1fr_320px]" style={{ minHeight: 540 }}>
             <div className="hidden lg:block" style={{ minHeight: 460, maxHeight: 600 }}>
               <EventFeed
                 events={geoEvents}
@@ -167,7 +168,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 onSelect={setSelectedEvent}
               />
             </div>
-            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 460 }}>
+            <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 540 }}>
               <GeopoliticalMap
                 data={data}
                 portfolioMarkers={portfolioMarkers}
@@ -178,7 +179,20 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 onSelectEvent={setSelectedEvent}
               />
             </div>
-            <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
+            <div className="space-y-2" style={{ minHeight: 540 }}>
+              {selectedEvent ? (
+                <div style={{ height: 540 }}>
+                  <IntelStack
+                    event={selectedEvent}
+                    onClear={() => setSelectedEvent(null)}
+                    portfolioTickers={stocks.map(s => s.ticker)}
+                    tickerThreats={tickerThreats}
+                  />
+                </div>
+              ) : (
+                <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
+              )}
+            </div>
           </div>
 
           {/* Mobile: feed below map */}
