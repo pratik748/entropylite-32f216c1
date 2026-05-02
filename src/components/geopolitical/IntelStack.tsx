@@ -19,10 +19,11 @@ function deriveTradeSignal(e: ScoredGeoEvent): { stance: "Bullish" | "Bearish" |
   const conf = Math.round((0.5 * e.confidence + 0.3 * rel + 0.2 * sev) * 100);
 
   let stance: "Bullish" | "Bearish" | "Volatile" = "Volatile";
-  if (e.category === "military" || e.category === "supply_chain") stance = "Bearish";
-  else if (e.category === "economic" && sev > 0.6) stance = "Volatile";
-  else if (e.category === "political") stance = "Volatile";
-  else stance = "Volatile";
+  if (e.category === "military" || e.category === "supply_chain" || e.category === "cyber") {
+    stance = "Bearish";
+  } else if (e.category === "economic" && sev < 0.4 && rel > 0.5) {
+    stance = "Bullish"; // benign macro print → risk-on
+  }
 
   const horizon = sev > 0.7 ? "1-3 days" : sev > 0.4 ? "1-2 weeks" : "weeks → months";
   const tone =
