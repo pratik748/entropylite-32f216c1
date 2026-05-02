@@ -153,6 +153,64 @@ const REGION_LABELS: Record<string, string> = {
   BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
 };
 
+function sanitizeRecommendation(rec: any): Recommendation {
+  return {
+    ticker: typeof rec?.ticker === "string" ? rec.ticker : "—",
+    name: typeof rec?.name === "string" ? rec.name : "Unnamed asset",
+    assetClass: typeof rec?.assetClass === "string" ? rec.assetClass : "asset",
+    exchange: typeof rec?.exchange === "string" ? rec.exchange : "",
+    currency: typeof rec?.currency === "string" ? rec.currency : "USD",
+    realPrice: Number(rec?.realPrice) || 0,
+    realCurrency: typeof rec?.realCurrency === "string" ? rec.realCurrency : (typeof rec?.currency === "string" ? rec.currency : "USD"),
+    currentEstPrice: Number(rec?.currentEstPrice) || 0,
+    entryZone: Array.isArray(rec?.entryZone) ? [Number(rec.entryZone[0]) || 0, Number(rec.entryZone[1]) || 0] : [0, 0],
+    targetPrice: Number(rec?.targetPrice) || 0,
+    stopLoss: Number(rec?.stopLoss) || 0,
+    timeHorizon: typeof rec?.timeHorizon === "string" ? rec.timeHorizon : "n/a",
+    suggestedQty: Number(rec?.suggestedQty) || 1,
+    confidence: Number(rec?.confidence) || 0,
+    thesis: typeof rec?.thesis === "string" ? rec.thesis : "",
+    catalyst: typeof rec?.catalyst === "string" ? rec.catalyst : "No catalyst provided.",
+    hedgingStrategy: typeof rec?.hedgingStrategy === "string" ? rec.hedgingStrategy : "No hedge specified.",
+    riskReward: typeof rec?.riskReward === "string" ? rec.riskReward : "—",
+    sector: typeof rec?.sector === "string" ? rec.sector : "Unclassified",
+    tags: Array.isArray(rec?.tags) ? rec.tags.filter((t: unknown) => typeof t === "string") : [],
+    riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.filter((t: unknown) => typeof t === "string") : [],
+    strategy: typeof rec?.strategy === "string" ? rec.strategy : undefined,
+    pairedInstrument: typeof rec?.pairedInstrument === "string" ? rec.pairedInstrument : undefined,
+    pairedStructure: typeof rec?.pairedStructure === "string" ? rec.pairedStructure : undefined,
+    capitalEfficiency: Number.isFinite(Number(rec?.capitalEfficiency)) ? Number(rec.capitalEfficiency) : undefined,
+    priceChange24h: Number(rec?.priceChange24h) || 0,
+    priceVerified: Boolean(rec?.priceVerified),
+    sharpeRatio: Number.isFinite(Number(rec?.sharpeRatio)) ? Number(rec.sharpeRatio) : undefined,
+    maxDrawdown: Number.isFinite(Number(rec?.maxDrawdown)) ? Number(rec.maxDrawdown) : undefined,
+    portfolioCorrelation: Number.isFinite(Number(rec?.portfolioCorrelation)) ? Number(rec.portfolioCorrelation) : undefined,
+    volatility: Number.isFinite(Number(rec?.volatility)) ? Number(rec.volatility) : undefined,
+    zScore: Number.isFinite(Number(rec?.zScore)) ? Number(rec.zScore) : undefined,
+    quantScore: Number(rec?.quantScore) || 0,
+    closes: Array.isArray(rec?.closes) ? rec.closes.map((v: unknown) => Number(v)).filter((v: number) => Number.isFinite(v)) : [],
+    simulationTested: Boolean(rec?.simulationTested),
+    momentum20d: Number.isFinite(Number(rec?.momentum20d)) ? Number(rec.momentum20d) : undefined,
+    momentum5d: Number.isFinite(Number(rec?.momentum5d)) ? Number(rec.momentum5d) : undefined,
+    trendStrength: Number.isFinite(Number(rec?.trendStrength)) ? Number(rec.trendStrength) : undefined,
+    sentimentScore: Number.isFinite(Number(rec?.sentimentScore)) ? Number(rec.sentimentScore) : undefined,
+    sentimentLabel: typeof rec?.sentimentLabel === "string" ? rec.sentimentLabel : undefined,
+    earningsSignal: rec?.earningsSignal === "bullish" || rec?.earningsSignal === "neutral" || rec?.earningsSignal === "bearish" ? rec.earningsSignal : undefined,
+    sentimentHeadline: typeof rec?.sentimentHeadline === "string" ? rec.sentimentHeadline : undefined,
+    sentimentArticleCount: Number.isFinite(Number(rec?.sentimentArticleCount)) ? Number(rec.sentimentArticleCount) : undefined,
+    allocationPct: Number(rec?.allocationPct) || 0,
+    positionValue: Number.isFinite(Number(rec?.positionValue)) ? Number(rec.positionValue) : undefined,
+    riskBudgetPct: Number(rec?.riskBudgetPct) || 0,
+    hedgeInstrument: typeof rec?.hedgeInstrument === "string" ? rec.hedgeInstrument : undefined,
+    hedgeRatioPct: Number.isFinite(Number(rec?.hedgeRatioPct)) ? Number(rec.hedgeRatioPct) : undefined,
+    evidenceSummary: Array.isArray(rec?.evidenceSummary) ? rec.evidenceSummary.filter((t: unknown) => typeof t === "string") : [],
+    portfolioFit: typeof rec?.portfolioFit === "string" ? rec.portfolioFit : undefined,
+    riskVerdict: rec?.riskVerdict === "low" || rec?.riskVerdict === "medium" || rec?.riskVerdict === "high" ? rec.riskVerdict : undefined,
+    riskCompositeScore: Number.isFinite(Number(rec?.riskCompositeScore)) ? Number(rec.riskCompositeScore) : undefined,
+    horizonClass: rec?.horizonClass === "intraday" || rec?.horizonClass === "short_term" || rec?.horizonClass === "medium_term" || rec?.horizonClass === "long_term" ? rec.horizonClass : undefined,
+  };
+}
+
 // Mini sparkline component
 const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
   if (!data || data.length < 2) return null;
@@ -498,7 +556,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       
       setCachedDA(payload);
-      setRecommendations(data.recommendations);
+      setRecommendations(data.recommendations.map(sanitizeRecommendation));
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
