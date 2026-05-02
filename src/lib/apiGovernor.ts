@@ -55,6 +55,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "fetch-news":              "slow",
   "geopolitical-data":       "frequent",
   "desirable-assets":        "slow",
+  "tactical-movement":       "slow",
   "analyze-stock":           "ai",
   "direct-profit":           "ai",
   "strategy-generate":       "ai",
