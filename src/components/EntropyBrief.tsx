@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { toPng } from "html-to-image";
 import { X, Twitter, MessageCircle, Download, Copy, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { exportNodeToPng } from "@/lib/exportImage";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
@@ -94,14 +94,9 @@ export default function EntropyBrief({ open, onClose, stocks }: Props) {
     if (!cardRef.current) return null;
     setExporting(true);
     try {
-      const url = await toPng(cardRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: "#0a0a0a",
-      });
-      return url;
+      return await exportNodeToPng(cardRef.current, { backgroundColor: "#0a0a0a", pixelRatio: 2 });
     } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+      toast({ title: "Export failed", description: e?.message || "Try again", variant: "destructive" });
       return null;
     } finally {
       setExporting(false);
