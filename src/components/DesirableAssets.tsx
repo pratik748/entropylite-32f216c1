@@ -536,8 +536,10 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         }
       }
 
+      const sanitizedRecommendations = data.recommendations.map(sanitizeRecommendation);
+
       const payload = {
-        recommendations: data.recommendations,
+        recommendations: sanitizedRecommendations,
         marketCondition: data.marketCondition || "",
         regimeType: data.regimeType || "",
         liveWebContext: data.liveWebContext || "",
@@ -546,7 +548,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       };
       
       // Save tickers for anti-repeat on next refresh
-      const newTickers = data.recommendations.map((r: any) => r.ticker);
+      const newTickers = sanitizedRecommendations.map((r) => r.ticker);
       // Replace, don't append — the recent-slate memory is a single window.
       savePreviousTickers(newTickers);
       
@@ -556,7 +558,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
       
       setCachedDA(payload);
-      setRecommendations(data.recommendations.map(sanitizeRecommendation));
+      setRecommendations(sanitizedRecommendations);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
@@ -586,8 +588,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   // without having to re-run the funnel. Cache TTL is 2h.
   useEffect(() => {
     const cached = getCachedDA();
-    if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
-      setRecommendations(cached.recommendations);
+      if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
+        setRecommendations(cached.recommendations.map(sanitizeRecommendation));
       setMarketCondition(cached.marketCondition || "");
       setRegimeType(cached.regimeType || "");
       setLiveWebContext(cached.liveWebContext || "");
