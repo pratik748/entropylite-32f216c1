@@ -42,6 +42,10 @@ export interface GeoEventMarker {
   [key: string]: unknown;
 }
 
+export interface TacticalShip { mmsi: string; lat: number; lng: number; sog?: number; cog?: number; name?: string; type?: string; }
+export interface TacticalPlane { icao24: string; callsign?: string; lat: number; lng: number; heading?: number; alt?: number; vel?: number; origin?: string; }
+export interface TacticalChokepoint { name: string; lat: number; lng: number; ships: number; stoppedShips: number; planes: number; stress: number; delta: number; }
+
 interface Props {
   data: MapData;
   portfolioMarkers: PortfolioMarker[];
@@ -50,6 +54,9 @@ interface Props {
   geoEvents?: GeoEventMarker[];
   selectedEventId?: string | null;
   onSelectEvent?: (e: any) => void;
+  ships?: TacticalShip[];
+  planes?: TacticalPlane[];
+  chokepoints?: TacticalChokepoint[];
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -65,7 +72,16 @@ const EVENT_COLORS: Record<string, string> = {
   cyber: "#22d3ee",
 };
 
-export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConflict, visibleLayers, geoEvents, selectedEventId, onSelectEvent }: Props) {
+const SHIP_COLORS: Record<string, string> = {
+  cargo: "#38bdf8", tanker: "#fb923c", passenger: "#a78bfa",
+  fishing: "#94a3b8", military: "#ef4444", wing: "#22d3ee", other: "#cbd5e1",
+};
+
+export default function GeopoliticalMap({
+  data, portfolioMarkers, onSelectConflict, visibleLayers,
+  geoEvents, selectedEventId, onSelectEvent,
+  ships, planes, chokepoints,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const initRef = useRef(false);
@@ -88,7 +104,7 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
-    ["conflicts", "tradeHubs", "supplyChains", "entropy", "forex", "portfolio", "events"].forEach(name => {
+    ["conflicts", "tradeHubs", "supplyChains", "entropy", "forex", "portfolio", "events", "ships", "planes", "chokepoints"].forEach(name => {
       layersRef.current[name] = L.layerGroup().addTo(map);
     });
 
@@ -266,6 +282,83 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
     }
   }, [geoEvents, visibleLayers.events, selectedEventId, onSelectEvent]);
 
+  // Tactical: ships
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const layer = layersRef.current.ships;
+    if (!layer) return;
+    layer.clearLayers();
+    if (visibleLayers.ships === false || !ships?.length) return;
+    ships.slice(0, 250).forEach(s => {
+      const color = SHIP_COLORS[s.type || "other"] || SHIP_COLORS.other;
+      const idle = (s.sog ?? 0) < 0.5;
+      L.circleMarker([s.lat, s.lng], {
+        radius: idle ? 3.2 : 2.4,
+        color,
+        fillColor: color,
+        fillOpacity: idle ? 0.85 : 0.55,
+        weight: idle ? 1.2 : 0.5,
+        opacity: 0.9,
+      })
+        .bindTooltip(
+          `<b>${s.name || s.mmsi}</b><br/>${s.type || "vessel"} · ${(s.sog ?? 0).toFixed(1)} kn${idle ? " · <span style='color:#fb923c'>idle</span>" : ""}`,
+          { direction: "top", className: "entropy-tooltip", offset: [0, -4] },
+        )
+        .addTo(layer);
+    });
+  }, [ships, visibleLayers.ships]);
+
+  // Tactical: planes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const layer = layersRef.current.planes;
+    if (!layer) return;
+    layer.clearLayers();
+    if (visibleLayers.planes === false || !planes?.length) return;
+    planes.slice(0, 350).forEach(p => {
+      const heading = p.heading ?? 0;
+      const icon = L.divIcon({
+        className: "geo-plane-icon",
+        html: `<div style="transform:rotate(${heading}deg);font-size:11px;line-height:11px;color:#67e8f9;text-shadow:0 0 4px rgba(34,211,238,0.6);">▲</div>`,
+        iconSize: [11, 11],
+        iconAnchor: [5, 5],
+      });
+      L.marker([p.lat, p.lng], { icon })
+        .bindTooltip(
+          `<b>${(p.callsign || p.icao24).trim()}</b><br/>${p.origin || ""} · ${p.alt ? Math.round(p.alt) + "m" : ""} · ${p.vel ? Math.round(p.vel * 1.94384) + "kn" : ""}`,
+          { direction: "top", className: "entropy-tooltip", offset: [0, -6] },
+        )
+        .addTo(layer);
+    });
+  }, [planes, visibleLayers.planes]);
+
+  // Tactical: chokepoint stress halos
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const layer = layersRef.current.chokepoints;
+    if (!layer) return;
+    layer.clearLayers();
+    if (visibleLayers.chokepoints === false || !chokepoints?.length) return;
+    chokepoints.forEach(c => {
+      const color = c.stress > 0.6 ? "#ef4444" : c.stress > 0.35 ? "#f59e0b" : "#22d3ee";
+      L.circleMarker([c.lat, c.lng], {
+        radius: 14 + c.stress * 18,
+        color,
+        fillColor: color,
+        fillOpacity: 0.05 + c.stress * 0.18,
+        weight: 1.5,
+        opacity: 0.5 + c.stress * 0.4,
+        dashArray: "3 3",
+        className: "geo-pulse-ring",
+      })
+        .bindTooltip(
+          `<b>${c.name}</b><br/>Stress ${Math.round(c.stress * 100)}<br/>${c.ships} ships (${c.stoppedShips} idle) · ${c.planes} flights<br/>Δ vs baseline ${c.delta > 0 ? "+" : ""}${Math.round(c.delta * 100)}%`,
+          { direction: "top", className: "entropy-tooltip", offset: [0, -10] },
+        )
+        .addTo(layer);
+    });
+  }, [chokepoints, visibleLayers.chokepoints]);
+
   // Fly-to on conflict select
   const flyTo = useCallback((lat: number, lng: number) => {
     mapRef.current?.flyTo([lat, lng], 5, { duration: 1 });
@@ -280,6 +373,9 @@ export default function GeopoliticalMap({ data, portfolioMarkers, onSelectConfli
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Entropy</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Hub</span>
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> Live event</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> Vessel</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-300" /> Aircraft</span>
+        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-400" /> Choke stress</span>
         <span className="flex items-center gap-1 text-primary">◆ Portfolio</span>
       </div>
     </div>

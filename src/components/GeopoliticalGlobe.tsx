@@ -10,6 +10,7 @@ import type { GeoData, TickerThreat } from "@/hooks/useGeoIntelligence";
 import EventFeed from "@/components/geopolitical/EventFeed";
 import { useGeoEvents, type ScoredGeoEvent } from "@/hooks/useGeoEvents";
 import IntelStack from "@/components/geopolitical/IntelStack";
+import { useTacticalMovement } from "@/hooks/useTacticalMovement";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -38,6 +39,7 @@ function getTickerGeo(ticker: string): { lat: number; lng: number } | null {
 const LAYER_LABELS: Record<string, string> = {
   conflicts: "Conflicts", events: "Live Events", tradeHubs: "Trade Hubs", supplyChains: "Supply Routes",
   entropy: "Entropy Zones", forex: "FX Stress", portfolio: "Portfolio",
+  ships: "Vessels (AIS)", planes: "Flights (ADS-B)", chokepoints: "Chokepoints",
 };
 
 const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposedTickers, tickerThreats, onRefresh }: Props) => {
@@ -45,10 +47,12 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   const [viewMode, setViewMode] = useState<"map" | "threats" | "forex">("map");
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
     conflicts: true, events: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
+    ships: true, planes: true, chokepoints: true,
   });
   const [showLayers, setShowLayers] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ScoredGeoEvent | null>(null);
   const { events: geoEvents, loading: eventsLoading, lastTick: eventsLastTick, error: eventsError } = useGeoEvents();
+  const { data: tactical } = useTacticalMovement(true);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -116,6 +120,33 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
 
       <RiskStrip data={data} />
 
+      {/* Chokepoint Stress Strip */}
+      {tactical?.chokepoints && tactical.chokepoints.length > 0 && (
+        <div className="glass-panel rounded-xl px-2.5 py-1.5 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max">
+            <span className="text-[8px] font-mono uppercase tracking-widest text-muted-foreground flex-shrink-0">
+              Chokepoints
+            </span>
+            {tactical.chokepoints.map(c => {
+              const tone = c.stress > 0.6 ? "text-loss border-loss/30 bg-loss/5"
+                : c.stress > 0.35 ? "text-warning border-warning/30 bg-warning/5"
+                : "text-muted-foreground border-border/40 bg-muted/20";
+              return (
+                <div key={c.name} className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border ${tone}`}>
+                  <span className="font-mono text-[9px] font-semibold whitespace-nowrap">{c.name}</span>
+                  <span className="font-mono text-[9px] tabular-nums opacity-80">
+                    {c.ships}🚢 · {c.planes}✈
+                  </span>
+                  <span className="font-mono text-[9px] tabular-nums font-bold">
+                    {Math.round(c.stress * 100)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Slim Exposure Alert */}
       {exposedTickers.length > 0 && (
         <div className="glass-panel rounded-xl px-3 py-2 border border-loss/30 flex items-center gap-2 flex-wrap">
@@ -177,6 +208,9 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 geoEvents={geoEvents as any}
                 selectedEventId={selectedEvent?.id || null}
                 onSelectEvent={setSelectedEvent}
+                ships={tactical?.ships}
+                planes={tactical?.planes}
+                chokepoints={tactical?.chokepoints}
               />
             </div>
             <div className="space-y-2" style={{ minHeight: 540 }}>
