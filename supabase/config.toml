@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.geopolitical-data]
 verify_jwt = false
 
+[functions.tactical-movement]
+verify_jwt = false
+
 [functions.desirable-assets]
 verify_jwt = false
 
