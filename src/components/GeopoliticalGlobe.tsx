@@ -35,7 +35,7 @@ function getTickerGeo(ticker: string): { lat: number; lng: number } | null {
 }
 
 const LAYER_LABELS: Record<string, string> = {
-  conflicts: "Conflicts", tradeHubs: "Trade Hubs", supplyChains: "Supply Routes",
+  conflicts: "Conflicts", events: "Live Events", tradeHubs: "Trade Hubs", supplyChains: "Supply Routes",
   entropy: "Entropy Zones", forex: "FX Stress", portfolio: "Portfolio",
 };
 
@@ -43,7 +43,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   const [selectedConflict, setSelectedConflict] = useState<ConflictEvent | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "threats" | "forex">("map");
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
-    conflicts: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
+    conflicts: true, events: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
   });
   const [showLayers, setShowLayers] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ScoredGeoEvent | null>(null);
@@ -168,7 +168,15 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
               />
             </div>
             <div className="glass-panel rounded-xl overflow-hidden relative" style={{ minHeight: 460 }}>
-              <GeopoliticalMap data={data} portfolioMarkers={portfolioMarkers} onSelectConflict={setSelectedConflict} visibleLayers={visibleLayers} />
+              <GeopoliticalMap
+                data={data}
+                portfolioMarkers={portfolioMarkers}
+                onSelectConflict={setSelectedConflict}
+                visibleLayers={visibleLayers}
+                geoEvents={geoEvents}
+                selectedEventId={selectedEvent?.id || null}
+                onSelectEvent={setSelectedEvent}
+              />
             </div>
             <ThreatFeed data={data} selectedConflict={selectedConflict} onSelectConflict={setSelectedConflict} exposedTickers={exposedTickers} />
           </div>
