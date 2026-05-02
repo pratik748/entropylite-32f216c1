@@ -37,6 +37,7 @@ import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ProofCard from "@/components/ProofCard";
+import ModuleErrorBoundary from "@/components/ModuleErrorBoundary";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -651,20 +652,30 @@ const IndexContent = () => {
               )}
               {activeTab === "geopolitical" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
-                  <GeopoliticalGlobe
-                    key={refreshKey}
-                    stocks={stocks}
-                    geoData={geoData}
-                    geoLoading={geoLoading}
-                    exposedTickers={exposedTickers}
-                    tickerThreats={tickerThreats}
-                    onRefresh={geoRefresh}
-                  />
+                  <ModuleErrorBoundary
+                    title="Geopolitical module recovered"
+                    description="The live geopolitics panel hit a render error. Retry keeps the rest of the terminal running."
+                  >
+                    <GeopoliticalGlobe
+                      key={refreshKey}
+                      stocks={stocks}
+                      geoData={geoData}
+                      geoLoading={geoLoading}
+                      exposedTickers={exposedTickers}
+                      tickerThreats={tickerThreats}
+                      onRefresh={geoRefresh}
+                    />
+                  </ModuleErrorBoundary>
                 </div>
               )}
               {activeTab === "desirable" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
-                  <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                  <ModuleErrorBoundary
+                    title="Desirable Assets module recovered"
+                    description="The recommendations board hit a render error. Retry will remount just this module."
+                  >
+                    <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                  </ModuleErrorBoundary>
                 </div>
               )}
               {activeTab === "risk" && (
