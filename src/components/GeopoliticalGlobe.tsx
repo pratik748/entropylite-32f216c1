@@ -120,6 +120,33 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
 
       <RiskStrip data={data} />
 
+      {/* Chokepoint Stress Strip */}
+      {tactical?.chokepoints && tactical.chokepoints.length > 0 && (
+        <div className="glass-panel rounded-xl px-2.5 py-1.5 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max">
+            <span className="text-[8px] font-mono uppercase tracking-widest text-muted-foreground flex-shrink-0">
+              Chokepoints
+            </span>
+            {tactical.chokepoints.map(c => {
+              const tone = c.stress > 0.6 ? "text-loss border-loss/30 bg-loss/5"
+                : c.stress > 0.35 ? "text-warning border-warning/30 bg-warning/5"
+                : "text-muted-foreground border-border/40 bg-muted/20";
+              return (
+                <div key={c.name} className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border ${tone}`}>
+                  <span className="font-mono text-[9px] font-semibold whitespace-nowrap">{c.name}</span>
+                  <span className="font-mono text-[9px] tabular-nums opacity-80">
+                    {c.ships}🚢 · {c.planes}✈
+                  </span>
+                  <span className="font-mono text-[9px] tabular-nums font-bold">
+                    {Math.round(c.stress * 100)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Slim Exposure Alert */}
       {exposedTickers.length > 0 && (
         <div className="glass-panel rounded-xl px-3 py-2 border border-loss/30 flex items-center gap-2 flex-wrap">
