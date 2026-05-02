@@ -10,6 +10,7 @@ import type { GeoData, TickerThreat } from "@/hooks/useGeoIntelligence";
 import EventFeed from "@/components/geopolitical/EventFeed";
 import { useGeoEvents, type ScoredGeoEvent } from "@/hooks/useGeoEvents";
 import IntelStack from "@/components/geopolitical/IntelStack";
+import { useTacticalMovement } from "@/hooks/useTacticalMovement";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -38,6 +39,7 @@ function getTickerGeo(ticker: string): { lat: number; lng: number } | null {
 const LAYER_LABELS: Record<string, string> = {
   conflicts: "Conflicts", events: "Live Events", tradeHubs: "Trade Hubs", supplyChains: "Supply Routes",
   entropy: "Entropy Zones", forex: "FX Stress", portfolio: "Portfolio",
+  ships: "Vessels (AIS)", planes: "Flights (ADS-B)", chokepoints: "Chokepoints",
 };
 
 const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposedTickers, tickerThreats, onRefresh }: Props) => {
@@ -45,10 +47,12 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   const [viewMode, setViewMode] = useState<"map" | "threats" | "forex">("map");
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({
     conflicts: true, events: true, tradeHubs: true, supplyChains: true, entropy: true, forex: true, portfolio: true,
+    ships: true, planes: true, chokepoints: true,
   });
   const [showLayers, setShowLayers] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ScoredGeoEvent | null>(null);
   const { events: geoEvents, loading: eventsLoading, lastTick: eventsLastTick, error: eventsError } = useGeoEvents();
+  const { data: tactical } = useTacticalMovement(true);
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -177,6 +181,9 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 geoEvents={geoEvents as any}
                 selectedEventId={selectedEvent?.id || null}
                 onSelectEvent={setSelectedEvent}
+                ships={tactical?.ships}
+                planes={tactical?.planes}
+                chokepoints={tactical?.chokepoints}
               />
             </div>
             <div className="space-y-2" style={{ minHeight: 540 }}>
