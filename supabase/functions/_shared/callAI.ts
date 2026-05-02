@@ -47,6 +47,47 @@ function pickKeyIndex(total: number): number {
   return i;
 }
 
+// Round-robin cursor for Gemini fallback keys.
+let __geminiKeyCursor = 0;
+function pickGeminiKey(): string | null {
+  const keys = [Deno.env.get("GOOGLE_GEMINI_KEY"), Deno.env.get("GOOGLE_GEMINI_KEY_2")].filter(Boolean) as string[];
+  if (keys.length === 0) return null;
+  const i = __geminiKeyCursor % keys.length;
+  __geminiKeyCursor = (__geminiKeyCursor + 1) % 1_000_000;
+  return keys[i];
+}
+
+/** Gemini fallback — used when ALL Mistral keys are rate-limited. */
+async function callGeminiFallback(opts: CallAIOptions): Promise<AIResult> {
+  const key = pickGeminiKey();
+  if (!key) throw new Error("No Gemini fallback key configured");
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const body: any = {
+    systemInstruction: { parts: [{ text: systemText }] },
+    contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],
+    generationConfig: {
+      temperature: opts.temperature ?? 0.6,
+      maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
+    },
+  };
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, 60000);
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const text = parts.map((p: any) => p?.text || "").join("").trim();
+  if (!text) throw new Error("Empty Gemini response");
+  return { text: stripThinkingBlocks(text), provider: "gemini" };
+}
+
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
@@ -238,7 +279,14 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
       // continue to next key
     }
   }
-  throw lastErr || new Error("All Mistral keys failed");
+  // All Mistral keys exhausted — try Gemini fallback (different provider, different quota).
+  try {
+    console.warn("callMistral → all keys failed, falling back to Gemini");
+    return await callGeminiFallback(opts);
+  } catch (geminiErr: any) {
+    console.warn("Gemini fallback also failed:", geminiErr?.message || geminiErr);
+    throw lastErr || geminiErr || new Error("All AI providers failed");
+  }
 }
 
 /**
