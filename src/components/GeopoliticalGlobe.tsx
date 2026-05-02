@@ -173,7 +173,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 portfolioMarkers={portfolioMarkers}
                 onSelectConflict={setSelectedConflict}
                 visibleLayers={visibleLayers}
-                geoEvents={geoEvents}
+                geoEvents={geoEvents as any}
                 selectedEventId={selectedEvent?.id || null}
                 onSelectEvent={setSelectedEvent}
               />
