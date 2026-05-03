@@ -405,11 +405,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FAQ, kill objections */}
-      <section className="border-t border-black/5">
-        {/* IDENTITY SHIFT */}
-      </section>
-
+      {/* IDENTITY SHIFT */}
       <section className="border-t border-black/5 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-24 sm:py-36 text-center">
           <h2 className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05]">
@@ -421,6 +417,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FAQ, kill objections */}
       <section className="border-t border-black/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-10 sm:mb-12">
