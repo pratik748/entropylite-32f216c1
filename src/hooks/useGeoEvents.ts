@@ -127,8 +127,10 @@ function articleToEvent(a: NewsArticle): GeoEvent | null {
   const s = scoreFor(a.title, tier, cat);
   const id = `${a.source}-${a.link || a.title}`.slice(0, 200);
   const text = `${a.title} ${a.description || ""}`;
-  const inferredLoc = inferLocation(text);
-  if (!inferredLoc) return null;
+  // Best-effort location. If nothing matches, default to a neutral
+  // "Global" point near the equator so the article still shows on the
+  // wire (it just won't add a misleading marker on the map clusters).
+  const inferredLoc = inferLocation(text) ?? { lat: 0, lng: 0, place: "Global" };
 
   return {
     id,

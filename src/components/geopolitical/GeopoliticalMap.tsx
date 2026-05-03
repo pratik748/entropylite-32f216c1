@@ -77,6 +77,11 @@ const SHIP_COLORS: Record<string, string> = {
   fishing: "#94a3b8", military: "#ef4444", wing: "#22d3ee", other: "#cbd5e1",
 };
 
+const isLL = (a: unknown, b: unknown): boolean =>
+  typeof a === "number" && typeof b === "number" &&
+  Number.isFinite(a) && Number.isFinite(b) &&
+  Math.abs(a) <= 90 && Math.abs(b) <= 180;
+
 export default function GeopoliticalMap({
   data, portfolioMarkers, onSelectConflict, visibleLayers,
   geoEvents, selectedEventId, onSelectEvent,
@@ -137,6 +142,7 @@ export default function GeopoliticalMap({
     // Conflicts
     if (visibleLayers.conflicts !== false) {
       data.conflictEvents.forEach(evt => {
+        if (!isLL(evt.lat, evt.lng)) return;
         const color = TYPE_COLORS[evt.type] || "#ff3232";
         const r = 5 + evt.severity * 10;
 
@@ -165,6 +171,7 @@ export default function GeopoliticalMap({
     // Trade hubs
     if (visibleLayers.tradeHubs !== false) {
       data.tradeHubs.forEach(hub => {
+        if (!isLL(hub.lat, hub.lng)) return;
         L.circleMarker([hub.lat, hub.lng], {
           radius: 5, color: "hsl(210,100%,60%)", fillColor: "hsl(210,100%,60%)",
           fillOpacity: 0.6, weight: 1, opacity: 0.8,
@@ -176,6 +183,7 @@ export default function GeopoliticalMap({
     // Supply chains
     if (visibleLayers.supplyChains !== false) {
       data.supplyChainRisks?.forEach(risk => {
+        if (!isLL(risk.startLat, risk.startLng) || !isLL(risk.endLat, risk.endLng)) return;
         const c = risk.riskLevel === "high" ? "#ff3c3c" : risk.riskLevel === "medium" ? "#ffb400" : "#3ca0ff";
         L.polyline([[risk.startLat, risk.startLng], [risk.endLat, risk.endLng]], {
           color: c, weight: 2, opacity: 0.5, dashArray: "8 4",
@@ -187,6 +195,7 @@ export default function GeopoliticalMap({
     // Entropy zones
     if (visibleLayers.entropy !== false) {
       data.highEntropyZones.forEach(zone => {
+        if (!isLL(zone.lat, zone.lng)) return;
         L.circleMarker([zone.lat, zone.lng], {
           radius: 22, color: "#ff7820", fillColor: "#ff7820",
           fillOpacity: 0.06, weight: 2, opacity: 0.4,
@@ -201,6 +210,7 @@ export default function GeopoliticalMap({
     // Forex stress
     if (visibleLayers.forex !== false) {
       data.forexVolatility.filter(f => f.isStressed).forEach(fx => {
+        if (!isLL(fx.lat, fx.lng)) return;
         L.circleMarker([fx.lat, fx.lng], {
           radius: 6,
           color: Math.abs(fx.change24h) > 2 ? "#ff5050" : "#ffc800",
@@ -216,6 +226,7 @@ export default function GeopoliticalMap({
     // Portfolio markers
     if (visibleLayers.portfolio !== false) {
       portfolioMarkers.forEach(pm => {
+        if (!isLL(pm.lat, pm.lng)) return;
         L.circleMarker([pm.lat, pm.lng], {
           radius: 8, color: "hsl(210,100%,60%)", fillColor: "hsl(210,100%,60%)",
           fillOpacity: 0.4, weight: 2, opacity: 0.8,
@@ -244,7 +255,9 @@ export default function GeopoliticalMap({
 
     // Markers
     geoEvents.slice(0, 80).forEach(e => {
-      if (!e.loc || typeof e.loc.lat !== "number") return;
+      if (!e.loc || !isLL(e.loc.lat, e.loc.lng)) return;
+      // Skip the synthetic "Global" placeholder used for unlocatable wire items.
+      if (e.loc.lat === 0 && e.loc.lng === 0) return;
       const color = EVENT_COLORS[e.category] || "#a855f7";
       const r = 4 + e.decayedScore * 10;
       const isSelected = selectedEventId === e.id;
@@ -268,7 +281,7 @@ export default function GeopoliticalMap({
 
     // Heat layer (weighted by decayedScore)
     const heatPoints = geoEvents
-      .filter(e => e.loc && typeof e.loc.lat === "number")
+      .filter(e => e.loc && isLL(e.loc.lat, e.loc.lng) && !(e.loc.lat === 0 && e.loc.lng === 0))
       .map(e => [e.loc.lat, e.loc.lng, Math.min(1, e.decayedScore * 1.4)] as [number, number, number]);
     if (heatPoints.length > 0) {
       // @ts-ignore — leaflet.heat extends L
@@ -290,6 +303,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.ships === false || !ships?.length) return;
     ships.slice(0, 250).forEach(s => {
+      if (!isLL(s.lat, s.lng)) return;
       const color = SHIP_COLORS[s.type || "other"] || SHIP_COLORS.other;
       const idle = (s.sog ?? 0) < 0.5;
       L.circleMarker([s.lat, s.lng], {
@@ -316,6 +330,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.planes === false || !planes?.length) return;
     planes.slice(0, 350).forEach(p => {
+      if (!isLL(p.lat, p.lng)) return;
       const heading = p.heading ?? 0;
       const icon = L.divIcon({
         className: "geo-plane-icon",
@@ -340,6 +355,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.chokepoints === false || !chokepoints?.length) return;
     chokepoints.forEach(c => {
+      if (!isLL(c.lat, c.lng)) return;
       const color = c.stress > 0.6 ? "#ef4444" : c.stress > 0.35 ? "#f59e0b" : "#22d3ee";
       L.circleMarker([c.lat, c.lng], {
         radius: 14 + c.stress * 18,
