@@ -245,6 +245,8 @@ export default function GeopoliticalMap({
     // Markers
     geoEvents.slice(0, 80).forEach(e => {
       if (!e.loc || typeof e.loc.lat !== "number") return;
+      // Skip the synthetic "Global" placeholder used for unlocatable wire items.
+      if (e.loc.lat === 0 && e.loc.lng === 0) return;
       const color = EVENT_COLORS[e.category] || "#a855f7";
       const r = 4 + e.decayedScore * 10;
       const isSelected = selectedEventId === e.id;
@@ -268,7 +270,7 @@ export default function GeopoliticalMap({
 
     // Heat layer (weighted by decayedScore)
     const heatPoints = geoEvents
-      .filter(e => e.loc && typeof e.loc.lat === "number")
+      .filter(e => e.loc && typeof e.loc.lat === "number" && !(e.loc.lat === 0 && e.loc.lng === 0))
       .map(e => [e.loc.lat, e.loc.lng, Math.min(1, e.decayedScore * 1.4)] as [number, number, number]);
     if (heatPoints.length > 0) {
       // @ts-ignore — leaflet.heat extends L
