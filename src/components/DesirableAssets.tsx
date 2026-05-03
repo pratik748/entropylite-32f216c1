@@ -593,17 +593,23 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   // without having to re-run the funnel. Cache TTL is 2h.
   useEffect(() => {
     const cached = getCachedDA();
-      if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
-        setRecommendations(cached.recommendations.map(sanitizeRecommendation));
+    if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
+      setRecommendations(cached.recommendations.map(sanitizeRecommendation));
       setMarketCondition(cached.marketCondition || "");
       setRegimeType(cached.regimeType || "");
       setLiveWebContext(cached.liveWebContext || "");
       setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
       setLastFetch(cached.timestamp);
       setHasSearched(true);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (!bootstrapFetchDone.current) {
+      bootstrapFetchDone.current = true;
+      setHasSearched(true);
+      fetchRecommendations(true, true);
+    }
+  }, [fetchRecommendations]);
 
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
