@@ -22,10 +22,10 @@ const STATS = [
 ];
 
 const PRINCIPLES = [
-  { title: "Distributions, not forecasts", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
-  { title: "Structure beats narrative", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
-  { title: "Your trades teach the system", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
-  { title: "Quiet by default", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
+  { title: "Forecasts are fiction. Distributions are real.", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
+  { title: "Structure moves price. Narrative explains it later.", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
+  { title: "The system learns from you, not the crowd.", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
+  { title: "Twelve engines. One quiet surface.", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
 ];
 
 const FEATURES = [
@@ -62,9 +62,9 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite | The Operating System of Finance";
+    document.title = "EntropyLite | See what the market hasn't decided yet";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence. Free during founding access.");
+    if (meta) meta.setAttribute("content", "EntropyLite shows you what can happen — before the market decides. Probabilistic scenarios, structural constraints, twelve engines, one terminal.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
@@ -98,13 +98,20 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1] sm:leading-[1.02] mb-5 sm:mb-7">
-            A research-grade way
+            Every trade you've taken
             <br />
-            <span className="text-black/45">to observe the markets.</span>
+            <span className="text-black/45">was already too late.</span>
           </h1>
 
-          <p className="text-[16px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed">
-            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints and a live read on institutional flows. <span className="text-black font-semibold">On one screen.</span>
+          <div className="text-[16px] sm:text-xl text-black/60 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed space-y-1">
+            <p>Markets move before you act.</p>
+            <p>Information arrives delayed.</p>
+            <p>Retail reacts. Institutions position.</p>
+          </div>
+
+          <p className="text-[15px] sm:text-lg text-black max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed font-medium">
+            EntropyLite doesn't tell you what will happen.<br className="hidden sm:block" />
+            <span className="text-black/55"> It shows you what </span><em className="not-italic text-black">can</em><span className="text-black/55"> happen — before the market decides.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
@@ -113,7 +120,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-lg shadow-black/20 rounded-full"
               onClick={goSignup}
             >
-              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
               className="font-mono text-xs tracking-wide px-8 h-12 rounded-full border border-black/15 bg-white text-black hover:bg-black/[0.03] hover:border-black/25 transition-all w-full sm:w-auto"
@@ -143,13 +150,14 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-black/[0.015]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-28">
           <div className="text-center mb-10 sm:mb-14">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Principles</p>
-            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              A different way of reading markets
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The shift</p>
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-5 leading-[1.05]">
+              You were taught to predict.
             </h2>
-            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Four ideas shape every layer. They are the reason the terminal looks and feels the way it does.
-            </p>
+            <div className="text-base sm:text-lg text-black/60 max-w-2xl mx-auto leading-relaxed space-y-1">
+              <p>But markets don't move on predictions.</p>
+              <p className="text-black">They move on pressure. On positioning. On constraints.</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
@@ -168,7 +176,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Begin. Sign in free. <ArrowRight className="ml-1 h-4 w-4" />
+              Step inside <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -178,12 +186,12 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-8 sm:mb-12">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The terminal</p>
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The experience</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              This is what you sign in to
+              This is what you see when you stop guessing.
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Live portfolio, 10,000 path Monte Carlo, VaR and CVaR, a multi source intel feed and a structural flow read. All on one screen.
+              Four layers of perception, surfaced at once.
             </p>
           </div>
 
@@ -200,19 +208,19 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-10 pt-8 border-t border-black/5">
             <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Live portfolio</p>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 01 · Position</p>
               <p className="text-sm text-black/70 leading-snug">Multi currency and multi exchange, normalised to your base currency.</p>
             </div>
             <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Monte Carlo</p>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 02 · Probability</p>
               <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252 day horizon, with profit probability and tail risk.</p>
             </div>
             <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Risk metrics</p>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 03 · Risk surface</p>
               <p className="text-sm text-black/70 leading-snug">VaR and CVaR at 95% and 99% confidence, recomputed live per asset.</p>
             </div>
             <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Flow detection</p>
+              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 04 · Flow</p>
               <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma and dark pools.</p>
             </div>
           </div>
@@ -223,7 +231,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Open the terminal. Free. <ArrowRight className="ml-1 h-4 w-4" />
+              Open the terminal <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -232,8 +240,52 @@ export default function LandingPage() {
       {/* TABBED GALLERY, real screen captures of every core surface */}
       <FeatureGallery />
 
-      {/* MATH & RESEARCH, flaunt the real quant under the hood */}
+      {/* UNDER THE HOOD — proof intro band */}
+      <section className="border-t border-black/5 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-4 text-center">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Proof</p>
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
+            This isn't opinion. This is math.
+          </h2>
+          <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
+            Monte Carlo. VaR / CVaR. Merton. Ornstein–Uhlenbeck. Run on real history, not vibes.
+          </p>
+        </div>
+      </section>
       <MathResearch />
+
+      {/* CLANK — the weapon */}
+      <section className="border-t border-black/5 bg-black text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-32">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6 text-center">CLANK</p>
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-center leading-[1.05] mb-4">
+            Sometimes markets stop being probabilistic.
+          </h2>
+          <p className="text-4xl sm:text-6xl font-bold tracking-tighter text-center text-white/35 mb-14 sm:mb-20">
+            They lock.
+          </p>
+
+          <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6 text-center">
+            <p className="text-base sm:text-lg text-white/85 leading-relaxed">CLANK detects deterministic windows.</p>
+            <p className="text-base sm:text-lg text-white/85 leading-relaxed">Structural inevitabilities — gamma walls, ETF rebalances, liquidity vacuums.</p>
+            <p className="text-base sm:text-lg text-white leading-relaxed font-medium">When the math collapses to one outcome, you see it first.</p>
+          </div>
+
+          <p className="font-mono text-[10px] text-white/30 tracking-wider text-center mt-12 sm:mt-14">
+            Constraint detection across liquidity, positioning and dealer gamma.
+          </p>
+
+          <div className="text-center mt-10 sm:mt-12">
+            <Button
+              size="lg"
+              className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12"
+              onClick={goSignup}
+            >
+              See CLANK live <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
 
       {/* FEATURES GRID */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
@@ -241,10 +293,10 @@ export default function LandingPage() {
 
           <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The stack</p>
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-            Twelve intelligence layers, one terminal
+            While you're looking at one chart,<br className="hidden sm:block" /> twelve systems are already running.
           </h2>
           <p className="text-sm sm:text-base text-black/55 max-w-xl mx-auto">
-            The same engines a professional desk runs. Fused into one view. Live by default.
+            Each one a separate engine. Composed into one read.
           </p>
         </div>
 
@@ -270,10 +322,10 @@ export default function LandingPage() {
           <div className="text-center mb-10 sm:mb-14">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The pipeline</p>
             <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              From raw data to a decision you can act on
+              From chaos. To decision.
             </h2>
             <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Six stages, running in the background while you are looking at something else.
+              Six stages. Always running. You see only the conclusion.
             </p>
           </div>
 
@@ -353,6 +405,18 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* IDENTITY SHIFT */}
+      <section className="border-t border-black/5 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-24 sm:py-36 text-center">
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05]">
+            You're not trading anymore.
+          </h2>
+          <p className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05] text-black/35 mt-2">
+            You're operating.
+          </p>
+        </div>
+      </section>
+
       {/* FAQ, kill objections */}
       <section className="border-t border-black/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
@@ -380,11 +444,11 @@ export default function LandingPage() {
       {/* FINAL CTA */}
       <section className="border-t border-black/5 bg-black text-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            Quietly capable, always on
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 leading-[1.05]">
+            Most people will keep reacting.
           </h2>
-          <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
-            Free while we are under our first ten thousand users. Founding members keep founding pricing after that. No card. No trial timer.
+          <p className="text-2xl sm:text-3xl text-white/55 mb-10 font-semibold tracking-tight">
+            You don't have to.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
@@ -392,7 +456,7 @@ export default function LandingPage() {
               className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-xl"
               onClick={goSignup}
             >
-              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Enter EntropyLite <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
               className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-white/20 text-white hover:bg-white/5 transition-colors w-full sm:w-auto"
@@ -432,7 +496,7 @@ export default function LandingPage() {
           className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-12 rounded-full"
           onClick={goSignup}
         >
-          Sign In Free. No Card Required. <ArrowRight className="ml-1 h-4 w-4" />
+          Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
     </div>

@@ -1,145 +1,125 @@
-## Geopolitical Intelligence → Battle Board Terminal (BBT)
+## Goal
 
-Rebuild `GeopoliticalGlobe` into a four-pane command surface that streams live events, projects them onto a reactive map, derives 2nd/3rd-order causal chains, and overlays tactical movement (ships/planes). Existing Leaflet map, `useGeoIntelligence` hook, and `geopolitical-data` edge function are kept as the foundation and extended — not thrown away.
+Rewrite `src/pages/LandingPage.tsx` so the page reads like a narrative — tension → awakening → immersion → proof → weapon → power → control → identity → inevitability — without removing a single technical block. Apple + hedge fund + war room. Short sentences. Heavy whitespace. Keep the existing minimal black-on-white aesthetic.
 
-### Final layout (desktop, ≥1280px)
+Nothing is removed. The existing terminal screenshot, `FeatureGallery`, `MathResearch`, FAQ, founding-access reassurance, and footer all stay. Only copy, ordering, and a few framing wrappers change.
+
+## New Section Order
 
 ```text
-┌───────────────────────────────────────────────────────────────────────┐
-│  GLOBAL RISK STRIP · regime · capital flow · safe-haven · last tick   │
-├──────────────┬─────────────────────────────────────┬──────────────────┤
-│              │                                     │                  │
-│  LIVE FEED   │         BATTLE MAP                  │  INTEL STACK     │
-│  (events)    │   heat zones + pulsing markers      │  • Snapshot      │
-│  scrolling   │   ships ▲  planes ✈  routes ━━     │  • Causal chain  │
-│  age-decayed │   tap → selects + drills            │  • Trade signal  │
-│              │                                     │                  │
-├──────────────┴─────────────────────────────────────┴──────────────────┤
-│  MOVEMENT TICKER · live ship/plane reroutes · chokepoint pressure     │
-└───────────────────────────────────────────────────────────────────────┘
+1. HERO — Tension first
+2. THE SHIFT — Principles reframed as awakenings
+3. THE EXPERIENCE — Terminal screenshot as "layers of perception"
+4. UNDER THE HOOD — Math/models (existing MathResearch, reframed intro)
+5. CLANK — Standalone weapon section (new)
+6. THE STACK — 12 layers, progressive reveal
+7. THE PIPELINE — 6 stages reframed "from chaos to decision"
+8. IDENTITY SHIFT — "You're not trading. You're operating."
+9. CTA — Inevitability + FAQ + final dark CTA
 ```
 
-Mobile collapses to stacked tabs: Map · Feed · Intel · Movement.
+## Section-by-Section Copy
 
-### What gets built
+**1. HERO (rewrite, keep logo + stats + CTA)**
+- Eyebrow badge: keep "Free during founding access · No credit card"
+- H1: "Every trade you've taken / was already too late."  (second line in `text-black/45`)
+- Sub-paragraph (3 short lines, generous leading):
+  - "Markets move before you act."
+  - "Information arrives delayed."
+  - "Retail reacts. Institutions position."
+- Closing line above CTA:
+  - "EntropyLite doesn't tell you what will happen. It shows you what *can* happen — before the market decides."
+- Primary CTA label: **Enter the Terminal** (replaces "Sign In Free")
+- Keep secondary "See what is inside"
+- Keep stats strip unchanged
 
-**1. Live Event Pipeline (`geo-events` edge function — new)**
-- Pulls in parallel every 20s: GDELT (already used), `fetch-news`, RSS proxies for Reuters/AP.
-- Normalizes each headline into the structured `GeoEvent` schema below.
-- AI scoring pass via `callAI` (Gemini Flash, jsonMode) assigns: lat/lng, category, severity, market_relevance, velocity, entities. Uses the existing `safeParseJSON` + key-rotation.
-- Decay function: `score_now = score * exp(-age_minutes / half_life)`; events fall off feed below 0.15.
-- Returns `{ events, lastTick }`. Front-end polls every 20s (no WebSocket — Lovable Cloud functions are stateless; this is the honest, working alternative).
+**2. THE SHIFT (replaces "Principles")**
+- Eyebrow: "The shift"
+- H2: "You were taught to predict."
+- Lead paragraph:
+  - "But markets don't move on predictions."
+  - "They move on pressure. On positioning. On constraints."
+- Reframe each of the 4 PRINCIPLES as a realization. Keep current `desc` text but rewrite `title` as a first-person realization:
+  - "Forecasts are fiction. Distributions are real."
+  - "Structure moves price. Narrative explains it later."
+  - "The system learns from me, not the crowd."
+  - "Twelve engines. One quiet surface."
+- CTA underneath: "Step inside →"
 
-**2. Battle Map upgrades (`GeopoliticalMap.tsx`)**
-- Adds three layer groups: `events` (pulsing markers, color by category), `ships` (▲ icons), `planes` (✈ icons).
-- Heat-zone overlay using Leaflet `heatLayer` weighted by event density × severity.
-- Marker click → calls `onSelectEvent(event)` instead of just conflict.
-- Chokepoint highlight when supply route crosses a high-severity event.
+**3. THE EXPERIENCE (rewrite intro of the terminal preview block)**
+- Eyebrow: "The experience"
+- H2: "This is what you see when you stop guessing."
+- Sub: "Four layers of perception, surfaced at once."
+- Keep the dashboardPreview image unchanged.
+- Relabel the four mini-captions as *layers of perception* (not "features"):
+  - "Layer 01 — Live portfolio" / current desc
+  - "Layer 02 — Probability" / Monte Carlo desc
+  - "Layer 03 — Risk surface" / VaR/CVaR desc
+  - "Layer 04 — Flow" / institutional flow desc
+- Keep `<FeatureGallery />` immediately after with new lead-in heading: "Every surface, captured live."
 
-**3. Causal Chain Engine (`causal-effects` edge function — new)**
-- On event tap: front-end calls with `{ eventId, portfolioTickers }`.
-- AI returns a node graph: `{ nodes: [{ id, label, kind, confidence }], edges: [{ from, to, strength }] }` up to depth 3.
-- Cached server-side per event hash for 10 min.
-- Rendered with **React Flow** (`@xyflow/react` — needs install) inside the Intel Stack pane. Tap node → expand sub-chain, collapse siblings. Edge thickness = strength, glow = confidence.
+**4. UNDER THE HOOD (wrap MathResearch)**
+- Add a short intro band above `<MathResearch />`:
+  - Eyebrow: "Proof"
+  - H2: "This isn't opinion. This is math."
+  - Sub: "Monte Carlo. VaR / CVaR. Merton. Ornstein–Uhlenbeck. Run on real history, not vibes."
+- `<MathResearch />` itself unchanged.
 
-**4. Ships & Planes layer (`tactical-movement` edge function — new)**
-- Ships: AISStream.io free tier (key needed) **or** MarineTraffic public endpoints; bounded by viewport bbox.
-- Planes: OpenSky Network anonymous endpoint (free, no key; rate-limited to ~10s polling).
-- Returns last-known positions for vessels/aircraft within view + flagged anomalies (loitering, rapid course change near chokepoints).
-- Tap marker → side card with origin/destination, type, strategic note.
-- Honest fallback: if API quota exceeds, layer is hidden with a "movement feed paused" pill.
+**5. CLANK (new dedicated section — major addition)**
+- Full-width, dark band (`bg-black text-white`) to make it feel like a weapon reveal.
+- Eyebrow (white/40): "CLANK"
+- H2 (white): "Sometimes markets stop being probabilistic."
+- Giant follow-up line in muted white: "They lock."
+- Three short stacked statements:
+  - "CLANK detects deterministic windows."
+  - "Structural inevitabilities — gamma walls, ETF rebalances, liquidity vacuums."
+  - "When the math collapses to one outcome, you see it first."
+- Footnote line: "Constraint detection across liquidity, positioning and dealer gamma."
+- CTA: "See CLANK live →" (goes to /dashboard)
 
-**5. Event ↔ Movement correlation**
-- Worker function on the events response: any active event within 500km of an AIS chokepoint pulls those ship tracks into the event's snapshot panel and draws a red dashed reroute line on the map.
+**6. THE STACK (replaces "Twelve intelligence layers" grid intro)**
+- Eyebrow: "The stack"
+- H2: "While you're looking at one chart, twelve systems are already running."
+- Keep the existing 9-card FEATURES grid (the layers). Rename heading sub: "Each one a separate engine. Composed into one read."
 
-**6. Trade Impact Signal (Entropy integration)**
-- Per selected event, the Intel Stack shows: bullish/bearish/volatile chip, confidence %, time horizon, exposed portfolio tickers (already computed in `useGeoIntelligence.computeTickerThreats`).
-- Event severity is forwarded into Scar/TRUTH via existing `twrd-ingest` as a claim with `domain: "geopolitical"` so the prediction core consumes it.
+**7. THE PIPELINE (rewrite intro of HOW_IT_WORKS)**
+- Eyebrow: "The pipeline"
+- H2: "From chaos. To decision."
+- Sub: "Six stages. Always running. You see only the conclusion."
+- Keep the 6 HOW_IT_WORKS items unchanged.
+- CTA stays.
 
-### Data architecture
+**8. IDENTITY SHIFT (new tight band between pipeline and FAQ)**
+- White section, lots of whitespace, centered.
+- One line, large: "You're not trading anymore."
+- Below in muted: "You're operating."
+- No CTA — silence holds the weight.
 
-```ts
-interface GeoEvent {
-  id: string;                // hash(title+source+day)
-  title: string;
-  source: string;
-  url: string;
-  ts: number;                // unix ms
-  loc: { lat: number; lng: number; place: string };
-  category: "military" | "economic" | "political" | "supply_chain" | "cyber";
-  severity: number;          // 0-1
-  market_relevance: number;  // 0-1
-  velocity: number;          // 0-1, how fast it's spreading
-  confidence: number;        // 0-1 from AI
-  entities: { countries: string[]; tickers: string[]; commodities: string[] };
-  decayedScore: number;      // computed client-side each render
-}
+**9. CTA / INEVITABILITY (rewrite final dark CTA + keep FAQ above it)**
+- Keep "Why now / risk reversal" trio (no card, 30s setup, founding) unchanged.
+- Keep FAQ section unchanged.
+- Final dark CTA copy:
+  - H2: "Most people will keep reacting."
+  - Sub: "You don't have to."
+  - Primary CTA: **Enter EntropyLite**
+  - Keep founding-pricing footnote.
 
-interface CausalGraph {
-  rootEventId: string;
-  nodes: { id: string; label: string; kind: "event" | "asset" | "macro" | "policy"; confidence: number }[];
-  edges: { from: string; to: string; strength: number; rationale: string }[];
-}
+## Implementation Notes (technical)
 
-interface MovementMarker {
-  id: string; kind: "ship" | "plane";
-  lat: number; lng: number; heading: number; speed: number;
-  type?: string; flag?: string; from?: string; to?: string;
-  anomaly?: "reroute" | "loiter" | "airspace_close";
-}
-```
+- Single file edit: `src/pages/LandingPage.tsx`.
+- Update the `PRINCIPLES` array titles; keep descriptions.
+- Replace section header copy blocks; keep all JSX structure for grids, cards, image, CTAs.
+- Add new CLANK `<section>` between MathResearch and the FEATURES grid. Use existing tokens (`bg-black text-white`, `font-mono text-[10px] tracking-[0.3em]`).
+- Add new IDENTITY `<section>` between the "Why now" risk-reversal block and FAQ.
+- Update document.title to: `"EntropyLite | See what the market hasn't decided yet"` and meta description to match the new hook.
+- No new dependencies, no asset changes, no route changes.
+- Mobile sticky CTA label updated to "Enter the Terminal".
 
-### Visual language (BBT)
+## What Is NOT Changed
 
-- Background `#000`, surfaces `hsl(var(--surface-1))`.
-- Accents: cyan `#22d3ee` (data), red `#ef4444` (military), amber `#f59e0b` (economic), purple `#a855f7` (political), blue `#3b82f6` (logistics).
-- Typography: existing JetBrains Mono for tickers/numerics, Inter for prose.
-- Pulsing markers via CSS `@keyframes` (already used in PortfolioPanel risk dots). No external animation lib.
-- All colors via existing semantic tokens in `index.css`/`tailwind.config.ts` — no raw hex in components except the map style URLs.
+- `FeatureGallery.tsx`, `MathResearch.tsx`, `PublicNav`, footer, FAQ content, stats, dashboard image, founding-access reassurance trio, routes, auth redirect logic.
+- All math, models, formulas, layer count, pipeline steps remain intact.
 
-### Performance
+## Outcome
 
-- Feed virtualized (only ~30 events render); rest tracked in ref.
-- Map markers diff-updated, never wiped (extends existing pattern in `GeopoliticalMap`).
-- Causal graph lazy: only fetched on tap, not on event arrival.
-- Movement layer disabled at zoom < 4 to keep marker count sane.
-- Single `useGeoIntelligence` poll cycle; events/movement piggyback on it via parallel `Promise.all`.
-
-### Files touched / created
-
-Created:
-- `supabase/functions/geo-events/index.ts`
-- `supabase/functions/causal-effects/index.ts` *(file exists for a different purpose — will be replaced or namespaced as `geo-causal`)*
-- `supabase/functions/tactical-movement/index.ts`
-- `src/components/geopolitical/BattleBoard.tsx` (new shell, replaces old `GeopoliticalGlobe` body)
-- `src/components/geopolitical/EventFeed.tsx`
-- `src/components/geopolitical/IntelStack.tsx`
-- `src/components/geopolitical/CausalGraph.tsx`
-- `src/components/geopolitical/MovementTicker.tsx`
-- `src/hooks/useGeoEvents.ts`
-- `src/hooks/useTacticalMovement.ts`
-
-Edited:
-- `src/components/geopolitical/GeopoliticalMap.tsx` — add events/ships/planes layers + heat overlay
-- `src/components/GeopoliticalGlobe.tsx` — becomes thin wrapper over `BattleBoard`
-- `src/pages/Index.tsx` — pass new hooks down
-- `package.json` — add `@xyflow/react`, `leaflet.heat`
-
-Untouched: `useGeoIntelligence` (still drives risk strip, ticker threats, escalation toasts), `geopolitical-data` edge function (still source of truth for conflicts/forex/regime).
-
-### Honest constraints (to set expectations)
-
-- **WebSockets**: Supabase Edge Functions are request/response — true push needs Realtime channels or a 3rd-party socket. Plan uses 20s polling, which feels live but isn't socket-grade. We can add Supabase Realtime later if you want sub-second.
-- **AIS data**: Free tiers (AISStream/MarineTraffic) are heavily rate-limited and bbox-bound. Coverage will be partial — major chokepoints only. Will request the AIS key as a secret when we get to step 4.
-- **OpenSky planes**: Free anonymous tier works but caps at ~10s polling and ~500 aircraft per call.
-- **News sources**: Reuters/AP/Bloomberg do not offer free APIs. We use GDELT (free, global, 15-min lag) + NewsData.io (key already configured) + RSS proxies. "Bloomberg-style" feed will be branded as "Wire" without claiming Bloomberg.
-
-### Build order (one task per stage so you see it land progressively)
-
-1. Live event pipeline + feed pane (visible value immediately).
-2. Map event markers + heat overlay + tap-to-select.
-3. Intel stack + causal graph engine.
-4. Tactical movement layer (ships, then planes).
-5. Event↔movement correlation + trade-impact signal wired to Scar/TRUTH.
-
-Approve and I'll execute in that order.
+The page reads top-to-bottom as a single arc that makes the visitor feel a power shift, while every institutional proof point a serious reader needs is still on the page — just reframed as revelation instead of a feature list.
