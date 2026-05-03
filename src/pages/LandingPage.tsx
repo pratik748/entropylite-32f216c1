@@ -98,13 +98,20 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1] sm:leading-[1.02] mb-5 sm:mb-7">
-            A research-grade way
+            Every trade you've taken
             <br />
-            <span className="text-black/45">to observe the markets.</span>
+            <span className="text-black/45">was already too late.</span>
           </h1>
 
-          <p className="text-[16px] sm:text-xl text-black/60 max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed">
-            Built for the trader who reads filings, not Twitter. Scenario distributions, structural constraints and a live read on institutional flows. <span className="text-black font-semibold">On one screen.</span>
+          <div className="text-[16px] sm:text-xl text-black/60 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed space-y-1">
+            <p>Markets move before you act.</p>
+            <p>Information arrives delayed.</p>
+            <p>Retail reacts. Institutions position.</p>
+          </div>
+
+          <p className="text-[15px] sm:text-lg text-black max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed font-medium">
+            EntropyLite doesn't tell you what will happen.<br className="hidden sm:block" />
+            <span className="text-black/55"> It shows you what </span><em className="not-italic text-black">can</em><span className="text-black/55"> happen — before the market decides.</span>
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
@@ -113,7 +120,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-lg shadow-black/20 rounded-full"
               onClick={goSignup}
             >
-              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
               className="font-mono text-xs tracking-wide px-8 h-12 rounded-full border border-black/15 bg-white text-black hover:bg-black/[0.03] hover:border-black/25 transition-all w-full sm:w-auto"
