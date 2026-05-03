@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
 import FeatureGallery from "@/components/landing/FeatureGallery";
 import MathResearch from "@/components/landing/MathResearch";
+import InteractiveDemo from "@/components/landing/InteractiveDemo";
 import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
@@ -145,6 +146,9 @@ export default function LandingPage() {
           </div>
         </div>
       </header>
+
+      {/* INTERACTIVE DEMO — try one ticker, no login */}
+      <InteractiveDemo />
 
       {/* PRINCIPLES, quiet, classy positioning */}
       <section className="border-t border-black/5 bg-black/[0.015]">
