@@ -255,7 +255,7 @@ export default function GeopoliticalMap({
 
     // Markers
     geoEvents.slice(0, 80).forEach(e => {
-      if (!e.loc || typeof e.loc.lat !== "number") return;
+      if (!e.loc || !isLL(e.loc.lat, e.loc.lng)) return;
       // Skip the synthetic "Global" placeholder used for unlocatable wire items.
       if (e.loc.lat === 0 && e.loc.lng === 0) return;
       const color = EVENT_COLORS[e.category] || "#a855f7";
@@ -281,7 +281,7 @@ export default function GeopoliticalMap({
 
     // Heat layer (weighted by decayedScore)
     const heatPoints = geoEvents
-      .filter(e => e.loc && typeof e.loc.lat === "number" && !(e.loc.lat === 0 && e.loc.lng === 0))
+      .filter(e => e.loc && isLL(e.loc.lat, e.loc.lng) && !(e.loc.lat === 0 && e.loc.lng === 0))
       .map(e => [e.loc.lat, e.loc.lng, Math.min(1, e.decayedScore * 1.4)] as [number, number, number]);
     if (heatPoints.length > 0) {
       // @ts-ignore — leaflet.heat extends L
@@ -303,6 +303,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.ships === false || !ships?.length) return;
     ships.slice(0, 250).forEach(s => {
+      if (!isLL(s.lat, s.lng)) return;
       const color = SHIP_COLORS[s.type || "other"] || SHIP_COLORS.other;
       const idle = (s.sog ?? 0) < 0.5;
       L.circleMarker([s.lat, s.lng], {
@@ -329,6 +330,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.planes === false || !planes?.length) return;
     planes.slice(0, 350).forEach(p => {
+      if (!isLL(p.lat, p.lng)) return;
       const heading = p.heading ?? 0;
       const icon = L.divIcon({
         className: "geo-plane-icon",
@@ -353,6 +355,7 @@ export default function GeopoliticalMap({
     layer.clearLayers();
     if (visibleLayers.chokepoints === false || !chokepoints?.length) return;
     chokepoints.forEach(c => {
+      if (!isLL(c.lat, c.lng)) return;
       const color = c.stress > 0.6 ? "#ef4444" : c.stress > 0.35 ? "#f59e0b" : "#22d3ee";
       L.circleMarker([c.lat, c.lng], {
         radius: 14 + c.stress * 18,
