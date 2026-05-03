@@ -23,7 +23,10 @@ export interface ScoredGeoEvent extends GeoEvent {
 
 const POLL_MS = 60_000;
 const HALF_LIFE_MIN = 90; // event score halves every 90 minutes
-const MIN_DECAYED = 0.08;
+// No location/score gating — every article from the live news feed flows
+// into the Geo wire. The map still skips the synthetic Global marker so we
+// don't litter (0,0), but the wire shows everything.
+const MIN_DECAYED = 0;
 
 function decayed(e: GeoEvent): ScoredGeoEvent {
   const ageMin = Math.max(0, (Date.now() - e.ts) / 60000);
