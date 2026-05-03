@@ -407,6 +407,21 @@ export default function LandingPage() {
 
       {/* FAQ, kill objections */}
       <section className="border-t border-black/5">
+        {/* IDENTITY SHIFT */}
+      </section>
+
+      <section className="border-t border-black/5 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-24 sm:py-36 text-center">
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05]">
+            You're not trading anymore.
+          </h2>
+          <p className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05] text-black/35 mt-2">
+            You're operating.
+          </p>
+        </div>
+      </section>
+
+      <section className="border-t border-black/5">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           <div className="text-center mb-10 sm:mb-12">
             <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Last questions</p>
@@ -432,11 +447,11 @@ export default function LandingPage() {
       {/* FINAL CTA */}
       <section className="border-t border-black/5 bg-black text-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-4">
-            Quietly capable, always on
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 leading-[1.05]">
+            Most people will keep reacting.
           </h2>
-          <p className="text-sm sm:text-base text-white/60 mb-8 max-w-lg mx-auto">
-            Free while we are under our first ten thousand users. Founding members keep founding pricing after that. No card. No trial timer.
+          <p className="text-2xl sm:text-3xl text-white/55 mb-10 font-semibold tracking-tight">
+            You don't have to.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
             <Button
@@ -444,7 +459,7 @@ export default function LandingPage() {
               className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-xl"
               onClick={goSignup}
             >
-              Sign In Free <ArrowRight className="ml-1 h-4 w-4" />
+              Enter EntropyLite <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
             <button
               className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-white/20 text-white hover:bg-white/5 transition-colors w-full sm:w-auto"
@@ -484,7 +499,7 @@ export default function LandingPage() {
           className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-12 rounded-full"
           onClick={goSignup}
         >
-          Sign In Free. No Card Required. <ArrowRight className="ml-1 h-4 w-4" />
+          Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
     </div>
