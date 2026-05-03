@@ -69,7 +69,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 ];
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>("geopolitical");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
