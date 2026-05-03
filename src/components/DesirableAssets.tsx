@@ -95,8 +95,8 @@ const riskProfileColors: Record<string, string> = {
 };
 
 const MAX_RETRIES = 2;
-const DA_CACHE_KEY = "da_recommendations_v6";
-const DA_PREV_TICKERS_KEY = "da_previous_tickers_v2";
+const DA_CACHE_KEY = "da_recommendations_v7";
+const DA_PREV_TICKERS_KEY = "da_previous_tickers_v3";
 const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
 
 function getPreviousTickers(): string[] {
@@ -271,6 +271,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const [autoRepaired, setAutoRepaired] = useState(false);
   const [repairNote, setRepairNote] = useState<string | null>(null);
   const retryCount = useRef(0);
+  const bootstrapFetchDone = useRef(false);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
   const {
@@ -322,7 +323,10 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (!forceRefresh) {
       const cached = getCachedDA();
       if (cached) {
-        setRecommendations(cached.recommendations || []);
+        const cachedRecommendations = Array.isArray(cached.recommendations)
+          ? cached.recommendations.map(sanitizeRecommendation)
+          : [];
+        setRecommendations(cachedRecommendations);
         setMarketCondition(cached.marketCondition || "");
         setRegimeType(cached.regimeType || "");
         setLiveWebContext(cached.liveWebContext || "");
@@ -480,6 +484,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
             selectedHorizon || "any-horizon",
           ].join("|"),
+          force: forceRefresh,
         }),
       });
 
@@ -588,17 +593,23 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   // without having to re-run the funnel. Cache TTL is 2h.
   useEffect(() => {
     const cached = getCachedDA();
-      if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
-        setRecommendations(cached.recommendations.map(sanitizeRecommendation));
+    if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
+      setRecommendations(cached.recommendations.map(sanitizeRecommendation));
       setMarketCondition(cached.marketCondition || "");
       setRegimeType(cached.regimeType || "");
       setLiveWebContext(cached.liveWebContext || "");
       setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
       setLastFetch(cached.timestamp);
       setHasSearched(true);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (!bootstrapFetchDone.current) {
+      bootstrapFetchDone.current = true;
+      setHasSearched(true);
+      fetchRecommendations(true, true);
+    }
+  }, [fetchRecommendations]);
 
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
