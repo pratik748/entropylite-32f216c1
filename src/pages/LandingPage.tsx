@@ -150,13 +150,14 @@ export default function LandingPage() {
       <section className="border-t border-black/5 bg-black/[0.015]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-28">
           <div className="text-center mb-10 sm:mb-14">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Principles</p>
-            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              A different way of reading markets
+            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The shift</p>
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-5 leading-[1.05]">
+              You were taught to predict.
             </h2>
-            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Four ideas shape every layer. They are the reason the terminal looks and feels the way it does.
-            </p>
+            <div className="text-base sm:text-lg text-black/60 max-w-2xl mx-auto leading-relaxed space-y-1">
+              <p>But markets don't move on predictions.</p>
+              <p className="text-black">They move on pressure. On positioning. On constraints.</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
@@ -175,7 +176,7 @@ export default function LandingPage() {
               className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
               onClick={goSignup}
             >
-              Begin. Sign in free. <ArrowRight className="ml-1 h-4 w-4" />
+              Step inside <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
