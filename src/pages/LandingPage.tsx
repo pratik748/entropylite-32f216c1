@@ -22,10 +22,10 @@ const STATS = [
 ];
 
 const PRINCIPLES = [
-  { title: "Distributions, not forecasts", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
-  { title: "Structure beats narrative", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
-  { title: "Your trades teach the system", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
-  { title: "Quiet by default", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
+  { title: "Forecasts are fiction. Distributions are real.", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
+  { title: "Structure moves price. Narrative explains it later.", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
+  { title: "The system learns from you, not the crowd.", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
+  { title: "Twelve engines. One quiet surface.", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
 ];
 
 const FEATURES = [
@@ -62,9 +62,9 @@ export default function LandingPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "Entropy Lite | The Operating System of Finance";
+    document.title = "EntropyLite | See what the market hasn't decided yet";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Probabilistic scenario analysis, structural constraint detection, and continuous market intelligence. Free during founding access.");
+    if (meta) meta.setAttribute("content", "EntropyLite shows you what can happen — before the market decides. Probabilistic scenarios, structural constraints, twelve engines, one terminal.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
