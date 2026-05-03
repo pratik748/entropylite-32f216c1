@@ -229,7 +229,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             </div>
             <div className="hidden lg:block" style={{ height: 420 }}>
               <ThreatFeed
-                data={data}
+                data={safeData}
                 selectedConflict={selectedConflict}
                 onSelectConflict={setSelectedConflict}
                 exposedTickers={exposedTickers}
@@ -253,8 +253,8 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
         </div>
       )}
 
-      {viewMode === "threats" && data && <ThreatsView data={data} exposedTickers={exposedTickers} />}
-      {viewMode === "forex" && data && <ForexView data={data} />}
+      {viewMode === "threats" && <ThreatsView data={safeData} exposedTickers={exposedTickers} />}
+      {viewMode === "forex" && <ForexView data={safeData} />}
       {viewMode !== "map" && !data && (
         <div className="text-center py-12 text-xs text-muted-foreground">
           Legacy intel summary paused (rate-limited). Live wire still active —
