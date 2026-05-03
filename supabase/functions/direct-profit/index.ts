@@ -856,23 +856,72 @@ Deno.serve(async (req) => {
       output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines, deterministic);
     }
 
-    // ── HARD CONSENSUS RECONCILIATION ──────────────────────────────────
-    // If the intelligence summary contradicts the AI's action, downgrade
-    // to WAIT instead of letting the user act on contradictory advice.
+    // ── MASTER ARBITER ──────────────────────────────────────────────────
+    // The dashboard intelligence (analyze-stock) is the single source of
+    // truth for direction. Direct Profit's job is to translate that verdict
+    // into an executable ticket — never to contradict it. Map suggestion
+    // → action deterministically, then rebuild prices for the forced side.
     if (intelSummary?.suggestion) {
       const sug = String(intelSummary.suggestion);
-      const act = String(output.action);
-      const conflict =
-        (sug === "Exit" && act === "BUY") ||
-        (sug === "Add" && act === "SELL") ||
-        ((sug === "Skip" || sug === "Hold") && act !== "WAIT" && (intelSummary.confidence ?? 0) >= 60);
-      if (conflict) {
-        console.log(`direct-profit reconciled: AI=${act} vs intel=${sug} → WAIT`);
-        output.action = "WAIT";
-        output.direction = "SIDEWAYS";
-        output.directionReason = `Intelligence says ${sug}`;
-        output.confidence = Math.min(Number(output.confidence) || 50, 45);
-        output.consensus = "SPLIT";
+      const aiAct = String(output.action);
+      const forcedAction: "BUY" | "SELL" | "WAIT" =
+        sug === "Add" ? "BUY"
+        : sug === "Exit" ? "SELL"
+        : "WAIT"; // Hold or Skip → no fresh ticket
+
+      if (forcedAction !== aiAct) {
+        console.log(`direct-profit arbiter: AI=${aiAct} → ${forcedAction} (intel=${sug})`);
+        // Rebuild a deterministic plan for the FORCED side so the entry,
+        // target, stop and R:R all line up with the new action.
+        const sideDet = buildDeterministicFallback(
+          { ...snap, currentPrice: snap.currentPrice }, tech, currency, market, vix,
+          riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol,
+        );
+        // Override the deterministic action by directly recomputing prices
+        // for the forced direction using the same widths.
+        const cp = snap.currentPrice;
+        const entryWidth = Math.max(0.006, Math.min(0.02, tech.dailyVol / 100));
+        const targetWidth = Math.max(0.018, Math.min(0.08, entryWidth * 2.4));
+        const stopWidth = Math.max(0.012, Math.min(0.04, entryWidth * 1.2));
+        let eL = cp, eH = cp, tg = cp, sl = cp, rr = 0;
+        if (forcedAction === "BUY") {
+          eL = cp * (1 - entryWidth); eH = cp * (1 + entryWidth * 0.35);
+          tg = Math.max(cp * (1 + targetWidth), tech.resistance || 0);
+          sl = Math.min(cp * (1 - stopWidth), tech.support || cp * (1 - stopWidth));
+          rr = (tg - (eL + eH) / 2) / Math.max((eL + eH) / 2 - sl, 0.01);
+        } else if (forcedAction === "SELL") {
+          eL = cp * (1 - entryWidth * 0.35); eH = cp * (1 + entryWidth);
+          tg = Math.min(cp * (1 - targetWidth), tech.support || cp * (1 - targetWidth));
+          sl = Math.max(cp * (1 + stopWidth), tech.resistance || cp * (1 + stopWidth));
+          rr = ((eL + eH) / 2 - tg) / Math.max(sl - (eL + eH) / 2, 0.01);
+        }
+
+        output.action = forcedAction;
+        output.direction = forcedAction === "BUY" ? "UP" : forcedAction === "SELL" ? "DOWN" : "SIDEWAYS";
+        output.directionReason = `Intelligence verdict: ${sug}`;
+        if (forcedAction === "WAIT") {
+          output.entryLow = roundPrice(cp * 0.99);
+          output.entryHigh = roundPrice(cp * 1.01);
+          output.targetPrice = roundPrice(tech.resistance || cp * 1.02);
+          output.stopLoss = roundPrice(tech.support || cp * 0.98);
+          output.riskRewardRatio = 0;
+          output.protection = "Wait for a cleaner setup before taking risk.";
+        } else {
+          output.entryLow = roundPrice(eL);
+          output.entryHigh = roundPrice(eH);
+          output.targetPrice = roundPrice(tg);
+          output.stopLoss = roundPrice(sl);
+          output.riskRewardRatio = Number(Math.abs(rr).toFixed(2));
+          output.protection = forcedAction === "BUY"
+            ? `${resolvedTicker} ${roundPrice(sl)} PE as hedge. Trail stop at ${currencySymbol}${roundPrice(sl)}. Risk/share: ${currencySymbol}${roundPrice(cp - sl)}.`
+            : `Cover above ${currencySymbol}${roundPrice(sl)} with ${resolvedTicker} ${roundPrice(sl)} CE. Max loss: ${currencySymbol}${roundPrice(sl - cp)}/share.`;
+        }
+        output.confidence = Math.min(
+          Math.max(Number(output.confidence) || 50, Number(intelSummary.confidence) || 50),
+          88,
+        );
+        output.consensus = "ARBITRATED";
+        void sideDet; // referenced for future tuning
       }
       // Attach the intelligence snapshot so the UI can render both views.
       (output as any).intelligence = {
