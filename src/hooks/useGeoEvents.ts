@@ -67,6 +67,31 @@ function extractCommodities(s: string): string[] {
   return Array.from(new Set((s.match(COMMODITY_RE) || []).map((c) => c.toLowerCase()))).slice(0, 4);
 }
 
+const PLACE_COORDS: Array<{ pattern: RegExp; lat: number; lng: number; place: string }> = [
+  { pattern: /\bukraine|kyiv|kiev\b/i, lat: 50.4501, lng: 30.5234, place: "Ukraine" },
+  { pattern: /\brussia|moscow\b/i, lat: 55.7558, lng: 37.6173, place: "Russia" },
+  { pattern: /\bisrael|gaza|tel aviv|jerusalem\b/i, lat: 31.7683, lng: 35.2137, place: "Israel / Gaza" },
+  { pattern: /\biran|tehran\b/i, lat: 35.6892, lng: 51.389, place: "Iran" },
+  { pattern: /\bchina|beijing\b/i, lat: 39.9042, lng: 116.4074, place: "China" },
+  { pattern: /\btaiwan|taipei\b/i, lat: 25.033, lng: 121.5654, place: "Taiwan" },
+  { pattern: /\bindia|new delhi|mumbai\b/i, lat: 28.6139, lng: 77.209, place: "India" },
+  { pattern: /\bpakistan|islamabad\b/i, lat: 33.6844, lng: 73.0479, place: "Pakistan" },
+  { pattern: /\bsaudi|riyadh\b/i, lat: 24.7136, lng: 46.6753, place: "Saudi Arabia" },
+  { pattern: /\bred sea|suez|yemen\b/i, lat: 15.3694, lng: 44.191, place: "Red Sea / Yemen" },
+  { pattern: /\beurope|brussels|berlin|paris\b/i, lat: 50.8503, lng: 4.3517, place: "Europe" },
+  { pattern: /\bunited states|u\.s\.|us |washington|new york\b/i, lat: 38.9072, lng: -77.0369, place: "United States" },
+  { pattern: /\bjapan|tokyo\b/i, lat: 35.6762, lng: 139.6503, place: "Japan" },
+];
+
+function inferLocation(text: string): GeoEvent["loc"] | null {
+  for (const candidate of PLACE_COORDS) {
+    if (candidate.pattern.test(text)) {
+      return { lat: candidate.lat, lng: candidate.lng, place: candidate.place };
+    }
+  }
+  return null;
+}
+
 function scoreFor(title: string, sourceTier: number, category: GeoEvent["category"]): {
   severity: number; market_relevance: number; velocity: number; confidence: number;
 } {
@@ -102,13 +127,16 @@ function articleToEvent(a: NewsArticle): GeoEvent | null {
   const s = scoreFor(a.title, tier, cat);
   const id = `${a.source}-${a.link || a.title}`.slice(0, 200);
   const text = `${a.title} ${a.description || ""}`;
+  const inferredLoc = inferLocation(text);
+  if (!inferredLoc) return null;
+
   return {
     id,
     title: a.title,
     source: a.source,
     url: a.link,
     ts,
-    loc: { lat: 0, lng: 0, place: "" },
+    loc: inferredLoc,
     category: cat,
     ...s,
     entities: {
