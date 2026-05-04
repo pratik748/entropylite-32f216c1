@@ -38,7 +38,19 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
     <header data-density="compact" className="border-b border-border/70 glass-panel relative shrink-0">
       <div className="px-3 sm:container flex h-16 sm:h-20 items-center justify-between relative z-10">
         <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-          <img alt="Entropy" className="h-14 sm:h-16 object-contain flex-shrink-0" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+          {onOpenBrief ? (
+            <button
+              onClick={onOpenBrief}
+              data-tour="brief-btn"
+              title="Open today's Entropy Brief"
+              className="flex-shrink-0 rounded-md transition-all hover:opacity-90 active:scale-95 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              aria-label="Open Entropy Brief"
+            >
+              <img alt="Entropy — tap for today's Brief" className="h-14 sm:h-16 object-contain pointer-events-none" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+            </button>
+          ) : (
+            <img alt="Entropy" className="h-14 sm:h-16 object-contain flex-shrink-0" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+          )}
           <span className="hidden lg:inline font-mono text-[8px] text-muted-foreground/40 uppercase tracking-[0.2em] leading-tight max-w-[220px]">Economic Neural Trading &amp; Risk Optimisation via Predictive Yield</span>
           <div className="hidden md:flex items-center gap-3 ml-3 pl-3 border-l border-border/60">
             {markets.map(m => {
@@ -57,7 +69,6 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
           {onOpenBrief && (
             <button
               onClick={onOpenBrief}
-              data-tour="brief-btn"
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/70 bg-surface-2/60 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-surface-2 transition-all text-[10px] font-mono font-semibold"
               title="Generate today's shareable Entropy Brief"
             >
