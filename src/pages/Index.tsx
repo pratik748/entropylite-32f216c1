@@ -38,6 +38,8 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ProofCard from "@/components/ProofCard";
 import ModuleErrorBoundary from "@/components/ModuleErrorBoundary";
+import TerminalTour from "@/components/tour/TerminalTour";
+import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +74,7 @@ const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
@@ -81,6 +84,31 @@ const IndexContent = () => {
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
   const { convertToBase } = useFX();
+
+  // First-time tutorial: open after portfolio loaded
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      const done = localStorage.getItem(TOUR_FLAG_KEY);
+      if (!done) {
+        const t = setTimeout(() => setTourOpen(true), 600);
+        return () => clearTimeout(t);
+      }
+    } catch {}
+  }, [loaded]);
+
+  // Press "?" to replay tour
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        setTourOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Live total portfolio value in base currency (used for risk-budgeted position sizing)
   const portfolioValueBase = useMemo(() => {
@@ -336,6 +364,11 @@ const IndexContent = () => {
         onOpenBrief={() => setBriefOpen(true)}
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
+      <TerminalTour
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        setActiveTab={(t) => handleTabSwitch(t as Tab)}
+      />
       {proofStock && (
         <ProofCard open={!!proofStock} onClose={() => setProofStock(null)} stock={proofStock} />
       )}
