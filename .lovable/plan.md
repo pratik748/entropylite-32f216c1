@@ -1,125 +1,72 @@
-## Goal
+# First-Time Tutorial — Arrow-Based Walkthrough
 
-Rewrite `src/pages/LandingPage.tsx` so the page reads like a narrative — tension → awakening → immersion → proof → weapon → power → control → identity → inevitability — without removing a single technical block. Apple + hedge fund + war room. Short sentences. Heavy whitespace. Keep the existing minimal black-on-white aesthetic.
+When a user opens the dashboard for the first time, overlay a guided tour that points (with arrows) at the key parts of the terminal, one step at a time. After completion or skip, it never shows again.
 
-Nothing is removed. The existing terminal screenshot, `FeatureGallery`, `MathResearch`, FAQ, founding-access reassurance, and footer all stay. Only copy, ordering, and a few framing wrappers change.
+## What the tour covers
 
-## New Section Order
+Sequenced steps, each with a short title, one-line description, and an arrow pointing to the actual element:
 
-```text
-1. HERO — Tension first
-2. THE SHIFT — Principles reframed as awakenings
-3. THE EXPERIENCE — Terminal screenshot as "layers of perception"
-4. UNDER THE HOOD — Math/models (existing MathResearch, reframed intro)
-5. CLANK — Standalone weapon section (new)
-6. THE STACK — 12 layers, progressive reveal
-7. THE PIPELINE — 6 stages reframed "from chaos to decision"
-8. IDENTITY SHIFT — "You're not trading. You're operating."
-9. CTA — Inevitability + FAQ + final dark CTA
-```
+1. **Stock Input** — "Drop a ticker here. This is where every analysis begins."
+2. **Tab Bar** — "Nine modes. Dashboard is your cockpit; the rest are specialist lenses."
+3. **Geopolitics tab** — "Live world risk overlay. Already running in the background."
+4. **Sandbox tab** — "Twelve engines. Run scenarios before the market does."
+5. **Risk + Fortress tabs** — "Defensive layer. Stress, hedge, fortress mode."
+6. **Direct Profit toggle (header)** — "One-button verdict. Arbitrated across all engines."
+7. **Brief button (header)** — "Three insights. Shareable card. PNG export."
+8. **System Status bar** — "Live data health. Always visible."
 
-## Section-by-Section Copy
+Final step: "You're in. Press ? anytime to replay the tour."
 
-**1. HERO (rewrite, keep logo + stats + CTA)**
-- Eyebrow badge: keep "Free during founding access · No credit card"
-- H1: "Every trade you've taken / was already too late."  (second line in `text-black/45`)
-- Sub-paragraph (3 short lines, generous leading):
-  - "Markets move before you act."
-  - "Information arrives delayed."
-  - "Retail reacts. Institutions position."
-- Closing line above CTA:
-  - "EntropyLite doesn't tell you what will happen. It shows you what *can* happen — before the market decides."
-- Primary CTA label: **Enter the Terminal** (replaces "Sign In Free")
-- Keep secondary "See what is inside"
-- Keep stats strip unchanged
+## How it works
 
-**2. THE SHIFT (replaces "Principles")**
-- Eyebrow: "The shift"
-- H2: "You were taught to predict."
-- Lead paragraph:
-  - "But markets don't move on predictions."
-  - "They move on pressure. On positioning. On constraints."
-- Reframe each of the 4 PRINCIPLES as a realization. Keep current `desc` text but rewrite `title` as a first-person realization:
-  - "Forecasts are fiction. Distributions are real."
-  - "Structure moves price. Narrative explains it later."
-  - "The system learns from me, not the crowd."
-  - "Twelve engines. One quiet surface."
-- CTA underneath: "Step inside →"
+- **Trigger**: On `/dashboard` mount, check `localStorage.entropy_tour_done`. If absent and `loaded === true` and stocks have hydrated, start the tour.
+- **Replay**: Pressing `?` (or a small "Tour" link in the header overflow) re-opens it.
+- **Skip / Next / Back**: Footer buttons. ESC = skip. Skip and Finish both set the flag.
+- **No external library** — keep bundle lean. Custom lightweight component using `getBoundingClientRect()` + a fixed overlay.
 
-**3. THE EXPERIENCE (rewrite intro of the terminal preview block)**
-- Eyebrow: "The experience"
-- H2: "This is what you see when you stop guessing."
-- Sub: "Four layers of perception, surfaced at once."
-- Keep the dashboardPreview image unchanged.
-- Relabel the four mini-captions as *layers of perception* (not "features"):
-  - "Layer 01 — Live portfolio" / current desc
-  - "Layer 02 — Probability" / Monte Carlo desc
-  - "Layer 03 — Risk surface" / VaR/CVaR desc
-  - "Layer 04 — Flow" / institutional flow desc
-- Keep `<FeatureGallery />` immediately after with new lead-in heading: "Every surface, captured live."
+## Visual style
 
-**4. UNDER THE HOOD (wrap MathResearch)**
-- Add a short intro band above `<MathResearch />`:
-  - Eyebrow: "Proof"
-  - H2: "This isn't opinion. This is math."
-  - Sub: "Monte Carlo. VaR / CVaR. Merton. Ornstein–Uhlenbeck. Run on real history, not vibes."
-- `<MathResearch />` itself unchanged.
+Matches the institutional terminal aesthetic (no buzzwords, mono labels):
 
-**5. CLANK (new dedicated section — major addition)**
-- Full-width, dark band (`bg-black text-white`) to make it feel like a weapon reveal.
-- Eyebrow (white/40): "CLANK"
-- H2 (white): "Sometimes markets stop being probabilistic."
-- Giant follow-up line in muted white: "They lock."
-- Three short stacked statements:
-  - "CLANK detects deterministic windows."
-  - "Structural inevitabilities — gamma walls, ETF rebalances, liquidity vacuums."
-  - "When the math collapses to one outcome, you see it first."
-- Footnote line: "Constraint detection across liquidity, positioning and dealer gamma."
-- CTA: "See CLANK live →" (goes to /dashboard)
+- Full-screen dim overlay (`bg-background/80 backdrop-blur-sm`), z-index above header.
+- A "spotlight" cutout: a transparent rounded rectangle aligned to the target element's bounding box (4px padding), with a 1px primary border + soft glow.
+- An **SVG arrow** drawn from the tooltip card to the spotlight edge — curved bezier, 1.5px stroke, primary color, animated dash on draw.
+- Tooltip card: `glass-panel` style, ~280px wide, mono caption + step counter `03 / 08`, title, body, and `Skip · Back · Next` row.
+- Auto-positions the card on the side with most space (top/bottom/left/right of target). Repositions on window resize and on tab change.
+- Smooth 200ms fade between steps.
 
-**6. THE STACK (replaces "Twelve intelligence layers" grid intro)**
-- Eyebrow: "The stack"
-- H2: "While you're looking at one chart, twelve systems are already running."
-- Keep the existing 9-card FEATURES grid (the layers). Rename heading sub: "Each one a separate engine. Composed into one read."
+## Mobile behavior
 
-**7. THE PIPELINE (rewrite intro of HOW_IT_WORKS)**
-- Eyebrow: "The pipeline"
-- H2: "From chaos. To decision."
-- Sub: "Six stages. Always running. You see only the conclusion."
-- Keep the 6 HOW_IT_WORKS items unchanged.
-- CTA stays.
+Viewport is 420px. The tab bar wraps and Direct Profit/Brief live in a Sheet menu.
 
-**8. IDENTITY SHIFT (new tight band between pipeline and FAQ)**
-- White section, lots of whitespace, centered.
-- One line, large: "You're not trading anymore."
-- Below in muted: "You're operating."
-- No CTA — silence holds the weight.
+- Detect `useIsMobile()`. On mobile, condense to 5 steps (Input, Tabs, Direct Profit, Brief, Status), and skip steps whose target is offscreen.
+- For targets inside the mobile menu (Sheet), the tour will programmatically open the Sheet for that step, then close it after Next.
+- Arrows shorten to straight lines on small screens.
 
-**9. CTA / INEVITABILITY (rewrite final dark CTA + keep FAQ above it)**
-- Keep "Why now / risk reversal" trio (no card, 30s setup, founding) unchanged.
-- Keep FAQ section unchanged.
-- Final dark CTA copy:
-  - H2: "Most people will keep reacting."
-  - Sub: "You don't have to."
-  - Primary CTA: **Enter EntropyLite**
-  - Keep founding-pricing footnote.
+## Tab-aware steps
 
-## Implementation Notes (technical)
+Some targets only exist when their tab is active (e.g. Geopolitics globe). For those steps the tour calls `setActiveTab(...)` first, waits one frame for layout, then anchors the arrow. After Next, it returns to `dashboard`.
 
-- Single file edit: `src/pages/LandingPage.tsx`.
-- Update the `PRINCIPLES` array titles; keep descriptions.
-- Replace section header copy blocks; keep all JSX structure for grids, cards, image, CTAs.
-- Add new CLANK `<section>` between MathResearch and the FEATURES grid. Use existing tokens (`bg-black text-white`, `font-mono text-[10px] tracking-[0.3em]`).
-- Add new IDENTITY `<section>` between the "Why now" risk-reversal block and FAQ.
-- Update document.title to: `"EntropyLite | See what the market hasn't decided yet"` and meta description to match the new hook.
-- No new dependencies, no asset changes, no route changes.
-- Mobile sticky CTA label updated to "Enter the Terminal".
+## Technical details
 
-## What Is NOT Changed
+**New files**
+- `src/components/tour/TerminalTour.tsx` — overlay, spotlight, SVG arrow, card, keyboard handlers.
+- `src/components/tour/tourSteps.ts` — ordered step list `{ id, selector, title, body, requiresTab?, side? }`.
+- `src/hooks/useTour.ts` — manages `localStorage` flag, current step index, start/skip/finish, and exposes `startTour()` for the replay shortcut.
 
-- `FeatureGallery.tsx`, `MathResearch.tsx`, `PublicNav`, footer, FAQ content, stats, dashboard image, founding-access reassurance trio, routes, auth redirect logic.
-- All math, models, formulas, layer count, pipeline steps remain intact.
+**Edits**
+- `src/pages/Index.tsx`:
+  - Add `data-tour="..."` attributes to: stock input wrapper, tab bar container, each relevant tab button, status bar, and (via props) the Brief + Direct Profit buttons.
+  - Mount `<TerminalTour stocks={stocks} setActiveTab={handleTabSwitch} />` after `loaded`.
+  - Listen for `?` keypress to call `startTour()`.
+- `src/components/Header.tsx`: forward `data-tour="brief-btn"` and `data-tour="direct-profit-btn"` onto the existing buttons (no visual change).
+- `src/components/terminal/SystemStatusBar.tsx`: add `data-tour="status-bar"` on root.
 
-## Outcome
+**Selector strategy**: query by `[data-tour="..."]` so refactors that change classNames don't break the tour. If a target is missing, that step is skipped silently.
 
-The page reads top-to-bottom as a single arc that makes the visitor feel a power shift, while every institutional proof point a serious reader needs is still on the page — just reframed as revelation instead of a feature list.
+**Persistence**: `localStorage.setItem("entropy_tour_done", "1")` on Finish or Skip. Versioned key (`entropy_tour_done_v1`) so we can bump it later when the UI changes meaningfully.
+
+## Out of scope
+
+- Onboarding for `/` landing page (this is dashboard-only, per request).
+- Per-tab nested tours inside Sandbox/Augment sub-modules (can be a follow-up).
