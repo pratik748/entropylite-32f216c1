@@ -29,7 +29,7 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   const savingsColor = apiMetrics.savingsPercent > 50 ? "text-gain" : apiMetrics.savingsPercent > 20 ? "text-warning" : "text-muted-foreground";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 px-2 sm:px-4 flex items-center justify-between font-mono text-[8px]" style={{ height: '24px' }}>
+    <div data-tour="status-bar" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-surface-1 px-2 sm:px-4 flex items-center justify-between font-mono text-[8px]" style={{ height: '24px' }}>
       <div className="flex items-center gap-2 sm:gap-3">
         <span className="h-1.5 w-1.5 rounded-full bg-gain flex-shrink-0" />
         <div className="flex items-center gap-1">

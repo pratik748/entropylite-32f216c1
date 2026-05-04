@@ -38,6 +38,8 @@ import PanelWrapper from "@/components/terminal/PanelWrapper";
 import EntropyBrief from "@/components/EntropyBrief";
 import ProofCard from "@/components/ProofCard";
 import ModuleErrorBoundary from "@/components/ModuleErrorBoundary";
+import TerminalTour from "@/components/tour/TerminalTour";
+import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +74,7 @@ const IndexContent = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
@@ -81,6 +84,31 @@ const IndexContent = () => {
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade } = useOutcomeGradient();
   const { convertToBase } = useFX();
+
+  // First-time tutorial: open after portfolio loaded
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      const done = localStorage.getItem(TOUR_FLAG_KEY);
+      if (!done) {
+        const t = setTimeout(() => setTourOpen(true), 600);
+        return () => clearTimeout(t);
+      }
+    } catch {}
+  }, [loaded]);
+
+  // Press "?" to replay tour
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        setTourOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Live total portfolio value in base currency (used for risk-budgeted position sizing)
   const portfolioValueBase = useMemo(() => {
@@ -336,6 +364,11 @@ const IndexContent = () => {
         onOpenBrief={() => setBriefOpen(true)}
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
+      <TerminalTour
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        setActiveTab={(t) => handleTabSwitch(t as Tab)}
+      />
       {proofStock && (
         <ProofCard open={!!proofStock} onClose={() => setProofStock(null)} stock={proofStock} />
       )}
@@ -407,7 +440,7 @@ const IndexContent = () => {
           )}
 
           {/* Tab Navigation */}
-          <nav data-density="compact" className="border-b border-border/70 bg-surface-1/95 backdrop-blur-md sticky top-0 z-30 shrink-0">
+          <nav data-density="compact" data-tour="tab-bar" className="border-b border-border/70 bg-surface-1/95 backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div
               className="px-2 sm:container flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide relative"
               style={{ scrollSnapType: "x mandatory" }}
@@ -416,6 +449,7 @@ const IndexContent = () => {
                 <button
                   key={tab.id}
                   onClick={() => handleTabSwitch(tab.id)}
+                  data-tour-tab={tab.id}
                   style={{ scrollSnapAlign: "start" }}
                   className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 rounded-t ${
                     activeTab === tab.id
@@ -451,7 +485,9 @@ const IndexContent = () => {
                 (isMobile ? (
                   /* Mobile: stacked layout */
                   <div className="p-1.5 space-y-1.5 pb-24">
-                    <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+                    <div data-tour="stock-input">
+                      <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+                    </div>
                     {effectiveLoading && <LoadingState />}
                     {analysis && !effectiveLoading && (
                       <>

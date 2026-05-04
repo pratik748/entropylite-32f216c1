@@ -60,7 +60,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-2 border-b border-border">
+      <div className="p-2 border-b border-border" data-tour="stock-input">
         <StockInput onAnalyze={onAnalyze} isLoading={isLoading} compact />
       </div>
 

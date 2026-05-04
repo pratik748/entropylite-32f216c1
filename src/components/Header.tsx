@@ -57,6 +57,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
           {onOpenBrief && (
             <button
               onClick={onOpenBrief}
+              data-tour="brief-btn"
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/70 bg-surface-2/60 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-surface-2 transition-all text-[10px] font-mono font-semibold"
               title="Generate today's shareable Entropy Brief"
             >
@@ -68,6 +69,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
           {onToggleDirectProfit && (
             <button
               onClick={onToggleDirectProfit}
+              data-tour="direct-profit-btn"
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-[10px] font-mono font-semibold ${
                 directProfitMode
                   ? "border-primary bg-primary/10 text-primary"
