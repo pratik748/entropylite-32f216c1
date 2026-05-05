@@ -18,6 +18,8 @@ import { useFortressMode } from "@/hooks/useFortressMode";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { type Threat, type DefensiveAction } from "@/lib/fortress-engine";
+import { useDemoMode } from "@/lib/demoMode";
+import { Eye, EyeOff } from "lucide-react";
 
 interface FortressModeProps {
   stocks: PortfolioStock[];
@@ -46,6 +48,7 @@ const kindIcon = (k: DefensiveAction["kind"]) => {
 
 const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
   const { fmt, sym } = useNormalizedPortfolio(stocks);
+  const { on: demoOn, toggle: toggleDemo } = useDemoMode();
   const {
     active,
     toggle,
@@ -67,11 +70,14 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
 
   if (analyzed.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-card p-12 text-center">
-        <ShieldOff className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground">
-          Analyze positions to activate Fortress Mode.
-        </p>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border bg-card p-12 text-center">
+          <ShieldOff className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">
+            Analyze positions to activate Fortress Mode.
+          </p>
+        </div>
+        <DemoToggleCard demoOn={demoOn} toggleDemo={toggleDemo} />
       </div>
     );
   }
@@ -392,6 +398,9 @@ const FortressMode = ({ stocks, setStocks }: FortressModeProps) => {
           efficiency, hedge costs are capped to preserve upside.
         </p>
       </div>
+
+      {/* Demo Mode toggle — global showcase snapshot */}
+      <DemoToggleCard demoOn={demoOn} toggleDemo={toggleDemo} />
     </div>
   );
 };
@@ -443,6 +452,63 @@ const ProjectionRow = ({
       <span className={`text-base font-bold ${improved ? "text-gain" : "text-foreground"}`}>
         {post}
       </span>
+    </div>
+  </div>
+);
+
+const DemoToggleCard = ({
+  demoOn,
+  toggleDemo,
+}: {
+  demoOn: boolean;
+  toggleDemo: () => void;
+}) => (
+  <div
+    className={`rounded-xl border p-4 transition-colors ${
+      demoOn
+        ? "border-primary/40 bg-gradient-to-br from-primary/5 via-card to-card"
+        : "border-border bg-card"
+    }`}
+  >
+    <div className="flex flex-wrap items-center gap-3">
+      <div
+        className={`flex h-10 w-10 items-center justify-center rounded-lg border ${
+          demoOn ? "border-primary/40 bg-primary/10" : "border-border bg-surface-2"
+        }`}
+      >
+        {demoOn ? (
+          <Eye className="h-5 w-5 text-primary" />
+        ) : (
+          <EyeOff className="h-5 w-5 text-muted-foreground" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-foreground">Demo Mode</h3>
+          {demoOn && (
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
+              Showcase Active
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Frozen institutional snapshot — every module (Desirable, Direct Profit, Causal
+          Effects, Sandbox, Augment, Risk, Brief) renders fully populated with a curated
+          portfolio. Your real positions stay untouched.
+        </p>
+      </div>
+      <Button
+        onClick={toggleDemo}
+        size="sm"
+        variant={demoOn ? "default" : "outline"}
+        className={
+          demoOn
+            ? "h-8 bg-primary px-3 text-[11px] font-mono uppercase tracking-widest text-primary-foreground hover:bg-primary/90"
+            : "h-8 px-3 text-[11px] font-mono uppercase tracking-widest"
+        }
+      >
+        {demoOn ? "Exit Demo" : "Enable Demo"}
+      </Button>
     </div>
   </div>
 );
