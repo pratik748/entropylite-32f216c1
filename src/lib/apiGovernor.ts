@@ -10,8 +10,6 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { isDemoOn } from "./demoMode";
-import { getDemoFixture } from "./demoFixtures";
 
 // --------------- Types ---------------
 
@@ -215,18 +213,6 @@ export async function governedInvoke<T = any>(
 ): Promise<{ data: T | null; error: any; cached: boolean }> {
   if (opts.skip) {
     return { data: null, error: null, cached: false };
-  }
-
-  // ── Demo Mode short-circuit ─────────────────────────────────────────
-  // When the operator has enabled the frozen investor showcase, every
-  // governed network call returns a deterministic fixture instead of
-  // touching the backend. This guarantees zero loading spinners and zero
-  // empty-state panels across the terminal.
-  if (isDemoOn()) {
-    const fixture = getDemoFixture(functionName, opts.body);
-    if (fixture !== undefined) {
-      return { data: fixture as T, error: null, cached: true };
-    }
   }
 
   const tier = opts.tier || ENDPOINT_TIER[functionName] || "frequent";

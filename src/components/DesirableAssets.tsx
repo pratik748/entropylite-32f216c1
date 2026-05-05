@@ -10,7 +10,6 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
-import { useDemoMode } from "@/lib/demoMode";
 
 interface Recommendation {
   ticker: string;
@@ -275,7 +274,6 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const bootstrapFetchDone = useRef(false);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { baseCurrency } = useFX();
-  const { on: demoOn } = useDemoMode();
   const {
     getAssetBoost,
     validateSignal,
@@ -612,18 +610,6 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       fetchRecommendations(true, true);
     }
   }, [fetchRecommendations]);
-
-  // Demo Mode: when toggled, force a refetch so the panel immediately
-  // picks up the frozen showcase recommendations from the governor's
-  // demo short-circuit. Bypass the local DA cache entirely.
-  useEffect(() => {
-    if (!demoOn) return;
-    setHasSearched(true);
-    setError(null);
-    retryCount.current = 0;
-    try { localStorage.removeItem(DA_CACHE_KEY); } catch {}
-    fetchRecommendations(true, true);
-  }, [demoOn, fetchRecommendations]);
 
   const handleAdd = (rec: Recommendation) => {
     const price = rec.realPrice || rec.currentEstPrice;
