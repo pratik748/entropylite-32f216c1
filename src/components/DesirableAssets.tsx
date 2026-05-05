@@ -273,7 +273,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   const retryCount = useRef(0);
   const bootstrapFetchDone = useRef(false);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { baseCurrency } = useFX();
+  const { baseCurrency, indiaMode } = useFX();
   const {
     getAssetBoost,
     validateSignal,
@@ -424,7 +424,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             portfolioSignals,
             portfolioValue: totalValue || 100000,
             baseCurrency,
-            indiaMode: baseCurrency === "INR",
+            indiaMode,
             // On manual force-refresh, drop the recent-slate memory entirely
             // so the engine isn't fighting two exclusion lists at once.
             previousTickers: forceRefresh ? [] : getPreviousTickers(),
@@ -476,6 +476,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           cacheKey: [
             "v2",
             baseCurrency,
+            indiaMode ? "in" : "gl",
             existingTickers.slice().sort().join(","),
             sellTickers.slice().sort().join(",") || "ns",
             highRiskTickers.slice().sort().join(",") || "nr",
@@ -585,7 +586,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         progressTimer.current = null;
       }
     }
-  }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
+  }, [stocks.length, baseCurrency, indiaMode, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
 
   // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
