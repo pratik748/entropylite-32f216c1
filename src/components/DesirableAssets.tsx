@@ -476,6 +476,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           cacheKey: [
             "v2",
             baseCurrency,
+            indiaMode ? "in" : "gl",
             existingTickers.slice().sort().join(","),
             sellTickers.slice().sort().join(",") || "ns",
             highRiskTickers.slice().sort().join(",") || "nr",
@@ -585,7 +586,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         progressTimer.current = null;
       }
     }
-  }, [stocks.length, baseCurrency, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
+  }, [stocks.length, baseCurrency, indiaMode, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
 
   // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
