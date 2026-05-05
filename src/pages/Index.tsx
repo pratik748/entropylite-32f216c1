@@ -380,6 +380,23 @@ const IndexContent = () => {
         onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
         onOpenBrief={() => setBriefOpen(true)}
       />
+      {demoOn && (
+        <div className="flex items-center justify-center gap-3 bg-warning/15 border-b border-warning/40 px-3 py-1.5 text-[11px] font-mono text-warning">
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+          <span className="font-bold tracking-wider">DEMO MODE ACTIVE</span>
+          <span className="hidden sm:inline text-warning/80">— frozen showcase data, no live feeds</span>
+          <button
+            onClick={() => {
+              try { localStorage.removeItem("entropy_demo_v1"); } catch {}
+              window.dispatchEvent(new CustomEvent("entropy:demo-changed", { detail: false }));
+              window.location.reload();
+            }}
+            className="ml-2 rounded border border-warning/50 px-2 py-0.5 text-[10px] font-bold uppercase hover:bg-warning/20"
+          >
+            Turn off
+          </button>
+        </div>
+      )}
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
       <TerminalTour
         open={tourOpen}
