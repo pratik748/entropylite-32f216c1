@@ -40,6 +40,7 @@ import ProofCard from "@/components/ProofCard";
 import ModuleErrorBoundary from "@/components/ModuleErrorBoundary";
 import TerminalTour from "@/components/tour/TerminalTour";
 import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
+import { useDemoMode, getDemoStocks } from "@/lib/demoMode";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,8 +77,24 @@ const IndexContent = () => {
   const [briefOpen, setBriefOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
-  const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
+  const { stocks: realStocks, setStocks: setRealStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
+  const { on: demoOn } = useDemoMode();
+  // When Demo Mode is on, every module sees a frozen showcase portfolio.
+  // Real stocks are preserved untouched in the cloud — we just swap the
+  // working set at the render boundary.
+  const stocks = demoOn ? getDemoStocks() : realStocks;
+  const setStocks = demoOn ? ((() => {}) as typeof setRealStocks) : setRealStocks;
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
+  // Auto-pick a default active position when entering demo mode so the
+  // dashboard pane renders fully populated for investors.
+  useEffect(() => {
+    if (demoOn) {
+      const demo = getDemoStocks();
+      if (!demo.find((s) => s.id === activeStockId)) {
+        setActiveStockId(demo[0]?.id ?? null);
+      }
+    }
+  }, [demoOn, activeStockId]);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
