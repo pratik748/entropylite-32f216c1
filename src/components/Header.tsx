@@ -46,10 +46,10 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
               className="flex-shrink-0 rounded-md transition-all hover:opacity-90 active:scale-95 focus:outline-none focus:ring-1 focus:ring-primary/40"
               aria-label="Open Entropy Brief"
             >
-              <img alt="Entropy — tap for today's Brief" className="h-14 sm:h-16 object-contain pointer-events-none" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+              <img alt="Entropy — tap for today's Brief" className="h-14 sm:h-16 object-contain pointer-events-none" src="/brand/entropy-mark.jpg" />
             </button>
           ) : (
-            <img alt="Entropy" className="h-14 sm:h-16 object-contain flex-shrink-0" src="/lovable-uploads/9357bd58-6be2-4fd2-97f0-ac56eb56f217.jpg" />
+            <img alt="Entropy" className="h-14 sm:h-16 object-contain flex-shrink-0" src="/brand/entropy-mark.jpg" />
           )}
           <span className="hidden lg:inline font-mono text-[8px] text-muted-foreground/40 uppercase tracking-[0.2em] leading-tight max-w-[220px]">Economic Neural Trading &amp; Risk Optimisation via Predictive Yield</span>
           <div className="hidden md:flex items-center gap-3 ml-3 pl-3 border-l border-border/60">
