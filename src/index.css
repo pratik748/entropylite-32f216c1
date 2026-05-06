@@ -588,4 +588,4 @@
   50% { opacity: 0.4; }
 }
 
-#edit-badge, #lovable-badge, [id^="lovable-"], [class*="lovable-badge"] { display: none !important; }
+#lovable-badge { display: none !important; }

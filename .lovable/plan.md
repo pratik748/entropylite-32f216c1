@@ -1,70 +1,72 @@
-# Faster sign-in + remove visible Lovable branding
+# First-Time Tutorial — Arrow-Based Walkthrough
 
-Two separate problems, fixed together.
+When a user opens the dashboard for the first time, overlay a guided tour that points (with arrows) at the key parts of the terminal, one step at a time. After completion or skip, it never shows again.
 
----
+## What the tour covers
 
-## Part 1 — Why login feels slow, and what we'll change
+Sequenced steps, each with a short title, one-line description, and an arrow pointing to the actual element:
 
-Today's flow on `/dashboard`:
+1. **Stock Input** — "Drop a ticker here. This is where every analysis begins."
+2. **Tab Bar** — "Nine modes. Dashboard is your cockpit; the rest are specialist lenses."
+3. **Geopolitics tab** — "Live world risk overlay. Already running in the background."
+4. **Sandbox tab** — "Twelve engines. Run scenarios before the market does."
+5. **Risk + Fortress tabs** — "Defensive layer. Stress, hedge, fortress mode."
+6. **Direct Profit toggle (header)** — "One-button verdict. Arbitrated across all engines."
+7. **Brief button (header)** — "Three insights. Shareable card. PNG export."
+8. **System Status bar** — "Live data health. Always visible."
 
-```text
-1. AuthGate mounts
-2. getSession() round-trip   ──► waits before showing anything
-3. User sees AuthPage, clicks "Continue with Google"
-4. Broker call to oauth.lovable.app  (cold, ~300–800ms)
-5. Redirect to Google consent
-6. Redirect back to /dashboard
-7. AuthGate re-mounts → getSession() AGAIN
-8. Finally Index renders
-```
+Final step: "You're in. Press ? anytime to replay the tour."
 
-The visible "spinning forever" comes mostly from steps 2, 4 and 7. Fixes:
+## How it works
 
-1. **Optimistic AuthGate** — render the auth UI immediately, only show the loading splash for the brief moment after a known redirect (when URL has `code=` / `#access_token`). Right now every cold visit waits on `getSession()` even when there is no session.
-2. **Cache the session locally** — read `localStorage` for an existing Supabase session synchronously on first paint, so returning users skip the splash entirely. `onAuthStateChange` then reconciles in the background.
-3. **Preconnect to OAuth + Supabase hosts** — add `<link rel="preconnect">` and `<link rel="dns-prefetch">` in `index.html` for the OAuth broker host and the Supabase project host, so the TLS handshake is warm before the user clicks the button.
-4. **Disable button immediately, no second await** — the OAuth handler already redirects; remove the `setLoading(null)` after the redirect path so the spinner stays until the browser actually navigates (prevents the "I clicked but nothing happened" feel).
-5. **Drop the logo preload-then-decode chain on AuthPage** — load the logo with `fetchpriority="high"` and `decoding="async"` so the page is interactive before the image finishes.
+- **Trigger**: On `/dashboard` mount, check `localStorage.entropy_tour_done`. If absent and `loaded === true` and stocks have hydrated, start the tour.
+- **Replay**: Pressing `?` (or a small "Tour" link in the header overflow) re-opens it.
+- **Skip / Next / Back**: Footer buttons. ESC = skip. Skip and Finish both set the flag.
+- **No external library** — keep bundle lean. Custom lightweight component using `getBoundingClientRect()` + a fixed overlay.
 
-Expected result: returning users land on `/dashboard` with no splash; new sign-ins shave roughly 300–600 ms off the click→Google redirect.
+## Visual style
 
-> Note: the actual OAuth round-trip through Google is outside our control. We can only remove the local overhead before and after.
+Matches the institutional terminal aesthetic (no buzzwords, mono labels):
 
----
+- Full-screen dim overlay (`bg-background/80 backdrop-blur-sm`), z-index above header.
+- A "spotlight" cutout: a transparent rounded rectangle aligned to the target element's bounding box (4px padding), with a 1px primary border + soft glow.
+- An **SVG arrow** drawn from the tooltip card to the spotlight edge — curved bezier, 1.5px stroke, primary color, animated dash on draw.
+- Tooltip card: `glass-panel` style, ~280px wide, mono caption + step counter `03 / 08`, title, body, and `Skip · Back · Next` row.
+- Auto-positions the card on the side with most space (top/bottom/left/right of target). Repositions on window resize and on tab change.
+- Smooth 200ms fade between steps.
 
-## Part 2 — Remove every visible "Lovable" / "gpt-engineer" trace
+## Mobile behavior
 
-Audit found these public leaks:
+Viewport is 420px. The tab bar wraps and Direct Profit/Brief live in a Sheet menu.
 
-| Where | What leaks | Fix |
-|---|---|---|
-| `src/components/Header.tsx` (logo `<img src>`) | `/lovable-uploads/9357bd58-...jpg` | Move the logo file to `public/brand/entropy-mark.jpg` and update the two `<img src>`s. |
-| `index.html` `og:image` + `twitter:image` | `storage.googleapis.com/gpt-engineer-file-uploads/...` | Re-host the social card under `public/brand/social-card.webp` and point both meta tags to `https://entropylite.in/brand/social-card.webp`. |
-| `src/index.css` line 591 | `#lovable-badge { display:none }` selector | Rename selector to a neutral `#edit-badge` (kept as defensive hide; the badge is already disabled via publish settings). |
-| Other `/lovable-uploads/...` references project-wide | Any image still served from that path | Sweep the codebase, copy each referenced asset into `public/brand/` (or `src/assets/`) and rewrite the paths. |
-| Built JS bundle | `@lovable.dev/cloud-auth-js` import string | Cannot be removed without breaking managed OAuth. **Acceptable** — it only appears inside minified JS, not in any user-facing URL or UI. |
-| Network tab during sign-in | Request to `oauth.lovable.app` | Inherent to managed Google OAuth. Flagged below as a trade-off. |
+- Detect `useIsMobile()`. On mobile, condense to 5 steps (Input, Tabs, Direct Profit, Brief, Status), and skip steps whose target is offscreen.
+- For targets inside the mobile menu (Sheet), the tour will programmatically open the Sheet for that step, then close it after Next.
+- Arrows shorten to straight lines on small screens.
 
-### One real trade-off to decide
+## Tab-aware steps
 
-The managed OAuth broker call to `oauth.lovable.app` is visible to anyone who opens DevTools → Network during sign-in. Two options:
+Some targets only exist when their tab is active (e.g. Geopolitics globe). For those steps the tour calls `setActiveTab(...)` first, waits one frame for layout, then anchors the arrow. After Next, it returns to `dashboard`.
 
-- **Keep managed OAuth** (recommended): faster to ship, no Google Cloud setup, branding leak is only visible to people inspecting network traffic.
-- **Switch to bring-your-own Google OAuth**: requires creating a Google Cloud OAuth client and pasting client ID/secret into Cloud → Auth → Google. Network requests then go to `*.supabase.co` instead of `oauth.lovable.app`. Still not your own domain, but no "lovable" string.
+## Technical details
 
-I'll proceed with managed OAuth unless you say otherwise — switching later is a 5-minute config change, no code rewrite.
+**New files**
+- `src/components/tour/TerminalTour.tsx` — overlay, spotlight, SVG arrow, card, keyboard handlers.
+- `src/components/tour/tourSteps.ts` — ordered step list `{ id, selector, title, body, requiresTab?, side? }`.
+- `src/hooks/useTour.ts` — manages `localStorage` flag, current step index, start/skip/finish, and exposes `startTour()` for the replay shortcut.
 
----
+**Edits**
+- `src/pages/Index.tsx`:
+  - Add `data-tour="..."` attributes to: stock input wrapper, tab bar container, each relevant tab button, status bar, and (via props) the Brief + Direct Profit buttons.
+  - Mount `<TerminalTour stocks={stocks} setActiveTab={handleTabSwitch} />` after `loaded`.
+  - Listen for `?` keypress to call `startTour()`.
+- `src/components/Header.tsx`: forward `data-tour="brief-btn"` and `data-tour="direct-profit-btn"` onto the existing buttons (no visual change).
+- `src/components/terminal/SystemStatusBar.tsx`: add `data-tour="status-bar"` on root.
 
-## Files I will touch
+**Selector strategy**: query by `[data-tour="..."]` so refactors that change classNames don't break the tour. If a target is missing, that step is skipped silently.
 
-- `src/App.tsx` — optimistic AuthGate, synchronous session bootstrap
-- `src/pages/AuthPage.tsx` — remove premature `setLoading(null)`, image priority hints
-- `index.html` — preconnect/dns-prefetch hints, swap social-image URLs
-- `src/components/Header.tsx` — swap logo src to neutral path
-- `src/index.css` — rename badge selector
-- `public/brand/` (new folder) — host logo + social card under our own domain
-- Sweep + rewrite any other `/lovable-uploads/...` references found
+**Persistence**: `localStorage.setItem("entropy_tour_done", "1")` on Finish or Skip. Versioned key (`entropy_tour_done_v1`) so we can bump it later when the UI changes meaningfully.
 
-No database, edge function, or auth-provider changes required.
+## Out of scope
+
+- Onboarding for `/` landing page (this is dashboard-only, per request).
+- Per-tab nested tours inside Sandbox/Augment sub-modules (can be a follow-up).

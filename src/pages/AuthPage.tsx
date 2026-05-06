@@ -11,18 +11,10 @@ export default function AuthPage() {
 
   const handleOAuth = async (provider: "google" | "apple") => {
     setLoading(provider);
-    try {
-      const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: window.location.origin + "/dashboard",
-      });
-      // If the browser is about to redirect, keep the spinner — don't clear loading.
-      if ((result as any)?.redirected) return;
-      if ((result as any)?.error) {
-        toast.error((result as any).error.message || "Sign in failed");
-      }
-    } catch (e: any) {
-      toast.error(e?.message || "Sign in failed");
-    }
+    const { error } = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: window.location.origin,
+    });
+    if (error) toast.error(error.message || "Sign in failed");
     setLoading(null);
   };
 
@@ -39,9 +31,6 @@ export default function AuthPage() {
           src={entropyLogoFull}
           alt="Entropy"
           className="h-20 object-contain"
-          // @ts-expect-error - fetchpriority is a valid HTML attr
-          fetchpriority="high"
-          decoding="async"
         />
 
         <h1
