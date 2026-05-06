@@ -22,9 +22,35 @@ import CadenceEntryPage from "./pages/CadenceEntryPage";
 
 const queryClient = new QueryClient();
 
+// Synchronously sniff localStorage for an existing Supabase session so returning
+// users skip the loading splash entirely. We only block render when an OAuth
+// redirect is in progress (URL has a code/access_token).
+function readCachedSession(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        const raw = localStorage.getItem(k);
+        if (raw && raw.length > 20) return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
+function isOAuthReturn(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hash || "";
+  const s = window.location.search || "";
+  return h.includes("access_token=") || h.includes("error=") || s.includes("code=");
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedHasSession = readCachedSession();
+  const oauthReturn = isOAuthReturn();
+  const [session, setSession] = useState<Session | null>(cachedHasSession ? ({} as Session) : null);
+  // Only show splash while we're processing an OAuth redirect.
+  const [loading, setLoading] = useState(oauthReturn);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -49,7 +75,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground font-mono text-sm animate-pulse">Loading...</p>
+        <p className="text-muted-foreground font-mono text-sm animate-pulse">Signing you in…</p>
       </div>
     );
   }
