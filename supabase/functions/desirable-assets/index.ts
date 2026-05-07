@@ -1246,10 +1246,26 @@ Return via the tool call only.`,
       // INVERSE HARD FILTER: when India mode is OFF the user wants global / non-India
       // ideas. Strip .NS / .BO so we don't leak Indian tickers into international slates
       // just because the model latched onto INR-base context.
+      // Also strip bare Indian base tickers (e.g. "RELIANCE", "TCS") and INR-currency
+      // candidates — model often emits them without the .NS suffix.
+      const INDIAN_BASES = new Set([
+        "WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC",
+        "KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS",
+        "TECHM","HINDUNILVR","POWERGRID","NTPC","ONGC","COALINDIA","BPCL","JSWSTEEL","TATASTEEL","DRREDDY",
+        "CIPLA","DIVISLAB","ULTRACEMCO","GRASIM","NESTLEIND","BAJAJFINSV","HEROMOTOCO","EICHERMOT","APOLLOHOSP",
+        "HINDALCO","VEDL","MRF","IRCTC","ETERNAL","ZOMATO","PAYTM","NYKAA","DMART","TRENT","JIOFIN",
+        "ASIANPAINT","NIFTYBEES","BANKBEES","ITBEES","GOLDBEES","SILVERBEES","INDIAVIX",
+      ]);
       const before = candidates.length;
       candidates = candidates.filter((c: any) => {
         const t = String(c?.ticker || "").toUpperCase();
-        return !t.endsWith(".NS") && !t.endsWith(".BO");
+        const ccy = String(c?.currency || "").toUpperCase();
+        const exch = String(c?.exchange || "").toUpperCase();
+        if (t.endsWith(".NS") || t.endsWith(".BO")) return false;
+        if (INDIAN_BASES.has(t)) return false;
+        if (ccy === "INR") return false;
+        if (exch === "NSE" || exch === "BSE") return false;
+        return true;
       });
       if (candidates.length !== before) {
         console.log(`desirable-assets non-India hard-filter: stripped ${before - candidates.length} Indian tickers (indiaMode=off)`);
