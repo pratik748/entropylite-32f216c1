@@ -1,70 +1,97 @@
-# Faster sign-in + remove visible Lovable branding
+## Problem
 
-Two separate problems, fixed together.
+Today, `useSellNotifications` only fires toasts ("🚨 Profit Erased") after gains have already evaporated. It never records that you *would have* sold at the peak, so you only see the bad outcome — not the profit your system actually identified.
 
----
+The app should:
 
-## Part 1 — Why login feels slow, and what we'll change
+1. Detect the optimal exit moment using advanced computation (not just peak tracking).
+2. Auto-record a "locked profit" event the instant the exit signal fires (a virtual sell).
+3. Show you the realized P&L you captured, even if the live price keeps falling.
 
-Today's flow on `/dashboard`:
+## Solution: Auto-Lock Profit Engine
+
+A new layer that converts sell signals into recorded virtual exits and surfaces realized gains.
+
+### 1. Exit-signal computation (advanced, not heuristic)
+
+New file `src/lib/exit-signal-engine.ts` consuming the existing `useQuantSnapshot` (real σ, μ, drawdown, Sharpe, Merton DD) plus per-asset peak tracking. Triggers a virtual exit when ANY of:
+
+- **Trailing-stop breach (Chandelier exit):** price drops below `peak − k·ATR`, where ATR is computed from 1y daily bars (k=2.5, tightens to 1.5 once profit > 1σ_annual).
+- **Drawdown-from-peak threshold:** `(peak − price)/peak ≥ max(0.5·σ_daily·√5, 1.5%)` — adapts to the asset's own volatility.
+- **Momentum reversal:** 5-day log-return slope flips negative AND z-score of today's return < −1.0.
+- **Risk regime shift:** Merton PD jumps > 25% intraday, or `riskScore ≥ 75` while in profit.
+- **AI sell suggestion** from existing analysis (already detected, now triggers a lock instead of a toast).
+
+The first trigger wins; we record the exit price = current price at that tick.
+
+### 2. Virtual sell ledger (locked profits)
+
+New table `locked_exits` (Lovable Cloud) with RLS scoped to `auth.uid()`:
 
 ```text
-1. AuthGate mounts
-2. getSession() round-trip   ──► waits before showing anything
-3. User sees AuthPage, clicks "Continue with Google"
-4. Broker call to oauth.lovable.app  (cold, ~300–800ms)
-5. Redirect to Google consent
-6. Redirect back to /dashboard
-7. AuthGate re-mounts → getSession() AGAIN
-8. Finally Index renders
+id uuid pk
+user_id uuid
+ticker text
+buy_price numeric
+exit_price numeric
+quantity numeric
+pnl_abs numeric
+pnl_pct numeric
+peak_price numeric
+trigger_reason text   -- 'chandelier' | 'drawdown' | 'momentum' | 'risk' | 'ai'
+locked_at timestamptz
+currency text
 ```
 
-The visible "spinning forever" comes mostly from steps 2, 4 and 7. Fixes:
+When a trigger fires:
 
-1. **Optimistic AuthGate** — render the auth UI immediately, only show the loading splash for the brief moment after a known redirect (when URL has `code=` / `#access_token`). Right now every cold visit waits on `getSession()` even when there is no session.
-2. **Cache the session locally** — read `localStorage` for an existing Supabase session synchronously on first paint, so returning users skip the splash entirely. `onAuthStateChange` then reconciles in the background.
-3. **Preconnect to OAuth + Supabase hosts** — add `<link rel="preconnect">` and `<link rel="dns-prefetch">` in `index.html` for the OAuth broker host and the Supabase project host, so the TLS handshake is warm before the user clicks the button.
-4. **Disable button immediately, no second await** — the OAuth handler already redirects; remove the `setLoading(null)` after the redirect path so the spinner stays until the browser actually navigates (prevents the "I clicked but nothing happened" feel).
-5. **Drop the logo preload-then-decode chain on AuthPage** — load the logo with `fetchpriority="high"` and `decoding="async"` so the page is interactive before the image finishes.
+- Insert a row.
+- Mark the position in local state as "locked" so we don't re-fire.
+- Show a positive toast: `🔒 AAPL — Profit locked at +4.2% ($312). Trigger: trailing-stop. Live price may diverge; your captured gain is recorded.`
 
-Expected result: returning users land on `/dashboard` with no splash; new sign-ins shave roughly 300–600 ms off the click→Google redirect.
+### 3. UI surfaces
 
-> Note: the actual OAuth round-trip through Google is outside our control. We can only remove the local overhead before and after.
+- **PortfolioBlotter:** new column `LOCKED` showing 🔒 + locked P&L for positions that hit an exit. Live PNL stays visible but greyed out, so you can see "what you saved."
+- **New panel `LockedProfitsPanel**` (collapsible under blotter or as a tab): list of locked exits, total realized P&L in base currency, win-rate, average trigger reason. Sortable, exportable.
+- **Header KPI:** "Realized (locked): +$X" next to the existing live P&L sparkline.
 
----
+### 4. Replace bad alert behavior
 
-## Part 2 — Remove every visible "Lovable" / "gpt-engineer" trace
+In `useSellNotifications`:
 
-Audit found these public leaks:
+- Remove the "🚨 Profit Erased" toast (it's the symptom we're fixing).
+- Replace "Near max profit / max profit zone" toasts with calls into the exit-signal engine so they actually lock instead of just warning.
+- Keep risk-critical and AI-sell toasts but route them through the lock engine first.
 
-| Where | What leaks | Fix |
-|---|---|---|
-| `src/components/Header.tsx` (logo `<img src>`) | `/lovable-uploads/9357bd58-...jpg` | Move the logo file to `public/brand/entropy-mark.jpg` and update the two `<img src>`s. |
-| `index.html` `og:image` + `twitter:image` | `storage.googleapis.com/gpt-engineer-file-uploads/...` | Re-host the social card under `public/brand/social-card.webp` and point both meta tags to `https://entropylite.in/brand/social-card.webp`. |
-| `src/index.css` line 591 | `#lovable-badge { display:none }` selector | Rename selector to a neutral `#edit-badge` (kept as defensive hide; the badge is already disabled via publish settings). |
-| Other `/lovable-uploads/...` references project-wide | Any image still served from that path | Sweep the codebase, copy each referenced asset into `public/brand/` (or `src/assets/`) and rewrite the paths. |
-| Built JS bundle | `@lovable.dev/cloud-auth-js` import string | Cannot be removed without breaking managed OAuth. **Acceptable** — it only appears inside minified JS, not in any user-facing URL or UI. |
-| Network tab during sign-in | Request to `oauth.lovable.app` | Inherent to managed Google OAuth. Flagged below as a trade-off. |
+### 5. Settings
 
-### One real trade-off to decide
+Small settings popover (gear in blotter header):
 
-The managed OAuth broker call to `oauth.lovable.app` is visible to anyone who opens DevTools → Network during sign-in. Two options:
+- Auto-lock: ON / OFF (default ON)
+- Aggressiveness: Conservative (k=3 ATR) / Balanced (2.5) / Aggressive (1.5)
+- Min profit before any lock can fire: default 0.5%
 
-- **Keep managed OAuth** (recommended): faster to ship, no Google Cloud setup, branding leak is only visible to people inspecting network traffic.
-- **Switch to bring-your-own Google OAuth**: requires creating a Google Cloud OAuth client and pasting client ID/secret into Cloud → Auth → Google. Network requests then go to `*.supabase.co` instead of `oauth.lovable.app`. Still not your own domain, but no "lovable" string.
+Stored in `localStorage` under `entropy_autolock_config`.
 
-I'll proceed with managed OAuth unless you say otherwise — switching later is a 5-minute config change, no code rewrite.
+## Files
 
----
+**New**
 
-## Files I will touch
+- `src/lib/exit-signal-engine.ts` — pure math, takes AssetStats + price history + peak → trigger or null
+- `src/hooks/useAutoLockProfits.ts` — wires quant snapshot + portfolio + writes to `locked_exits`
+- `src/components/LockedProfitsPanel.tsx`
+- `supabase/migrations/<ts>_locked_exits.sql` — table + RLS
 
-- `src/App.tsx` — optimistic AuthGate, synchronous session bootstrap
-- `src/pages/AuthPage.tsx` — remove premature `setLoading(null)`, image priority hints
-- `index.html` — preconnect/dns-prefetch hints, swap social-image URLs
-- `src/components/Header.tsx` — swap logo src to neutral path
-- `src/index.css` — rename badge selector
-- `public/brand/` (new folder) — host logo + social card under our own domain
-- Sweep + rewrite any other `/lovable-uploads/...` references found
+**Edited**
 
-No database, edge function, or auth-provider changes required.
+- `src/hooks/useSellNotifications.ts` — remove "profit erased", route through lock engine
+- `src/components/terminal/PortfolioBlotter.tsx` — LOCKED column + grey-out locked rows
+- `src/components/charts/PortfolioSparkline.tsx` — add realized line
+- `src/pages/Index.tsx` — mount `useAutoLockProfits`, render `LockedProfitsPanel`
+
+## Notes
+
+- This is a *virtual* sell — we don't touch any broker. The user keeps holding the asset; we just record the moment your system decided "exit now" so you can see the profit it captured vs. what holding cost you.
+- All math uses real 1y history via the existing quant engine — no random walks or fake sine waves.
+- 60s grace period on new positions stays, so freshly added stocks don't auto-lock immediately.
+- The engine should send a notification when you open the app that you earned thiss instead of you lose this
