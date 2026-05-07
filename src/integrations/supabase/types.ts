@@ -166,6 +166,54 @@ export type Database = {
         }
         Relationships: []
       }
+      locked_exits: {
+        Row: {
+          buy_price: number
+          currency: string
+          exit_price: number
+          id: string
+          locked_at: string
+          peak_price: number
+          pnl_abs: number
+          pnl_pct: number
+          position_key: string
+          quantity: number
+          ticker: string
+          trigger_reason: string
+          user_id: string
+        }
+        Insert: {
+          buy_price?: number
+          currency?: string
+          exit_price?: number
+          id?: string
+          locked_at?: string
+          peak_price?: number
+          pnl_abs?: number
+          pnl_pct?: number
+          position_key: string
+          quantity?: number
+          ticker: string
+          trigger_reason?: string
+          user_id: string
+        }
+        Update: {
+          buy_price?: number
+          currency?: string
+          exit_price?: number
+          id?: string
+          locked_at?: string
+          peak_price?: number
+          pnl_abs?: number
+          pnl_pct?: number
+          position_key?: string
+          quantity?: number
+          ticker?: string
+          trigger_reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lodger_trades: {
         Row: {
           actual_hold_min: number
