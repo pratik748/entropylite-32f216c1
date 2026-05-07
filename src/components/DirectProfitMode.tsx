@@ -706,10 +706,10 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                 {/* News Sentiment */}
                 <div className="border-b border-border p-4 space-y-1.5">
                   <div className="flex items-center gap-2 text-sm">
-                    <span>🟢</span><span className="text-foreground">{result.positiveNews}</span>
+                    <span className="text-gain font-mono text-[10px]">+</span><span className="text-foreground">{result.positiveNews}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span>🔴</span><span className="text-foreground">{result.negativeNews}</span>
+                    <span className="text-loss font-mono text-[10px]">−</span><span className="text-foreground">{result.negativeNews}</span>
                   </div>
                 </div>
 
@@ -902,7 +902,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${item.action === "BUY" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
                             {item.action}
                           </span>
-                          {hitTarget && <span className="text-[10px] text-gain">🎯 Target Hit</span>}
+                          {hitTarget && <span className="text-[10px] text-gain font-mono">TARGET HIT</span>}
                           {hitStop && <span className="text-[10px] text-loss">⛔ Stop Hit</span>}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
