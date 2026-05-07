@@ -73,7 +73,7 @@ const urgencyConfig: Record<string, { label: string; color: string }> = {
   IMMEDIATE:     { label: "⚡ IMMEDIATE", color: "text-loss" },
   TODAY:         { label: "🕐 TODAY", color: "text-warning" },
   THIS_WEEK:     { label: "📅 THIS WEEK", color: "text-foreground" },
-  WHEN_TRIGGERED: { label: "🎯 ON TRIGGER", color: "text-muted-foreground" },
+  WHEN_TRIGGERED: { label: "ON TRIGGER", color: "text-muted-foreground" },
 };
 
 const categoryLabels: Record<string, string> = {

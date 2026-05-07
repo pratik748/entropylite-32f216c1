@@ -341,6 +341,13 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) {
       setLoading(true);
       setError(null);
+      // Clear stale results immediately so the loading screen is unambiguous —
+      // user explicitly asked old assets to disappear when "Find Assets" is tapped.
+      setRecommendations([]);
+      setMarketCondition("");
+      setLiveWebContext("");
+      setStats({ generated: 0, passed: 0 });
+      setAddedTickers(new Set());
       setLoadingProgress(0);
       setLoadingStage("Initializing quant funnel...");
       // Simulate progress through stages
@@ -367,6 +374,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     }
     try {
       const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
+
+      // Cross-module conflict guard: pull tickers Direct Profit just proposed
+      // (stored in dp-portfolio) so Desirable Assets doesn't surface contradictory
+      // setups for the same names the user just acted on in Direct Profit.
+      let dpTickers: string[] = [];
+      try {
+        const raw = localStorage.getItem("dp-portfolio");
+        if (raw) {
+          const items = JSON.parse(raw);
+          if (Array.isArray(items)) {
+            dpTickers = items.map((it: any) => String(it?.ticker || "").toUpperCase()).filter(Boolean);
+          }
+        }
+      } catch { /* ignore */ }
 
       // Build weights and sectors maps
       const portfolioWeights: Record<string, number> = {};
@@ -418,7 +439,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         },
         run: () => governedInvoke("desirable-assets", {
           body: {
-            portfolioTickers: existingTickers,
+            portfolioTickers: Array.from(new Set([...existingTickers, ...dpTickers])),
             portfolioWeights,
             portfolioSectors,
             portfolioSignals,
