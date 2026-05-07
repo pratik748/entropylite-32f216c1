@@ -7,6 +7,7 @@ import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
 import PortfolioSparkline from "@/components/charts/PortfolioSparkline";
+import LockedProfitsPanel from "@/components/LockedProfitsPanel";
 
 interface PortfolioBlotterProps {
   stocks: PortfolioStock[];
@@ -155,6 +156,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
       {analyzed.length > 0 && (
         <>
           <PortfolioSparkline stocks={stocks} />
+          <LockedProfitsPanel stocks={stocks} />
           <div className="border-t border-border px-2 py-1.5 font-mono text-[9px] flex justify-between text-muted-foreground">
             <span>TOTAL ({baseCurrency})</span>
             <span className="text-foreground font-semibold tabular-nums">
