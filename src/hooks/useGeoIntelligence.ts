@@ -121,7 +121,7 @@ export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
     // 1. Global risk spike
     if (next.globalRiskScore - prev.globalRiskScore >= 10) {
       toast({
-        title: "⚠️ Global Risk Spike",
+        title: "Global risk spike",
         description: `Risk score surged from ${prev.globalRiskScore} → ${next.globalRiskScore}. Regime: ${next.regimeSignal}`,
         variant: "destructive",
       });
@@ -132,7 +132,7 @@ export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
       const isWorse = next.regimeSignal === "crisis" || (next.regimeSignal === "transition" && prev.regimeSignal === "stable");
       if (isWorse) {
         toast({
-          title: "🔴 Regime Shift Detected",
+          title: "Regime shift detected",
           description: `Market regime changed: ${prev.regimeSignal} → ${next.regimeSignal}. ${next.capitalFlowDirection === "risk-off" ? "Capital fleeing to safe havens." : ""}`,
           variant: "destructive",
         });
@@ -147,13 +147,13 @@ export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
       if (!prevConflict && !alertedRef.current.has(alertKey)) {
         alertedRef.current.add(alertKey);
         toast({
-          title: `🆕 New Threat: ${conflict.name}`,
+          title: `New threat: ${conflict.name}`,
           description: `Severity: ${(conflict.severity * 100).toFixed(0)}%, ${conflict.summary?.slice(0, 100)}`,
         });
       } else if (prevConflict && conflict.severity - prevConflict.severity >= 0.15 && !alertedRef.current.has(alertKey)) {
         alertedRef.current.add(alertKey);
         toast({
-          title: `📈 Escalation: ${conflict.name}`,
+          title: `Escalation: ${conflict.name}`,
           description: `Severity increased ${(prevConflict.severity * 100).toFixed(0)}% → ${(conflict.severity * 100).toFixed(0)}%${conflict.actionableIntel ? `. ${conflict.actionableIntel}` : ""}`,
           variant: "destructive",
         });
@@ -177,7 +177,7 @@ export function useGeoIntelligence(stocks: PortfolioStock[], refreshKey = 0) {
           if (!alertedRef.current.has(key)) {
             alertedRef.current.add(key);
             toast({
-              title: `🎯 ${stock.ticker} Under Threat`,
+              title: `${stock.ticker} under threat`,
               description: `${threat.name} now affects your position.${threat.actionableIntel ? ` Intel: ${threat.actionableIntel}` : ""}`,
               variant: "destructive",
             });
