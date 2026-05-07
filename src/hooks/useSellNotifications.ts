@@ -229,21 +229,9 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         });
       }
 
-      // ── PROFIT ERASED ─────────────────────────────────────
-      if (
-        cooldownOk && graceOk &&
-        tracker.lastPnlPct > 0.3 &&
-        pnlPct < 0
-      ) {
-        tracker.notifiedAt = now;
-        dirty = true;
-        toast({
-          title: `🚨 ${ticker}, Profit Erased`,
-          description: `Was +${tracker.lastPnlPct.toFixed(1)}%, now ${pnlPct.toFixed(1)}%. Previous gains wiped out.`,
-          variant: "destructive",
-          duration: 15000,
-        });
-      }
+      // "Profit Erased" alerts removed — the Auto-Lock Profit Engine
+      // (useAutoLockProfits) now records a virtual exit at the optimal
+      // moment and surfaces realized P&L instead of warning after the fact.
 
       tracker.lastPnlPct = pnlPct;
     }

@@ -1,72 +1,97 @@
-# First-Time Tutorial — Arrow-Based Walkthrough
+## Problem
 
-When a user opens the dashboard for the first time, overlay a guided tour that points (with arrows) at the key parts of the terminal, one step at a time. After completion or skip, it never shows again.
+Today, `useSellNotifications` only fires toasts ("🚨 Profit Erased") after gains have already evaporated. It never records that you *would have* sold at the peak, so you only see the bad outcome — not the profit your system actually identified.
 
-## What the tour covers
+The app should:
 
-Sequenced steps, each with a short title, one-line description, and an arrow pointing to the actual element:
+1. Detect the optimal exit moment using advanced computation (not just peak tracking).
+2. Auto-record a "locked profit" event the instant the exit signal fires (a virtual sell).
+3. Show you the realized P&L you captured, even if the live price keeps falling.
 
-1. **Stock Input** — "Drop a ticker here. This is where every analysis begins."
-2. **Tab Bar** — "Nine modes. Dashboard is your cockpit; the rest are specialist lenses."
-3. **Geopolitics tab** — "Live world risk overlay. Already running in the background."
-4. **Sandbox tab** — "Twelve engines. Run scenarios before the market does."
-5. **Risk + Fortress tabs** — "Defensive layer. Stress, hedge, fortress mode."
-6. **Direct Profit toggle (header)** — "One-button verdict. Arbitrated across all engines."
-7. **Brief button (header)** — "Three insights. Shareable card. PNG export."
-8. **System Status bar** — "Live data health. Always visible."
+## Solution: Auto-Lock Profit Engine
 
-Final step: "You're in. Press ? anytime to replay the tour."
+A new layer that converts sell signals into recorded virtual exits and surfaces realized gains.
 
-## How it works
+### 1. Exit-signal computation (advanced, not heuristic)
 
-- **Trigger**: On `/dashboard` mount, check `localStorage.entropy_tour_done`. If absent and `loaded === true` and stocks have hydrated, start the tour.
-- **Replay**: Pressing `?` (or a small "Tour" link in the header overflow) re-opens it.
-- **Skip / Next / Back**: Footer buttons. ESC = skip. Skip and Finish both set the flag.
-- **No external library** — keep bundle lean. Custom lightweight component using `getBoundingClientRect()` + a fixed overlay.
+New file `src/lib/exit-signal-engine.ts` consuming the existing `useQuantSnapshot` (real σ, μ, drawdown, Sharpe, Merton DD) plus per-asset peak tracking. Triggers a virtual exit when ANY of:
 
-## Visual style
+- **Trailing-stop breach (Chandelier exit):** price drops below `peak − k·ATR`, where ATR is computed from 1y daily bars (k=2.5, tightens to 1.5 once profit > 1σ_annual).
+- **Drawdown-from-peak threshold:** `(peak − price)/peak ≥ max(0.5·σ_daily·√5, 1.5%)` — adapts to the asset's own volatility.
+- **Momentum reversal:** 5-day log-return slope flips negative AND z-score of today's return < −1.0.
+- **Risk regime shift:** Merton PD jumps > 25% intraday, or `riskScore ≥ 75` while in profit.
+- **AI sell suggestion** from existing analysis (already detected, now triggers a lock instead of a toast).
 
-Matches the institutional terminal aesthetic (no buzzwords, mono labels):
+The first trigger wins; we record the exit price = current price at that tick.
 
-- Full-screen dim overlay (`bg-background/80 backdrop-blur-sm`), z-index above header.
-- A "spotlight" cutout: a transparent rounded rectangle aligned to the target element's bounding box (4px padding), with a 1px primary border + soft glow.
-- An **SVG arrow** drawn from the tooltip card to the spotlight edge — curved bezier, 1.5px stroke, primary color, animated dash on draw.
-- Tooltip card: `glass-panel` style, ~280px wide, mono caption + step counter `03 / 08`, title, body, and `Skip · Back · Next` row.
-- Auto-positions the card on the side with most space (top/bottom/left/right of target). Repositions on window resize and on tab change.
-- Smooth 200ms fade between steps.
+### 2. Virtual sell ledger (locked profits)
 
-## Mobile behavior
+New table `locked_exits` (Lovable Cloud) with RLS scoped to `auth.uid()`:
 
-Viewport is 420px. The tab bar wraps and Direct Profit/Brief live in a Sheet menu.
+```text
+id uuid pk
+user_id uuid
+ticker text
+buy_price numeric
+exit_price numeric
+quantity numeric
+pnl_abs numeric
+pnl_pct numeric
+peak_price numeric
+trigger_reason text   -- 'chandelier' | 'drawdown' | 'momentum' | 'risk' | 'ai'
+locked_at timestamptz
+currency text
+```
 
-- Detect `useIsMobile()`. On mobile, condense to 5 steps (Input, Tabs, Direct Profit, Brief, Status), and skip steps whose target is offscreen.
-- For targets inside the mobile menu (Sheet), the tour will programmatically open the Sheet for that step, then close it after Next.
-- Arrows shorten to straight lines on small screens.
+When a trigger fires:
 
-## Tab-aware steps
+- Insert a row.
+- Mark the position in local state as "locked" so we don't re-fire.
+- Show a positive toast: `🔒 AAPL — Profit locked at +4.2% ($312). Trigger: trailing-stop. Live price may diverge; your captured gain is recorded.`
 
-Some targets only exist when their tab is active (e.g. Geopolitics globe). For those steps the tour calls `setActiveTab(...)` first, waits one frame for layout, then anchors the arrow. After Next, it returns to `dashboard`.
+### 3. UI surfaces
 
-## Technical details
+- **PortfolioBlotter:** new column `LOCKED` showing 🔒 + locked P&L for positions that hit an exit. Live PNL stays visible but greyed out, so you can see "what you saved."
+- **New panel `LockedProfitsPanel**` (collapsible under blotter or as a tab): list of locked exits, total realized P&L in base currency, win-rate, average trigger reason. Sortable, exportable.
+- **Header KPI:** "Realized (locked): +$X" next to the existing live P&L sparkline.
 
-**New files**
-- `src/components/tour/TerminalTour.tsx` — overlay, spotlight, SVG arrow, card, keyboard handlers.
-- `src/components/tour/tourSteps.ts` — ordered step list `{ id, selector, title, body, requiresTab?, side? }`.
-- `src/hooks/useTour.ts` — manages `localStorage` flag, current step index, start/skip/finish, and exposes `startTour()` for the replay shortcut.
+### 4. Replace bad alert behavior
 
-**Edits**
-- `src/pages/Index.tsx`:
-  - Add `data-tour="..."` attributes to: stock input wrapper, tab bar container, each relevant tab button, status bar, and (via props) the Brief + Direct Profit buttons.
-  - Mount `<TerminalTour stocks={stocks} setActiveTab={handleTabSwitch} />` after `loaded`.
-  - Listen for `?` keypress to call `startTour()`.
-- `src/components/Header.tsx`: forward `data-tour="brief-btn"` and `data-tour="direct-profit-btn"` onto the existing buttons (no visual change).
-- `src/components/terminal/SystemStatusBar.tsx`: add `data-tour="status-bar"` on root.
+In `useSellNotifications`:
 
-**Selector strategy**: query by `[data-tour="..."]` so refactors that change classNames don't break the tour. If a target is missing, that step is skipped silently.
+- Remove the "🚨 Profit Erased" toast (it's the symptom we're fixing).
+- Replace "Near max profit / max profit zone" toasts with calls into the exit-signal engine so they actually lock instead of just warning.
+- Keep risk-critical and AI-sell toasts but route them through the lock engine first.
 
-**Persistence**: `localStorage.setItem("entropy_tour_done", "1")` on Finish or Skip. Versioned key (`entropy_tour_done_v1`) so we can bump it later when the UI changes meaningfully.
+### 5. Settings
 
-## Out of scope
+Small settings popover (gear in blotter header):
 
-- Onboarding for `/` landing page (this is dashboard-only, per request).
-- Per-tab nested tours inside Sandbox/Augment sub-modules (can be a follow-up).
+- Auto-lock: ON / OFF (default ON)
+- Aggressiveness: Conservative (k=3 ATR) / Balanced (2.5) / Aggressive (1.5)
+- Min profit before any lock can fire: default 0.5%
+
+Stored in `localStorage` under `entropy_autolock_config`.
+
+## Files
+
+**New**
+
+- `src/lib/exit-signal-engine.ts` — pure math, takes AssetStats + price history + peak → trigger or null
+- `src/hooks/useAutoLockProfits.ts` — wires quant snapshot + portfolio + writes to `locked_exits`
+- `src/components/LockedProfitsPanel.tsx`
+- `supabase/migrations/<ts>_locked_exits.sql` — table + RLS
+
+**Edited**
+
+- `src/hooks/useSellNotifications.ts` — remove "profit erased", route through lock engine
+- `src/components/terminal/PortfolioBlotter.tsx` — LOCKED column + grey-out locked rows
+- `src/components/charts/PortfolioSparkline.tsx` — add realized line
+- `src/pages/Index.tsx` — mount `useAutoLockProfits`, render `LockedProfitsPanel`
+
+## Notes
+
+- This is a *virtual* sell — we don't touch any broker. The user keeps holding the asset; we just record the moment your system decided "exit now" so you can see the profit it captured vs. what holding cost you.
+- All math uses real 1y history via the existing quant engine — no random walks or fake sine waves.
+- 60s grace period on new positions stays, so freshly added stocks don't auto-lock immediately.
+- The engine should send a notification when you open the app that you earned thiss instead of you lose this
