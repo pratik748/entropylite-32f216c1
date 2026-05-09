@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, Shield, Zap, MapPin, Radio, ChevronDown, ChevronUp } from "lucide-react";
 import ForexVolChart from "@/components/charts/ForexVolChart";
-import RiskGauge from "@/components/charts/RiskGauge";
 import type { ConflictEvent, ForexEntry, HighEntropyZone } from "./GeopoliticalMap";
 
 interface GeoData {
@@ -30,6 +29,9 @@ const TYPE_BADGE: Record<string, string> = {
 
 export function RiskStrip({ data }: { data: GeoData }) {
   const riskHigh = data.globalRiskScore >= 55;
+  const score = Math.max(0, Math.min(100, data.globalRiskScore || 0));
+  const scoreTone =
+    score >= 70 ? "text-loss" : score >= 45 ? "text-warning" : "text-gain";
 
   const items = [
     {
@@ -66,18 +68,36 @@ export function RiskStrip({ data }: { data: GeoData }) {
 
   return (
     <div className={`glass-panel rounded-xl px-3 py-2 ${riskHigh ? "glass-glow-loss" : ""}`}>
-      <div className="grid gap-2 grid-cols-[100px_1fr]">
-        <div className="flex items-center justify-center">
-          <RiskGauge score={data.globalRiskScore} size={90} />
+      <div className="space-y-2">
+        {/* Heat bar */}
+        <div>
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <p className="text-[8px] uppercase tracking-widest text-muted-foreground font-medium truncate">
+              Global Risk
+            </p>
+            <p className={`font-mono text-[10px] font-bold tabular-nums ${scoreTone}`}>
+              {score.toFixed(0)}<span className="text-muted-foreground font-normal">/100</span>
+            </p>
+          </div>
+          <div className="relative h-1.5 w-full rounded-full overflow-hidden bg-surface-3">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{
+                width: `${score}%`,
+                background:
+                  "linear-gradient(90deg, hsl(var(--gain)) 0%, hsl(var(--warning)) 55%, hsl(var(--loss)) 100%)",
+              }}
+            />
+          </div>
         </div>
-        <div className="grid gap-1.5 grid-cols-4">
+        <div className="grid gap-1.5 grid-cols-2 sm:grid-cols-4">
           {items.map((item, i) => (
-            <div key={i} className={`rounded-md border p-2 ${item.bg}`}>
-              <div className="flex items-center gap-1 mb-1">
-                <span className={`text-[8px] ${item.color}`}>{item.icon}</span>
+            <div key={i} className={`rounded-md border p-2 min-w-0 ${item.bg}`}>
+              <div className="flex items-center gap-1 mb-1 min-w-0">
+                <span className={`text-[8px] flex-shrink-0 ${item.color}`}>{item.icon}</span>
                 <p className="text-[7px] uppercase tracking-widest text-muted-foreground font-medium truncate">{item.label}</p>
               </div>
-              <p className={`font-mono text-xs font-black uppercase leading-none ${item.color}`}>
+              <p className={`font-mono text-xs font-black uppercase leading-none truncate ${item.color}`}>
                 {item.value}
                 {item.suffix && <span className="text-[7px] text-muted-foreground font-normal ml-0.5">{item.suffix}</span>}
               </p>
