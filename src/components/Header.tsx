@@ -3,7 +3,6 @@ import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Zap, Share2 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 interface HeaderProps {
   directProfitMode?: boolean;
