@@ -967,6 +967,10 @@ Deno.serve(async (req) => {
           output.stopLoss = roundPrice(tech.support || cp * 0.98);
           output.riskRewardRatio = 0;
           output.protection = "Wait for a cleaner setup before taking risk.";
+          (output as any).waitReasons = [
+            `Dashboard intelligence verdict: Skip — explicit avoid signal`,
+            ...(deterministic as any).waitReasons || [],
+          ];
         } else {
           output.entryLow = roundPrice(eL);
           output.entryHigh = roundPrice(eH);
