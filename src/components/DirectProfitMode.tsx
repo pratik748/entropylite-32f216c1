@@ -76,6 +76,9 @@ interface TradeResult {
   riskMetrics?: RiskMetrics;
   clankSignals?: ClankSignal[];
   newsHeadlines?: string[];
+  waitReasons?: string[];
+  bullSignals?: string[];
+  bearSignals?: string[];
   intelligence?: {
     suggestion?: "Add" | "Hold" | "Exit" | "Skip";
     confidence?: number;
@@ -215,6 +218,9 @@ function normalizeTradeResult(value: any): TradeResult | null {
     riskMetrics: value.riskMetrics || undefined,
     clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
     newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
+    waitReasons: Array.isArray(value.waitReasons) ? value.waitReasons.map((s: any) => String(s)) : undefined,
+    bullSignals: Array.isArray(value.bullSignals) ? value.bullSignals.map((s: any) => String(s)) : undefined,
+    bearSignals: Array.isArray(value.bearSignals) ? value.bearSignals.map((s: any) => String(s)) : undefined,
     intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
   };
 }
