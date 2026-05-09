@@ -504,11 +504,17 @@ function buildDeterministicFallback(
   const scoreDiff = bullScore - bearScore;
 
   const directionalEdge = Math.max(bullScore, bearScore);
-  const action = scoreDiff >= 1 && bullScore >= 2
-    ? "BUY"
-    : scoreDiff <= -1 && bearScore >= 2
-      ? "SELL"
-      : "WAIT";
+  // Trigger a directional ticket whenever one side has a clear edge.
+  // Previously required ≥2 bull AND scoreDiff ≥1, which collapsed to WAIT
+  // on most real setups. Now: any net edge with at least one signal fires,
+  // strong momentum alone (|score|≥2) is enough on its own.
+  const strongMomentum = Math.abs(tech.momentumScore) >= 2;
+  const action =
+    (scoreDiff >= 1 && bullScore >= 1) || (strongMomentum && tech.momentumScore > 0 && bearScore <= bullScore)
+      ? "BUY"
+      : (scoreDiff <= -1 && bearScore >= 1) || (strongMomentum && tech.momentumScore < 0 && bullScore <= bearScore)
+        ? "SELL"
+        : "WAIT";
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
@@ -864,12 +870,21 @@ Deno.serve(async (req) => {
     if (intelSummary?.suggestion) {
       const sug = String(intelSummary.suggestion);
       const aiAct = String(output.action);
-      const forcedAction: "BUY" | "SELL" | "WAIT" =
+      // Arbiter rules:
+      //  • "Add"  → force BUY  (intel is bullish enough to act)
+          //  • "Exit" → force SELL (intel says get out)
+          //  • "Skip" → force WAIT (intel explicitly says avoid)
+          //  • "Hold" → DO NOT force WAIT. Hold means "no fresh conviction
+          //             from the dashboard", but Direct Profit is a tactical
+          //             engine — if the deterministic/AI side has a clean
+          //             technical edge (momentum + R:R), let it fire.
+      const forcedAction: "BUY" | "SELL" | "WAIT" | null =
         sug === "Add" ? "BUY"
         : sug === "Exit" ? "SELL"
-        : "WAIT"; // Hold or Skip → no fresh ticket
+        : sug === "Skip" ? "WAIT"
+        : null; // Hold → no override
 
-      if (forcedAction !== aiAct) {
+      if (forcedAction && forcedAction !== aiAct) {
         console.log(`direct-profit arbiter: AI=${aiAct} → ${forcedAction} (intel=${sug})`);
         // Rebuild a deterministic plan for the FORCED side so the entry,
         // target, stop and R:R all line up with the new action.
