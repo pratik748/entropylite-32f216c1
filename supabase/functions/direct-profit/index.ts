@@ -518,6 +518,20 @@ function buildDeterministicFallback(
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
+  // Build a transparent reason list explaining WAIT — every threshold the
+  // setup failed to meet so the user sees exactly why nothing fired.
+  const waitReasons: string[] = [];
+  if (action === "WAIT") {
+    const absMom = Math.abs(tech.momentumScore);
+    waitReasons.push(`Bull signals ${bullScore} vs Bear ${bearScore} — net edge ${scoreDiff} (need |edge|≥1 with ≥1 confirming signal)`);
+    waitReasons.push(`Momentum ${tech.momentumScore}/3 — need |momentum|≥2 to fire on strength alone`);
+    if (Math.abs(tech.zScore) < 1.2) waitReasons.push(`Z-score ${tech.zScore} — need |z|≥1.2 for mean-reversion entry`);
+    if (tech.volumeRatio < 1.15) waitReasons.push(`Volume ${tech.volumeRatio}x avg — need ≥1.15x for confirmation`);
+    if (Math.abs(tech.changePct) < 2) waitReasons.push(`Day change ${tech.changePct}% — need |Δ|≥2% for follow-through`);
+    if (vix >= 25) waitReasons.push(`VIX ${vix.toFixed(1)} ≥ 25 — risk-off backdrop suppresses long edge`);
+    void absMom;
+  }
+
   const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
   const targetWidth = clamp(entryWidth * 2.4, 0.018, 0.08);
   const stopWidth = clamp(entryWidth * 1.2, 0.012, 0.04);
@@ -590,6 +604,9 @@ function buildDeterministicFallback(
     riskMetrics,
     clankSignals,
     newsHeadlines: newsHeadlines.slice(0, 5),
+    waitReasons,
+    bullSignals: bullishSignals,
+    bearSignals: bearishSignals,
   };
 }
 
@@ -670,6 +687,13 @@ function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot
     clankSignals,
     newsHeadlines: newsHeadlines.slice(0, 5),
   };
+
+  // Surface deterministic transparency: bull/bear signal lists + WAIT reasons
+  (output as any).bullSignals = (deterministic as any).bullSignals || [];
+  (output as any).bearSignals = (deterministic as any).bearSignals || [];
+  if (action === "WAIT") {
+    (output as any).waitReasons = (deterministic as any).waitReasons || [];
+  }
 
   if (parsedCount > 1) {
     output.consensus = consensusCount === parsedCount ? "UNANIMOUS" : consensusCount > 1 ? "MAJORITY" : "SPLIT";
@@ -860,6 +884,28 @@ Deno.serve(async (req) => {
         : scored.sort((a, b) => b._score - a._score)[0];
 
       output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines, deterministic);
+
+      // ── DETERMINISTIC OVERRIDE OF AI-WAIT ─────────────────────────────
+      // AI models default to WAIT under uncertainty even when the
+      // deterministic engine sees a clean technical edge. If the
+      // deterministic side has a non-WAIT action AND momentum is strong
+      // (|momentum|≥2), prefer it so the user gets actionable tickets
+      // instead of perpetual WAITs.
+      if (output.action === "WAIT" && deterministic.action !== "WAIT" && Math.abs(tech.momentumScore) >= 2) {
+        console.log(`direct-profit deterministic override: AI=WAIT → ${deterministic.action} (momentum=${tech.momentumScore})`);
+        output.action = deterministic.action;
+        output.direction = deterministic.direction;
+        output.directionReason = `Deterministic edge: ${deterministic.directionReason}`;
+        output.entryLow = deterministic.entryLow;
+        output.entryHigh = deterministic.entryHigh;
+        output.targetPrice = deterministic.targetPrice;
+        output.stopLoss = deterministic.stopLoss;
+        output.protection = deterministic.protection;
+        output.riskRewardRatio = deterministic.riskRewardRatio;
+        output.confidence = Math.max(Number(output.confidence) || 50, 55);
+        (output as any).waitReasons = undefined;
+        (output as any).consensus = "DETERMINISTIC_OVERRIDE";
+      }
     }
 
     // ── MASTER ARBITER ──────────────────────────────────────────────────
@@ -921,6 +967,10 @@ Deno.serve(async (req) => {
           output.stopLoss = roundPrice(tech.support || cp * 0.98);
           output.riskRewardRatio = 0;
           output.protection = "Wait for a cleaner setup before taking risk.";
+          (output as any).waitReasons = [
+            `Dashboard intelligence verdict: Skip — explicit avoid signal`,
+            ...(deterministic as any).waitReasons || [],
+          ];
         } else {
           output.entryLow = roundPrice(eL);
           output.entryHigh = roundPrice(eH);
