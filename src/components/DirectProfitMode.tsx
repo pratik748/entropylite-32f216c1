@@ -624,6 +624,35 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               )}
             </div>
 
+            {/* ── WAIT EXPLANATION ── */}
+            {result.action === "WAIT" && (result.waitReasons?.length || 0) > 0 && (
+              <div className="border-b border-border bg-surface-2/30 p-4">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
+                  Why WAIT — thresholds not met
+                </div>
+                <ul className="space-y-1.5">
+                  {result.waitReasons!.map((r, i) => (
+                    <li key={i} className="text-xs text-foreground flex gap-2">
+                      <span className="text-muted-foreground font-mono shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+                </ul>
+                {(result.bullSignals?.length || result.bearSignals?.length) ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <div className="text-gain font-mono uppercase tracking-wider mb-1">Bull ({result.bullSignals?.length || 0})</div>
+                      <div className="text-muted-foreground">{result.bullSignals?.join(", ") || "none"}</div>
+                    </div>
+                    <div>
+                      <div className="text-loss font-mono uppercase tracking-wider mb-1">Bear ({result.bearSignals?.length || 0})</div>
+                      <div className="text-muted-foreground">{result.bearSignals?.join(", ") || "none"}</div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             {/* ── PRICE CHART ── */}
             {historicalPrices[activeTicker]?.closes?.length > 0 && (
               <div className="border-b border-border p-3 bg-surface-2/30">
