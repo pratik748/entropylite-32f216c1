@@ -864,12 +864,21 @@ Deno.serve(async (req) => {
     if (intelSummary?.suggestion) {
       const sug = String(intelSummary.suggestion);
       const aiAct = String(output.action);
-      const forcedAction: "BUY" | "SELL" | "WAIT" =
+      // Arbiter rules:
+      //  • "Add"  → force BUY  (intel is bullish enough to act)
+          //  • "Exit" → force SELL (intel says get out)
+          //  • "Skip" → force WAIT (intel explicitly says avoid)
+          //  • "Hold" → DO NOT force WAIT. Hold means "no fresh conviction
+          //             from the dashboard", but Direct Profit is a tactical
+          //             engine — if the deterministic/AI side has a clean
+          //             technical edge (momentum + R:R), let it fire.
+      const forcedAction: "BUY" | "SELL" | "WAIT" | null =
         sug === "Add" ? "BUY"
         : sug === "Exit" ? "SELL"
-        : "WAIT"; // Hold or Skip → no fresh ticket
+        : sug === "Skip" ? "WAIT"
+        : null; // Hold → no override
 
-      if (forcedAction !== aiAct) {
+      if (forcedAction && forcedAction !== aiAct) {
         console.log(`direct-profit arbiter: AI=${aiAct} → ${forcedAction} (intel=${sug})`);
         // Rebuild a deterministic plan for the FORCED side so the entry,
         // target, stop and R:R all line up with the new action.
