@@ -3,7 +3,6 @@ import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Zap, Share2 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 interface HeaderProps {
   directProfitMode?: boolean;
@@ -13,7 +12,12 @@ interface HeaderProps {
 
 const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
-  const { baseCurrency, setBaseCurrency, indiaMode, setIndiaMode } = useFX();
+  const { baseCurrency, setBaseCurrency, setIndiaMode } = useFX();
+
+  // Auto-toggle India mode based on currency selection
+  useEffect(() => {
+    setIndiaMode(baseCurrency === "INR");
+  }, [baseCurrency, setIndiaMode]);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -91,17 +95,6 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
               <span className="hidden sm:inline">Direct Profit</span>
             </button>
           )}
-          {/* India Mode Toggle */}
-          <div className="flex items-center gap-1.5 pl-1.5 sm:pl-2 border-l border-border/50">
-            <span className="text-[10px]">🇮🇳</span>
-            <Switch
-              checked={indiaMode}
-              onCheckedChange={setIndiaMode}
-              className="h-4 w-8 data-[state=checked]:bg-primary"
-            />
-            <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">India</span>
-          </div>
-
           {/* Base Currency Selector */}
           <div className="flex items-center gap-1">
             <span className="hidden sm:inline font-mono text-[9px] text-muted-foreground/60">BASE</span>
