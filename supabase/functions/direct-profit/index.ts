@@ -518,6 +518,20 @@ function buildDeterministicFallback(
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
+  // Build a transparent reason list explaining WAIT — every threshold the
+  // setup failed to meet so the user sees exactly why nothing fired.
+  const waitReasons: string[] = [];
+  if (action === "WAIT") {
+    const absMom = Math.abs(tech.momentumScore);
+    waitReasons.push(`Bull signals ${bullScore} vs Bear ${bearScore} — net edge ${scoreDiff} (need |edge|≥1 with ≥1 confirming signal)`);
+    waitReasons.push(`Momentum ${tech.momentumScore}/3 — need |momentum|≥2 to fire on strength alone`);
+    if (Math.abs(tech.zScore) < 1.2) waitReasons.push(`Z-score ${tech.zScore} — need |z|≥1.2 for mean-reversion entry`);
+    if (tech.volumeRatio < 1.15) waitReasons.push(`Volume ${tech.volumeRatio}x avg — need ≥1.15x for confirmation`);
+    if (Math.abs(tech.changePct) < 2) waitReasons.push(`Day change ${tech.changePct}% — need |Δ|≥2% for follow-through`);
+    if (vix >= 25) waitReasons.push(`VIX ${vix.toFixed(1)} ≥ 25 — risk-off backdrop suppresses long edge`);
+    void absMom;
+  }
+
   const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
   const targetWidth = clamp(entryWidth * 2.4, 0.018, 0.08);
   const stopWidth = clamp(entryWidth * 1.2, 0.012, 0.04);
@@ -590,6 +604,9 @@ function buildDeterministicFallback(
     riskMetrics,
     clankSignals,
     newsHeadlines: newsHeadlines.slice(0, 5),
+    waitReasons,
+    bullSignals: bullishSignals,
+    bearSignals: bearishSignals,
   };
 }
 
