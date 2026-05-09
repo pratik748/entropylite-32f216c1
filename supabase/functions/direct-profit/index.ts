@@ -504,11 +504,17 @@ function buildDeterministicFallback(
   const scoreDiff = bullScore - bearScore;
 
   const directionalEdge = Math.max(bullScore, bearScore);
-  const action = scoreDiff >= 1 && bullScore >= 2
-    ? "BUY"
-    : scoreDiff <= -1 && bearScore >= 2
-      ? "SELL"
-      : "WAIT";
+  // Trigger a directional ticket whenever one side has a clear edge.
+  // Previously required ≥2 bull AND scoreDiff ≥1, which collapsed to WAIT
+  // on most real setups. Now: any net edge with at least one signal fires,
+  // strong momentum alone (|score|≥2) is enough on its own.
+  const strongMomentum = Math.abs(tech.momentumScore) >= 2;
+  const action =
+    (scoreDiff >= 1 && bullScore >= 1) || (strongMomentum && tech.momentumScore > 0 && bearScore <= bullScore)
+      ? "BUY"
+      : (scoreDiff <= -1 && bearScore >= 1) || (strongMomentum && tech.momentumScore < 0 && bullScore <= bearScore)
+        ? "SELL"
+        : "WAIT";
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
