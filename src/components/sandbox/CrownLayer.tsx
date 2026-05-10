@@ -103,7 +103,7 @@ const CrownLayer = ({ stocks }: Props) => {
                   <span className="font-mono text-sm font-bold text-foreground">{opp.asset}</span>
                   <span className={`text-[10px] font-mono ${
                     opp.urgency === "High" ? "text-loss" : opp.urgency === "Medium" ? "text-warning" : "text-muted-foreground"
-                  }`}>⚡ {opp.urgency}</span>
+                  }`}>{opp.urgency}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs text-muted-foreground">R:R {opp.riskReward}</span>

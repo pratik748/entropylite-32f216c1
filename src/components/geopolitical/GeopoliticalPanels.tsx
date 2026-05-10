@@ -52,7 +52,7 @@ export function RiskStrip({ data }: { data: GeoData }) {
       label: "Entropy",
       value: data.highEntropyZones.length,
       suffix: " active",
-      icon: "⚡",
+      icon: "■",
       color: data.highEntropyZones.length >= 3 ? "text-loss" : "text-warning",
       bg: data.highEntropyZones.length >= 3 ? "bg-loss/5 border-loss/20" : "bg-warning/5 border-warning/20",
     },
@@ -236,7 +236,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
               <div key={i} className={`glass-card rounded-md p-2.5 border-loss/20 ${zone.severity > 0.6 ? "glass-glow-loss" : ""}`}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-bold text-foreground">{zone.name}</span>
-                  <span className="rounded bg-loss/20 px-1.5 py-0.5 text-[8px] font-mono font-bold text-loss">⚡{zone.entropyScore.toFixed(0)}</span>
+                  <span className="rounded bg-loss/20 px-1.5 py-0.5 text-[8px] font-mono font-bold text-loss">{zone.entropyScore.toFixed(0)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                   <div><p className="text-[7px] text-muted-foreground uppercase">Severity</p><p className="font-mono font-bold text-loss">{(zone.severity * 100).toFixed(0)}%</p></div>
@@ -261,7 +261,7 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
             {exposedTickers.map(t => (
               <div key={t} className="flex items-center justify-between glass-subtle rounded-md p-2">
                 <span className="font-mono text-xs font-bold text-foreground">{t}</span>
-                <span className="text-[9px] text-loss font-mono font-bold">⚠ EXPOSED</span>
+                <span className="text-[9px] text-loss font-mono font-bold">EXPOSED</span>
               </div>
             ))}
           </div>
@@ -293,7 +293,7 @@ export function ForexView({ data }: { data: GeoData }) {
               <p className={`font-mono text-[9px] font-semibold ${fx.change24h >= 0 ? "text-gain" : "text-loss"}`}>
                 {fx.change24h >= 0 ? "+" : ""}{fx.change24h.toFixed(2)}%
               </p>
-              {fx.isStressed && <span className="text-[7px] text-loss font-mono">⚠ STRESSED</span>}
+              {fx.isStressed && <span className="text-[7px] text-loss font-mono">STRESSED</span>}
             </div>
           ))}
         </div>

@@ -114,7 +114,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     {tickerThreats?.[s.ticker] && tickerThreats[s.ticker].threatLevel !== "none" && (
                       <span className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0 text-[7px] font-bold uppercase ${THREAT_COLORS[tickerThreats[s.ticker].threatLevel] || ""}`} title={tickerThreats[s.ticker].threats.join(", ")}>
                         <AlertTriangle className="h-2 w-2" />
-                        {tickerThreats[s.ticker].threatLevel === "critical" ? "⚠" : tickerThreats[s.ticker].score}
+                        {tickerThreats[s.ticker].threatLevel === "critical" ? "!" : tickerThreats[s.ticker].score}
                       </span>
                     )}
                     <button

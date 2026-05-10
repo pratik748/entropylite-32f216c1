@@ -394,7 +394,7 @@ const StrategyFactory = ({ stocks }: Props) => {
                   </div>
                   <div className="flex items-center gap-2">
                     {hasPosition ? (
-                      <span className="rounded-lg bg-gain/10 border border-gain/20 px-2.5 py-1.5 text-[9px] font-medium text-gain">✓ Active</span>
+                      <span className="rounded-lg bg-gain/10 border border-gain/20 px-2.5 py-1.5 text-[9px] font-medium text-gain">Active</span>
                     ) : (
                       <button onClick={() => handlePaperTrade(strat)} disabled={isSubmitting || !alpaca.account}
                         className="flex items-center gap-1 rounded-lg bg-gain/10 border border-gain/20 px-2.5 py-1.5 text-[9px] font-medium text-gain hover:bg-gain/20 disabled:opacity-40 transition-colors">

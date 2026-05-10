@@ -376,7 +376,7 @@ const OutcomeGradientDashboard = () => {
               </div>
               <div className={`rounded-lg border p-3 text-center ${shadowComparison.promoted ? "border-gain/30 bg-gain/5" : "border-border/50 bg-muted/10"}`}>
                 <p className="text-[8px] uppercase tracking-wider text-muted-foreground mb-1">
-                  Evolved (ODGS) {shadowComparison.promoted && <span className="text-gain ml-1">★ PROMOTED</span>}
+                  Evolved (ODGS) {shadowComparison.promoted && <span className="text-gain ml-1">PROMOTED</span>}
                 </p>
                 <p className={`font-mono text-xl font-bold ${shadowComparison.evolvedPnlRolling >= 0 ? "text-gain" : "text-loss"}`}>
                   {shadowComparison.evolvedPnlRolling >= 0 ? "+" : ""}{shadowComparison.evolvedPnlRolling.toFixed(2)}%

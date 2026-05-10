@@ -277,7 +277,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <div className="space-y-1.5">
             {aiData.topRisks.map((r: string, i: number) => (
               <div key={i} className="flex items-start gap-2 text-xs text-secondary-foreground">
-                <span className="text-loss font-mono">⚠</span>
+                <span className="text-loss font-mono">!</span>
                 <span>{r}</span>
               </div>
             ))}

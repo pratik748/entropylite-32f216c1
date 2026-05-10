@@ -167,7 +167,7 @@ export function useAutoLockProfits(stocks: PortfolioStock[]) {
               const pnlPct = ((current - s.buyPrice) / s.buyPrice) * 100;
               const verb = pnl >= 0 ? "Profit locked" : "Loss capped";
               toast({
-                title: `🔒 ${s.ticker} — ${verb} at ${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`,
+                title: `${s.ticker} — ${verb} at ${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%`,
                 description: `${decision.reason}. Captured P&L: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}. Holding continues; live price may diverge.`,
                 duration: 18000,
               });

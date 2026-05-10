@@ -200,7 +200,7 @@ export default function GeopoliticalMap({
           radius: 22, color: "#ff7820", fillColor: "#ff7820",
           fillOpacity: 0.06, weight: 2, opacity: 0.4,
           dashArray: "4 4", className: "geo-pulse-ring",
-        }).bindTooltip(`⚡${zone.entropyScore.toFixed(0)}`, {
+        }).bindTooltip(`${zone.entropyScore.toFixed(0)}`, {
           permanent: true, direction: "right", className: "entropy-tooltip",
           offset: [24, 0],
         }).addTo(layers.entropy);
