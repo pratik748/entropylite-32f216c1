@@ -582,7 +582,7 @@ function LearningTab({
                             </button>
                           )
                         ) : (
-                          <span className="text-[9px] text-muted-foreground">✓</span>
+                          <span className="text-[9px] text-muted-foreground">OK</span>
                         )}
                       </td>
                     </tr>

@@ -82,7 +82,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
-            {t === "Foresight" ? "🔮 Foresight" : t}
+            {t}
           </button>
         ))}
       </div>

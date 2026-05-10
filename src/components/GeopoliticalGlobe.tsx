@@ -109,7 +109,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye, Intelligence Map</h2>
             <p className="text-[8px] text-muted-foreground font-mono tracking-widest truncate">
               LIVE 20s · {safeData.conflictEvents.length} CONFLICTS · {geoEvents.length} WIRE
-              {exposedTickers.length > 0 && <span className="text-loss ml-1">⚠ {exposedTickers.length} EXPOSED</span>}
+              {exposedTickers.length > 0 && <span className="text-loss ml-1">{exposedTickers.length} EXPOSED</span>}
             </p>
           </div>
         </div>
@@ -117,7 +117,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
           {(["map", "threats", "forex"] as const).map(m => (
             <button key={m} onClick={() => setViewMode(m)}
               className={`rounded-md px-2 py-1 text-[9px] font-mono font-medium transition-all ${viewMode === m ? "glass-panel glass-glow-primary text-primary" : "glass-subtle text-muted-foreground hover:text-foreground"}`}>
-              {m === "map" ? "🗺 Map" : m === "threats" ? "⚠ Threats" : "💱 FX"}
+              {m === "map" ? "Map" : m === "threats" ? "Threats" : "FX"}
             </button>
           ))}
           <Button size="sm" variant="ghost" onClick={() => onRefresh(false)} className="h-6 w-6 p-0">
@@ -143,7 +143,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 <div key={c.name} className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border ${tone}`}>
                   <span className="font-mono text-[9px] font-semibold whitespace-nowrap">{c.name}</span>
                   <span className="font-mono text-[9px] tabular-nums opacity-80">
-                    {c.ships}🚢 · {c.planes}✈
+                    {c.ships} ships · {c.planes} air
                   </span>
                   <span className="font-mono text-[9px] tabular-nums font-bold">
                     {Math.round(c.stress * 100)}

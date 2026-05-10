@@ -392,7 +392,7 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
                 ? "bg-primary/20 border border-primary/40 shadow-[0_0_12px_hsl(var(--primary)/0.2)]"
                 : "bg-transparent border border-transparent hover:bg-surface-2 opacity-30 hover:opacity-100"
             }`}
-            title="🎶"
+            title="Audio"
           >
             {isPlaying ? (
               <Volume2 className="h-3.5 w-3.5 text-primary animate-pulse" />

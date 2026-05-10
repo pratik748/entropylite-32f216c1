@@ -29,7 +29,7 @@ export function useIntelligenceRefresh() {
 
     // Show brief toast
     toastRef.current = toast({
-      title: "⚡ Updating Intelligence…",
+      title: "Updating Intelligence…",
       description: "Refreshing all modules with live market data",
     });
 

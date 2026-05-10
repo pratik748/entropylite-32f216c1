@@ -995,10 +995,10 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     title={`Adverse ${(validation.pAdverse * 100).toFixed(0)}% · DD ${validation.expectedDrawdownPct.toFixed(1)}% / budget ${validation.drawdownBudgetPct.toFixed(1)}%`}
                   >
                     {validation.status === "EXECUTABLE"
-                      ? "✓ ODG OK"
+                      ? "ODG OK"
                       : validation.status === "ARMED"
-                      ? `⏸ ARMED · ${validation.confirmationsMissing[0]?.replace(/_/g, " ") || "wait"}`
-                      : `✕ BLOCKED · ${validation.topReason}`}
+                      ? `ARMED · ${validation.confirmationsMissing[0]?.replace(/_/g, " ") || "wait"}`
+                      : `BLOCKED · ${validation.topReason}`}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1155,7 +1155,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
 
               {/* Entry Zone */}
               <div className={`rounded-lg px-3 py-2 mb-3 text-[10px] font-mono relative z-10 ${inZone ? "bg-gain/10 text-gain border border-gain/20" : "bg-surface-2 text-muted-foreground"}`}>
-                <span className="font-bold">{inZone ? "✓ IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{entryZone[0].toLocaleString()} – {sym}{entryZone[1].toLocaleString()}
+                <span className="font-bold">{inZone ? "IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{entryZone[0].toLocaleString()} – {sym}{entryZone[1].toLocaleString()}
                 {inZone && " · BUY SIGNAL ACTIVE"}
               </div>
 
@@ -1218,7 +1218,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   className="h-7 gap-1 text-[10px]"
                 >
                   {justAdded
-                    ? "Added ✓"
+                    ? "Added"
                     : alreadyOwned
                     ? "Owned"
                     : tradeBlocked

@@ -779,7 +779,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     </div>
                     {result.consensus && result.providersUsed && result.providersUsed > 1 && (
                       <div className="text-center text-[10px] text-muted-foreground mt-1">
-                        {result.consensus === "UNANIMOUS" ? "✓ All engines agree" : result.consensus === "MAJORITY" ? "⚡ Majority consensus" : "⚠ Split signal"} ({result.providersUsed} engines)
+                        {result.consensus === "UNANIMOUS" ? "All engines agree" : result.consensus === "MAJORITY" ? "Majority consensus" : "Split signal"} ({result.providersUsed} engines)
                       </div>
                     )}
                   </div>
@@ -883,7 +883,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   onClick={addToPortfolio}
                   className="text-xs h-8 gap-1.5"
                 >
-                  {added || alreadyInPortfolio ? <>✓ Added</> : <><Plus className="h-3.5 w-3.5" /> Add to Portfolio</>}
+                  {added || alreadyInPortfolio ? <>Added</> : <><Plus className="h-3.5 w-3.5" /> Add to Portfolio</>}
                 </Button>
               ) : <div />}
               <button
@@ -938,7 +938,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                             {item.action}
                           </span>
                           {hitTarget && <span className="text-[10px] text-gain font-mono">TARGET HIT</span>}
-                          {hitStop && <span className="text-[10px] text-loss">⛔ Stop Hit</span>}
+                          {hitStop && <span className="text-[10px] text-loss">Stop Hit</span>}
                         </div>
                         <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
                           Entry {itemSym}{item.entryPrice.toLocaleString()} → Target {itemSym}{item.targetPrice.toLocaleString()}

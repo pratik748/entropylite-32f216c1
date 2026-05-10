@@ -9,7 +9,7 @@ const CARD_BG = "hsl(0,0%,5%)";
 const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 6, fontSize: 11 };
 
 const LIFECYCLE_STAGES = [
-  { stage: "Pre-Trade", status: "complete", checks: ["Compliance ✓", "Margin ✓", "Limit ✓", "Best Execution ✓"] },
+  { stage: "Pre-Trade", status: "complete", checks: ["Compliance OK", "Margin OK", "Limit OK", "Best Execution OK"] },
   { stage: "Execution", status: "complete", checks: ["Order Placed", "Matched", "Confirmed", "Allocated"] },
   { stage: "Clearing", status: "active", checks: ["Netting Done", "CCP Submitted", "Awaiting Confirmation", "--"] },
   { stage: "Settlement", status: "pending", checks: ["T+1 DVP", "Custodian", "ISIN Transfer", "Cash Transfer"] },

@@ -413,7 +413,7 @@ Deno.serve(async (req) => {
       .from("cadence_topics_used")
       .upsert({ topic, entry_id: inserted!.id });
 
-    console.log(`[cadence] ✓ Published ${slug} in ${Date.now() - startedAt}ms`);
+    console.log(`[cadence] Published ${slug} in ${Date.now() - startedAt}ms`);
 
     return new Response(
       JSON.stringify({ ok: true, slug: inserted!.slug, providersUsed, elapsedMs: Date.now() - startedAt }),

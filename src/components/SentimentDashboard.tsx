@@ -161,8 +161,8 @@ const RedditCard = ({ reddit }: { reddit: NonNullable<SentimentData["redditSenti
         <Badge variant="outline" className={`text-[8px] ${moodColor}`}>{reddit.mood}</Badge>
       </div>
       <div className="grid grid-cols-2 gap-1 text-[9px] font-mono text-muted-foreground mb-2">
-        <div>🐂 Bullish: <span className="text-gain">{reddit.totalBullish}</span></div>
-        <div>🐻 Bearish: <span className="text-loss">{reddit.totalBearish}</span></div>
+        <div>Bullish: <span className="text-gain">{reddit.totalBullish}</span></div>
+        <div>Bearish: <span className="text-loss">{reddit.totalBearish}</span></div>
       </div>
       {reddit.subreddits.map((sub, i) => (
         <div key={i} className="flex items-center justify-between text-[8px] font-mono text-muted-foreground border-t border-border/50 pt-1 mt-1">
@@ -178,7 +178,7 @@ const RedditCard = ({ reddit }: { reddit: NonNullable<SentimentData["redditSenti
         <div className="mt-2 space-y-1 max-h-[100px] overflow-y-auto">
           {reddit.topPosts.slice(0, 3).map((p, i) => (
             <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" className="block text-[8px] font-mono text-foreground/80 hover:text-primary truncate">
-              ↗ {p.title} <span className="text-muted-foreground">({p.score}⇡ {p.comments}💬)</span>
+              {p.title} <span className="text-muted-foreground">({p.score} pts · {p.comments} comments)</span>
             </a>
           ))}
         </div>
