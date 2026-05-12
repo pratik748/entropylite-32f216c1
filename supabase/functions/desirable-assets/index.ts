@@ -1380,19 +1380,14 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     ];
     const uniqueTickers = [...new Set(allTickers)];
 
-    // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
-    const BATCH_SIZE = 10;
-    const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
-    for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
-      const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map(async (ticker) => {
-          const data = await fetchYahooChart(ticker);
-          return { ticker, data };
-        })
-      );
-      priceResults.push(...batchResults);
-    }
+    // Fire all Yahoo fetches in parallel — fetchYahooChart already has an 8s
+    // per-call timeout, so concurrency is bounded by individual aborts.
+    const priceResults = await Promise.allSettled(
+      uniqueTickers.map(async (ticker) => {
+        const data = await fetchYahooChart(ticker);
+        return { ticker, data };
+      }),
+    );
 
     const tickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
     for (const r of priceResults) {
