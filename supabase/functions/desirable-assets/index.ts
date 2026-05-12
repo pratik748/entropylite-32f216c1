@@ -1742,20 +1742,16 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
-    const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(8, scored.length));
-
+    // Run all sentiment lookups in parallel — GDELT calls now have a 5s timeout.
+    const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(6, scored.length));
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
-    const SENTIMENT_BATCH = 4;
-    for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
-      const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
-      const sentimentResults = await Promise.allSettled(
-        batch.map((s) => fetchTickerRealtimeSentiment(s.rec.ticker, s.rec.name)),
-      );
-      for (let j = 0; j < batch.length; j++) {
-        const result = sentimentResults[j];
-        if (result.status === "fulfilled" && result.value) {
-          sentimentByTicker[batch[j].rec.ticker] = result.value;
-        }
+    const sentimentResults = await Promise.allSettled(
+      sentimentCandidates.map((s) => fetchTickerRealtimeSentiment(s.rec.ticker, s.rec.name)),
+    );
+    for (let j = 0; j < sentimentCandidates.length; j++) {
+      const result = sentimentResults[j];
+      if (result.status === "fulfilled" && result.value) {
+        sentimentByTicker[sentimentCandidates[j].rec.ticker] = result.value;
       }
     }
 
