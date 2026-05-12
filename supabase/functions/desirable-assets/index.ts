@@ -124,7 +124,14 @@ async function fetchTickerRealtimeSentiment(ticker: string, name?: string): Prom
     const query = `${tickerQuery}${nameQuery} (earnings OR guidance OR outlook OR revenue OR analyst)`;
     const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&maxrecords=24&format=json&sort=DateDesc`;
 
-    const res = await fetch(url, { headers: { "User-Agent": UA } });
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { "User-Agent": UA }, signal: controller.signal });
+    } finally {
+      clearTimeout(t);
+    }
     if (!res.ok) return null;
     const data = await res.json();
     const articles = Array.isArray(data?.articles) ? data.articles.slice(0, 20) : [];
