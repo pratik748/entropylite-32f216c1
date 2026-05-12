@@ -124,7 +124,14 @@ async function fetchTickerRealtimeSentiment(ticker: string, name?: string): Prom
     const query = `${tickerQuery}${nameQuery} (earnings OR guidance OR outlook OR revenue OR analyst)`;
     const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&maxrecords=24&format=json&sort=DateDesc`;
 
-    const res = await fetch(url, { headers: { "User-Agent": UA } });
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { "User-Agent": UA }, signal: controller.signal });
+    } finally {
+      clearTimeout(t);
+    }
     if (!res.ok) return null;
     const data = await res.json();
     const articles = Array.isArray(data?.articles) ? data.articles.slice(0, 20) : [];
@@ -1373,19 +1380,14 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     ];
     const uniqueTickers = [...new Set(allTickers)];
 
-    // Batch Yahoo fetches in groups of 6 to avoid rate limits / timeouts
-    const BATCH_SIZE = 10;
-    const priceResults: PromiseSettledResult<{ ticker: string; data: any }>[] = [];
-    for (let i = 0; i < uniqueTickers.length; i += BATCH_SIZE) {
-      const batch = uniqueTickers.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map(async (ticker) => {
-          const data = await fetchYahooChart(ticker);
-          return { ticker, data };
-        })
-      );
-      priceResults.push(...batchResults);
-    }
+    // Fire all Yahoo fetches in parallel — fetchYahooChart already has an 8s
+    // per-call timeout, so concurrency is bounded by individual aborts.
+    const priceResults = await Promise.allSettled(
+      uniqueTickers.map(async (ticker) => {
+        const data = await fetchYahooChart(ticker);
+        return { ticker, data };
+      }),
+    );
 
     const tickerData: Record<string, NonNullable<Awaited<ReturnType<typeof fetchYahooChart>>>> = {};
     for (const r of priceResults) {
@@ -1740,20 +1742,16 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
-    const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(8, scored.length));
-
+    // Run all sentiment lookups in parallel — GDELT calls now have a 5s timeout.
+    const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(6, scored.length));
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
-    const SENTIMENT_BATCH = 4;
-    for (let i = 0; i < sentimentCandidates.length; i += SENTIMENT_BATCH) {
-      const batch = sentimentCandidates.slice(i, i + SENTIMENT_BATCH);
-      const sentimentResults = await Promise.allSettled(
-        batch.map((s) => fetchTickerRealtimeSentiment(s.rec.ticker, s.rec.name)),
-      );
-      for (let j = 0; j < batch.length; j++) {
-        const result = sentimentResults[j];
-        if (result.status === "fulfilled" && result.value) {
-          sentimentByTicker[batch[j].rec.ticker] = result.value;
-        }
+    const sentimentResults = await Promise.allSettled(
+      sentimentCandidates.map((s) => fetchTickerRealtimeSentiment(s.rec.ticker, s.rec.name)),
+    );
+    for (let j = 0; j < sentimentCandidates.length; j++) {
+      const result = sentimentResults[j];
+      if (result.status === "fulfilled" && result.value) {
+        sentimentByTicker[sentimentCandidates[j].rec.ticker] = result.value;
       }
     }
 
