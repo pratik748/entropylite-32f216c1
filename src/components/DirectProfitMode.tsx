@@ -275,6 +275,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const portfolioTickersRef = useRef<string[]>([]);
   const { indiaMode, baseCurrency, convertToBase } = useFX();
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
+  const { logTrade } = useTradeLogger();
 
   useEffect(() => {
     if (activeTicker && !loading) {
@@ -425,6 +426,15 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         lesson: "",
       };
       setPortfolio((prev) => [item, ...prev]);
+      logTrade({
+        ticker: activeTicker,
+        action: result.action as "BUY" | "SELL",
+        price: entryPrice,
+        qty: 0,
+        pnl: 0,
+        source: item.source || "",
+        catalyst: item.catalyst || "",
+      });
     }
     setAdded(true);
 
