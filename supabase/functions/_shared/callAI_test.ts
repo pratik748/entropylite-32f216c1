@@ -11,16 +11,12 @@ async function probe(label: string, url: string, headers: Record<string,string>,
 }
 
 Deno.test("probe 1min.ai endpoints", async () => {
-  const models = [
-    "mistral-large", "mistral-small", "open-mistral-7b", "open-mixtral-8x7b",
-    "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
-    "claude-3-haiku-20240307", "claude-3-5-sonnet-20240620",
-    "gemini-1.5-pro", "gemini-1.5-flash",
-    "deepseek-chat", "command-r", "llama-3-70b",
-  ];
-  for (const m of models) {
-    await probe(`CHAT_WITH_AI ${m}`, "https://api.1min.ai/api/features?isStreaming=false",
-      { "API-KEY": apiKey, "Content-Type": "application/json" },
-      { type: "CHAT_WITH_AI", model: m, promptObject: { prompt: "ping", isMixed: false, webSearch: false } });
+  // Discover endpoints
+  for (const path of ["/api/features", "/api/models", "/api/account", "/api/features/types"]) {
+    try {
+      const r = await fetch(`https://api.1min.ai${path}`, { headers: { "API-KEY": apiKey } });
+      const t = await r.text();
+      console.log(`GET ${path} → ${r.status}: ${t.slice(0, 400)}`);
+    } catch (e) { console.log(`GET ${path} ERR ${(e as Error).message}`); }
   }
 });
