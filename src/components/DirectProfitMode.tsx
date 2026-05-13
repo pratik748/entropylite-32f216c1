@@ -458,6 +458,41 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setPortfolio((prev) => prev.filter((p) => p.ticker !== symbol));
   };
 
+  const updateLog = (symbol: string, patch: Partial<PortfolioItem>) => {
+    setPortfolio((prev) => prev.map((p) => (p.ticker === symbol ? { ...p, ...patch } : p)));
+  };
+
+  const exportLog = () => {
+    if (portfolio.length === 0) return;
+    const rows = [
+      ["time_iso", "ticker", "action", "entry", "current", "pnl_pct", "currency", "source", "catalyst", "lesson"].join(","),
+      ...portfolio.map((p) => {
+        const pnl = p.action === "BUY" ? p.currentPrice - p.entryPrice : p.entryPrice - p.currentPrice;
+        const pct = p.entryPrice > 0 ? (pnl / p.entryPrice) * 100 : 0;
+        const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        return [
+          new Date(p.addedAt).toISOString(),
+          p.ticker,
+          p.action,
+          p.entryPrice,
+          p.currentPrice,
+          pct.toFixed(2),
+          p.currency,
+          esc(p.source || ""),
+          esc(p.catalyst || ""),
+          esc(p.lesson || ""),
+        ].join(",");
+      }),
+    ].join("\n");
+    const blob = new Blob([rows], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trade-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const toggleVoice = () => {
     if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
