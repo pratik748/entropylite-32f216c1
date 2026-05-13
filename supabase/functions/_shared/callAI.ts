@@ -295,7 +295,7 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and round-robin between them
 // inside the lane registry. Default model is gemini-2.0-flash for low latency
 // and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
-const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.0-flash";
+const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const model = GEMINI_DEFAULT_MODEL;
