@@ -215,14 +215,16 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
  */
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const lanes = buildLanes(reported);
-  if (lanes.length === 0) throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / ONEMIN_AI_API_KEY)");
+  if (lanes.length === 0) throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
 
-  // Round-robin across lanes (Mistral key1, Mistral key2, 1min.ai). Counter is
-  // per-isolate. On any error (429/5xx/auth/network/empty), we cascade to the
-  // next lane so the caller almost never sees a transient failure while another
-  // provider still has quota.
-  const idx = pickKeyIndex(lanes.length);
-  const ordered = lanes.slice(idx).concat(lanes.slice(0, idx));
+  // Cascade order: round-robin across Mistral keys first (load balance), then
+  // fall through to Gemini keys, then 1min.ai. Gemini quota is only consumed
+  // when both Mistral keys fail (429/5xx/auth/network/empty).
+  const mistralLanes = lanes.filter((l) => l.label.startsWith("mistral"));
+  const fallbackLanes = lanes.filter((l) => !l.label.startsWith("mistral"));
+  const idx = mistralLanes.length > 0 ? pickKeyIndex(mistralLanes.length) : 0;
+  const rotatedMistral = mistralLanes.slice(idx).concat(mistralLanes.slice(0, idx));
+  const ordered = [...rotatedMistral, ...fallbackLanes];
 
   let lastErr: any = null;
   for (const lane of ordered) {
