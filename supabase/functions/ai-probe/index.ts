@@ -6,7 +6,8 @@ serve(async (req) => {
   const which = url.searchParams.get("key") || "1";
   const apiKey = which === "2" ? Deno.env.get("GOOGLE_GEMINI_KEY_2") : Deno.env.get("GOOGLE_GEMINI_KEY");
   if (!apiKey) return new Response(JSON.stringify({ ok: false, error: "no key" }), { headers: { ...cors, "Content-Type": "application/json" } });
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+  const model = url.searchParams.get("model") || "gemini-2.0-flash";
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with only OK" }] }] }),
   });
