@@ -245,7 +245,7 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
 //   Headers: API-KEY: <key>
 //   Body: { type: "CHAT_WITH_AI", model, promptObject: { prompt, isMixed, webSearch } }
 // Response shape: aiRecord.aiRecordDetail.resultObject[0] (string)
-const ONEMIN_DEFAULT_MODEL = "gpt-4o-mini";
+const ONEMIN_DEFAULT_MODEL = Deno.env.get("ONEMIN_AI_MODEL") || "mistral-nemo";
 
 async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const apiKey = Deno.env.get("ONEMIN_AI_API_KEY");
@@ -303,7 +303,13 @@ function buildLanes(reported?: AIResult["provider"]): Lane[] {
 
   if (m1) lanes.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) lanes.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  if (onemin) lanes.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
+  // 1min.ai lane is wired but disabled by default until a model that this
+  // account supports is confirmed. Activate by setting:
+  //   ONEMIN_AI_ENABLED=1
+  //   ONEMIN_AI_MODEL=<a model name your 1min.ai plan allows>
+  if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
+    lanes.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
+  }
   return lanes;
 }
 
