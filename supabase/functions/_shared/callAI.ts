@@ -245,7 +245,7 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
 //   Headers: API-KEY: <key>
 //   Body: { type: "CHAT_WITH_AI", model, promptObject: { prompt, isMixed, webSearch } }
 // Response shape: aiRecord.aiRecordDetail.resultObject[0] (string)
-const ONEMIN_DEFAULT_MODEL = "mistral-nemo";
+const ONEMIN_DEFAULT_MODEL = "gpt-4o-mini";
 
 async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const apiKey = Deno.env.get("ONEMIN_AI_API_KEY");
