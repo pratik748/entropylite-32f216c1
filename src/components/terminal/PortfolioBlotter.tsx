@@ -155,7 +155,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
 
       {analyzed.length > 0 && (
         <>
-          <TradeLogger stocks={stocks} />
+          <TradeLogger />
           <LockedProfitsPanel stocks={stocks} />
           <div className="border-t border-border px-2 py-1.5 font-mono text-[9px] flex justify-between text-muted-foreground">
             <span>TOTAL ({baseCurrency})</span>
