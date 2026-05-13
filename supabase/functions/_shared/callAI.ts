@@ -216,10 +216,12 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const primary = Deno.env.get("MISTRAL_API_KEY");
   const secondary = Deno.env.get("MISTRAL_API_KEY_2");
+  const tertiary = Deno.env.get("MISTRAL_API_KEY_3");
   const available: Array<{ key: string; label: string }> = [];
   if (primary) available.push({ key: primary, label: "primary" });
   if (secondary) available.push({ key: secondary, label: "secondary" });
-  if (available.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2)");
+  if (tertiary) available.push({ key: tertiary, label: "tertiary" });
+  if (available.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3)");
 
   // Round-robin load balance across keys so each carries ~half the traffic.
   // Counter is per-isolate; on Mistral 429/5xx we rotate to the other key
