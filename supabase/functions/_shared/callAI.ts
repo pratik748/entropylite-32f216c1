@@ -238,14 +238,7 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
       // continue to next key
     }
   }
-  // All Mistral keys exhausted — try Gemini fallback (different provider, different quota).
-  try {
-    console.warn("callMistral → all keys failed, falling back to Gemini");
-    return await callGeminiFallback(opts);
-  } catch (geminiErr: any) {
-    console.warn("Gemini fallback also failed:", geminiErr?.message || geminiErr);
-    throw lastErr || geminiErr || new Error("All AI providers failed");
-  }
+  throw lastErr || new Error("All Mistral keys failed");
 }
 
 /**
@@ -339,46 +332,7 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
  * failure so callers degrade gracefully — but we DO try, because the user
  * explicitly asked for real-time recommendations, not training-cutoff guesses.
  */
-export async function fetchLiveWebContext(query: string, maxBullets = 8): Promise<string> {
-  const key = Deno.env.get("GOOGLE_GEMINI_KEY") || Deno.env.get("GOOGLE_GEMINI_KEY_2");
-  if (!key || !query) return "";
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    const body = {
-      contents: [{ role: "user", parts: [{ text: `Search the web RIGHT NOW for: ${query}\n\nReturn ${maxBullets} concise bullet points with the freshest market-moving facts (today / this week). Each bullet: one sentence + the source ticker / company / index it relates to. Include exact tickers when possible. No preamble, no markdown headings, no disclaimers.` }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
-    };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } finally { clearTimeout(timer); }
-    if (!res.ok) {
-      console.warn("fetchLiveWebContext non-2xx:", res.status, (await res.text()).slice(0, 200));
-      return "";
-    }
-    const data = await res.json();
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-    const text = parts.map((p: any) => p?.text || "").join("\n").trim();
-    if (!text) return "";
-    // Extract grounding citations (URLs) so the model sees real sources.
-    const citations: string[] = [];
-    const grounding = data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    for (const ch of grounding.slice(0, maxBullets)) {
-      const u = ch?.web?.uri || ch?.web?.url;
-      const t = ch?.web?.title;
-      if (u) citations.push(`  ↳ ${t ? t + " — " : ""}${u}`);
-    }
-    return `\n## LIVE WEB CONTEXT (Google Search, ${new Date().toISOString().split("T")[0]})\n${text}${citations.length ? "\n\nSources:\n" + citations.join("\n") : ""}\n`;
-  } catch (e) {
-    console.warn("fetchLiveWebContext failed:", (e as Error).message);
-    return "";
-  }
+export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
+  // Live web context disabled — Gemini removed. Mistral-only stack.
+  return "";
 }
