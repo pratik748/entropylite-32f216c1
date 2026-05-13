@@ -214,15 +214,16 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
  * Falls back on any error from key 1 (rate limit, auth, network, empty body).
  */
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
-  const lanes = buildLanes(reported);
-  if (lanes.length === 0) throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / ONEMIN_AI_API_KEY)");
+  const { primary, fallback } = buildLanes(reported);
+  if (primary.length === 0 && fallback.length === 0) {
+    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
+  }
 
-  // Round-robin across lanes (Mistral key1, Mistral key2, 1min.ai). Counter is
-  // per-isolate. On any error (429/5xx/auth/network/empty), we cascade to the
-  // next lane so the caller almost never sees a transient failure while another
-  // provider still has quota.
-  const idx = pickKeyIndex(lanes.length);
-  const ordered = lanes.slice(idx).concat(lanes.slice(0, idx));
+  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
+  // sequentially only after every primary lane has failed.
+  const idx = primary.length ? pickKeyIndex(primary.length) : 0;
+  const orderedPrimary = primary.slice(idx).concat(primary.slice(0, idx));
+  const ordered = orderedPrimary.concat(fallback);
 
   let lastErr: any = null;
   for (const lane of ordered) {
@@ -288,6 +289,50 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 }
 
 // ---------------------------------------------------------------------------
+// Gemini lane (Google Generative Language API)
+// ---------------------------------------------------------------------------
+// Used as a tertiary failover after both Mistral keys. We expose two keys
+// (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and round-robin between them
+// inside the lane registry. Default model is gemini-2.0-flash for low latency
+// and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
+const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
+
+async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
+  const model = GEMINI_DEFAULT_MODEL;
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const jsonHint = opts.jsonMode
+    ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences."
+    : "";
+  const body: Record<string, any> = {
+    systemInstruction: { role: "system", parts: [{ text: systemText }] },
+    contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
+    generationConfig: {
+      temperature: opts.temperature ?? 0.6,
+      maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
+    },
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts;
+  const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
+  if (!text || !text.trim()) throw new Error("Empty Gemini response");
+  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+}
+
+// ---------------------------------------------------------------------------
 // Lane registry — assembles all available providers into a single rotation.
 // ---------------------------------------------------------------------------
 interface Lane {
@@ -295,22 +340,29 @@ interface Lane {
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
-function buildLanes(reported?: AIResult["provider"]): Lane[] {
-  const lanes: Lane[] = [];
+/**
+ * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
+ * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
+ */
+function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
+  const primary: Lane[] = [];
+  const fallback: Lane[] = [];
   const m1 = Deno.env.get("MISTRAL_API_KEY");
   const m2 = Deno.env.get("MISTRAL_API_KEY_2");
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
+  const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
+  const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
 
-  if (m1) lanes.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) lanes.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // 1min.ai lane is wired but disabled by default until a model that this
-  // account supports is confirmed. Activate by setting:
-  //   ONEMIN_AI_ENABLED=1
-  //   ONEMIN_AI_MODEL=<a model name your 1min.ai plan allows>
+  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
+  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
+  // Gemini lanes — sequential fallback after every Mistral key fails.
+  // Ensures analytics never go dark when Mistral is rate-limited or down.
+  if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
+  if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
-    lanes.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
+    fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
-  return lanes;
+  return { primary, fallback };
 }
 
 /**
