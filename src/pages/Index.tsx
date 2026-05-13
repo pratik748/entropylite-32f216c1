@@ -333,6 +333,16 @@ const IndexContent = () => {
     if (stock?.analysis) {
       const currentPrice = stock.analysis.currentPrice ?? stock.buyPrice;
       const pnlPct = ((currentPrice - stock.buyPrice) / stock.buyPrice) * 100;
+      const pnlAbs = (currentPrice - stock.buyPrice) * stock.quantity;
+      logTrade({
+        ticker: stock.ticker,
+        action: "SELL",
+        price: currentPrice,
+        qty: stock.quantity,
+        pnl: pnlAbs,
+        source: `Close · entry ${stock.buyPrice.toFixed(2)} → exit ${currentPrice.toFixed(2)}`,
+        catalyst: `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}% realized`,
+      });
       ingestTrade({
         asset: stock.ticker,
         assetClass: "equity",
@@ -355,6 +365,16 @@ const IndexContent = () => {
       if (pnlPct > 0) {
         setProofStock({ ...stock });
       }
+    } else if (stock) {
+      logTrade({
+        ticker: stock.ticker,
+        action: "SELL",
+        price: stock.buyPrice,
+        qty: stock.quantity,
+        pnl: 0,
+        source: "Position closed",
+        catalyst: "Closed before analysis",
+      });
     }
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
