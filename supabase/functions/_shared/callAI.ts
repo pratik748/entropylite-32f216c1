@@ -214,33 +214,103 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
  * Falls back on any error from key 1 (rate limit, auth, network, empty body).
  */
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
-  const primary = Deno.env.get("MISTRAL_API_KEY");
-  const secondary = Deno.env.get("MISTRAL_API_KEY_2");
-  const tertiary = Deno.env.get("MISTRAL_API_KEY_3");
-  const available: Array<{ key: string; label: string }> = [];
-  if (primary) available.push({ key: primary, label: "primary" });
-  if (secondary) available.push({ key: secondary, label: "secondary" });
-  if (tertiary) available.push({ key: tertiary, label: "tertiary" });
-  if (available.length === 0) throw new Error("No Mistral API keys configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3)");
+  const lanes = buildLanes(reported);
+  if (lanes.length === 0) throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / ONEMIN_AI_API_KEY)");
 
-  // Round-robin load balance across keys so each carries ~half the traffic.
-  // Counter is per-isolate; on Mistral 429/5xx we rotate to the other key
-  // immediately so the user never sees a rate-limit failure when the other
-  // key still has quota.
-  const idx = pickKeyIndex(available.length);
-  const ordered = available.slice(idx).concat(available.slice(0, idx));
+  // Round-robin across lanes (Mistral key1, Mistral key2, 1min.ai). Counter is
+  // per-isolate. On any error (429/5xx/auth/network/empty), we cascade to the
+  // next lane so the caller almost never sees a transient failure while another
+  // provider still has quota.
+  const idx = pickKeyIndex(lanes.length);
+  const ordered = lanes.slice(idx).concat(lanes.slice(0, idx));
 
   let lastErr: any = null;
-  for (const { key, label } of ordered) {
+  for (const lane of ordered) {
     try {
-      return await callMistralWithKey(opts, key, reported);
+      return await lane.call(opts);
     } catch (e: any) {
       lastErr = e;
-      console.warn(`callMistral → ${label} key failed:`, e?.message || e);
-      // continue to next key
+      console.warn(`callAI → lane ${lane.label} failed:`, e?.message || e);
     }
   }
-  throw lastErr || new Error("All Mistral keys failed");
+  throw lastErr || new Error("All AI lanes failed");
+}
+
+// ---------------------------------------------------------------------------
+// 1min.ai lane
+// ---------------------------------------------------------------------------
+// 1min.ai exposes a unified gateway over many models. We use it as a third
+// resilience lane alongside Mistral. Endpoint:
+//   POST https://api.1min.ai/api/features?isStreaming=false
+//   Headers: API-KEY: <key>
+//   Body: { type: "CHAT_WITH_AI", model, promptObject: { prompt, isMixed, webSearch } }
+// Response shape: aiRecord.aiRecordDetail.resultObject[0] (string)
+const ONEMIN_DEFAULT_MODEL = Deno.env.get("ONEMIN_AI_MODEL") || "mistral-nemo";
+
+async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const apiKey = Deno.env.get("ONEMIN_AI_API_KEY");
+  if (!apiKey) throw new Error("ONEMIN_AI_API_KEY not configured");
+
+  // 1min.ai has no system role — fold system into the user prompt.
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const jsonHint = opts.jsonMode
+    ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences. No comments."
+    : "";
+  const combinedPrompt = `${systemText}\n\n=== USER ===\n${opts.userPrompt}${jsonHint}`;
+
+  const body = {
+    type: "CHAT_WITH_AI",
+    model: ONEMIN_DEFAULT_MODEL,
+    promptObject: {
+      prompt: combinedPrompt,
+      isMixed: false,
+      webSearch: false,
+    },
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout("https://api.1min.ai/api/features?isStreaming=false", {
+    method: "POST",
+    headers: { "API-KEY": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `1minAI ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  // Result can be array or string depending on the feature.
+  const raw = data?.aiRecord?.aiRecordDetail?.resultObject;
+  const text = Array.isArray(raw) ? raw.join("") : (typeof raw === "string" ? raw : "");
+  if (!text || !text.trim()) throw new Error("Empty 1minAI response");
+  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+}
+
+// ---------------------------------------------------------------------------
+// Lane registry — assembles all available providers into a single rotation.
+// ---------------------------------------------------------------------------
+interface Lane {
+  label: string;
+  call: (opts: CallAIOptions) => Promise<AIResult>;
+}
+
+function buildLanes(reported?: AIResult["provider"]): Lane[] {
+  const lanes: Lane[] = [];
+  const m1 = Deno.env.get("MISTRAL_API_KEY");
+  const m2 = Deno.env.get("MISTRAL_API_KEY_2");
+  const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
+
+  if (m1) lanes.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
+  if (m2) lanes.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
+  // 1min.ai lane is wired but disabled by default until a model that this
+  // account supports is confirmed. Activate by setting:
+  //   ONEMIN_AI_ENABLED=1
+  //   ONEMIN_AI_MODEL=<a model name your 1min.ai plan allows>
+  if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
+    lanes.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
+  }
+  return lanes;
 }
 
 /**
