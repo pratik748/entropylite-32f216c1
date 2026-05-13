@@ -92,5 +92,3 @@ verify_jwt = false
 
 [functions.cadence-generate]
 verify_jwt = false
-[functions.ai-probe]
-verify_jwt = false
