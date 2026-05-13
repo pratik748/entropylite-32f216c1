@@ -47,47 +47,6 @@ function pickKeyIndex(total: number): number {
   return i;
 }
 
-// Round-robin cursor for Gemini fallback keys.
-let __geminiKeyCursor = 0;
-function pickGeminiKey(): string | null {
-  const keys = [Deno.env.get("GOOGLE_GEMINI_KEY"), Deno.env.get("GOOGLE_GEMINI_KEY_2")].filter(Boolean) as string[];
-  if (keys.length === 0) return null;
-  const i = __geminiKeyCursor % keys.length;
-  __geminiKeyCursor = (__geminiKeyCursor + 1) % 1_000_000;
-  return keys[i];
-}
-
-/** Gemini fallback — used when ALL Mistral keys are rate-limited. */
-async function callGeminiFallback(opts: CallAIOptions): Promise<AIResult> {
-  const key = pickGeminiKey();
-  if (!key) throw new Error("No Gemini fallback key configured");
-  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-  const body: any = {
-    systemInstruction: { parts: [{ text: systemText }] },
-    contents: [{ role: "user", parts: [{ text: opts.userPrompt }] }],
-    generationConfig: {
-      temperature: opts.temperature ?? 0.6,
-      maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
-      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
-    },
-  };
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, 60000);
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const text = parts.map((p: any) => p?.text || "").join("").trim();
-  if (!text) throw new Error("Empty Gemini response");
-  return { text: stripThinkingBlocks(text), provider: "gemini" };
-}
-
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
@@ -279,14 +238,7 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
       // continue to next key
     }
   }
-  // All Mistral keys exhausted — try Gemini fallback (different provider, different quota).
-  try {
-    console.warn("callMistral → all keys failed, falling back to Gemini");
-    return await callGeminiFallback(opts);
-  } catch (geminiErr: any) {
-    console.warn("Gemini fallback also failed:", geminiErr?.message || geminiErr);
-    throw lastErr || geminiErr || new Error("All AI providers failed");
-  }
+  throw lastErr || new Error("All Mistral keys failed");
 }
 
 /**
@@ -380,46 +332,7 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
  * failure so callers degrade gracefully — but we DO try, because the user
  * explicitly asked for real-time recommendations, not training-cutoff guesses.
  */
-export async function fetchLiveWebContext(query: string, maxBullets = 8): Promise<string> {
-  const key = Deno.env.get("GOOGLE_GEMINI_KEY") || Deno.env.get("GOOGLE_GEMINI_KEY_2");
-  if (!key || !query) return "";
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    const body = {
-      contents: [{ role: "user", parts: [{ text: `Search the web RIGHT NOW for: ${query}\n\nReturn ${maxBullets} concise bullet points with the freshest market-moving facts (today / this week). Each bullet: one sentence + the source ticker / company / index it relates to. Include exact tickers when possible. No preamble, no markdown headings, no disclaimers.` }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 900 },
-    };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } finally { clearTimeout(timer); }
-    if (!res.ok) {
-      console.warn("fetchLiveWebContext non-2xx:", res.status, (await res.text()).slice(0, 200));
-      return "";
-    }
-    const data = await res.json();
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-    const text = parts.map((p: any) => p?.text || "").join("\n").trim();
-    if (!text) return "";
-    // Extract grounding citations (URLs) so the model sees real sources.
-    const citations: string[] = [];
-    const grounding = data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    for (const ch of grounding.slice(0, maxBullets)) {
-      const u = ch?.web?.uri || ch?.web?.url;
-      const t = ch?.web?.title;
-      if (u) citations.push(`  ↳ ${t ? t + " — " : ""}${u}`);
-    }
-    return `\n## LIVE WEB CONTEXT (Google Search, ${new Date().toISOString().split("T")[0]})\n${text}${citations.length ? "\n\nSources:\n" + citations.join("\n") : ""}\n`;
-  } catch (e) {
-    console.warn("fetchLiveWebContext failed:", (e as Error).message);
-    return "";
-  }
+export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
+  // Live web context disabled — Gemini removed. Mistral-only stack.
+  return "";
 }
