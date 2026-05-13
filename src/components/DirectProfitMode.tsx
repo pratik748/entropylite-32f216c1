@@ -102,6 +102,9 @@ interface PortfolioItem {
   currentPrice: number;
   currency: string;
   addedAt: number;
+  source?: string;
+  catalyst?: string;
+  lesson?: string;
 }
 
 const STORAGE_KEY = "dp-portfolio";
@@ -414,6 +417,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         currentPrice: livePrice ?? result.currentPrice,
         currency: itemCurrency,
         addedAt: Date.now(),
+        source: result.consensus
+          ? `${result.consensus} · ${result.providersUsed ?? "?"} engines · ${result.confidence}%`
+          : `AI · ${result.confidence}%`,
+        catalyst: (result.action === "BUY" ? result.positiveNews : result.negativeNews)?.slice(0, 140) || result.directionReason,
+        lesson: "",
       };
       setPortfolio((prev) => [item, ...prev]);
     }
@@ -448,6 +456,41 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
   const removeFromPortfolio = (symbol: string) => {
     setPortfolio((prev) => prev.filter((p) => p.ticker !== symbol));
+  };
+
+  const updateLog = (symbol: string, patch: Partial<PortfolioItem>) => {
+    setPortfolio((prev) => prev.map((p) => (p.ticker === symbol ? { ...p, ...patch } : p)));
+  };
+
+  const exportLog = () => {
+    if (portfolio.length === 0) return;
+    const rows = [
+      ["time_iso", "ticker", "action", "entry", "current", "pnl_pct", "currency", "source", "catalyst", "lesson"].join(","),
+      ...portfolio.map((p) => {
+        const pnl = p.action === "BUY" ? p.currentPrice - p.entryPrice : p.entryPrice - p.currentPrice;
+        const pct = p.entryPrice > 0 ? (pnl / p.entryPrice) * 100 : 0;
+        const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        return [
+          new Date(p.addedAt).toISOString(),
+          p.ticker,
+          p.action,
+          p.entryPrice,
+          p.currentPrice,
+          pct.toFixed(2),
+          p.currency,
+          esc(p.source || ""),
+          esc(p.catalyst || ""),
+          esc(p.lesson || ""),
+        ].join(",");
+      }),
+    ].join("\n");
+    const blob = new Blob([rows], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trade-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const toggleVoice = () => {
@@ -898,74 +941,113 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
           </div>
         )}
 
-        {/* Portfolio */}
+        {/* Advanced Trade Logger */}
         {portfolio.length > 0 && (
           <div className="glass-panel rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">My Trades</span>
-                  <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{portfolio.length}</span>
-                </div>
-                <div className="text-right">
-                  <div className={`text-sm font-bold font-mono ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
-                    {totalPnl >= 0 ? "+" : ""}{baseSym}{Math.abs(totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                  <div className={`text-[10px] ${totalPnlPct >= 0 ? "text-gain" : "text-loss"}`}>
-                    {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}% avg
-                  </div>
-                </div>
+            <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Briefcase className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold text-foreground">Trade Log</span>
+                <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{portfolio.length}</span>
               </div>
+              <button
+                onClick={exportLog}
+                className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded border border-border"
+                title="Export CSV"
+              >
+                Export CSV
+              </button>
             </div>
             <div className="divide-y divide-border">
               {portfolio.map((item) => {
                 const itemCurrency = resolveAssetCurrency(item.ticker, item.currency, indiaMode ? "INR" : "USD");
                 const itemSym = getCurrencySymbol(itemCurrency);
                 const pnl = item.action === "BUY" ? item.currentPrice - item.entryPrice : item.entryPrice - item.currentPrice;
-                const pnlPct = (pnl / item.entryPrice) * 100;
-                const pnlBase = itemCurrency !== baseCurrency ? convertToBase(pnl, itemCurrency) : null;
-                const hitTarget = item.action === "BUY" ? item.currentPrice >= item.targetPrice : item.currentPrice <= item.targetPrice;
-                const hitStop = item.action === "BUY" ? item.currentPrice <= item.stopLoss : item.currentPrice >= item.stopLoss;
+                const pnlPct = item.entryPrice > 0 ? (pnl / item.entryPrice) * 100 : 0;
+                const ts = new Date(item.addedAt);
+                const tStr = ts.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
                 return (
-                  <div key={item.ticker} className="p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-bold font-mono text-foreground">{item.ticker}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${item.action === "BUY" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
-                            {item.action}
-                          </span>
-                          {hitTarget && <span className="text-[10px] text-gain font-mono">TARGET HIT</span>}
-                          {hitStop && <span className="text-[10px] text-loss">Stop Hit</span>}
+                  <div key={item.ticker} className="p-3 space-y-2">
+                    {/* Row 1: time · ticker · action · pnl */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">{tStr}</span>
+                        <span className="text-sm font-bold font-mono text-foreground truncate">{item.ticker}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${item.action === "BUY" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
+                          {item.action}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <div className={`text-sm font-bold font-mono ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                            {pnl >= 0 ? "+" : ""}{itemSym}{Math.abs(pnl).toFixed(2)}
+                          </div>
+                          <div className={`text-[10px] font-mono ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
+                            {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                          </div>
                         </div>
-                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                          Entry {itemSym}{item.entryPrice.toLocaleString()} → Target {itemSym}{item.targetPrice.toLocaleString()}
-                        </div>
+                        <button onClick={() => removeFromPortfolio(item.ticker)} className="text-muted-foreground hover:text-loss transition-colors p-1">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right">
-                        <div className={`text-sm font-bold font-mono ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                          {pnl >= 0 ? "+" : ""}{itemSym}{Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                        <div className={`text-[10px] ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
-                          {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-                        </div>
-                        {pnlBase !== null && (
-                          <div className={`text-[10px] font-mono ${pnlBase >= 0 ? "text-gain/70" : "text-loss/70"}`}>
-                            ≈ {pnlBase >= 0 ? "+" : "-"}{formatCurrency(Math.abs(pnlBase), baseCurrency)}
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => removeFromPortfolio(item.ticker)} className="text-muted-foreground hover:text-loss transition-colors p-1">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+
+                    {/* Row 2: entry → current */}
+                    <div className="text-[10px] font-mono text-muted-foreground">
+                      Entry {itemSym}{item.entryPrice.toLocaleString()} → Now {itemSym}{item.currentPrice.toLocaleString()}
+                      {" · "}Target {itemSym}{item.targetPrice.toLocaleString()}
+                      {" · "}Stop {itemSym}{item.stopLoss.toLocaleString()}
+                    </div>
+
+                    {/* Source */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Source</label>
+                      <input
+                        value={item.source || ""}
+                        onChange={(e) => updateLog(item.ticker, { source: e.target.value })}
+                        placeholder="e.g. AI consensus · 4 engines"
+                        className="w-full bg-surface-2/40 border border-border rounded px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+                      />
+                    </div>
+
+                    {/* Catalyst */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Catalyst</label>
+                      <input
+                        value={item.catalyst || ""}
+                        onChange={(e) => updateLog(item.ticker, { catalyst: e.target.value })}
+                        placeholder="What triggered this trade?"
+                        className="w-full bg-surface-2/40 border border-border rounded px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+                      />
+                    </div>
+
+                    {/* Lesson */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">Lesson (one-liner)</label>
+                      <input
+                        value={item.lesson || ""}
+                        onChange={(e) => updateLog(item.ticker, { lesson: e.target.value })}
+                        placeholder="What did this trade teach you?"
+                        maxLength={140}
+                        className="w-full bg-surface-2/40 border border-border rounded px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
+                      />
                     </div>
                   </div>
                 );
               })}
+            </div>
+            <div className="px-3 py-2 border-t border-border flex items-center justify-between text-[10px] font-mono">
+              <span className="text-muted-foreground uppercase tracking-wider">Total</span>
+              <div className="flex items-center gap-2">
+                <span className={`font-bold ${totalPnl >= 0 ? "text-gain" : "text-loss"}`}>
+                  {totalPnl >= 0 ? "+" : ""}{baseSym}{Math.abs(totalPnl).toFixed(2)}
+                </span>
+                <span className={`${totalPnlPct >= 0 ? "text-gain" : "text-loss"}`}>
+                  ({totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%)
+                </span>
+              </div>
             </div>
           </div>
         )}
