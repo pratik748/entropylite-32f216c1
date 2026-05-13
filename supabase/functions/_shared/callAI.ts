@@ -339,28 +339,29 @@ interface Lane {
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
-function buildLanes(reported?: AIResult["provider"]): Lane[] {
-  const lanes: Lane[] = [];
+/**
+ * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
+ * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
+ */
+function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
+  const primary: Lane[] = [];
+  const fallback: Lane[] = [];
   const m1 = Deno.env.get("MISTRAL_API_KEY");
   const m2 = Deno.env.get("MISTRAL_API_KEY_2");
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
   const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
 
-  if (m1) lanes.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) lanes.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // Gemini lanes — tertiary failover after both Mistral keys. Ensures
-  // analytics never go dark when Mistral is rate-limited or down.
-  if (g1) lanes.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
-  if (g2) lanes.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
-  // 1min.ai lane is wired but disabled by default until a model that this
-  // account supports is confirmed. Activate by setting:
-  //   ONEMIN_AI_ENABLED=1
-  //   ONEMIN_AI_MODEL=<a model name your 1min.ai plan allows>
+  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
+  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
+  // Gemini lanes — sequential fallback after every Mistral key fails.
+  // Ensures analytics never go dark when Mistral is rate-limited or down.
+  if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
+  if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
-    lanes.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
+    fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
-  return lanes;
+  return { primary, fallback };
 }
 
 /**
