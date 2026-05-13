@@ -25,6 +25,7 @@ import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
+import { useTradeLogger } from "@/hooks/useTradeLogger";
 
 import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
@@ -77,6 +78,7 @@ const IndexContent = () => {
   const [tourOpen, setTourOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
+  const { logTrade } = useTradeLogger();
   const [activeStockId, setActiveStockId] = useState<string | null>(null);
   const [priceStatus, setPriceStatus] = useState<PriceStatusMap>({});
   const priceStatusRef = useRef(priceStatus);
@@ -294,6 +296,15 @@ const IndexContent = () => {
       setStocks((prev) => [...prev, newStock]);
       setActiveStockId(newId);
       analyzeStock(newId, normalizedTicker, buyPrice, quantity);
+      logTrade({
+        ticker: normalizedTicker,
+        action: "BUY",
+        price: buyPrice,
+        qty: quantity,
+        pnl: 0,
+        source: "Manual entry · Portfolio",
+        catalyst: "Position opened",
+      });
     }
   };
 
