@@ -102,6 +102,9 @@ interface PortfolioItem {
   currentPrice: number;
   currency: string;
   addedAt: number;
+  source?: string;
+  catalyst?: string;
+  lesson?: string;
 }
 
 const STORAGE_KEY = "dp-portfolio";
