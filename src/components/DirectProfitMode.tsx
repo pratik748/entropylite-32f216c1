@@ -417,6 +417,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         currentPrice: livePrice ?? result.currentPrice,
         currency: itemCurrency,
         addedAt: Date.now(),
+        source: result.consensus
+          ? `${result.consensus} · ${result.providersUsed ?? "?"} engines · ${result.confidence}%`
+          : `AI · ${result.confidence}%`,
+        catalyst: (result.action === "BUY" ? result.positiveNews : result.negativeNews)?.slice(0, 140) || result.directionReason,
+        lesson: "",
       };
       setPortfolio((prev) => [item, ...prev]);
     }
