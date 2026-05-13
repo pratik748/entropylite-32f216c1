@@ -32,6 +32,7 @@ import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
 import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
+import { useTradeLogger } from "@/hooks/useTradeLogger";
 
 interface RiskMetrics {
   var95: number;
