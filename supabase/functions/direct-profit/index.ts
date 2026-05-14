@@ -955,7 +955,10 @@ Deno.serve(async (req) => {
       // deterministic side has a non-WAIT action AND momentum is strong
       // (|momentum|≥2), prefer it so the user gets actionable tickets
       // instead of perpetual WAITs.
-      if (output.action === "WAIT" && deterministic.action !== "WAIT" && Math.abs(tech.momentumScore) >= 2) {
+      if (
+        output.action === "WAIT" &&
+        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint)
+      ) {
         console.log(`direct-profit deterministic override: AI=WAIT → ${deterministic.action} (momentum=${tech.momentumScore})`);
         output.action = deterministic.action;
         output.direction = deterministic.direction;
@@ -988,10 +991,15 @@ Deno.serve(async (req) => {
           //             from the dashboard", but Direct Profit is a tactical
           //             engine — if the deterministic/AI side has a clean
           //             technical edge (momentum + R:R), let it fire.
+      const allowDirectionalAgainstSkip =
+        sug === "Skip" &&
+        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint) &&
+        deterministic.action === "BUY";
+
       const forcedAction: "BUY" | "SELL" | "WAIT" | null =
         sug === "Add" ? "BUY"
         : sug === "Exit" ? "SELL"
-        : sug === "Skip" ? "WAIT"
+        : sug === "Skip" ? (allowDirectionalAgainstSkip ? null : "WAIT")
         : null; // Hold → no override
 
       if (forcedAction && forcedAction !== aiAct) {
@@ -1051,6 +1059,15 @@ Deno.serve(async (req) => {
         );
         output.consensus = "ARBITRATED";
         void sideDet; // referenced for future tuning
+      }
+
+      if (allowDirectionalAgainstSkip) {
+        console.log(`direct-profit arbiter: preserving ${output.action} despite intel=Skip due to desirable/technical confirmation`);
+        output.confidence = Math.min(
+          Math.max(Number(output.confidence) || 50, Math.max(Number(intelSummary.confidence) || 0, 54)),
+          84,
+        );
+        output.consensus = "CONTEXTUAL_OVERRIDE";
       }
       // Attach the intelligence snapshot so the UI can render both views.
       (output as any).intelligence = {
