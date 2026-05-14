@@ -627,6 +627,43 @@ function buildDeterministicFallback(
   };
 }
 
+function hasContextualDirectionalEdge(
+  deterministic: ReturnType<typeof buildDeterministicFallback>,
+  tech: TechnicalSnapshot,
+  riskMetrics: RiskMetrics,
+  clankSignals: ClankSignal[],
+  desirableHint?: { listed?: boolean; avgPnlPct?: number; zoneCount?: number; regimes?: string[] } | null,
+) {
+  if (deterministic.action === "WAIT") return false;
+
+  const bullCount = Array.isArray((deterministic as any).bullSignals)
+    ? (deterministic as any).bullSignals.length
+    : 0;
+  const bearCount = Array.isArray((deterministic as any).bearSignals)
+    ? (deterministic as any).bearSignals.length
+    : 0;
+  const signalSpread = deterministic.action === "BUY"
+    ? bullCount - bearCount
+    : bearCount - bullCount;
+
+  const criticalClank = clankSignals.some((signal) => signal.severity === "CRITICAL");
+  const supportiveTape =
+    Math.abs(tech.momentumScore) >= 2 ||
+    Math.abs(tech.zScore) >= 1.1 ||
+    Math.abs(tech.changePct) >= 1.2 ||
+    signalSpread >= 2;
+  const desirableSupport =
+    deterministic.action === "BUY" &&
+    desirableHint?.listed &&
+    (desirableHint.avgPnlPct ?? 0) >= 0 &&
+    signalSpread >= 1 &&
+    tech.momentumScore >= 0 &&
+    riskMetrics.sharpeRatio > -0.35;
+  const severeRiskPenalty = riskMetrics.sharpeRatio < -0.75;
+
+  return !criticalClank && !severeRiskPenalty && (supportiveTape || desirableSupport);
+}
+
 function sanitizeOutput(best: any, snap: MarketSnapshot, tech: TechnicalSnapshot, parsedCount: number, consensusCount: number, riskMetrics: RiskMetrics, clankSignals: ClankSignal[], newsHeadlines: string[], deterministic: ReturnType<typeof buildDeterministicFallback>) {
   const action = ["BUY", "SELL", "WAIT"].includes(best?.action) ? best.action : "WAIT";
   const realPrice = roundPrice(snap.currentPrice);
@@ -817,8 +854,18 @@ Deno.serve(async (req) => {
         `RULES:\n` +
         `• If suggestion is "Exit" → action MUST be SELL or WAIT (never BUY).\n` +
         `• If suggestion is "Add" → action MUST be BUY or WAIT (never SELL).\n` +
-        `• If suggestion is "Hold" or "Skip" → action MUST be WAIT unless your own data is overwhelming.\n` +
+        `• If suggestion is "Hold" → prefer WAIT, but BUY/SELL is allowed when technical edge and risk-reward are clearly favorable.\n` +
+        `• If suggestion is "Skip" → prefer WAIT, but a directional trade is allowed when the asset is flagged as desirable and your own evidence is clearly stronger.\n` +
         `• Your verdict text must NOT contradict the intelligence verdict.`
+      : "";
+
+    const desirableContext = desirableHint?.listed
+      ? `\n\nDESIRABLE-ASSET CONTEXT:\n` +
+        `- Listed in desirable assets: YES\n` +
+        `- Avg PnL in outcome gradient: ${Number(desirableHint.avgPnlPct ?? 0).toFixed(2)}%\n` +
+        `- Matching zones: ${desirableHint.zoneCount ?? 0}\n` +
+        `- Matching regimes: ${(desirableHint.regimes || []).join(", ") || "N/A"}\n` +
+        `Treat this as a supporting bullish prior, not a hard override.`
       : "";
 
     console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix} | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
@@ -837,7 +884,7 @@ Deno.serve(async (req) => {
 
     const riskContext = `\n\nQUANTITATIVE RISK METRICS (computed from real returns):\n- 1-Day VaR (95%): ${currencySymbol}${riskMetrics.var95} per share\n- 1-Day CVaR (95%): ${currencySymbol}${riskMetrics.cvar95} per share\n- 1-Day VaR (99%): ${currencySymbol}${riskMetrics.var99} per share\n- Sharpe Ratio (annualized): ${riskMetrics.sharpeRatio}\n- Sortino Ratio: ${riskMetrics.sortinoRatio}\n- Max Drawdown (30D): ${riskMetrics.maxDrawdown}%\n- Beta Estimate: ${riskMetrics.betaEstimate}\n- Kelly Fraction: ${riskMetrics.kellyFraction}\nUse these to calibrate your confidence level — low Sharpe + high VaR = lower confidence, etc.`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode — output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment — high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality — negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints — active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n11. Intelligence consensus (analyze-stock suggestion) — your action MUST be consistent with it.\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\nPROTECTION FIELD (CRITICAL):\n- MUST be specific to the ticker being analyzed — use the STOCK's OWN options (e.g., "${resolvedTicker} 780 PE" not "Nifty Put")\n- Include a specific strike price derived from the stop-loss or support level\n- Include risk per share in currency terms\n- For BUY: suggest a PUT at/near stop-loss strike as downside hedge\n- For SELL: suggest covering with a CALL at/near stop-loss strike\n- For WAIT: state "no position, no hedge needed"\n- NEVER suggest generic index hedges unless the ticker itself is an index\n\n${quantContext}${clankContext}${newsContext}${riskContext}${intelContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string (MUST be stock-specific with strike price and risk per share),\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode — output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment — high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality — negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints — active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n11. Intelligence consensus (analyze-stock suggestion) — your action should respect it, but use context rather than defaulting blindly to WAIT.\n12. Desirable-asset context — treat it as a supporting bullish prior when the technicals agree.\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\nPROTECTION FIELD (CRITICAL):\n- MUST be specific to the ticker being analyzed — use the STOCK's OWN options (e.g., "${resolvedTicker} 780 PE" not "Nifty Put")\n- Include a specific strike price derived from the stop-loss or support level\n- Include risk per share in currency terms\n- For BUY: suggest a PUT at/near stop-loss strike as downside hedge\n- For SELL: suggest covering with a CALL at/near stop-loss strike\n- For WAIT: state "no position, no hedge needed"\n- NEVER suggest generic index hedges unless the ticker itself is an index\n\n${quantContext}${clankContext}${newsContext}${riskContext}${intelContext}${desirableContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string (MUST be stock-specific with strike price and risk per share),\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
 
     const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nRISK METRICS:\n- VaR 95%: ${currencySymbol}${riskMetrics.var95}/share | CVaR 95%: ${currencySymbol}${riskMetrics.cvar95}/share\n- VaR 99%: ${currencySymbol}${riskMetrics.var99}/share\n- Sharpe: ${riskMetrics.sharpeRatio} | Sortino: ${riskMetrics.sortinoRatio}\n- Max DD: ${riskMetrics.maxDrawdown}% | Beta: ${riskMetrics.betaEstimate}\n- Kelly: ${riskMetrics.kellyFraction}\n\n${clankSignals.length > 0 ? "STRUCTURAL CONSTRAINTS:\n" + clankSignals.map(s => `[${s.severity}] ${s.label}`).join("\n") : "No active structural constraints."}\n\n${newsHeadlines.length > 0 ? "RECENT NEWS:\n" + newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n") : "No recent headlines available."}\n\nProduce a complete, executable trade decision grounded in ALL the data above.`;
 
@@ -908,7 +955,10 @@ Deno.serve(async (req) => {
       // deterministic side has a non-WAIT action AND momentum is strong
       // (|momentum|≥2), prefer it so the user gets actionable tickets
       // instead of perpetual WAITs.
-      if (output.action === "WAIT" && deterministic.action !== "WAIT" && Math.abs(tech.momentumScore) >= 2) {
+      if (
+        output.action === "WAIT" &&
+        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint)
+      ) {
         console.log(`direct-profit deterministic override: AI=WAIT → ${deterministic.action} (momentum=${tech.momentumScore})`);
         output.action = deterministic.action;
         output.direction = deterministic.direction;
@@ -941,10 +991,15 @@ Deno.serve(async (req) => {
           //             from the dashboard", but Direct Profit is a tactical
           //             engine — if the deterministic/AI side has a clean
           //             technical edge (momentum + R:R), let it fire.
+      const allowDirectionalAgainstSkip =
+        sug === "Skip" &&
+        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint) &&
+        deterministic.action === "BUY";
+
       const forcedAction: "BUY" | "SELL" | "WAIT" | null =
         sug === "Add" ? "BUY"
         : sug === "Exit" ? "SELL"
-        : sug === "Skip" ? "WAIT"
+        : sug === "Skip" ? (allowDirectionalAgainstSkip ? null : "WAIT")
         : null; // Hold → no override
 
       if (forcedAction && forcedAction !== aiAct) {
@@ -1004,6 +1059,15 @@ Deno.serve(async (req) => {
         );
         output.consensus = "ARBITRATED";
         void sideDet; // referenced for future tuning
+      }
+
+      if (allowDirectionalAgainstSkip) {
+        console.log(`direct-profit arbiter: preserving ${output.action} despite intel=Skip due to desirable/technical confirmation`);
+        output.confidence = Math.min(
+          Math.max(Number(output.confidence) || 50, Math.max(Number(intelSummary.confidence) || 0, 54)),
+          84,
+        );
+        output.consensus = "CONTEXTUAL_OVERRIDE";
       }
       // Attach the intelligence snapshot so the UI can render both views.
       (output as any).intelligence = {
