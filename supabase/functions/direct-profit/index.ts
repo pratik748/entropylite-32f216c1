@@ -513,33 +513,40 @@ function buildDeterministicFallback(
   const bearScore = bearishSignals.length;
   const scoreDiff = bullScore - bearScore;
 
+  // ── Contextual decision (not a strict gate) ──
+  // Lean on the *balance* of evidence rather than rigid count thresholds.
+  // We compute a continuous bias from momentum, mean-reversion, trend,
+  // signal balance, and ODGS context, then pick a side whenever the bias
+  // is meaningfully off zero. WAIT is reserved for genuinely flat tape.
+  let bias = 0;
+  bias += tech.momentumScore * 1.2;                                    // -3..+3 → -3.6..+3.6
+  bias += (snap.currentPrice > tech.sma20 ? 0.6 : -0.6);
+  bias += clamp(-tech.zScore, -1.5, 1.5) * 0.8;                        // mean-reversion pull
+  bias += clamp(tech.changePct / 2, -1.5, 1.5);                        // intraday follow-through
+  bias += scoreDiff * 0.5;                                             // net signal edge
+  if (desirableHint?.listed) bias += 0.8 + Math.min(1.2, (desirableHint.avgPnlPct ?? 0) / 5);
+  if (criticalClank.length > 0) bias -= 1.0;
+  if (vix >= 28) bias -= 0.5;
+  if (tech.volumeRatio >= 1.15) bias += Math.sign(bias) * 0.4;         // volume amplifies prevailing side
+
   const directionalEdge = Math.max(bullScore, bearScore);
-  // Trigger a directional ticket whenever one side has a clear edge.
-  // Previously required ≥2 bull AND scoreDiff ≥1, which collapsed to WAIT
-  // on most real setups. Now: any net edge with at least one signal fires,
-  // strong momentum alone (|score|≥2) is enough on its own.
-  const strongMomentum = Math.abs(tech.momentumScore) >= 2;
-  const action =
-    (scoreDiff >= 1 && bullScore >= 1) || (strongMomentum && tech.momentumScore > 0 && bearScore <= bullScore)
-      ? "BUY"
-      : (scoreDiff <= -1 && bearScore >= 1) || (strongMomentum && tech.momentumScore < 0 && bullScore <= bearScore)
-        ? "SELL"
-        : "WAIT";
-  const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : scoreDiff > 0 ? "UP" : scoreDiff < 0 ? "DOWN" : "SIDEWAYS";
+  // Only WAIT when the tape is truly indecisive: tiny bias AND no momentum AND no mean-reversion stretch.
+  const trulyFlat =
+    Math.abs(bias) < 0.6 &&
+    Math.abs(tech.momentumScore) <= 1 &&
+    Math.abs(tech.zScore) < 1.0 &&
+    Math.abs(tech.changePct) < 0.6;
+  const action: "BUY" | "SELL" | "WAIT" = trulyFlat ? "WAIT" : (bias >= 0 ? "BUY" : "SELL");
+  const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
-  // Build a transparent reason list explaining WAIT — every threshold the
-  // setup failed to meet so the user sees exactly why nothing fired.
+  // WAIT explanation — only emitted when the tape is genuinely flat.
   const waitReasons: string[] = [];
   if (action === "WAIT") {
-    const absMom = Math.abs(tech.momentumScore);
-    waitReasons.push(`Bull signals ${bullScore} vs Bear ${bearScore} — net edge ${scoreDiff} (need |edge|≥1 with ≥1 confirming signal)`);
-    waitReasons.push(`Momentum ${tech.momentumScore}/3 — need |momentum|≥2 to fire on strength alone`);
-    if (Math.abs(tech.zScore) < 1.2) waitReasons.push(`Z-score ${tech.zScore} — need |z|≥1.2 for mean-reversion entry`);
-    if (tech.volumeRatio < 1.15) waitReasons.push(`Volume ${tech.volumeRatio}x avg — need ≥1.15x for confirmation`);
-    if (Math.abs(tech.changePct) < 2) waitReasons.push(`Day change ${tech.changePct}% — need |Δ|≥2% for follow-through`);
-    if (vix >= 25) waitReasons.push(`VIX ${vix.toFixed(1)} ≥ 25 — risk-off backdrop suppresses long edge`);
-    void absMom;
+    waitReasons.push(`Tape is flat — composite bias ${bias.toFixed(2)} (|bias|<0.6)`);
+    waitReasons.push(`Momentum ${tech.momentumScore}/3, z-score ${tech.zScore}, day change ${tech.changePct}%`);
+    waitReasons.push(`Bull ${bullScore} vs Bear ${bearScore} — no decisive lean either way`);
+    if (vix >= 28) waitReasons.push(`VIX ${vix.toFixed(1)} elevated — caution on directional entries`);
   }
 
   const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
