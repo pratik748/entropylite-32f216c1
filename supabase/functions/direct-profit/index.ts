@@ -476,6 +476,7 @@ function buildDeterministicFallback(
   newsHeadlines: string[],
   resolvedTicker: string,
   currencySymbol: string,
+  desirableHint?: { listed?: boolean; avgPnlPct?: number; zoneCount?: number; regimes?: string[] } | null,
 ) {
   const bullishSignals: string[] = [];
   const bearishSignals: string[] = [];
@@ -498,6 +499,15 @@ function buildDeterministicFallback(
   // CLANK-derived signals
   const criticalClank = clankSignals.filter(s => s.severity === "CRITICAL");
   if (criticalClank.length > 0) bearishSignals.push("structural constraint active");
+
+  // ── ODGS Desirable-Asset hint ──
+  // If the user's outcome-gradient memory has flagged this ticker as a
+  // historically profitable node, treat it as a confirming bullish signal
+  // (and a strong one when the avg PnL is materially positive).
+  if (desirableHint?.listed) {
+    bullishSignals.push("ODGS desirable asset");
+    if ((desirableHint.avgPnlPct ?? 0) >= 3) bullishSignals.push("ODGS high-edge zone");
+  }
 
   const bullScore = bullishSignals.length;
   const bearScore = bearishSignals.length;
