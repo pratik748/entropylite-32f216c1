@@ -540,18 +540,13 @@ function buildDeterministicFallback(
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
-  // Build a transparent reason list explaining WAIT — every threshold the
-  // setup failed to meet so the user sees exactly why nothing fired.
+  // WAIT explanation — only emitted when the tape is genuinely flat.
   const waitReasons: string[] = [];
   if (action === "WAIT") {
-    const absMom = Math.abs(tech.momentumScore);
-    waitReasons.push(`Bull signals ${bullScore} vs Bear ${bearScore} — net edge ${scoreDiff} (need |edge|≥1 with ≥1 confirming signal)`);
-    waitReasons.push(`Momentum ${tech.momentumScore}/3 — need |momentum|≥2 to fire on strength alone`);
-    if (Math.abs(tech.zScore) < 1.2) waitReasons.push(`Z-score ${tech.zScore} — need |z|≥1.2 for mean-reversion entry`);
-    if (tech.volumeRatio < 1.15) waitReasons.push(`Volume ${tech.volumeRatio}x avg — need ≥1.15x for confirmation`);
-    if (Math.abs(tech.changePct) < 2) waitReasons.push(`Day change ${tech.changePct}% — need |Δ|≥2% for follow-through`);
-    if (vix >= 25) waitReasons.push(`VIX ${vix.toFixed(1)} ≥ 25 — risk-off backdrop suppresses long edge`);
-    void absMom;
+    waitReasons.push(`Tape is flat — composite bias ${bias.toFixed(2)} (|bias|<0.6)`);
+    waitReasons.push(`Momentum ${tech.momentumScore}/3, z-score ${tech.zScore}, day change ${tech.changePct}%`);
+    waitReasons.push(`Bull ${bullScore} vs Bear ${bearScore} — no decisive lean either way`);
+    if (vix >= 28) waitReasons.push(`VIX ${vix.toFixed(1)} elevated — caution on directional entries`);
   }
 
   const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
