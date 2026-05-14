@@ -33,6 +33,7 @@ import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/c
 import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
 interface RiskMetrics {
   var95: number;
@@ -276,6 +277,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { indiaMode, baseCurrency, convertToBase } = useFX();
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const { logTrade } = useTradeLogger();
+  const { desirableZones } = useOutcomeGradient();
 
   useEffect(() => {
     if (activeTicker && !loading) {
@@ -370,7 +372,24 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     try {
       const response = await Promise.race([
         governedInvoke<TradeResult>("direct-profit", {
-          body: { ticker: normalizedTicker, indiaMode },
+          body: {
+            ticker: normalizedTicker,
+            indiaMode,
+            desirableHint: (() => {
+              const norm = normalizedTicker.replace(/\.(NS|BO)$/i, "").toUpperCase();
+              const matches = desirableZones.filter(z =>
+                z.assets.some(a => a.replace(/\.(NS|BO)$/i, "").toUpperCase() === norm)
+              );
+              if (matches.length === 0) return null;
+              const avgPnl = matches.reduce((s, z) => s + z.avgPnlPct, 0) / matches.length;
+              return {
+                listed: true,
+                avgPnlPct: Number(avgPnl.toFixed(2)),
+                zoneCount: matches.length,
+                regimes: matches.map(z => z.regime).slice(0, 3),
+              };
+            })(),
+          },
           tier: "ai",
           force: true,
         }),
