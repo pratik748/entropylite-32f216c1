@@ -84,7 +84,7 @@ const IndexContent = () => {
   const priceStatusRef = useRef(priceStatus);
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
-  const { ingestTrade } = useOutcomeGradient();
+  const { ingestTrade, desirableZones } = useOutcomeGradient();
   const { convertToBase } = useFX();
 
   // First-time tutorial: open after portfolio loaded
@@ -254,8 +254,24 @@ const IndexContent = () => {
         }),
       );
       try {
+        // Compute Desirable Assets (ODGS) hint so analyze-stock can override
+        // a borderline "Skip" verdict when the asset is a high-edge zone pick.
+        const norm = ticker.replace(/\.(NS|BO)$/i, "").toUpperCase();
+        const matches = desirableZones.filter((z) =>
+          z.assets.some((a) => a.replace(/\.(NS|BO)$/i, "").toUpperCase() === norm),
+        );
+        const desirableHint = matches.length === 0
+          ? null
+          : {
+              listed: true,
+              avgPnlPct: Number(
+                (matches.reduce((s, z) => s + z.avgPnlPct, 0) / matches.length).toFixed(2),
+              ),
+              zoneCount: matches.length,
+              regimes: matches.map((z) => z.regime).slice(0, 3),
+            };
         const { data, error } = await governedInvoke("analyze-stock", {
-          body: { ticker, buyPrice, quantity, directProfitContext },
+          body: { ticker, buyPrice, quantity, directProfitContext, desirableHint },
         });
         if (error) throw error;
         const analysisData = { ...data, ticker, buyPrice, quantity };
@@ -278,7 +294,7 @@ const IndexContent = () => {
         toast({ title: "Analysis Failed", description: err.message || "Could not analyze.", variant: "destructive" });
       }
     },
-    [setStocks, addHistoryEntry],
+    [setStocks, addHistoryEntry, desirableZones],
   );
 
   const handleAnalyze = (ticker: string, buyPrice: number, quantity: number) => {

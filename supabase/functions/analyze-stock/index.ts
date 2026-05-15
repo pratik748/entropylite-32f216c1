@@ -374,6 +374,19 @@ serve(async (req) => {
       ? rawBody.directProfitContext
       : null;
 
+    // Optional Desirable Assets (ODGS) hint. When the ticker shows up in one
+    // or more high-edge desirable zones we treat that as a confirming bullish
+    // prior — boosts the signal and prevents the "Skip / NO EDGE" verdict
+    // from firing on assets the gradient explicitly recommends.
+    const desirableHint: {
+      listed?: boolean;
+      avgPnlPct?: number;
+      zoneCount?: number;
+      regimes?: string[];
+    } | null = rawBody.desirableHint && typeof rawBody.desirableHint === "object"
+      ? rawBody.desirableHint
+      : null;
+
     if (!ticker || !Number.isFinite(buyPrice) || !Number.isFinite(quantity) || buyPrice <= 0 || quantity <= 0) {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), {
         status: 400,
@@ -570,6 +583,17 @@ serve(async (req) => {
     if (expReturn21d > 2) signal += 1;
     if (expReturn21d < -2) signal -= 1;
 
+    // ---- Desirable Assets (ODGS) confirming prior ----
+    // If the asset is on the desirable list with a positive historical edge,
+    // treat it as a bullish confluence proportional to the avgPnlPct.
+    const desirableListed = !!desirableHint?.listed;
+    const desirableAvgPnl = Number(desirableHint?.avgPnlPct || 0);
+    if (desirableListed) {
+      if (desirableAvgPnl >= 5) signal += 2;
+      else if (desirableAvgPnl >= 2) signal += 1;
+      else if (desirableAvgPnl <= -3) signal -= 1;
+    }
+
     // ---- Stricter thresholds + new "Skip" bucket when edge is absent ----
     // Add: needs +3 confluences AND R:R >= 1.5 AND not stretched
     // Exit: needs -3 confluences OR (deeply underwater + bearish)
@@ -585,6 +609,17 @@ serve(async (req) => {
       suggestion = "Skip";
     } else {
       suggestion = "Hold";
+    }
+
+    // ── DESIRABLE OVERRIDE ──
+    // Never tell the user "NO EDGE" on an asset that the Desirable Assets
+    // (Outcome Gradient) engine is actively recommending with a positive
+    // historical PnL profile. Promote Skip → Hold, and Hold → Add when the
+    // edge is large and the trade structure isn't broken.
+    if (suggestion === "Skip" && desirableListed && desirableAvgPnl >= 0 && dataCoverage >= 3) {
+      suggestion = signal >= 2 && rrRatio >= 1.2 ? "Add" : "Hold";
+    } else if (suggestion === "Hold" && desirableListed && desirableAvgPnl >= 5 && rrRatio >= 1.2 && posIn52w < 92 && signal >= 1) {
+      suggestion = "Add";
     }
 
     // ── CONSISTENCY GUARD: reconcile with Direct Profit verdict ──
