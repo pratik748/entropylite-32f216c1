@@ -374,6 +374,19 @@ serve(async (req) => {
       ? rawBody.directProfitContext
       : null;
 
+    // Optional Desirable Assets (ODGS) hint. When the ticker shows up in one
+    // or more high-edge desirable zones we treat that as a confirming bullish
+    // prior — boosts the signal and prevents the "Skip / NO EDGE" verdict
+    // from firing on assets the gradient explicitly recommends.
+    const desirableHint: {
+      listed?: boolean;
+      avgPnlPct?: number;
+      zoneCount?: number;
+      regimes?: string[];
+    } | null = rawBody.desirableHint && typeof rawBody.desirableHint === "object"
+      ? rawBody.desirableHint
+      : null;
+
     if (!ticker || !Number.isFinite(buyPrice) || !Number.isFinite(quantity) || buyPrice <= 0 || quantity <= 0) {
       return new Response(JSON.stringify({ error: "ticker, buyPrice, and quantity are required" }), {
         status: 400,
