@@ -41,31 +41,45 @@ const StatArbEngine = ({ stocks }: Props) => {
   const analyzed = stocks.filter(s => s.analysis);
   useEffect(() => {
     if (analyzed.length > 0) {
-      fetchHistorical(analyzed.map(s => s.ticker));
+      // 1-year window required. Annualising μ from a 3-month sample turns
+      // ordinary noise into headline-grabbing fake drifts (the "+249%" issue).
+      fetchHistorical(analyzed.map(s => s.ticker), "1y");
     }
   }, [analyzed.length]);
 
   const assetData = useMemo(() => {
     return holdings.map(h => {
       const histData = historicalPrices[h.rawTicker];
-      // Derive real μ and σ from historical data if available
+      // Conservative default: risk-free-ish drift, σ from risk score.
       let vol = (h.risk / 100) * 0.3;
-      let mu = h.suggestion === "Add" ? 0.12 : h.suggestion === "Exit" ? -0.05 : 0.06;
-      
-      if (histData?.closes?.length > 20) {
+      let mu = 0.04;
+      let muSource: "historical-shrunk" | "default" = "default";
+
+      // We require ≥120 daily observations and apply James-Stein-style
+      // shrinkage toward zero (t / (t+1)) before annualising. We also clamp
+      // the annualised drift to ±35% — any single-asset μ outside that
+      // range is not statistically defensible from <2y of daily data and
+      // is exactly how naive ×252 produces fake "+249%" headline returns.
+      if (histData?.closes?.length && histData.closes.length >= 120) {
         const logRets = SA.returns(histData.closes);
+        const n = logRets.length;
         const dailyMu = SA.mean(logRets);
         const dailySigma = SA.stddev(logRets);
-        mu = dailyMu * 252; // Annualize
-        vol = dailySigma * Math.sqrt(252); // Annualize
+        const se = (dailySigma / Math.sqrt(Math.max(n, 1))) || 1e-9;
+        const tStat = Math.abs(dailyMu) / se;
+        const shrink = tStat / (tStat + 1);
+        const annualised = dailyMu * shrink * 252;
+        mu = Math.max(-0.35, Math.min(0.35, annualised));
+        vol = dailySigma * Math.sqrt(252);
+        muSource = "historical-shrunk";
       }
-      
+
       const price = h.price;
       const weight = totalValue > 0 ? h.value / totalValue : 1 / (holdings.length || 1);
       return {
         ticker: h.ticker, price, vol, mu, weight, risk: h.risk, beta: h.beta,
         value: h.value, buyPrice: h.buyPrice, pnlPct: h.pnlPct, sector: h.sector,
-        rawTicker: h.rawTicker,
+        rawTicker: h.rawTicker, muSource,
       };
     });
   }, [holdings, totalValue, historicalPrices]);
@@ -110,7 +124,7 @@ const StatArbEngine = ({ stocks }: Props) => {
 interface AssetDatum {
   ticker: string; price: number; vol: number; mu: number; weight: number;
   risk: number; beta: number; value: number; buyPrice: number; pnlPct: number; sector: string;
-  rawTicker: string;
+  rawTicker: string; muSource: "historical-shrunk" | "default";
 }
 type Fmt = (v: number) => string;
 type HistPrices = Record<string, HistoricalData>;
@@ -699,6 +713,11 @@ function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[
 
 function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
   const [horizon, setHorizon] = useState<number>(252);
+  const muCoverage = assets.length === 0
+    ? "default"
+    : assets.every(a => a.muSource === "historical-shrunk")
+      ? "historical"
+      : assets.some(a => a.muSource === "historical-shrunk") ? "mixed" : "default";
   const horizonOptions = [
     { label: "30d", value: 30 },
     { label: "90d", value: 90 },
@@ -795,6 +814,16 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/10 px-3 py-1.5 text-[9px] sm:text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className={`font-bold uppercase tracking-wider ${muCoverage === "historical" ? "text-gain" : muCoverage === "mixed" ? "text-warning" : "text-loss"}`}>
+          {muCoverage === "historical" ? "Historical μ" : muCoverage === "mixed" ? "Partial μ" : "Default μ"}
+        </span>
+        <span className="font-mono">
+          μ shrunk via Stein-style t/(t+1) on ≥120 daily log-returns, clamped to ±35%/yr.
+        </span>
+        <span className="font-mono">No marked-up returns. No synthetic priors.</span>
       </div>
 
       {/* Simulation Parameters Card */}
