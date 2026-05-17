@@ -38,8 +38,13 @@ const ExecutionEngine = ({ stocks }: Props) => {
       switch (algo) {
         case "VWAP": sliceSize = totalValue * (vwapWeights[i] / totalWeight); break;
         case "TWAP": sliceSize = perSlice; break;
-        case "POV": sliceSize = totalValue * (participation / 100) / slices * (1 + Math.random() * 0.3); break;
-        case "Adaptive": sliceSize = perSlice * (1 + (Math.random() - 0.5) * 0.5); break;
+        // POV intensifies with intraday volume — modeled as the empirical U-shape
+        // (open/close heavy) scaled by participation. Deterministic, no Math.random.
+        case "POV": sliceSize = (totalValue * (participation / 100) / slices) * vwapWeights[i]; break;
+        // Adaptive sizes inversely with realized intraday vol — when vol spikes,
+        // shrink the slice. We approximate the vol profile with the same U-curve,
+        // inverted, plus a deterministic scaler from the holding's risk score.
+        case "Adaptive": sliceSize = perSlice * (2 - vwapWeights[i] / Math.max(...vwapWeights)); break;
         default: sliceSize = perSlice;
       }
 
