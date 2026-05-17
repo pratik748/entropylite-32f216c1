@@ -948,7 +948,20 @@ serve(async (req) => {
     const treatAsGlobal = !indiaMode && (baseCurrency === "USD" || baseCurrency === "INR");
     const regionInfo = treatAsGlobal ? undefined : rawRegionInfo;
     const isUSUser = !regionInfo || baseCurrency === "USD" || treatAsGlobal;
-    const seed = Math.floor(Math.random() * 99999);
+    // Deterministic seed: same portfolio + same UTC day → same recommendations.
+    // FNV-1a 32-bit hash over sorted tickers + date key + region context.
+    const seedKey = [
+      ...portfolioTickers.slice().sort(),
+      new Date().toISOString().slice(0, 10),
+      baseCurrency,
+      indiaMode ? "in" : "gl",
+    ].join("|");
+    let _h = 0x811c9dc5;
+    for (let i = 0; i < seedKey.length; i++) {
+      _h ^= seedKey.charCodeAt(i);
+      _h = (_h + ((_h << 1) + (_h << 4) + (_h << 7) + (_h << 8) + (_h << 24))) >>> 0;
+    }
+    const seed = _h % 99999;
     // Mistral-only — single source of truth for AI calls.
     const effectiveProvider = "mistral";
 
