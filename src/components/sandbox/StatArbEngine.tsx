@@ -1037,15 +1037,11 @@ function StructuralFlowPanel({ assets, historicalPrices }: { assets: AssetDatum[
     const today = new Date().getDate();
     return assets.flatMap(a => {
       const histData = historicalPrices[a.rawTicker];
-      let prices: number[];
-      let volumes: number[];
-      if (histData?.closes?.length > 10) {
-        prices = histData.closes.slice(-30);
-        volumes = histData.volumes.slice(-30);
-      } else {
-        prices = Array.from({ length: 30 }, (_, i) => a.price * (1 + 0.01 * SA.gaussianRandom() * (30 - i)));
-        volumes = Array.from({ length: 30 }, () => a.value * (8 + Math.random() * 4));
-      }
+      // No history → no flow detection. We refuse to fabricate price/volume
+      // series; this panel only fires on real data.
+      if (!histData?.closes?.length || histData.closes.length <= 10) return [];
+      const prices = histData.closes.slice(-30);
+      const volumes = histData.volumes.slice(-30);
       return SA.detectStructuralFlows(prices, volumes, today).map(f => ({ ...f, ticker: a.ticker }));
     });
   }, [assets, historicalPrices]);
