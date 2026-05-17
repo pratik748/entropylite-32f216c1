@@ -245,9 +245,6 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
         // Edge line
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
-        // Curved edge
-        const mx = (from.x + to.x) / 2 + (Math.random() - 0.5) * 0.1;
-        const my = (from.y + to.y) / 2 + (Math.random() - 0.5) * 0.1;
         ctx.lineTo(to.x, to.y);
 
         const edgeColor = toNode.direction === "up" ? "80, 200, 120" :
