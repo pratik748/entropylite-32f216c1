@@ -1,110 +1,78 @@
-# Real Math, Real Data — System-Wide Veracity Pass
+# Veracity Audit — Remaining Non-Deterministic / Synthetic Code
 
-Goal: every quantitative module reads from real historical data and runs real math. Synthetic numbers never used use ai and web to get real data The same `useQuantSnapshot` becomes the single source of truth feeding Direct Profit, Desirable Assets, Risk, Monte Carlo, Factor Models, Stat Arb, Causal, Execution, ESG, Order Management, and the dashboard.
+Scanned `src/` and `supabase/functions/` for `Math.random`, `mock`, `fake`, `synthetic`, `placeholder`, `hardcoded`, `stub`. Below is every remaining hit, classified by whether it is a **legitimate stochastic draw** (Monte Carlo / Box-Muller), a **cosmetic-only** jitter, or a **real fabrication** that still pollutes user-facing numbers.
 
-## Scope (modules touched)
+## 1. Legitimate stochastic math (KEEP — calibrated by real μ, σ)
 
-Frontend (currently use `Math.random` or heuristic proxies):
+These are valid Monte Carlo / GBM / jump-diffusion draws. Parameters come from `useQuantSnapshot` (real history). Randomness is the simulation itself, not fabricated output.
 
-- `src/components/sandbox/StatArbEngine.tsx` — already partially fixed; finish the propagation
-- `src/components/sandbox/MonteCarloEngine.tsx`
-- `src/components/sandbox/CausalEffectsEngine.tsx`
-- `src/components/sandbox/ExecutionEngine.tsx`
-- `src/components/augment/RiskModelingModule.tsx`
-- `src/components/augment/ESGModule.tsx`
-- `src/components/augment/OrderManagementModule.tsx`
-- `src/components/MonteCarloChart.tsx`
-- `src/components/DesirableAssets.tsx`
+| File | Lines | Purpose |
+|---|---|---|
+| `src/lib/statarb-math.ts` | 10–11, 59, 228, 431 | Box-Muller + jump draws inside GBM path generator |
+| `src/lib/future-graph-machine.ts` | 50–51 | Box-Muller for forward-graph projections |
+| `src/components/MonteCarloChart.tsx` | 21–22 | Box-Muller for chart paths |
+| `src/components/sandbox/MonteCarloEngine.tsx` | 19–20, 140, 156 | Box-Muller + Poisson jump in MC engine |
+| `supabase/functions/desirable-assets/index.ts` | 1628–1629 | Box-Muller inside per-asset 5,000-path GBM win-rate sim, driven by real `mu60`, `sig60` from `returns` |
 
-Backend:
+Recommendation: leave as-is. Optionally swap to a seeded PRNG for reproducibility — not a credibility issue.
 
-- `supabase/functions/desirable-assets/index.ts` — replace any noise-based PnL with real backtest using `historical-prices`
-- `supabase/functions/alternative-signals/index.ts` — drop random sentiment, use real news/sentiment from `fetch-news` + `sentiment-intel`
-- `supabase/functions/sec-filings/index.ts` — replace placeholder rows with real SEC EDGAR scrape (no fabrication)
-- `supabase/functions/direct-profit/index.ts` — consume the real-math `desirableHint` already passed in
+## 2. Cosmetic-only randomness (LOW PRIORITY — does not affect quant output)
 
-## Architecture
+| File | Lines | What it does | Risk |
+|---|---|---|---|
+| `src/lib/selfRepair.ts` | 44 | 0–400ms jitter on retry backoff | None — networking hygiene |
+| `src/components/ui/sidebar.tsx` | 536 | Random skeleton-shimmer width 50–90% | None — shadcn loading skeleton |
 
-```text
-                ┌──────────────────────────────┐
-                │  historical-prices (Yahoo→AV)│
-                │  fetch-news / sentiment-intel│
-                │  sec-filings (real EDGAR)    │
-                └──────────────┬───────────────┘
-                               │
-                               ▼
-                ┌──────────────────────────────┐
-                │  useQuantSnapshot (already)  │
-                │  + useRealSignals (new)      │  ← real μ,σ,corr,VaR,sentiment,filings
-                └──────────────┬───────────────┘
-                               │
-       ┌───────────────┬───────┴────────┬──────────────────┐
-       ▼               ▼                ▼                  ▼
- Desirable Assets   Direct Profit   Risk / Monte Carlo  Stat Arb / Causal
-       │               │                │                  │
-       └───────────────┴────────┬───────┴──────────────────┘
-                                ▼
-                       Dashboard analytics
-                       (one truth, one number)
+Recommendation: keep.
+
+## 3. Fabricated user-facing values (FIX — still violates credibility-first rule)
+
+These render numbers the user reads as if they were real telemetry.
+
+### 3a. `src/components/terminal/SystemStatusBar.tsx` (lines 12, 13, 27)
+```ts
+const [simCount] = useState(() => Math.floor(Math.random() * 3) + 1);
+const [cpuLoad]  = useState(() => (Math.random() * 20 + 8).toFixed(1));
+const latencyMs  = priceLatency ?? Math.floor(Math.random() * 40 + 12);
 ```
+The terminal status bar invents "simulations running", "CPU load %", and a fallback latency. These are visible in the chrome on every page.
+- **Fix**: derive `simCount` from the actual continuous-sim hook count; drop `cpuLoad` entirely (or compute from `performance.now()` frame timing); when `priceLatency` is unavailable show `—` instead of a fake number.
 
-## Plan
+### 3b. `supabase/functions/desirable-assets/index.ts` line 951
+```ts
+const seed = Math.floor(Math.random() * 99999);
+```
+A random seed is injected into the AI prompt, meaning identical inputs produce different recommendation lists across calls. Not fabrication per se, but it makes the desk look non-deterministic.
+- **Fix**: replace with a deterministic seed from `hash(portfolioTickers + dateKey)` so the same portfolio yields stable recommendations within a session/day.
 
-### 1. Real-data foundation
+## 4. Modules still labelled "synthetic" in code (REVIEW)
 
-- Audit every `Math.random()` in the modules above. For each, either (a) replace with a computation off the real series, or (b) wrap behind an explicit `provenance: "synthetic-fallback"` badge and only fire when `closes.length < 30`.
-- Extend `useQuantSnapshot` (or add `useRealSignals`) to expose: per-asset μ̂ (shrunk + clamped), σ, skew, kurt, jump stats, rolling 60d historical VaR/CVaR, Sharpe, Sortino, Pearson corr matrix, true portfolio σ via wᵀΣw, Merton DD/PD.
+These call themselves synthetic in comments or strings; verify they are gated behind a fallback / clearly badged in UI.
 
-### 2. Backtest-driven Desirable Assets
+| File | Context |
+|---|---|
+| `supabase/functions/alternative-signals/index.ts:123` | "Generate a synthetic but meaningful trade flow signal based on date patterns" — flow score derived from calendar, not real volume. **Action: replace with volume z-score from `historical-prices`, as already proposed in `.lovable/plan.md` §6.** |
+| `src/lib/future-graph-machine.ts:311` | "Generate synthetic historical data" — only used when no real series passed in. **Action: confirm the caller always passes real `closes`; otherwise add a `provenance: 'synthetic-fallback'` badge.** |
+| `src/lib/clank-engine.ts:167` | "Derive synthetic market signals from portfolio" — heuristic signals, not real. **Action: rebuild on top of `useQuantSnapshot` σ / corr or mark as `heuristic` in the Clank UI.** |
+| `src/hooks/useGeoEvents.ts:27`, `src/components/geopolitical/GeopoliticalMap.tsx:259` | Skip a synthetic "Global" marker — already handled correctly, no fabrication. |
+| `src/components/DesirableAssets.tsx:314` | Just a string explaining the no-fallback policy. OK. |
+| `src/components/landing/MathResearch.tsx:395` | Marketing copy. OK. |
 
-- Rewrite the scoring inside `supabase/functions/desirable-assets/index.ts`:
-  - Pull 1y daily closes via `historical-prices`
-  - Compute realized return, hit-rate, max drawdown, Sharpe per zone
-  - PnL% is the actual cumulative log-return of the zone window, not a noise draw
-  - Drop any zone with `n < 60` daily obs from the "recommended" list (mark as "insufficient history")
-- Surface `provenance: "historical-backtest"` in the payload so the dashboard and Direct Profit show the same number.
+## 5. Verified clean (previously fixed)
 
-### 3. Direct Profit alignment
+- `src/components/augment/ESGModule.tsx` — random scores removed
+- `src/components/augment/OrderManagementModule.tsx` — Almgren-Chriss slippage, deterministic
+- `src/components/sandbox/ExecutionEngine.tsx` — comment explicitly notes "no Math.random"
+- `src/components/sandbox/CausalEffectsEngine.tsx` — comments confirm deterministic edges
+- `src/components/sandbox/StatArbEngine.tsx` — shrinkage/clamping done
+- `supabase/functions/sec-filings/index.ts` — fabricated insider rows removed
 
-- Direct Profit already reads `desirableHint`. Switch it to consume the new backtested PnL fields (`realizedSharpe`, `hitRate`, `realizedPnlPct`) instead of the old "avgPnL".
-- The `CONTEXTUAL_OVERRIDE` rule fires only when the desirable signal carries `provenance: "historical-backtest"` AND `n >= 60`.
+## Recommended next actions (in priority order)
 
-### 4. Monte Carlo / Factor / Risk modules
+1. **`SystemStatusBar.tsx`** — strip the three fake telemetry numbers; this is the most visible fabrication left.
+2. **`alternative-signals/index.ts`** — implement volume z-score flow signal (already in `.lovable/plan.md`).
+3. **`clank-engine.ts`** — rebase "synthetic market signals" onto real σ / correlation from `useQuantSnapshot`, or label as heuristic.
+4. **`desirable-assets` seed** — make deterministic for session/day stability.
+5. **`future-graph-machine.ts`** — verify every caller passes real history; otherwise add provenance badge.
 
-- `MonteCarloEngine`, `MonteCarloChart`, `RiskModelingModule`: paths simulated from real μ̂ (shrunk, ±35% clamp), real σ, real jump intensity, real covariance. Remove the sine-wave VaR backtest entirely — use `rollingHistoricalVaR`.
-- `CausalEffectsEngine`: replace random effect sizes with regression coefficients from `logReturns` of paired series (event-window vs control-window).
-- `StatArbEngine`: finalize the shrinkage/clamping work; ensure Factor Model, Optimization, Mean Reversion, Foresight tabs all read from the same snapshot.
-
-### 5. Execution / Order Management / ESG
-
-- `ExecutionEngine`, `OrderManagementModule`: replace random fills/slippage with real bid-ask + ADV-derived impact: slippage = k·σ·√(orderSize/ADV). ADV from `historical-prices.volumes`.
-- `ESGModule`: drop random scores. Either pull from a real source (Yahoo `esgScores` endpoint + GDELT controversy count via `fetch-news`), or display "Data unavailable — connect ESG provider" instead of fabricating.
-
-### 6. Alternative signals & SEC filings
-
-- `alternative-signals`: sentiment from `sentiment-intel` (already exists); flow proxy from real volume z-score; remove random social score or label it "demo only".
-- `sec-filings`: scrape SEC EDGAR (`https://www.sec.gov/cgi-bin/browse-edgar`) with a UA header. Return real filings or an empty list — never fabricate rows.
-
-### 7. Provenance & UI honesty
-
-- Every module renders a small `MethodologyTooltip` (already exists) showing: data source, lookback N, formula, provenance (`historical` | `partial` | `synthetic-fallback` | `unavailable`).
-- Dashboard analytics widget shows the same provenance badge so "no edge found" only appears when the math truly says so — not because the input was random.
-
-### 8. Validation
-
-- For 5 tickers (AAPL, NVDA, CRWD, ARKK, RELIANCE.NS) verify:
-  - `historical-prices` returns ≥200 daily bars
-  - Desirable Assets PnL matches a manual `(P_end/P_start - 1)` calc within 1bp
-  - Direct Profit BUY/SELL/WAIT decision matches the documented rule given the real inputs
-  - Monte Carlo annualized μ stays inside ±35% and Sharpe is finite
-- Type-check and curl each edge function once after deploy.
-
-## Out of scope
-
-- No new UI sections, no design changes. Visual layout of each module stays as-is; only the numbers and the small provenance badge change.
-- No new paid data providers — only the keys already in secrets (Alpha Vantage, Newsdata, etc.) plus public Yahoo/SEC/GDELT.
-
-## Risk / trade-offs
-
-- Some modules will show fewer "recommendations" because zones with thin history get dropped. That is the correct behavior for a credibility-first system.
-- Edge-function latency increases slightly (extra `historical-prices` call inside `desirable-assets`); mitigated by the existing `governedInvoke` cache.
+No code changes made — plan mode.
