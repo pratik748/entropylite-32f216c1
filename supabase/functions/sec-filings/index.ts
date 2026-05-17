@@ -24,11 +24,13 @@ interface InsiderTrade {
   ticker: string;
   insiderName: string;
   title: string;
-  transactionType: "BUY" | "SELL";
-  shares: number;
-  pricePerShare: number;
-  totalValue: number;
+  transactionType: "BUY" | "SELL" | "UNKNOWN";
+  shares: number | null;
+  pricePerShare: number | null;
+  totalValue: number | null;
   filedDate: string;
+  url: string;
+  source: "edgar-form4" | "edgar-listing";
 }
 
 // Search SEC EDGAR full-text search
@@ -69,16 +71,7 @@ async function searchFilings(tickers: string[]): Promise<Filing[]> {
         const url = `https://efts.sec.gov/LATEST/search-index?q=%22${ticker}%22&forms=10-K,10-Q,8-K`;
         const res = await fetch(url, { headers: SEC_HEADERS });
         if (!res.ok) { await res.text(); continue; }
-        // Fallback: generate placeholder from known data
-        filings.push({
-          ticker,
-          companyName: ticker,
-          formType: "10-Q",
-          filedDate: getTodayDate(),
-          description: `Recent quarterly filing for ${ticker}`,
-          url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${ticker}&type=10-Q&dateb=&owner=include&count=5`,
-          significance: "medium",
-        });
+        // No data — return nothing rather than fabricate a row.
       } catch {
         // silently continue
       }
@@ -103,17 +96,25 @@ async function fetchInsiderTrades(tickers: string[]): Promise<InsiderTrade[]> {
       if (data.hits?.hits) {
         for (const hit of data.hits.hits.slice(0, 3)) {
           const s = hit._source || {};
+          // EDGAR listing API does not give shares/price — those live inside
+          // the Form 4 XML. We refuse to fabricate them. Surface only what
+          // EDGAR actually returned, with a link so the user can audit.
+          const accession = String(hit._id || "").split(":")[0] || "";
+          const filingUrl = accession
+            ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(s.ciks?.[0] || ticker)}&type=4&dateb=&owner=include&count=10`
+            : `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${ticker}&type=4&dateb=&owner=include&count=10`;
           trades.push({
             ticker,
             insiderName: s.display_names?.[0] || "Insider",
             title: "Officer/Director",
-            transactionType: Math.random() > 0.4 ? "BUY" : "SELL",
-            shares: Math.round(1000 + Math.random() * 50000),
-            pricePerShare: 50 + Math.random() * 200,
-            totalValue: 0,
+            transactionType: "UNKNOWN",
+            shares: null,
+            pricePerShare: null,
+            totalValue: null,
             filedDate: s.file_date || getTodayDate(),
+            url: filingUrl,
+            source: "edgar-listing",
           });
-          trades[trades.length - 1].totalValue = trades[trades.length - 1].shares * trades[trades.length - 1].pricePerShare;
         }
       }
     } catch (e) {
@@ -147,21 +148,28 @@ serve(async (req) => {
     ]);
 
     // Compute insider sentiment
+    // Insider sentiment requires real BUY/SELL classification from Form 4 XML,
+    // which we do not yet parse. Until we do, return null instead of a
+    // fabricated coin-flip score.
     const buyCount = insiderTrades.filter(t => t.transactionType === "BUY").length;
     const sellCount = insiderTrades.filter(t => t.transactionType === "SELL").length;
-    const insiderSentiment = buyCount + sellCount > 0
-      ? ((buyCount - sellCount) / (buyCount + sellCount) * 100).toFixed(0)
-      : "0";
+    const insiderSentiment: number | null = (buyCount + sellCount > 0)
+      ? ((buyCount - sellCount) / (buyCount + sellCount)) * 100
+      : null;
 
     return new Response(JSON.stringify({
       filings,
       insiderTrades,
-      insiderSentiment: parseFloat(insiderSentiment),
+      insiderSentiment,
+      provenance: {
+        filings: "sec.gov EDGAR full-text search",
+        insiderTrades: "sec.gov EDGAR Form 4 listing (shares/price not parsed — UNKNOWN until Form 4 XML reader is wired)",
+      },
       summary: {
         totalFilings: filings.length,
         totalInsiderTrades: insiderTrades.length,
         highSignificance: filings.filter(f => f.significance === "high").length,
-        netInsiderBuying: buyCount > sellCount,
+        netInsiderBuying: insiderSentiment !== null ? buyCount > sellCount : null,
       },
       timestamp: Date.now(),
     }), {

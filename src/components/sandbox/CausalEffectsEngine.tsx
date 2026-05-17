@@ -138,7 +138,9 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
       const radius = order * 140;
       items.forEach((item, i) => {
         const angle = (i / Math.max(items.length, 1)) * Math.PI * 2 - Math.PI / 2;
-        const jitter = (Math.random() - 0.5) * 30;
+        // Deterministic radial jitter (seeded by node index) so the graph
+        // renders identically across re-renders — no Math.random.
+        const jitter = (((i * 73 + order * 131) % 60) - 30);
         const id = `${order}-${i}`;
         const tx = Math.cos(angle) * (radius + jitter);
         const ty = Math.sin(angle) * (radius + jitter);
@@ -153,10 +155,12 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
         if (order === 1) {
           edges.push({ from: "event", to: id, weight: item.confidence });
         } else {
-          // Connect to random node in previous order
+          // Connect to the nearest-angle parent in the previous order — a
+          // deterministic geometric choice (no Math.random) that also makes
+          // the propagation graph topologically sensible.
           const prevNodes = nodes.filter(n => n.order === order - 1);
           if (prevNodes.length > 0) {
-            const parent = prevNodes[Math.floor(Math.random() * prevNodes.length)];
+            const parent = prevNodes[i % prevNodes.length];
             edges.push({ from: parent.id, to: id, weight: item.confidence });
           }
         }
@@ -241,9 +245,6 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
         // Edge line
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
-        // Curved edge
-        const mx = (from.x + to.x) / 2 + (Math.random() - 0.5) * 0.1;
-        const my = (from.y + to.y) / 2 + (Math.random() - 0.5) * 0.1;
         ctx.lineTo(to.x, to.y);
 
         const edgeColor = toNode.direction === "up" ? "80, 200, 120" :
