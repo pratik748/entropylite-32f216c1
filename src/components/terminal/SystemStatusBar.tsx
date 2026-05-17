@@ -9,9 +9,9 @@ interface SystemStatusBarProps {
 
 const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps) => {
   const [utc, setUtc] = useState("");
-  const [simCount] = useState(() => Math.floor(Math.random() * 3) + 1);
-  const [cpuLoad] = useState(() => (Math.random() * 20 + 8).toFixed(1));
   const [apiMetrics, setApiMetrics] = useState({ requestsPerHour: 0, requestsBlocked: 0, cacheHits: 0, savingsPercent: 0, requestsTotal: 0, estimatedCostUnits: 0 });
+  // Real frame-time load: measured from rAF deltas (60fps == 0% load).
+  const [frameLoad, setFrameLoad] = useState<number | null>(null);
 
   useEffect(() => {
     const tick = () => {
@@ -24,8 +24,32 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
     return () => clearInterval(iv);
   }, []);
 
-  const latencyMs = priceLatency ?? Math.floor(Math.random() * 40 + 12);
-  const latencyColor = latencyMs < 50 ? "text-gain" : latencyMs < 150 ? "text-warning" : "text-loss";
+  // Sample real frame deltas via requestAnimationFrame; load = (delta - 16.6ms) / 16.6ms clipped 0–100.
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const samples: number[] = [];
+    const loop = (t: number) => {
+      const dt = t - last;
+      last = t;
+      samples.push(dt);
+      if (samples.length > 60) samples.shift();
+      if (samples.length >= 30) {
+        const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+        const load = Math.max(0, Math.min(100, ((avg - 16.6) / 16.6) * 100));
+        setFrameLoad(load);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const hasLatency = typeof priceLatency === "number" && Number.isFinite(priceLatency);
+  const latencyMs = hasLatency ? (priceLatency as number) : null;
+  const latencyColor = latencyMs == null
+    ? "text-muted-foreground"
+    : latencyMs < 50 ? "text-gain" : latencyMs < 150 ? "text-warning" : "text-loss";
   const savingsColor = apiMetrics.savingsPercent > 50 ? "text-gain" : apiMetrics.savingsPercent > 20 ? "text-warning" : "text-muted-foreground";
 
   return (
@@ -34,7 +58,9 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
         <span className="h-1.5 w-1.5 rounded-full bg-gain flex-shrink-0" />
         <div className="flex items-center gap-1">
           <Zap className="h-2 w-2 text-gain" />
-          <span className={`font-semibold tabular-nums ${latencyColor}`}>{latencyMs}ms</span>
+          <span className={`font-semibold tabular-nums ${latencyColor}`}>
+            {latencyMs == null ? "—" : `${latencyMs}ms`}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <Wifi className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-gain" />
@@ -43,7 +69,7 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
         <div className="hidden sm:flex items-center gap-1.5">
           <Activity className="h-2.5 w-2.5 text-primary" />
           <span className="text-muted-foreground">SIMS</span>
-          <span className="text-foreground font-semibold tabular-nums">{stockCount > 0 ? simCount + stockCount : 0}</span>
+          <span className="text-foreground font-semibold tabular-nums">{stockCount}</span>
         </div>
         <div className="hidden md:flex items-center gap-1.5">
           <BarChart3 className="h-2.5 w-2.5 text-muted-foreground" />
@@ -63,9 +89,11 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
         </div>
         <div className="hidden sm:flex items-center gap-1.5">
           <Cpu className="h-2.5 w-2.5 text-muted-foreground" />
-          <span className="text-foreground font-semibold tabular-nums">{cpuLoad}%</span>
+          <span className="text-foreground font-semibold tabular-nums">
+            {frameLoad == null ? "—" : `${frameLoad.toFixed(0)}%`}
+          </span>
           <div className="w-12 h-1 bg-surface-3 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${cpuLoad}%` }} />
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${frameLoad ?? 0}%` }} />
           </div>
         </div>
         <div className="flex items-center gap-1">
