@@ -713,6 +713,11 @@ function LiquidityPanel({ assets, fmt, historicalPrices }: { assets: AssetDatum[
 
 function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt }) {
   const [horizon, setHorizon] = useState<number>(252);
+  const muCoverage = assets.length === 0
+    ? "default"
+    : assets.every(a => a.muSource === "historical-shrunk")
+      ? "historical"
+      : assets.some(a => a.muSource === "historical-shrunk") ? "mixed" : "default";
   const horizonOptions = [
     { label: "30d", value: 30 },
     { label: "90d", value: 90 },
@@ -809,6 +814,16 @@ function MonteCarloPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt }:
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/10 px-3 py-1.5 text-[9px] sm:text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className={`font-bold uppercase tracking-wider ${muCoverage === "historical" ? "text-gain" : muCoverage === "mixed" ? "text-warning" : "text-loss"}`}>
+          {muCoverage === "historical" ? "Historical μ" : muCoverage === "mixed" ? "Partial μ" : "Default μ"}
+        </span>
+        <span className="font-mono">
+          μ shrunk via Stein-style t/(t+1) on ≥120 daily log-returns, clamped to ±35%/yr.
+        </span>
+        <span className="font-mono">No marked-up returns. No synthetic priors.</span>
       </div>
 
       {/* Simulation Parameters Card */}
