@@ -153,10 +153,13 @@ describe("riskParityWeights — true ERC", () => {
 
 describe("fractionalKellyWeights", () => {
   it("scales linearly with fraction (before clipping)", () => {
-    const mu = [0.08, 0.05];
+    // μ small enough that full-Kelly weights still sum < 1 (no leverage cap)
+    const mu = [0.005, 0.003];
     const sigma = [[0.04, 0.01], [0.01, 0.09]];
     const full = fractionalKellyWeights(mu, sigma, 1)!;
     const half = fractionalKellyWeights(mu, sigma, 0.5)!;
+    // Sanity: full-Kelly not leverage-capped here
+    expect(full.risk[0] + full.risk[1]).toBeLessThan(1);
     expect(approx(half.risk[0], full.risk[0] * 0.5, 1e-9)).toBe(true);
     expect(approx(half.risk[1], full.risk[1] * 0.5, 1e-9)).toBe(true);
   });
