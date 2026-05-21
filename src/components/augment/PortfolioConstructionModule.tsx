@@ -201,7 +201,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     const regimeName = regime?.regime || "Range-Bound";
     const regimeAdvice = (() => {
       switch (regimeName) {
-        case "Trending Bull": return { color: "text-gain", suggestion: "Tilt toward momentum, overweight high-beta winners", recommended: "momentum" as Strategy };
+        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt — overweight high-μ names within Σ risk budget", recommended: "mean_variance" as Strategy };
         case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as Strategy };
         case "Crisis": return { color: "text-loss", suggestion: "Emergency risk parity, equalize risk and raise cash allocation", recommended: "risk_parity" as Strategy };
         case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as Strategy };
@@ -223,9 +223,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
 
   const { currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol, rmt, strategyError } = analytics;
 
-  const regimeRecommended = (regimeAdvice.recommended as string) === "momentum"
-    ? "mean_variance" as Strategy
-    : (regimeAdvice.recommended as Strategy);
+  const regimeRecommended = regimeAdvice.recommended;
 
   return (
     <div className="space-y-5">
