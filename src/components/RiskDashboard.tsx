@@ -8,6 +8,8 @@ import {
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
 import TruthBadge from "@/components/twrd/TruthBadge";
+import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
+import { pc1Concentration, jacobiEigen, marchenkoPastur } from "@/lib/portfolio-math";
 
 interface RiskDashboardProps {
   stocks: PortfolioStock[];
@@ -32,6 +34,22 @@ function computeVaRCVaR(stocks: PortfolioStock[]) {
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
   const staticVars = computeVaRCVaR(stocks);
+  const snap = useQuantSnapshot(stocks);
+
+  // Real PC1 systemic-concentration flag from Σ (no AI, no fabrication)
+  const systemic = useMemo(() => {
+    const Sigma = snap.covariance.matrix;
+    const N = Sigma.length;
+    if (!snap.ready || N < 2) return null;
+    const stds = Sigma.map((r, i) => Math.sqrt(Math.max(r[i], 0)));
+    if (stds.some(s => s <= 0)) return null;
+    const corr = Sigma.map((row, i) => row.map((v, j) => v / (stds[i] * stds[j])));
+    const pc1 = pc1Concentration(corr);
+    if (pc1 == null) return null;
+    const eig = jacobiEigen(corr);
+    const mp = eig ? marchenkoPastur(eig.values, snap.lookbackDays, N, 1) : null;
+    return { pc1, signalCount: mp?.signalCount ?? null, N, T: snap.lookbackDays };
+  }, [snap]);
 
   const [aiData, setAiData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -229,6 +247,35 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {riskTab === "clank" && <ClankEngine stocks={stocks} />}
 
       {riskTab === "analytics" && <>
+      {/* Systemic concentration — real RMT */}
+      {systemic && (
+        <div className={`rounded-xl border p-4 flex items-center justify-between ${
+          systemic.pc1 > 0.4 ? "border-loss/30 bg-loss/5"
+          : systemic.pc1 > 0.25 ? "border-warning/30 bg-warning/5"
+          : "border-border bg-card"
+        }`}>
+          <div className="flex items-center gap-3">
+            <Shield className={`h-4 w-4 ${
+              systemic.pc1 > 0.4 ? "text-loss" : systemic.pc1 > 0.25 ? "text-warning" : "text-gain"
+            }`} />
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                PC1 Systemic Concentration <span className="font-mono text-muted-foreground/60">(λ₁ / Σλᵢ)</span>
+              </p>
+              <p className={`text-sm font-bold font-mono ${
+                systemic.pc1 > 0.4 ? "text-loss" : systemic.pc1 > 0.25 ? "text-warning" : "text-gain"
+              }`}>
+                {(systemic.pc1 * 100).toFixed(1)}%
+                {systemic.pc1 > 0.4 && " — diversification illusory"}
+              </p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            {systemic.signalCount ?? "—"} of {systemic.N} eigenvalues above MP edge · {systemic.T}d
+          </p>
+        </div>
+      )}
+
       {/* VaR Stats */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {[

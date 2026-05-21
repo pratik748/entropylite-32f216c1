@@ -365,14 +365,28 @@ function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: 
     ? Number(clamp(1 + (tech.annualizedVol - 20) / 40, 0.3, 2.5).toFixed(2))
     : 1;
 
-  // Kelly fraction: f* = (p*b - q) / b  where p=win rate, b=avg win/avg loss
+  // Kelly fraction: f* = (p·b − q) / b  where p = win rate, b = avg win / avg loss.
+  // We use the *Wilson 95% lower bound* on p instead of the raw point estimate,
+  // so position sizing is conservative when the sample is small.
+  // Refs: Kelly (1956); Thorp (2006); Wilson (1927) for the binomial CI.
   const wins = returns.filter(r => r > 0);
   const losses = returns.filter(r => r < 0);
-  const winRate = wins.length / Math.max(n, 1);
+  const trials = Math.max(n, 1);
+  const successes = wins.length;
+  const phat = successes / trials;
+  // Wilson score 95% CI (z = 1.96)
+  const z = 1.96;
+  const z2 = z * z;
+  const denom = 1 + z2 / trials;
+  const center = (phat + z2 / (2 * trials)) / denom;
+  const margin = (z * Math.sqrt(phat * (1 - phat) / trials + z2 / (4 * trials * trials))) / denom;
+  const pLow = Math.max(0, center - margin);
   const avgWin = wins.length > 0 ? wins.reduce((s, v) => s + v, 0) / wins.length : 0;
   const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 1;
   const b = avgLoss > 0 ? avgWin / avgLoss : 1;
-  const kellyFraction = b > 0 ? Number(clamp((winRate * b - (1 - winRate)) / b, 0, 0.5).toFixed(2)) : 0;
+  // Fractional Kelly at 0.5× (standard half-Kelly safety floor on top of Wilson lower bound)
+  const kellyRaw = b > 0 ? (pLow * b - (1 - pLow)) / b : 0;
+  const kellyFraction = Number(clamp(kellyRaw * 0.5, 0, 0.25).toFixed(2));
 
   return {
     var95: roundPrice(notional * var95Pct),

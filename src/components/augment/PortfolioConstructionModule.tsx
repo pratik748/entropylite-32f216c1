@@ -8,10 +8,16 @@ import {
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
+import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
+import {
+  minVarianceWeights, meanVarianceWeights, riskParityWeights,
+  fractionalKellyWeights, pc1Concentration, jacobiEigen, marchenkoPastur,
+} from "@/lib/portfolio-math";
+import { MethodologyTooltip } from "@/components/quant/MethodologyTooltip";
 import { TrendingUp, ShieldAlert, Scale, Zap, AlertTriangle, ArrowRightLeft, Target, Brain } from "lucide-react";
 
 interface Props { stocks: PortfolioStock[]; }
-type Strategy = "equal_weight" | "risk_parity" | "momentum" | "min_variance";
+type Strategy = "equal_weight" | "risk_parity" | "mean_variance" | "min_variance";
 
 const PALETTE = [
   "hsl(0, 0%, 95%)", "hsl(152, 90%, 45%)", "hsl(210, 60%, 55%)", "hsl(38, 92%, 55%)",
@@ -25,9 +31,9 @@ const BG = "hsl(0,0%,3%)";
 
 const strategies: { id: Strategy; label: string; icon: typeof Scale; desc: string }[] = [
   { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "Uniform allocation across all positions" },
-  { id: "risk_parity", label: "Risk Parity", icon: ShieldAlert, desc: "Weight inversely by volatility to equalize risk contribution" },
-  { id: "momentum", label: "Momentum Tilt", icon: TrendingUp, desc: "Overweight winners, underweight losers" },
-  { id: "min_variance", label: "Min Variance", icon: Target, desc: "Minimize portfolio variance via low-beta overweight" },
+  { id: "risk_parity", label: "Risk Parity (ERC)", icon: ShieldAlert, desc: "Equal Risk Contribution solved on Σ (Maillard 2010)" },
+  { id: "mean_variance", label: "Mean-Variance", icon: TrendingUp, desc: "Markowitz utility max μᵀw − λwᵀΣw (Markowitz 1952)" },
+  { id: "min_variance", label: "Min Variance", icon: Target, desc: "w* = Σ⁻¹·1 / (1ᵀΣ⁻¹1), active-set long-only" },
 ];
 
 const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 8, fontSize: 11 };
@@ -35,6 +41,7 @@ const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadiu
 const PortfolioConstructionModule = ({ stocks }: Props) => {
   const { totalValue, holdings, fmt, totalPnl, totalInvested } = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(60000);
+  const snap = useQuantSnapshot(stocks);
   const [activeStrategy, setActiveStrategy] = useState<Strategy>("risk_parity");
 
   const analytics = useMemo(() => {
@@ -46,17 +53,42 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       risk: h.risk, beta: h.beta, pnlPct: h.pnlPct, sector: h.sector,
     }));
 
-    const computeTargets = (strategy: Strategy) => {
-      const n = holdings.length;
-      switch (strategy) {
-        case "equal_weight": return holdings.map(() => 100 / n);
-        case "risk_parity": { const inv = holdings.map(h => 1 / Math.max(h.risk, 5)); const s = inv.reduce((a, v) => a + v, 0); return inv.map(v => (v / s) * 100); }
-        case "momentum": { const sc = holdings.map(h => Math.max(h.pnlPct + 50, 1)); const s = sc.reduce((a, v) => a + v, 0); return sc.map(v => (v / s) * 100); }
-        case "min_variance": { const inv = holdings.map(h => 1 / Math.max(Math.abs(h.beta), 0.1)); const s = inv.reduce((a, v) => a + v, 0); return inv.map(v => (v / s) * 100); }
-      }
-    };
+    // Real Σ-based weights — no inverse-vol heuristics, no fallbacks.
+    const cov = snap.covariance;
+    const covTickers = cov.tickers;
+    const Sigma = cov.matrix;
+    const haveRealCov = snap.ready && covTickers.length >= 2 && Sigma.length === covTickers.length;
+    const muVec = haveRealCov
+      ? covTickers.map(t => snap.assetStats[t]?.mu ?? 0)
+      : [];
 
-    const targets = computeTargets(activeStrategy);
+    const n = holdings.length;
+    let strategyWeights: number[] | null = null;
+    let strategyError: string | null = null;
+    if (activeStrategy === "equal_weight") {
+      strategyWeights = holdings.map(() => 1 / n);
+    } else if (!haveRealCov) {
+      strategyError = "Needs ≥30d real history for every holding";
+    } else {
+      let solved: number[] | null = null;
+      if (activeStrategy === "risk_parity") solved = riskParityWeights(Sigma);
+      else if (activeStrategy === "min_variance") solved = minVarianceWeights(Sigma);
+      else if (activeStrategy === "mean_variance") solved = meanVarianceWeights(muVec, Sigma, 2);
+      if (!solved) {
+        strategyError = "Solver did not converge on real Σ";
+      } else {
+        // Map cov-ticker order → holdings order
+        const byTicker: Record<string, number> = {};
+        covTickers.forEach((t, i) => { byTicker[t] = solved![i]; });
+        strategyWeights = holdings.map(h => byTicker[h.ticker] ?? 0);
+        const s = strategyWeights.reduce((a, v) => a + v, 0);
+        if (s > 0) strategyWeights = strategyWeights.map(v => v / s);
+      }
+    }
+
+    const targets = strategyWeights
+      ? strategyWeights.map(w => w * 100)
+      : holdings.map(() => 0);
     const driftData = currentWeights.map((cw, i) => ({
       name: cw.name, current: +cw.weight.toFixed(1), target: +targets[i].toFixed(1),
       drift: +(cw.weight - targets[i]).toFixed(1),
@@ -83,10 +115,28 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     const hhi = currentWeights.reduce((s, w) => s + (w.weight / 100) ** 2, 0);
     const concentrationScore = Math.round(hhi * 100);
 
-    const frontier = Array.from({ length: 20 }, (_, i) => {
-      const riskLevel = 5 + i * 2.5;
-      return { risk: +riskLevel.toFixed(1), return: +(-2 + riskLevel * 0.6 + Math.sin(riskLevel * 0.3) * 2).toFixed(1) };
-    });
+    // Real efficient frontier: sweep λ across Markowitz utility on Σ.
+    // No synthetic curve — drop entirely if Σ unavailable.
+    let frontier: { risk: number; return: number }[] = [];
+    if (haveRealCov) {
+      const lambdas = [0.25, 0.5, 1, 1.5, 2, 3, 5, 8, 12, 20, 35, 60];
+      for (const lam of lambdas) {
+        const w = meanVarianceWeights(muVec, Sigma, lam);
+        if (!w) continue;
+        let muP = 0;
+        for (let i = 0; i < w.length; i++) muP += w[i] * muVec[i];
+        let varP = 0;
+        for (let i = 0; i < w.length; i++)
+          for (let j = 0; j < w.length; j++) varP += w[i] * w[j] * Sigma[i][j];
+        const sigP = Math.sqrt(Math.max(varP, 0));
+        frontier.push({
+          risk: +(sigP * Math.sqrt(252) * 100).toFixed(2),
+          return: +(muP * 252 * 100).toFixed(2),
+        });
+      }
+      // Deduplicate & sort by risk for a clean monotone trace
+      frontier.sort((a, b) => a.risk - b.risk);
+    }
     const portfolioPoint = { risk: +(annVol * 100).toFixed(1), return: +(annReturn * 100).toFixed(1) };
 
     const sectorMap: Record<string, { weight: number; count: number }> = {};
@@ -115,10 +165,43 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       { factor: "Efficiency", value: Math.round(Math.min(100, Math.max(0, sortino * 25 + 50))) },
     ];
 
+    // ── Noise vs Signal (RMT) ──────────────────────────────────────
+    // Build correlation from Σ → eigen-decompose → MP edge & PC1 share.
+    let rmt: {
+      lambdaPlus: number | null;
+      signalCount: number | null;
+      pc1Share: number | null;
+      eigCount: number;
+      T: number;
+    } = { lambdaPlus: null, signalCount: null, pc1Share: null, eigCount: 0, T: snap.lookbackDays };
+    if (haveRealCov && Sigma.length >= 2) {
+      const N = Sigma.length;
+      // Correlation = D⁻¹ Σ D⁻¹  with D = diag(√Σᵢᵢ)
+      const stds = Sigma.map((r, i) => Math.sqrt(Math.max(r[i], 0)));
+      if (stds.every(s => s > 0)) {
+        const corr: number[][] = Sigma.map((row, i) =>
+          row.map((v, j) => v / (stds[i] * stds[j]))
+        );
+        const eig = jacobiEigen(corr);
+        if (eig) {
+          const T = snap.lookbackDays;
+          const mp = marchenkoPastur(eig.values, T, N, 1);
+          const total = eig.values.reduce((a, v) => a + v, 0);
+          rmt = {
+            lambdaPlus: mp ? +mp.lambdaPlus.toFixed(3) : null,
+            signalCount: mp ? mp.signalCount : null,
+            pc1Share: total > 0 ? Math.max(...eig.values) / total : null,
+            eigCount: N,
+            T,
+          };
+        }
+      }
+    }
+
     const regimeName = regime?.regime || "Range-Bound";
     const regimeAdvice = (() => {
       switch (regimeName) {
-        case "Trending Bull": return { color: "text-gain", suggestion: "Tilt toward momentum, overweight high-beta winners", recommended: "momentum" as Strategy };
+        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt — overweight high-μ names within Σ risk budget", recommended: "mean_variance" as Strategy };
         case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as Strategy };
         case "Crisis": return { color: "text-loss", suggestion: "Emergency risk parity, equalize risk and raise cash allocation", recommended: "risk_parity" as Strategy };
         case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as Strategy };
@@ -127,8 +210,8 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       }
     })();
 
-    return { currentWeights, targets, driftData, sharpe, sortino, maxDrawdown, concentrationScore, hhi, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol };
-  }, [holdings, totalValue, activeStrategy, regime]);
+    return { currentWeights, targets, driftData, sharpe, sortino, maxDrawdown, concentrationScore, hhi, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol, rmt, strategyError, haveRealCov };
+  }, [holdings, totalValue, activeStrategy, regime, snap]);
 
   if (!analytics || holdings.length === 0) {
     return (
@@ -138,7 +221,9 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     );
   }
 
-  const { currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol } = analytics;
+  const { currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol, rmt, strategyError } = analytics;
+
+  const regimeRecommended = regimeAdvice.recommended;
 
   return (
     <div className="space-y-5">
@@ -180,12 +265,28 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
 
       {/* Strategy Selector */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Rebalancing Strategy</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Rebalancing Strategy</h3>
+          <MethodologyTooltip
+            title="Strategy Math"
+            methods={[
+              { label: "Equal Weight", formula: "wᵢ = 1/N", source: "Naïve baseline" },
+              { label: "Risk Parity (ERC)", formula: "wᵢ·(Σw)ᵢ = const", source: "Maillard, Roncalli, Teiletche (2010)", notes: "Newton iteration on Σ; null on non-convergence." },
+              { label: "Mean-Variance", formula: "max μᵀw − λ·wᵀΣw, λ=2", source: "Markowitz (1952)", notes: "Closed-form Σ⁻¹μ + Lagrangian, simplex projected." },
+              { label: "Min Variance", formula: "w* = Σ⁻¹·1 / (1ᵀΣ⁻¹1)", source: "Markowitz (1952)", notes: "Active-set long-only; null if Σ singular." },
+            ]}
+          />
+        </div>
+        {strategyError && (
+          <p className="mb-2 text-[10px] text-warning flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" /> {strategyError} — strategy targets unavailable
+          </p>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {strategies.map(s => {
             const Icon = s.icon;
             const active = activeStrategy === s.id;
-            const isRecommended = regimeAdvice.recommended === s.id;
+            const isRecommended = regimeRecommended === s.id;
             return (
               <button key={s.id} onClick={() => setActiveStrategy(s.id)}
                 className={`relative rounded-lg p-3 text-left transition-all border ${active ? "border-foreground bg-foreground/5" : "border-border hover:border-muted-foreground/30"}`}>
@@ -197,6 +298,56 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
             );
           })}
         </div>
+      </div>
+
+      {/* Noise vs Signal (RMT / Marchenko-Pastur) */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            Noise vs Signal
+            <span className="text-[9px] font-mono text-muted-foreground/60">RMT / Marchenko-Pastur</span>
+          </h3>
+          <MethodologyTooltip
+            title="Random Matrix Theory"
+            methods={[
+              { label: "MP upper edge", formula: "λ₊ = (1 + √(N/T))²", source: "Marchenko & Pastur (1967)", notes: "Eigenvalues > λ₊ on the realised correlation matrix carry genuine signal; the rest are sampling noise." },
+              { label: "PC1 concentration", formula: "λ₁ / Σλᵢ", source: "Bouchaud & Potters; Laloux et al. (1999)", notes: ">40% of variance in PC1 indicates a dominant systemic factor — diversification is illusory." },
+            ]}
+          />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Assets (N)</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.eigCount || "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lookback (T)</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.T ? `${rmt.T}d` : "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">λ₊ Edge</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.lambdaPlus ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">PC1 Share</p>
+            <p className={`font-mono text-lg font-bold ${
+              rmt.pc1Share == null ? "text-muted-foreground"
+              : rmt.pc1Share > 0.4 ? "text-loss"
+              : rmt.pc1Share > 0.25 ? "text-warning"
+              : "text-gain"
+            }`}>{rmt.pc1Share == null ? "—" : `${(rmt.pc1Share * 100).toFixed(1)}%`}</p>
+          </div>
+        </div>
+        {rmt.pc1Share != null && rmt.pc1Share > 0.4 && (
+          <p className="mt-2 text-[11px] text-loss flex items-center gap-1.5">
+            <AlertTriangle className="h-3 w-3" /> Systemic concentration: {(rmt.pc1Share * 100).toFixed(0)}% of variance in PC1 — diversification illusory.
+          </p>
+        )}
+        {rmt.signalCount != null && (
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {rmt.signalCount} of {rmt.eigCount} eigenvalues above MP noise edge.
+          </p>
+        )}
       </div>
 
       {/* Row 1: Allocation Pie + Efficient Frontier */}
