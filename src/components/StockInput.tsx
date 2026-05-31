@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { searchSymbols, type SymbolEntry } from "@/lib/symbolDirectory";
 
 interface StockInputProps {
   onAnalyze: (ticker: string, buyPrice: number, quantity: number) => void;
@@ -28,23 +29,83 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
   const [ticker, setTicker] = useState("");
   const [buyPrice, setBuyPrice] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const suggestions = useMemo<SymbolEntry[]>(
+    () => (ticker.trim().length >= 1 ? searchSymbols(ticker, compact ? 6 : 8) : []),
+    [ticker, compact],
+  );
+
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [ticker]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setShowSuggest(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const pickSuggestion = (entry: SymbolEntry) => {
+    setTicker(entry.ticker);
+    setShowSuggest(false);
+  };
+
+  const onTickerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggest || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => (i - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      // If the user is actively navigating suggestions, accept the highlighted one
+      // instead of submitting an incomplete form.
+      if (suggestions[activeIdx]) {
+        e.preventDefault();
+        pickSuggestion(suggestions[activeIdx]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggest(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (ticker && buyPrice && quantity) {
       onAnalyze(ticker.toUpperCase(), parseFloat(buyPrice), parseInt(quantity));
+      setShowSuggest(false);
     }
   };
 
   if (compact) {
     return (
       <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
-        <Input
-          placeholder="TICKER"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value)}
-          className="bg-surface-2 border-border font-mono text-[10px] h-6 px-1.5 w-20 placeholder:text-muted-foreground/30"
-        />
+        <div ref={wrapRef} className="relative">
+          <Input
+            placeholder="TICKER"
+            value={ticker}
+            onChange={(e) => { setTicker(e.target.value); setShowSuggest(true); }}
+            onFocus={() => setShowSuggest(true)}
+            onKeyDown={onTickerKeyDown}
+            className="bg-surface-2 border-border font-mono text-[10px] h-6 px-1.5 w-20 placeholder:text-muted-foreground/30"
+          />
+          {showSuggest && suggestions.length > 0 && (
+            <SuggestList
+              suggestions={suggestions}
+              activeIdx={activeIdx}
+              onPick={pickSuggestion}
+              compact
+            />
+          )}
+        </div>
         <Input
           type="number"
           step="0.01"
@@ -83,7 +144,7 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="space-y-1.5">
+        <div ref={wrapRef} className="space-y-1.5 relative">
           <Label htmlFor="ticker" className="text-[10px] uppercase tracking-wider text-muted-foreground">
             Ticker / Symbol
           </Label>
@@ -91,9 +152,19 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
             id="ticker"
             placeholder="AAPL, BTC-USD, RELIANCE.NS, GC=F..."
             value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
+            onChange={(e) => { setTicker(e.target.value); setShowSuggest(true); }}
+            onFocus={() => setShowSuggest(true)}
+            onKeyDown={onTickerKeyDown}
+            autoComplete="off"
             className="bg-surface-2 border-border font-mono text-sm placeholder:text-muted-foreground/30 h-9"
           />
+          {showSuggest && suggestions.length > 0 && (
+            <SuggestList
+              suggestions={suggestions}
+              activeIdx={activeIdx}
+              onPick={pickSuggestion}
+            />
+          )}
           <div className="flex flex-wrap gap-1">
             {QUICK_TICKERS.map((t) => (
               <button
@@ -152,3 +223,56 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
 };
 
 export default StockInput;
+
+// ---- Suggestion dropdown ----
+
+const KIND_LABELS: Record<SymbolEntry["kind"], string> = {
+  equity: "EQ",
+  crypto: "CRY",
+  fx: "FX",
+  commodity: "CMD",
+  etf: "ETF",
+  index: "IDX",
+};
+
+interface SuggestListProps {
+  suggestions: SymbolEntry[];
+  activeIdx: number;
+  onPick: (entry: SymbolEntry) => void;
+  compact?: boolean;
+}
+
+const SuggestList = ({ suggestions, activeIdx, onPick, compact }: SuggestListProps) => {
+  return (
+    <div
+      className={`absolute z-50 mt-1 ${compact ? "left-0 w-64" : "left-0 right-0"} rounded-md border border-border bg-popover shadow-lg overflow-hidden animate-fade-in`}
+    >
+      <ul className="max-h-72 overflow-auto py-1">
+        {suggestions.map((s, i) => {
+          const active = i === activeIdx;
+          return (
+            <li key={s.ticker}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); onPick(s); }}
+                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 transition-colors ${
+                  active ? "bg-primary/10" : "hover:bg-surface-2"
+                }`}
+              >
+                <span className="font-mono text-[11px] font-semibold text-foreground min-w-[80px]">
+                  {s.ticker}
+                </span>
+                <span className="text-[10px] text-muted-foreground truncate flex-1">
+                  {s.name}
+                </span>
+                <span className="font-mono text-[8px] text-muted-foreground/60 px-1 py-0.5 rounded bg-surface-2 border border-border/50">
+                  {KIND_LABELS[s.kind]} · {s.exchange}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
