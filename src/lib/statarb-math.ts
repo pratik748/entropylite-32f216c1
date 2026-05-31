@@ -135,47 +135,178 @@ export function garch11(
   return { sigma, forecast: Math.sqrt(Math.max(sig2, 1e-12)), params: { ...best, mu: m }, logLik: bestLL };
 }
 
-/** Hidden Markov Model, 2-state (bull/bear) Baum-Welch simplified */
+/**
+ * Hidden Markov Model with Gaussian emissions, fit by Baum-Welch (EM)
+ * and decoded by Viterbi. Returns posterior γ_t(s), most likely path,
+ * and learned transition + emission parameters.
+ */
 export function hmmRegimeDetect(
-  logReturns: number[], nStates = 3
-): { regimeProbs: number[][]; currentRegime: number; transitionMatrix: number[][] } {
+  logReturns: number[],
+  nStates = 3,
+  maxIter = 40,
+  tol = 1e-5
+): {
+  regimeProbs: number[][];
+  currentRegime: number;
+  transitionMatrix: number[][];
+  means: number[];
+  stds: number[];
+  initial: number[];
+  viterbi: number[];
+  logLik: number;
+  iterations: number;
+} {
   const n = logReturns.length;
-  // Initialize regime centers via quantile clustering
+  const S = nStates;
+
+  // ── Init via quantile clustering ──
   const sorted = [...logReturns].sort((a, b) => a - b);
-  const centers = Array.from({ length: nStates }, (_, i) => 
-    sorted[Math.floor((i + 0.5) * n / nStates)]
-  );
-  const stds = Array(nStates).fill(stddev(logReturns));
-  
-  // Assign regimes by closest center
-  const assignments = logReturns.map(r => {
-    let best = 0, bestDist = Infinity;
-    for (let s = 0; s < nStates; s++) {
-      const d = Math.abs(r - centers[s]);
-      if (d < bestDist) { bestDist = d; best = s; }
+  let means = Array.from({ length: S }, (_, i) => sorted[Math.floor((i + 0.5) * n / S)]);
+  const baseSd = Math.max(stddev(logReturns), 1e-6);
+  let stds = Array(S).fill(baseSd);
+  let initial = Array(S).fill(1 / S);
+  let trans: number[][] = Array.from({ length: S }, () => Array(S).fill(1 / S));
+
+  const gauss = (x: number, mu: number, sd: number) => {
+    const v = Math.max(sd * sd, 1e-12);
+    return Math.exp(-0.5 * (x - mu) ** 2 / v) / Math.sqrt(2 * Math.PI * v);
+  };
+
+  let prevLL = -Infinity;
+  let iter = 0;
+  let gamma: number[][] = [];
+  let logLik = -Infinity;
+
+  for (iter = 0; iter < maxIter; iter++) {
+    // ── Emission matrix B[t][s] ──
+    const B: number[][] = new Array(n);
+    for (let t = 0; t < n; t++) {
+      B[t] = new Array(S);
+      for (let s = 0; s < S; s++) B[t][s] = Math.max(gauss(logReturns[t], means[s], stds[s]), 1e-300);
     }
-    return best;
-  });
-  
-  // Build transition matrix
-  const trans = Array.from({ length: nStates }, () => Array(nStates).fill(0));
-  for (let i = 1; i < n; i++) trans[assignments[i - 1]][assignments[i]]++;
-  for (let s = 0; s < nStates; s++) {
-    const rowSum = trans[s].reduce((a, b) => a + b, 0) || 1;
-    trans[s] = trans[s].map(v => v / rowSum);
+
+    // ── Forward with scaling ──
+    const alpha: number[][] = new Array(n);
+    const c: number[] = new Array(n);
+    alpha[0] = new Array(S);
+    let s0 = 0;
+    for (let s = 0; s < S; s++) { alpha[0][s] = initial[s] * B[0][s]; s0 += alpha[0][s]; }
+    c[0] = 1 / Math.max(s0, 1e-300);
+    for (let s = 0; s < S; s++) alpha[0][s] *= c[0];
+    for (let t = 1; t < n; t++) {
+      alpha[t] = new Array(S);
+      let sumT = 0;
+      for (let j = 0; j < S; j++) {
+        let a = 0;
+        for (let i = 0; i < S; i++) a += alpha[t - 1][i] * trans[i][j];
+        alpha[t][j] = a * B[t][j];
+        sumT += alpha[t][j];
+      }
+      c[t] = 1 / Math.max(sumT, 1e-300);
+      for (let j = 0; j < S; j++) alpha[t][j] *= c[t];
+    }
+
+    // ── Backward with scaling ──
+    const beta: number[][] = new Array(n);
+    beta[n - 1] = new Array(S).fill(c[n - 1]);
+    for (let t = n - 2; t >= 0; t--) {
+      beta[t] = new Array(S);
+      for (let i = 0; i < S; i++) {
+        let b = 0;
+        for (let j = 0; j < S; j++) b += trans[i][j] * B[t + 1][j] * beta[t + 1][j];
+        beta[t][i] = b * c[t];
+      }
+    }
+
+    // ── γ and ξ ──
+    gamma = new Array(n);
+    const xiSum: number[][] = Array.from({ length: S }, () => Array(S).fill(0));
+    for (let t = 0; t < n; t++) {
+      gamma[t] = new Array(S);
+      let z = 0;
+      for (let s = 0; s < S; s++) { gamma[t][s] = alpha[t][s] * beta[t][s]; z += gamma[t][s]; }
+      const zi = 1 / Math.max(z, 1e-300);
+      for (let s = 0; s < S; s++) gamma[t][s] *= zi;
+    }
+    for (let t = 0; t < n - 1; t++) {
+      let z = 0;
+      const x: number[][] = Array.from({ length: S }, () => Array(S).fill(0));
+      for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {
+        x[i][j] = alpha[t][i] * trans[i][j] * B[t + 1][j] * beta[t + 1][j];
+        z += x[i][j];
+      }
+      const zi = 1 / Math.max(z, 1e-300);
+      for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) xiSum[i][j] += x[i][j] * zi;
+    }
+
+    // ── M-step ──
+    initial = gamma[0].slice();
+    const gammaTotal = Array(S).fill(0);
+    for (let t = 0; t < n; t++) for (let s = 0; s < S; s++) gammaTotal[s] += gamma[t][s];
+    const newTrans: number[][] = Array.from({ length: S }, () => Array(S).fill(0));
+    for (let i = 0; i < S; i++) {
+      const denom = gammaTotal[i] - gamma[n - 1][i] || 1e-12;
+      for (let j = 0; j < S; j++) newTrans[i][j] = xiSum[i][j] / denom;
+      const rs = newTrans[i].reduce((a, b) => a + b, 0) || 1;
+      for (let j = 0; j < S; j++) newTrans[i][j] /= rs;
+    }
+    trans = newTrans;
+    const newMeans = Array(S).fill(0);
+    const newVars = Array(S).fill(0);
+    for (let s = 0; s < S; s++) {
+      let num = 0;
+      for (let t = 0; t < n; t++) num += gamma[t][s] * logReturns[t];
+      newMeans[s] = num / Math.max(gammaTotal[s], 1e-12);
+    }
+    for (let s = 0; s < S; s++) {
+      let num = 0;
+      for (let t = 0; t < n; t++) num += gamma[t][s] * (logReturns[t] - newMeans[s]) ** 2;
+      newVars[s] = Math.max(num / Math.max(gammaTotal[s], 1e-12), 1e-10);
+    }
+    means = newMeans;
+    stds = newVars.map(Math.sqrt);
+
+    // ── Log-likelihood from scaling factors ──
+    logLik = 0;
+    for (let t = 0; t < n; t++) logLik -= Math.log(c[t]);
+    if (Math.abs(logLik - prevLL) < tol) { iter++; break; }
+    prevLL = logLik;
   }
-  
-  // Regime probabilities (soft assignment via gaussian likelihood)
-  const regimeProbs = logReturns.map(r => {
-    const probs = centers.map((c, s) => {
-      const z = (r - c) / (stds[s] || 0.01);
-      return Math.exp(-0.5 * z * z);
-    });
-    const sum = probs.reduce((a, b) => a + b, 0) || 1;
-    return probs.map(p => p / sum);
-  });
-  
-  return { regimeProbs, currentRegime: assignments[n - 1], transitionMatrix: trans };
+
+  // ── Viterbi decode ──
+  const logA = trans.map(row => row.map(p => Math.log(Math.max(p, 1e-300))));
+  const logPi = initial.map(p => Math.log(Math.max(p, 1e-300)));
+  const logB = (t: number, s: number) => {
+    const v = Math.max(stds[s] * stds[s], 1e-12);
+    return -0.5 * Math.log(2 * Math.PI * v) - 0.5 * (logReturns[t] - means[s]) ** 2 / v;
+  };
+  const delta: number[][] = new Array(n);
+  const psi: number[][] = new Array(n);
+  delta[0] = Array(S).fill(0).map((_, s) => logPi[s] + logB(0, s));
+  psi[0] = Array(S).fill(0);
+  for (let t = 1; t < n; t++) {
+    delta[t] = new Array(S); psi[t] = new Array(S);
+    for (let j = 0; j < S; j++) {
+      let bestVal = -Infinity, bestI = 0;
+      for (let i = 0; i < S; i++) {
+        const v = delta[t - 1][i] + logA[i][j];
+        if (v > bestVal) { bestVal = v; bestI = i; }
+      }
+      delta[t][j] = bestVal + logB(t, j); psi[t][j] = bestI;
+    }
+  }
+  const viterbi: number[] = new Array(n);
+  let last = 0, lastVal = -Infinity;
+  for (let s = 0; s < S; s++) if (delta[n - 1][s] > lastVal) { lastVal = delta[n - 1][s]; last = s; }
+  viterbi[n - 1] = last;
+  for (let t = n - 2; t >= 0; t--) viterbi[t] = psi[t + 1][viterbi[t + 1]];
+
+  return {
+    regimeProbs: gamma,
+    currentRegime: viterbi[n - 1],
+    transitionMatrix: trans,
+    means, stds, initial, viterbi, logLik, iterations: iter,
+  };
 }
 
 // ─── 2. Portfolio Risk ──────────────────────────────────────────────
