@@ -1267,10 +1267,12 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sy
     setFgmRunning(true);
     setTimeout(() => {
       const a = assets[Math.min(selectedAsset, assets.length - 1)];
-      const result = FGM.runFGM(a.ticker, a.buyPrice, a.price, a.mu, a.vol, fgmHorizon, fgmModel, fgmDepth);
+      // Use REAL daily closes when available — eliminates the synthetic-data pipeline.
+      const realCloses = historicalPrices[a.rawTicker as any]?.closes;
+      const result = FGM.runFGM(a.ticker, a.buyPrice, a.price, a.mu, a.vol, fgmHorizon, fgmModel, fgmDepth, realCloses);
       setFgmResult(result); setFgmRunning(false);
     }, 50);
-  }, [assets, selectedAsset, fgmHorizon, fgmModel, fgmDepth]);
+  }, [assets, selectedAsset, fgmHorizon, fgmModel, fgmDepth, historicalPrices]);
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTrades, setAiTrades] = useState<any>(null);
