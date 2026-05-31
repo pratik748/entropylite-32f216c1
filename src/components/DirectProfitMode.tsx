@@ -614,17 +614,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         <form onSubmit={handleSubmit} className="flex gap-2">
           <SuggestWrapper ticker={ticker} setTicker={setTicker} loading={loading} listening={listening} toggleVoice={toggleVoice} />
           <Button type="submit" disabled={!ticker.trim() || loading} className="h-12 px-6 font-semibold">
-            <button
-              type="button"
-              onClick={toggleVoice}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-sm transition-colors ${
-                listening ? "text-loss animate-pulse" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </button>
-          </div>
-          <Button type="submit" disabled={!ticker.trim() || loading} className="h-12 px-6 font-semibold">
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="h-3 w-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
