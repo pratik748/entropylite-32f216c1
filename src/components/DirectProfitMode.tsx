@@ -34,6 +34,7 @@ import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useSymbolSuggest } from "@/components/SymbolSuggest";
 
 interface RiskMetrics {
   var95: number;
