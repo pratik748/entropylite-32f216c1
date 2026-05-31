@@ -112,7 +112,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} historicalPrices={historicalPrices} />}
         {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} historicalPrices={historicalPrices} />}
         {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
-        {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} />}
+        {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} historicalPrices={historicalPrices} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
     </div>
