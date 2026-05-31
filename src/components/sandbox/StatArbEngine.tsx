@@ -112,7 +112,7 @@ const StatArbEngine = ({ stocks }: Props) => {
         {tab === "Stress Test" && <StressTestPanel assets={assetData} fmt={fmt} totalValue={totalValue} historicalPrices={historicalPrices} />}
         {tab === "Structural Flow" && <StructuralFlowPanel assets={assetData} historicalPrices={historicalPrices} />}
         {tab === "Mean Reversion" && <MeanReversionPanel assets={assetData} fmt={fmt} historicalPrices={historicalPrices} />}
-        {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} />}
+        {tab === "Foresight" && <ForesightPanel assets={assetData} totalValue={totalValue} portfolioMu={portfolioMu} portfolioVol={portfolioVol} fmt={fmt} sym={sym} historicalPrices={historicalPrices} />}
         {tab === "Real-Time" && <RealTimePanel assets={assetData} portfolioVol={portfolioVol} />}
       </div>
     </div>
@@ -1185,7 +1185,7 @@ function MeanReversionPanel({ assets, fmt, historicalPrices }: { assets: AssetDa
 }
 
 /** FUTURE GRAPH MACHINE, 2D Predictive Chart */
-function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sym }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt; sym: string }) {
+function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sym, historicalPrices }: { assets: AssetDatum[]; totalValue: number; portfolioMu: number; portfolioVol: number; fmt: Fmt; sym: string; historicalPrices: HistPrices }) {
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [tradeCards, setTradeCards] = useState<TradeInstruction[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<number>(0);
@@ -1267,10 +1267,12 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sy
     setFgmRunning(true);
     setTimeout(() => {
       const a = assets[Math.min(selectedAsset, assets.length - 1)];
-      const result = FGM.runFGM(a.ticker, a.buyPrice, a.price, a.mu, a.vol, fgmHorizon, fgmModel, fgmDepth);
+      // Use REAL daily closes when available — eliminates the synthetic-data pipeline.
+      const realCloses = historicalPrices[a.rawTicker as any]?.closes;
+      const result = FGM.runFGM(a.ticker, a.buyPrice, a.price, a.mu, a.vol, fgmHorizon, fgmModel, fgmDepth, realCloses);
       setFgmResult(result); setFgmRunning(false);
     }, 50);
-  }, [assets, selectedAsset, fgmHorizon, fgmModel, fgmDepth]);
+  }, [assets, selectedAsset, fgmHorizon, fgmModel, fgmDepth, historicalPrices]);
 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTrades, setAiTrades] = useState<any>(null);

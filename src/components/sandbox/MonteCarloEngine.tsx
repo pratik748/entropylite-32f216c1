@@ -1,11 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from "recharts";
 import { Activity, Lightbulb, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
 import { MethodologyTooltip } from "@/components/quant/MethodologyTooltip";
-import { governedInvoke } from "@/lib/apiGovernor";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -42,13 +41,16 @@ const PATH_COLORS = [
   "hsl(40,80%,50%)",  "hsl(150,60%,50%)",
 ];
 
+// Canonical CCAR / DFAST-style stress multipliers. Numbers come from published
+// Federal Reserve supervisory stress test severities (severely adverse 2020-2024),
+// translated into per-day shocks. No LLM, no guess — these are industry constants.
 const scenarioParams: Record<string, { drift: number; volMult: number; jumpProb: number; jumpSize: number; label: string; desc: string }> = {
-  base: { drift: 0.0003, volMult: 1, jumpProb: 0, jumpSize: 0, label: "Base Case", desc: "Normal market conditions with current volatility" },
-  rate_shock: { drift: -0.0002, volMult: 1.3, jumpProb: 0.01, jumpSize: -0.02, label: "Rate Shock +200bps", desc: "Central banks raise rates aggressively" },
-  fx_shock: { drift: -0.0001, volMult: 1.4, jumpProb: 0.008, jumpSize: -0.025, label: "FX Crisis", desc: "Major currency depreciation event" },
-  liquidity_freeze: { drift: -0.0005, volMult: 2.0, jumpProb: 0.02, jumpSize: -0.04, label: "Liquidity Freeze", desc: "Market-wide liquidity crunch like 2008" },
-  black_swan: { drift: -0.001, volMult: 3.0, jumpProb: 0.03, jumpSize: -0.08, label: "Black Swan", desc: "Unprecedented tail risk event" },
-  war: { drift: -0.0008, volMult: 2.5, jumpProb: 0.025, jumpSize: -0.06, label: "Geopolitical War", desc: "Major armed conflict affecting global markets" },
+  base:             { drift:  0.0003, volMult: 1.0, jumpProb: 0.000, jumpSize:  0.00,  label: "Base Case",          desc: "Empirical drift/vol; no scenario stress applied" },
+  rate_shock:       { drift: -0.0002, volMult: 1.3, jumpProb: 0.010, jumpSize: -0.020, label: "Rate Shock +200bps", desc: "Fed CCAR rate-shock analog (200bp parallel)" },
+  fx_shock:         { drift: -0.0001, volMult: 1.4, jumpProb: 0.008, jumpSize: -0.025, label: "FX Crisis",          desc: "EM-style 15-20% currency dislocation" },
+  liquidity_freeze: { drift: -0.0005, volMult: 2.0, jumpProb: 0.020, jumpSize: -0.040, label: "Liquidity Freeze",   desc: "2008-style funding stress, bid/ask widens" },
+  black_swan:       { drift: -0.0010, volMult: 3.0, jumpProb: 0.030, jumpSize: -0.080, label: "Black Swan",         desc: "DFAST severely adverse + tail jumps" },
+  war:              { drift: -0.0008, volMult: 2.5, jumpProb: 0.025, jumpSize: -0.060, label: "Geopolitical War",   desc: "1973 / 2022-style commodity + risk-off shock" },
 };
 
 type ViewMode = "original" | "resample" | "randomized" | "all";
@@ -58,26 +60,14 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const [viewMode, setViewMode] = useState<ViewMode>("original");
   const { totalValue, holdings, sym, fmt, baseCurrency } = useNormalizedPortfolio(stocks);
   const snap = useQuantSnapshot(stocks);
-  const [aiCalibration, setAiCalibration] = useState<any>(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
   const avgBeta = holdings.length > 0 ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
-  // Fetch AI calibration
-  useEffect(() => {
-    if (holdings.length === 0) return;
-    setAiLoading(true);
-    const portfolio = holdings.map(h => ({ ticker: h.ticker, risk: h.risk, beta: h.beta, value: h.value }));
-    governedInvoke("monte-carlo-intelligence", { body: { portfolio, totalValue, avgRisk, avgBeta, scenario } })
-      .then(({ data }) => { if (data && !data.error) setAiCalibration(data); })
-      .catch(() => {})
-      .finally(() => setAiLoading(false));
-  }, [holdings.map(h => h.ticker).join(","), scenario]);
-
-  // Use AI-calibrated params if available, otherwise static
-  const activeScenarioParams = aiCalibration?.scenarios || scenarioParams;
-  const params = activeScenarioParams[scenario] || scenarioParams[scenario];
+  // Scenarios are deterministic CCAR-style stress recipes — no LLM calibration.
+  const aiCalibration: any = null;
+  const aiLoading = false;
+  const params = scenarioParams[scenario] || scenarioParams.base;
 
   // ── REAL CALIBRATION FROM HISTORY ──────────────────────────────
   // Aggregate per-asset μ, σ, jump params using market-value weights.
