@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { TrendingUp, Info } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
-import MethodologyTooltip from "@/components/quant/MethodologyTooltip";
+import { MethodologyTooltip } from "@/components/quant/MethodologyTooltip";
 
 interface Props { stocks: PortfolioStock[]; }
 
@@ -87,10 +87,14 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
           </p>
         </div>
         <MethodologyTooltip
-          title="Block Bootstrap Annual Return"
-          formula="r_year = exp(Σ blocks(r_daily)) − 1, resampled 2,000× with block ≈ √n"
-          source="Politis & Romano (1994) — Stationary Bootstrap"
-          lookback={`${snap.lookbackDays} trading days`}
+          title="Returns Estimate"
+          methods={[{
+            label: "Block Bootstrap Annual Return",
+            formula: "r_year = exp(Σ blocks(r_daily)) − 1, resampled 2,000× with block ≈ √n",
+            source: "Politis & Romano (1994) — Stationary Bootstrap",
+            lookback: `${snap.lookbackDays} trading days`,
+            notes: "Preserves serial correlation. Assumes stationary return process; no alpha, costs, or regime shifts modeled.",
+          }]}
         />
       </div>
 
