@@ -298,18 +298,22 @@ export function runFGM(
   horizon: number,
   model: FGMModel,
   depth: number,
+  realPrices?: number[],
 ): { projection: FGMProjection; params: FGMParameters; historicalPrices: number[] } {
   // Check cache
-  const key = cacheKey(ticker, horizon, model, depth);
+  const useReal = !!(realPrices && realPrices.length >= 30);
+  const key = `${cacheKey(ticker, horizon, model, depth)}:${useReal ? `real${realPrices!.length}` : "synth"}`;
   const cached = cache.get(key);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
-    const historicalPrices = generateHistoricalPrices(buyPrice, currentPrice, mu, vol);
+    const historicalPrices = useReal ? realPrices! : generateHistoricalPrices(buyPrice, currentPrice, mu, vol);
     const params = extractParameters(historicalPrices);
     return { projection: cached.result, params, historicalPrices };
   }
 
-  // Generate synthetic historical data
-  const historicalPrices = generateHistoricalPrices(buyPrice, currentPrice, mu, vol);
+  // Prefer REAL historical prices; fall back to synthetic only if unavailable.
+  const historicalPrices = useReal
+    ? realPrices!
+    : generateHistoricalPrices(buyPrice, currentPrice, mu, vol);
   const params = extractParameters(historicalPrices);
 
   // Run simulation based on model
