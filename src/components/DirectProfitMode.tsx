@@ -612,14 +612,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value)}
-              placeholder="Enter stock name or speak"
-              className="bg-surface-2 border-border h-12 text-base font-mono pr-10 placeholder:text-muted-foreground/40"
-              disabled={loading}
-            />
+          <SuggestWrapper ticker={ticker} setTicker={setTicker} loading={loading} listening={listening} toggleVoice={toggleVoice} />
+          <Button type="submit" disabled={!ticker.trim() || loading} className="h-12 px-6 font-semibold">
             <button
               type="button"
               onClick={toggleVoice}
