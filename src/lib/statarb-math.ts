@@ -63,22 +63,76 @@ export function jumpDiffusionPath(
   return path;
 }
 
-/** GARCH(1,1): σ²t = α₀ + α₁ε²(t-1) + β₁σ²(t-1) */
+/** GARCH(1,1) Gaussian log-likelihood for params (ω, α, β). Higher is better. */
+function garchLogLik(rets: number[], omega: number, alpha: number, beta: number, mu: number): number {
+  const n = rets.length;
+  if (omega <= 0 || alpha < 0 || beta < 0 || alpha + beta >= 0.999) return -Infinity;
+  const uncondVar = omega / Math.max(1e-12, 1 - alpha - beta);
+  let sig2 = uncondVar;
+  let ll = 0;
+  for (let t = 0; t < n; t++) {
+    const eps = rets[t] - mu;
+    if (sig2 <= 0 || !isFinite(sig2)) return -Infinity;
+    ll += -0.5 * (Math.log(2 * Math.PI * sig2) + (eps * eps) / sig2);
+    sig2 = omega + alpha * eps * eps + beta * sig2;
+  }
+  return ll;
+}
+
+/**
+ * GARCH(1,1): σ²t = ω + αε²(t-1) + βσ²(t-1)
+ * Parameters estimated by quasi-MLE via coarse grid + local refinement.
+ * Constraints: ω>0, α≥0, β≥0, α+β<1 (covariance stationarity).
+ */
 export function garch11(
   logReturns: number[],
-  alpha0 = 0.00001, alpha1 = 0.08, beta1 = 0.90
-): { sigma: number[]; forecast: number } {
+  initOmega?: number, initAlpha?: number, initBeta?: number
+): { sigma: number[]; forecast: number; params: { omega: number; alpha: number; beta: number; mu: number }; logLik: number } {
   const n = logReturns.length;
-  const sigma: number[] = new Array(n);
   const m = mean(logReturns);
-  let sig2 = logReturns.reduce((s, r) => s + (r - m) ** 2, 0) / n;
-  
-  for (let t = 0; t < n; t++) {
-    sigma[t] = Math.sqrt(sig2);
-    const eps = logReturns[t] - m;
-    sig2 = alpha0 + alpha1 * eps * eps + beta1 * sig2;
+  const sampleVar = logReturns.reduce((s, r) => s + (r - m) ** 2, 0) / Math.max(1, n - 1);
+
+  // If params hard-overridden, just filter
+  let best = {
+    omega: initOmega ?? sampleVar * 0.05,
+    alpha: initAlpha ?? 0.08,
+    beta: initBeta ?? 0.90,
+  };
+  let bestLL = garchLogLik(logReturns, best.omega, best.alpha, best.beta, m);
+
+  if (initOmega === undefined && initAlpha === undefined && initBeta === undefined && n >= 50) {
+    // Coarse grid search over the typical (α, β) simplex; ω pinned to target uncond variance.
+    for (let alpha = 0.02; alpha <= 0.30; alpha += 0.02) {
+      for (let beta = 0.50; beta <= 0.97; beta += 0.02) {
+        if (alpha + beta >= 0.995) continue;
+        const omega = sampleVar * (1 - alpha - beta);
+        const ll = garchLogLik(logReturns, omega, alpha, beta, m);
+        if (ll > bestLL) { bestLL = ll; best = { omega, alpha, beta }; }
+      }
+    }
+    // Local refinement (random hill-climb)
+    let step = 0.02;
+    for (let iter = 0; iter < 200; iter++) {
+      const cand = {
+        omega: Math.max(1e-12, best.omega * (1 + (Math.random() - 0.5) * step)),
+        alpha: Math.max(0, best.alpha + (Math.random() - 0.5) * step),
+        beta: Math.max(0, Math.min(0.999 - best.alpha, best.beta + (Math.random() - 0.5) * step)),
+      };
+      const ll = garchLogLik(logReturns, cand.omega, cand.alpha, cand.beta, m);
+      if (ll > bestLL) { bestLL = ll; best = cand; }
+      else if (iter % 25 === 24) step *= 0.7;
+    }
   }
-  return { sigma, forecast: Math.sqrt(sig2) };
+
+  // Filter forward with estimated params
+  const sigma: number[] = new Array(n);
+  let sig2 = best.omega / Math.max(1e-12, 1 - best.alpha - best.beta);
+  for (let t = 0; t < n; t++) {
+    sigma[t] = Math.sqrt(Math.max(sig2, 1e-12));
+    const eps = logReturns[t] - m;
+    sig2 = best.omega + best.alpha * eps * eps + best.beta * sig2;
+  }
+  return { sigma, forecast: Math.sqrt(Math.max(sig2, 1e-12)), params: { ...best, mu: m }, logLik: bestLL };
 }
 
 /** Hidden Markov Model, 2-state (bull/bear) Baum-Welch simplified */
