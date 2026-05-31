@@ -111,13 +111,17 @@ export function useMarketRegime(pollIntervalMs = 15000, refreshKey = 0): MarketR
 
   const fetchData = useCallback(async () => {
     try {
-      const { data, error } = await governedInvoke("market-data", {
-        body: {
-          tickers: ["^GSPC", "^IXIC", "^DJI", "^N225", "^STOXX50E", "^HSI", "GC=F", "CL=F", "BTC-USD", "ETH-USD", "^TNX", "DX-Y.NYB", "SI=F", "EURUSD=X", "^FTSE"],
-          includeHistory: ["^GSPC"],
-          historyRange: "1y",
-        },
-      });
+      const [{ data, error }, hist] = await Promise.all([
+        governedInvoke<any>("market-data", {
+          body: {
+            tickers: ["^GSPC", "^IXIC", "^DJI", "^N225", "^STOXX50E", "^HSI", "GC=F", "CL=F", "BTC-USD", "ETH-USD", "^TNX", "DX-Y.NYB", "SI=F", "EURUSD=X", "^FTSE"],
+          },
+        }),
+        governedInvoke<any>("historical-prices", {
+          tier: "slow",
+          body: { tickers: ["^GSPC"], range: "1y" },
+        }).catch(() => ({ data: null, error: null })),
+      ]);
       if (error || !data) return;
 
       const sectors = (data.sectors || []).map((s: any) => ({ name: s.name, changePct: s.changePct }));
@@ -129,7 +133,7 @@ export function useMarketRegime(pollIntervalMs = 15000, refreshKey = 0): MarketR
       // Fall back to the heuristic only when history is unavailable.
       let hmmInfo: MarketRegime["hmm"] | undefined;
       let detected: RegimeType;
-      const spxCloses: number[] | undefined = data.history?.["^GSPC"]?.closes;
+      const spxCloses: number[] | undefined = hist?.data?.data?.["^GSPC"]?.closes;
       if (spxCloses && spxCloses.length >= 100) {
         try {
           const rets = logReturns(spxCloses);
