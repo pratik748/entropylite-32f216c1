@@ -34,6 +34,7 @@ import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { useSymbolSuggest } from "@/components/SymbolSuggest";
 
 interface RiskMetrics {
   var95: number;
@@ -611,24 +612,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value)}
-              placeholder="Enter stock name or speak"
-              className="bg-surface-2 border-border h-12 text-base font-mono pr-10 placeholder:text-muted-foreground/40"
-              disabled={loading}
-            />
-            <button
-              type="button"
-              onClick={toggleVoice}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-sm transition-colors ${
-                listening ? "text-loss animate-pulse" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </button>
-          </div>
+          <SuggestWrapper ticker={ticker} setTicker={setTicker} loading={loading} listening={listening} toggleVoice={toggleVoice} />
           <Button type="submit" disabled={!ticker.trim() || loading} className="h-12 px-6 font-semibold">
             {loading ? (
               <span className="flex items-center gap-2">
@@ -1087,3 +1071,36 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 };
 
 export default DirectProfitMode;
+
+// Ticker input with auto-suggest + voice mic button.
+interface SuggestWrapperProps {
+  ticker: string;
+  setTicker: (v: string) => void;
+  loading: boolean;
+  listening: boolean;
+  toggleVoice: () => void;
+}
+
+const SuggestWrapper = ({ ticker, setTicker, loading, listening, toggleVoice }: SuggestWrapperProps) => {
+  const { inputProps, dropdown, wrapRef } = useSymbolSuggest(ticker, setTicker, { limit: 6 });
+  return (
+    <div ref={wrapRef} className="relative flex-1">
+      <Input
+        {...inputProps}
+        placeholder="Enter stock name or speak"
+        className="bg-surface-2 border-border h-12 text-base font-mono pr-10 placeholder:text-muted-foreground/40"
+        disabled={loading}
+      />
+      <button
+        type="button"
+        onClick={toggleVoice}
+        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-sm transition-colors ${
+          listening ? "text-loss animate-pulse" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+      </button>
+      {dropdown}
+    </div>
+  );
+};
