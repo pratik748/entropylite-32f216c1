@@ -20,6 +20,7 @@ import ExposureDashboardModule from "./ExposureDashboardModule";
 import ClientReportingModule from "./ClientReportingModule";
 import ESGModule from "./ESGModule";
 import WorkflowModule from "./WorkflowModule";
+import ReturnsEstimateModule from "./ReturnsEstimateModule";
 
 interface AugmentDashboardProps {
   stocks: PortfolioStock[];
@@ -27,6 +28,7 @@ interface AugmentDashboardProps {
 
 const modules = [
   { id: "portfolio", label: "Portfolio Construction", icon: Briefcase },
+  { id: "returns", label: "Returns Estimate", icon: TrendingUp },
   { id: "benchmark", label: "Benchmark & Attribution", icon: BarChart3 },
   { id: "riskmodel", label: "Risk Modeling", icon: Shield },
   { id: "stress", label: "Stress Testing", icon: Zap },
@@ -51,6 +53,7 @@ const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
   const renderModule = () => {
     switch (activeModule) {
       case "portfolio": return <PortfolioConstructionModule stocks={stocks} />;
+      case "returns": return <ReturnsEstimateModule stocks={stocks} />;
       case "benchmark": return <BenchmarkModule stocks={stocks} />;
       case "riskmodel": return <RiskModelingModule stocks={stocks} />;
       case "stress": return <StressTestModule stocks={stocks} />;
