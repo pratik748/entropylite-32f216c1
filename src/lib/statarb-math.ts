@@ -3,6 +3,8 @@
  * Zero UI dependencies. All functions take arrays of numbers, return arrays of numbers.
  */
 
+import { hurstRS as _hurstRS } from "@/lib/quant/institutional";
+
 // ─── Random / Utility ───────────────────────────────────────────────
 
 export function gaussianRandom(): number {
@@ -788,11 +790,7 @@ export function meanReversionHalfLife(theta: number): number {
  * H < 0.5 = mean-reverting, H ≈ 0.5 = random walk, H > 0.5 = trending.
  */
 export function hurstExponent(prices: number[]): number {
-  // Lazy import to avoid circular module load
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { hurstRS } = require("@/lib/quant/institutional");
-  const rets = returns(prices);
-  return hurstRS(rets).H;
+  return _hurstRS(returns(prices)).H;
 }
 
 // ── Cointegration re-exports (Engle–Granger, Johansen) ───────────────
