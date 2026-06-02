@@ -3,6 +3,8 @@
  * Zero UI dependencies. All functions take arrays of numbers, return arrays of numbers.
  */
 
+import { hurstRS as _hurstRS } from "@/lib/quant/institutional";
+
 // ─── Random / Utility ───────────────────────────────────────────────
 
 export function gaussianRandom(): number {
@@ -782,18 +784,17 @@ export function meanReversionHalfLife(theta: number): number {
   return theta > 0 ? Math.log(2) / theta : Infinity;
 }
 
-/** Hurst exponent via R/S analysis, H < 0.5 = mean-reverting, H > 0.5 = trending */
+/**
+ * Hurst exponent via multi-scale R/S analysis with log-log regression.
+ * Delegates to the canonical institutional implementation (>= 6 scales).
+ * H < 0.5 = mean-reverting, H ≈ 0.5 = random walk, H > 0.5 = trending.
+ */
 export function hurstExponent(prices: number[]): number {
-  const n = prices.length;
-  if (n < 20) return 0.5;
-  const rets = returns(prices);
-  const m = mean(rets);
-  const cumDev = rets.map((r, i) => rets.slice(0, i + 1).reduce((s, v) => s + (v - m), 0));
-  const R = Math.max(...cumDev) - Math.min(...cumDev);
-  const S = stddev(rets);
-  if (S === 0) return 0.5;
-  return Math.log(R / S) / Math.log(n);
+  return _hurstRS(returns(prices)).H;
 }
+
+// ── Cointegration re-exports (Engle–Granger, Johansen) ───────────────
+export { engleGranger, adfTest, johansenTrace } from "@/lib/quant/institutional";
 
 /** Z-score of current price relative to rolling mean/std */
 export function zScore(price: number, prices: number[]): number {

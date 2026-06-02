@@ -155,7 +155,23 @@ export interface ConstraintStatus {
  * In production this would consume live VIX, gamma exposure, etc.
  * Here we derive from portfolio risk characteristics.
  */
-export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverrides?: Record<string, number>): ConstraintStatus[] {
+/**
+ * Real-market signals optionally injected from useQuantSnapshot or live VIX feed.
+ * When `realSignals` is provided, the engine uses true realized vol and
+ * observed VIX instead of portfolio-derived proxies.
+ */
+export interface ClankRealSignals {
+  vix?: number;            // observed CBOE VIX
+  realizedVolAnnual?: number; // % annualised from real returns
+  maxDrawdown?: number;    // realised max drawdown (negative)
+  ar1?: number;            // AR(1) of portfolio returns
+}
+
+export function evaluateConstraints(
+  stocks: PortfolioStock[],
+  confidenceOverrides?: Record<string, number>,
+  realSignals?: ClankRealSignals,
+): ConstraintStatus[] {
   const analyzed = stocks.filter(s => s.analysis);
   if (analyzed.length === 0) return CONSTRAINT_REGISTRY.map(c => defaultStatus(c));
 
@@ -164,13 +180,13 @@ export function evaluateConstraints(stocks: PortfolioStock[], confidenceOverride
   const avgVol = avgRisk / 100 * 0.03;
   const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
 
-  // Derive synthetic market signals from portfolio
-  const impliedVix = 12 + avgRisk * 0.35 + avgBeta * 5;
-  const impliedRealizedVol = avgVol * 100 * 16; // annualized
-  const drawdownProxy = analyzed.reduce((s, st) => {
+  // Prefer real market signals; fall back to portfolio-derived proxies.
+  const impliedVix = realSignals?.vix ?? (12 + avgRisk * 0.35 + avgBeta * 5);
+  const impliedRealizedVol = realSignals?.realizedVolAnnual ?? (avgVol * 100 * 16);
+  const drawdownProxy = realSignals?.maxDrawdown ?? (analyzed.reduce((s, st) => {
     const ret = ((st.analysis.currentPrice || st.buyPrice) - st.buyPrice) / st.buyPrice;
     return s + Math.min(ret, 0);
-  }, 0) / analyzed.length;
+  }, 0) / analyzed.length);
 
   return CONSTRAINT_REGISTRY.map(c => {
     const conf = confidenceOverrides?.[c.id] ?? c.confidenceScore;
