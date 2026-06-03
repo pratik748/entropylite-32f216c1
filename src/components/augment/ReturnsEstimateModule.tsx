@@ -25,12 +25,55 @@ function percentile(sorted: number[], p: number): number {
 }
 
 /**
+ * Winsorize returns at the [lo, hi] quantiles to control fat-tail noise
+ * that otherwise blows up annualized bootstrap medians.
+ */
+function winsorize(rets: number[], lo = 0.01, hi = 0.99): number[] {
+  if (rets.length === 0) return rets;
+  const sorted = [...rets].sort((a, b) => a - b);
+  const loV = sorted[Math.floor(lo * (sorted.length - 1))];
+  const hiV = sorted[Math.floor(hi * (sorted.length - 1))];
+  return rets.map(r => Math.min(hiV, Math.max(loV, r)));
+}
+
+/**
+ * Bayesian shrinkage of sample mean toward a long-term equity prior.
+ * Closed form: μ̂ = (n·σ_p² · μ_sample + σ_s² · μ_prior) / (n·σ_p² + σ_s²)
+ * where σ_s = sample stdev of daily returns, σ_p = prior stdev of μ.
+ * Equivalent to weighting the sample mean by its precision relative to the prior.
+ *
+ * Prior: 8% annual log-return → 0.08/252 daily, with prior stdev 12%/√252.
+ * This pulls noisy short-window means toward a defensible long-run equity premium
+ * instead of letting a 3-month rally produce a 80% forward median.
+ */
+function shrinkMean(rets: number[]): number {
+  const n = rets.length;
+  if (n === 0) return 0;
+  const muSample = rets.reduce((s, r) => s + r, 0) / n;
+  const v = rets.reduce((s, r) => s + (r - muSample) ** 2, 0) / Math.max(1, n - 1);
+  const sigmaS = Math.sqrt(v);
+  const muPrior = 0.08 / 252;          // ~8% annual equity prior
+  const sigmaPrior = 0.12 / Math.sqrt(252); // 12% prior dispersion on μ
+  const wSample = (n / (sigmaS * sigmaS || 1e-8));
+  const wPrior = 1 / (sigmaPrior * sigmaPrior);
+  return (wSample * muSample + wPrior * muPrior) / (wSample + wPrior);
+}
+
+/**
  * Stationary block bootstrap of daily log-returns → annualized return distribution.
  * Politis & Romano (1994). Block length ≈ √n preserves serial correlation.
+ * Returns are first winsorized and mean-shrunk toward a long-term equity prior
+ * so day-to-day rolls of the lookback window don't swing the forward median.
  */
 function bootstrapAnnualReturns(rets: number[], iters = 2000, seed = 42): number[] {
   const n = rets.length;
   if (n < 60) return [];
+  const wins = winsorize(rets);
+  const muSample = wins.reduce((s, r) => s + r, 0) / n;
+  const muShrunk = shrinkMean(wins);
+  // Re-center sample around the shrunken mean — keeps the empirical covariance/
+  // autocorrelation structure intact while taming μ instability.
+  const adj = wins.map(r => r - muSample + muShrunk);
   const rng = mulberry32(seed);
   const blockLen = Math.max(5, Math.round(Math.sqrt(n)));
   const horizon = 252;
@@ -41,7 +84,7 @@ function bootstrapAnnualReturns(rets: number[], iters = 2000, seed = 42): number
     while (drawn < horizon) {
       const start = Math.floor(rng() * n);
       const len = Math.min(blockLen, horizon - drawn);
-      for (let k = 0; k < len; k++) logSum += rets[(start + k) % n];
+      for (let k = 0; k < len; k++) logSum += adj[(start + k) % n];
       drawn += len;
     }
     out.push(Math.exp(logSum) - 1);
