@@ -98,12 +98,14 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
   const result = useMemo(() => {
     if (!snap.ready || snap.portfolio.returns.length < 60) return null;
     const rets = snap.portfolio.returns;
-    const muAnnual = snap.portfolio.muAnnual;
     const sigmaAnnual = snap.portfolio.sigmaAnnual;
+    const wins = winsorize(rets);
+    const muShrunkDaily = shrinkMean(wins);
+    const muAnnualShrunk = muShrunkDaily * 252;
     const dist = bootstrapAnnualReturns(rets);
     if (dist.length === 0) return null;
     return {
-      muAnnual,
+      muAnnual: muAnnualShrunk,
       sigmaAnnual,
       sharpe: snap.portfolio.sharpe,
       sortino: snap.portfolio.sortino,
@@ -111,7 +113,7 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
       p50: percentile(dist, 0.50),
       p95: percentile(dist, 0.95),
       lookbackDays: snap.lookbackDays,
-      historicalCAGR: Math.exp(muAnnual) - 1,
+      historicalCAGR: Math.exp(muAnnualShrunk) - 1,
     };
   }, [snap]);
 
