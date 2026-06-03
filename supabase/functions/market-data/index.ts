@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
-import { requireAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,7 +84,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    await requireAuth(req, corsHeaders);
+    // Market data is public (used on landing page) — no auth required.
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
     const indiaMode = body.indiaMode === true;
@@ -258,6 +257,8 @@ ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 se
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
     });
   } catch (error) {
+    // If something downstream threw a Response (e.g. auth helpers), forward it verbatim
+    if (error instanceof Response) return error;
     console.error("Error in market-data:", error);
     return new Response(JSON.stringify({ error: "Failed to fetch market data", details: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
