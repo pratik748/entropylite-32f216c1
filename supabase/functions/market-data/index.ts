@@ -89,6 +89,7 @@ serve(async (req) => {
     const provider = body.provider || "mistral";
     const indiaMode = body.indiaMode === true;
     const region = indiaMode ? "India" : (body.region || "All");
+    const requestedTickers: string[] = Array.isArray(body.tickers) ? body.tickers : [];
     const allIndices = [
       { symbol: "^GSPC", name: "S&P 500", region: "US" },
       { symbol: "^IXIC", name: "NASDAQ", region: "US" },
@@ -131,6 +132,20 @@ serve(async (req) => {
     // When indiaMode, filter indices to India only
     if (indiaMode) {
       indexData = indexData.filter((i: any) => i?.region === "India");
+    }
+
+    // Resolve any extra tickers the client asked for that aren't already in indexData
+    if (requestedTickers.length > 0) {
+      const have = new Set(indexData.map((i: any) => i?.symbol));
+      const missing = requestedTickers.filter((s) => s && !have.has(s));
+      const extra = await Promise.all(missing.map(async (sym) => {
+        try {
+          const q = await fetchYahooQuote(sym);
+          if (!q) return null;
+          return { symbol: sym, name: sym, region: "Other", price: q.price, change: q.change, changePct: q.changePct, currency: q.currency, volume: q.volume };
+        } catch { return null; }
+      }));
+      indexData = [...indexData, ...extra.filter(Boolean)];
     }
 
     const indiaSectorSymbols = [

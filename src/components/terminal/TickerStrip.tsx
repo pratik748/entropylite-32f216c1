@@ -100,12 +100,16 @@ const TickerStrip = () => {
           }
         }
         if (data?.macro) {
-          if (data.macro.goldPrice) lookup["GC=F"] = { price: data.macro.goldPrice, changePct: 0, currency: "USD" };
-          if (data.macro.crudeBrent) lookup["CL=F"] = { price: data.macro.crudeBrent, changePct: 0, currency: "USD" };
-          if (data.macro.btcUsd) lookup["BTC-USD"] = { price: data.macro.btcUsd, changePct: 0, currency: "USD" };
-          if (data.macro.ethUsd) lookup["ETH-USD"] = { price: data.macro.ethUsd, changePct: 0, currency: "USD" };
-          if (data.macro.silverPrice) lookup["SI=F"] = { price: data.macro.silverPrice, changePct: 0, currency: "USD" };
-          if (data.macro.eurUsd) lookup["EURUSD=X"] = { price: data.macro.eurUsd, changePct: 0, currency: "USD" };
+          // Macro is only a fallback when indices lookup didn't already provide the symbol
+          const fb = (sym: string, price: number) => {
+            if (price && !lookup[sym]) lookup[sym] = { price, changePct: 0, currency: "USD" };
+          };
+          fb("GC=F", data.macro.goldPrice);
+          fb("CL=F", data.macro.crudeBrent);
+          fb("BTC-USD", data.macro.btcUsd);
+          fb("ETH-USD", data.macro.ethUsd);
+          fb("SI=F", data.macro.silverPrice);
+          fb("EURUSD=X", data.macro.eurUsd);
         }
 
         setTickers(prev =>
