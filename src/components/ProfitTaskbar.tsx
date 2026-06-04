@@ -1,5 +1,6 @@
 import { Target, CheckCircle2, Circle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
+import { resolveAssetCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface ProfitTaskbarProps {
   ticker: string;
@@ -11,6 +12,7 @@ interface ProfitTaskbarProps {
   bullRange: [number, number];
   bearRange: [number, number];
   riskLevel: "Low" | "Medium" | "High";
+  currency?: string;
 }
 
 interface Task {
@@ -30,7 +32,13 @@ const ProfitTaskbar = ({
   bullRange,
   bearRange,
   riskLevel,
+  currency,
 }: ProfitTaskbarProps) => {
+  const ccy = resolveAssetCurrency(ticker, currency, "USD");
+  const sym = getCurrencySymbol(ccy);
+  const locale = ccy === "INR" ? "en-IN" : "en-US";
+  const fmt = (n: number, opts: Intl.NumberFormatOptions = {}) =>
+    `${sym}${n.toLocaleString(locale, opts)}`;
   const invested = buyPrice * quantity;
   const currentValue = currentPrice * quantity;
   const pnl = currentValue - invested;

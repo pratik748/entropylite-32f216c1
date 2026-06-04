@@ -91,12 +91,6 @@ export default function LandingPage() {
             loading="eager"
           />
 
-          {/* Trust badge */}
-          <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3.5 py-1.5 rounded-full border border-black/[0.08] bg-black/[0.015]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-[10px] tracking-wide text-black/60">Free during founding access · No credit card</span>
-          </div>
-
           <h1 className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1] sm:leading-[1.02] mb-5 sm:mb-7">
             Every trade you've taken
             <br />
