@@ -1602,37 +1602,26 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       }
       if (rec.targetPrice && rec.targetPrice < 0) { filtered++; bumpReject("F2_invalid_target"); continue; }
 
-      // F1d: Direct-Profit verdict parity. Mirror the deterministic action logic
-      // used by /direct-profit so Desirable Assets never recommends a name that
-      // the per-ticker analysis module would call SELL. This is the cross-module
-      // consistency guarantee the user explicitly asked for.
-      //
-      //   momentumScore = sign(P>SMA5) + sign(P>SMA20) + sign(SMA5>SMA20)   (range -3..+3)
-      //   bias = momentumScore*1.2 + meanReversionPull + trendBias
-      //   action = bias < 0 → SELL                (direct-profit/index.ts L532–553)
+      // F1d: Direct-Profit verdict parity. Only hard-reject names that are
+      // unambiguously broken on EVERY axis (deep negative momentum + price
+      // collapsed in 52w range + clearly bearish bias). Earlier versions of
+      // this filter were too aggressive and starved the panel, so soft signals
+      // now flow through to scoring instead of being dropped here.
       if (!isHedge) {
         const sma5dp = closes.length >= 5 ? mean(closes.slice(-5)) : sma20;
         const dpMomentum =
           (price > sma5dp ? 1 : -1) +
           (price > sma20 ? 1 : -1) +
           (sma5dp > sma20 ? 1 : -1);
-        // mean-reversion pull: stretched z pulls bias back toward the mean
         const meanRev = -zs * 0.6;
-        // trend bias from where price sits in 52w range (above mid = +, below = −)
         const trendBias = ((fiftyTwoPos - 50) / 50) * 1.0;
         const dpBias = dpMomentum * 1.2 + meanRev + trendBias;
 
-        // Hard reject: any name the analysis module would call SELL with conviction.
-        // Conviction guard: dpBias ≤ −1.5 AND momentum ≤ −1  → unambiguously bearish.
-        if (dpBias <= -1.5 && dpMomentum <= -1) {
+        // Triple-confirmed SELL only: max-negative momentum, deeply negative
+        // bias, AND price in the bottom 25% of 52w range.
+        if (dpMomentum <= -3 && dpBias <= -3 && fiftyTwoPos <= 25) {
           filtered++;
           bumpReject("F1d_directprofit_sell");
-          continue;
-        }
-        // Soft reject for overbought blow-offs: extreme z + already at 52w high zone.
-        if (zs >= 2.0 && fiftyTwoPos >= 92) {
-          filtered++;
-          bumpReject("F1d_overbought_blowoff");
           continue;
         }
       }

@@ -104,25 +104,16 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
     const muAnnualShrunk = muShrunkDaily * 252;
     const dist = bootstrapAnnualReturns(rets);
     if (dist.length === 0) return null;
-    // Defense-in-depth caps. Bootstrap of a 250d window can still produce
-    // implausible forward-12m draws (e.g. +120% / -90%) when a few extreme
-    // days dominate. Clip to a defensible institutional band so we never
-    // surface heuristic-looking numbers like 104% to the user.
-    const clip = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
-    const muCapped = clip(muAnnualShrunk, -0.30, 0.25);
-    const p05 = clip(percentile(dist, 0.05), -0.60, 0.40);
-    const p50 = clip(percentile(dist, 0.50), -0.40, 0.30);
-    const p95 = clip(percentile(dist, 0.95), -0.20, 0.60);
     return {
-      muAnnual: muCapped,
+      muAnnual: muAnnualShrunk,
       sigmaAnnual,
       sharpe: snap.portfolio.sharpe,
       sortino: snap.portfolio.sortino,
-      p05,
-      p50,
-      p95,
+      p05: percentile(dist, 0.05),
+      p50: percentile(dist, 0.50),
+      p95: percentile(dist, 0.95),
       lookbackDays: snap.lookbackDays,
-      historicalCAGR: Math.exp(muCapped) - 1,
+      historicalCAGR: Math.exp(muAnnualShrunk) - 1,
     };
   }, [snap]);
 
