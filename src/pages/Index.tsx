@@ -691,6 +691,7 @@ const IndexContent = () => {
                                 bullRange={analysis.bullRange}
                                 bearRange={analysis.bearRange}
                                 riskLevel={analysis.riskLevel}
+                                currency={(analysis as any).currency}
                               />
                             )}
                           </div>
