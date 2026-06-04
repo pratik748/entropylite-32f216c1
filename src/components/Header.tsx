@@ -85,14 +85,15 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
             <button
               onClick={onToggleDirectProfit}
               data-tour="direct-profit-btn"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all text-[10px] font-mono font-semibold ${
+              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-md border transition-all text-[11px] sm:text-xs font-mono font-semibold shadow-sm ${
                 directProfitMode
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border/70 bg-surface-2/60 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-surface-2"
+                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border-primary/60 bg-primary/15 text-primary hover:bg-primary/25 hover:border-primary"
               }`}
+              title="Direct Profit Mode"
             >
-              <Zap className="h-3 w-3" />
-              <span className="hidden sm:inline">Direct Profit</span>
+              <Zap className="h-3.5 w-3.5" />
+              <span>Direct Profit</span>
             </button>
           )}
           {/* Base Currency Selector */}

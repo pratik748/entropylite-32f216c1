@@ -1,5 +1,6 @@
 import { Target, CheckCircle2, Circle, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { getScenarioConfig, MICRO_DISCLAIMER } from "@/lib/sebiCompliance";
+import { resolveAssetCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface ProfitTaskbarProps {
   ticker: string;
@@ -11,6 +12,7 @@ interface ProfitTaskbarProps {
   bullRange: [number, number];
   bearRange: [number, number];
   riskLevel: "Low" | "Medium" | "High";
+  currency?: string;
 }
 
 interface Task {
@@ -30,7 +32,13 @@ const ProfitTaskbar = ({
   bullRange,
   bearRange,
   riskLevel,
+  currency,
 }: ProfitTaskbarProps) => {
+  const ccy = resolveAssetCurrency(ticker, currency, "USD");
+  const sym = getCurrencySymbol(ccy);
+  const locale = ccy === "INR" ? "en-IN" : "en-US";
+  const fmt = (n: number, opts: Intl.NumberFormatOptions = {}) =>
+    `${sym}${n.toLocaleString(locale, opts)}`;
   const invested = buyPrice * quantity;
   const currentValue = currentPrice * quantity;
   const pnl = currentValue - invested;
@@ -48,7 +56,7 @@ const ProfitTaskbar = ({
   // Task 1: Analysis complete
   tasks.push({
     label: "Intelligence Analysis Complete",
-    detail: `Analyzed ${ticker} at ₹${buyPrice.toLocaleString("en-IN")}`,
+    detail: `Analyzed ${ticker} at ${fmt(buyPrice)}`,
     status: "done",
     icon: <CheckCircle2 className="h-4 w-4" />,
   });
@@ -65,14 +73,14 @@ const ProfitTaskbar = ({
   if (isProfit) {
     tasks.push({
       label: `Unrealized Gain: ${pnlPct.toFixed(1)}%`,
-      detail: `+₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })} on ${quantity} units`,
+      detail: `+${fmt(pnl, { maximumFractionDigits: 0 })} on ${quantity} units`,
       status: pnlPct >= 10 ? "done" : "active",
       icon: <TrendingUp className="h-4 w-4" />,
     });
   } else {
     tasks.push({
       label: `Unrealized Loss: ${pnlPct.toFixed(1)}%`,
-      detail: `₹${pnl.toLocaleString("en-IN", { maximumFractionDigits: 0 })}, reassess thesis if fundamentals shift`,
+      detail: `${fmt(pnl, { maximumFractionDigits: 0 })}, reassess thesis if fundamentals shift`,
       status: "active",
       icon: <TrendingDown className="h-4 w-4" />,
     });
@@ -82,21 +90,21 @@ const ProfitTaskbar = ({
   if (suggestion === "Add" && confidence >= 60) {
     tasks.push({
       label: "Upside Scenario Detected",
-      detail: `${confidence}% confidence. Projected upper range: ₹${bullRange[1].toLocaleString("en-IN")}`,
+      detail: `${confidence}% confidence. Projected upper range: ${fmt(bullRange[1])}`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
   } else if (suggestion === "Exit") {
     tasks.push({
       label: "Downside Scenario Detected",
-      detail: `Invalidation zone near ₹${invalidationZone.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
+      detail: `Invalidation zone near ${fmt(invalidationZone, { maximumFractionDigits: 0 })}`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
   } else {
     tasks.push({
       label: "Observe & Monitor",
-      detail: `Reaction zone above ₹${projectedUpside.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
+      detail: `Reaction zone above ${fmt(projectedUpside, { maximumFractionDigits: 0 })} (+10%)`,
       status: "active",
       icon: <Target className="h-4 w-4" />,
     });
@@ -106,12 +114,12 @@ const ProfitTaskbar = ({
   const hitUpside10 = currentPrice >= projectedUpside;
   const hitUpside20 = currentPrice >= projectedUpside20;
   tasks.push({
-    label: hitUpside20 ? "20% Projected Range Reached" : hitUpside10 ? "10% Projected Range Reached" : `Projected Range: ₹${projectedUpside.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+10%)`,
+    label: hitUpside20 ? "20% Projected Range Reached" : hitUpside10 ? "10% Projected Range Reached" : `Projected Range: ${fmt(projectedUpside, { maximumFractionDigits: 0 })} (+10%)`,
     detail: hitUpside20
       ? "Upper projected range achieved, reassess positioning"
       : hitUpside10
-      ? `Next level: ₹${projectedUpside20.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (+20%)`
-      : `Invalidation zone: ₹${invalidationZone.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (-8%)`,
+      ? `Next level: ${fmt(projectedUpside20, { maximumFractionDigits: 0 })} (+20%)`
+      : `Invalidation zone: ${fmt(invalidationZone, { maximumFractionDigits: 0 })} (-8%)`,
     status: hitUpside20 ? "done" : hitUpside10 ? "active" : "pending",
     icon: <Target className="h-4 w-4" />,
   });
@@ -120,7 +128,7 @@ const ProfitTaskbar = ({
   if (currentPrice <= bearRange[0]) {
     tasks.push({
       label: "Price in Downside Zone",
-      detail: `Below ₹${bearRange[0].toLocaleString("en-IN")}, reassess thesis`,
+      detail: `Below ${fmt(bearRange[0])}, reassess thesis`,
       status: "active",
       icon: <AlertTriangle className="h-4 w-4" />,
     });
