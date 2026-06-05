@@ -708,6 +708,49 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     </li>
                   ))}
                 </ul>
+                {result.ensemble && (
+                  <div className="mt-4 pt-3 border-t border-border/60">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                        Engine consensus
+                      </div>
+                      <div className="text-[10px] font-mono text-muted-foreground">
+                        {(result.ensemble.calibratedProb * 100).toFixed(0)}% calibrated · {(result.ensemble.agreement * 100).toFixed(0)}% agree
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-primary/70 transition-all"
+                        style={{ width: `${Math.round(result.ensemble.calibratedProb * 100)}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <div className="text-gain font-mono uppercase tracking-wider mb-1">
+                          ✓ Agreeing ({result.ensemble.agreeingEngines.length})
+                        </div>
+                        <ul className="space-y-0.5 text-muted-foreground">
+                          {result.ensemble.agreeingEngines.slice(0, 6).map((e) => (
+                            <li key={e.id} className="truncate">• {e.label}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="text-loss font-mono uppercase tracking-wider mb-1">
+                          ✗ Disagreeing ({result.ensemble.disagreeingEngines.length})
+                        </div>
+                        <ul className="space-y-0.5 text-muted-foreground">
+                          {result.ensemble.disagreeingEngines.slice(0, 6).map((e) => (
+                            <li key={e.id} className="truncate">• {e.label}</li>
+                          ))}
+                          {result.ensemble.disagreeingEngines.length === 0 && (
+                            <li className="italic opacity-60">none — but threshold not met</li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {(result.bullSignals?.length || result.bearSignals?.length) ? (
                   <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                     <div>
