@@ -226,6 +226,12 @@ export function buildTickerCandidates(rawTicker: string): string[] {
   const base = normalized.replace(/\.(NS|BO)$/, "");
 
   if (!isIndian) {
+    // Plain alpha symbol with no exchange / special char → also try Indian exchanges
+    // as a safety net so small-caps (e.g. GTLINFRA, RTNPOWER) resolve without being
+    // in the curated allow-list.
+    if (!hasExchange && /^[A-Z0-9&]+$/.test(normalized) && normalized.length <= 12) {
+      return dedupe([normalized, `${normalized}.NS`, `${normalized}.BO`]);
+    }
     return [normalized];
   }
 
