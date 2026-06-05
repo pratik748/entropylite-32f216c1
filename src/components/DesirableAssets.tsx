@@ -65,6 +65,14 @@ interface Recommendation {
   riskVerdict?: "low" | "medium" | "high";
   riskCompositeScore?: number;
   horizonClass?: "intraday" | "short_term" | "medium_term" | "long_term";
+  consensus?: {
+    decision: "BUY" | "SELL" | "STAND_ASIDE";
+    calibratedProb: number;
+    agreement: number;
+    engineCount: number;
+    consensusLabel: "UNANIMOUS" | "MAJORITY" | "SPLIT";
+    expectedR: number;
+  };
 }
 
 interface Props {
