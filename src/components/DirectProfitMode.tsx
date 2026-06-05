@@ -94,6 +94,18 @@ interface TradeResult {
     bearRange?: [number, number];
     sentiment?: number;
   };
+  ensemble?: {
+    decision: "BUY" | "SELL" | "STAND_ASIDE";
+    calibratedProb: number;
+    agreement: number;
+    engineCount: number;
+    expectedR: number;
+    consensusLabel: "UNANIMOUS" | "MAJORITY" | "SPLIT";
+    standAsideReason?: string;
+    agreeingEngines: { id: string; label: string; confidence: number }[];
+    disagreeingEngines: { id: string; label: string; confidence: number }[];
+    abstainingEngines: { id: string; label: string }[];
+  };
 }
 
 interface PortfolioItem {
