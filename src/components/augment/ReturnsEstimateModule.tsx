@@ -104,16 +104,31 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
     const muAnnualShrunk = muShrunkDaily * 252;
     const dist = bootstrapAnnualReturns(rets);
     if (dist.length === 0) return null;
+    const p05 = percentile(dist, 0.05);
+    const p50 = percentile(dist, 0.50);
+    const p95 = percentile(dist, 0.95);
+    // ── INSUFFICIENT-EVIDENCE GUARD ────────────────────────────
+    // If the bootstrap confidence band is implausibly wide (>120pp
+    // p05→p95) or the sample is short relative to noise (n < 120
+    // and σ > 30%), refuse to emit a confident point estimate.
+    const ciWidth = p95 - p05;
+    const insufficient =
+      ciWidth > 1.2 ||
+      (rets.length < 120 && sigmaAnnual > 0.30) ||
+      !Number.isFinite(p50);
     return {
       muAnnual: muAnnualShrunk,
       sigmaAnnual,
       sharpe: snap.portfolio.sharpe,
       sortino: snap.portfolio.sortino,
-      p05: percentile(dist, 0.05),
-      p50: percentile(dist, 0.50),
-      p95: percentile(dist, 0.95),
+      p05,
+      p50,
+      p95,
       lookbackDays: snap.lookbackDays,
       historicalCAGR: Math.exp(muAnnualShrunk) - 1,
+      ciWidth,
+      sampleN: rets.length,
+      insufficient,
     };
   }, [snap]);
 
@@ -149,6 +164,12 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
         </div>
       ) : (
         <>
+          {result.insufficient && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-400">
+              <div className="font-semibold uppercase tracking-wider text-[10px] mb-1">Insufficient evidence — interpret with care</div>
+              Confidence band is {(result.ciWidth * 100).toFixed(0)}pp wide on {result.sampleN} days of data. The point estimate is shown for reference, but the bootstrap cannot pin a reliable forward return until the sample grows or volatility cools.
+            </div>
+          )}
           {/* Hero band */}
           <div className="rounded-lg border border-border bg-surface-2/40 p-5">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Suggested annual return</div>

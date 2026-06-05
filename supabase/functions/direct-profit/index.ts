@@ -5,6 +5,7 @@ const corsHeaders = {
 
 import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
+import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -1097,6 +1098,128 @@ Deno.serve(async (req) => {
         sentiment: intelSummary.overallSentiment,
       };
     }
+
+    // ── ENSEMBLE CONSENSUS GATE ────────────────────────────────────────
+    // Final accuracy layer. Every independent engine casts a directional
+    // vote weighted by its historical reliability × current confidence.
+    // If the calibrated win-probability falls below the threshold or the
+    // engines disagree too much, the BUY/SELL is downgraded to WAIT with
+    // an explicit STAND_ASIDE reason — this is the single biggest lever
+    // against day-to-day result inconsistency.
+    const dirOf = (a: string): -1 | 0 | 1 => a === "BUY" ? 1 : a === "SELL" ? -1 : 0;
+    const engineSignals: EngineSignal[] = [
+      {
+        id: "deterministic",
+        label: "Deterministic technicals",
+        direction: dirOf(deterministic.action),
+        confidence: pctToConf(deterministic.confidence),
+        reliability: 0.62,
+      },
+      {
+        id: "ai_verdict",
+        label: "AI verdict",
+        direction: dirOf(String(output.action)),
+        confidence: pctToConf(Number(output.confidence)),
+        reliability: 0.60,
+      },
+      {
+        id: "momentum",
+        label: "Momentum (SMA/MA alignment)",
+        direction: tech.momentumScore >= 1 ? 1 : tech.momentumScore <= -1 ? -1 : 0,
+        confidence: Math.min(1, Math.abs(tech.momentumScore) / 3),
+        reliability: 0.58,
+        hasSignal: Math.abs(tech.momentumScore) >= 1,
+      },
+      {
+        id: "mean_reversion",
+        label: "Mean reversion (z-score)",
+        direction: tech.zScore <= -1.2 ? 1 : tech.zScore >= 1.2 ? -1 : 0,
+        confidence: Math.min(1, Math.abs(tech.zScore) / 2.5),
+        reliability: 0.54,
+        hasSignal: Math.abs(tech.zScore) >= 1.2,
+      },
+      {
+        id: "sharpe",
+        label: "Risk-adjusted return (Sharpe)",
+        direction: riskMetrics.sharpeRatio > 0.5 ? 1 : riskMetrics.sharpeRatio < -0.3 ? -1 : 0,
+        confidence: Math.min(1, Math.abs(riskMetrics.sharpeRatio) / 2),
+        reliability: 0.56,
+        hasSignal: Math.abs(riskMetrics.sharpeRatio) >= 0.3,
+      },
+      {
+        id: "volume",
+        label: "Volume confirmation",
+        direction: tech.volumeRatio >= 1.4 ? (tech.changePct >= 0 ? 1 : -1) : 0,
+        confidence: Math.min(1, (tech.volumeRatio - 1) / 1.5),
+        reliability: 0.55,
+        hasSignal: tech.volumeRatio >= 1.4,
+      },
+      {
+        id: "clank",
+        label: "CLANK structural constraints",
+        direction: clankSignals.some((s) => s.severity === "CRITICAL") ? -1 : 0,
+        confidence: clankSignals.some((s) => s.severity === "CRITICAL") ? 0.75 : 0,
+        reliability: 0.65,
+        hasSignal: clankSignals.some((s) => s.severity === "CRITICAL" || s.severity === "HIGH"),
+      },
+      {
+        id: "intelligence",
+        label: "Dashboard intelligence",
+        direction: intelSummary?.suggestion === "Add" ? 1
+          : intelSummary?.suggestion === "Exit" ? -1
+          : intelSummary?.suggestion === "Skip" ? -1
+          : 0,
+        confidence: pctToConf(intelSummary?.confidence),
+        reliability: 0.66,
+        hasSignal: !!intelSummary?.suggestion && intelSummary.suggestion !== "Hold",
+      },
+      {
+        id: "desirable",
+        label: "ODGS desirable-asset memory",
+        direction: desirableHint?.listed ? 1 : 0,
+        confidence: Math.min(1, 0.5 + Math.max(0, (desirableHint?.avgPnlPct ?? 0) / 10)),
+        reliability: 0.60,
+        hasSignal: !!desirableHint?.listed,
+      },
+    ];
+
+    const rrFromOutput = Number(output.riskRewardRatio);
+    const consensus = runConsensus(engineSignals, {
+      rUp: Number.isFinite(rrFromOutput) && rrFromOutput > 0 ? rrFromOutput : 2.0,
+      rDown: 1.0,
+    });
+
+    // Apply the gate. If the ensemble says STAND_ASIDE and we currently
+    // hold a directional ticket, downgrade to WAIT and explain why.
+    if (consensus.decision === "STAND_ASIDE" && output.action !== "WAIT") {
+      console.log(`direct-profit consensus gate: ${output.action} → WAIT (${consensus.standAsideReason})`);
+      output.action = "WAIT";
+      output.direction = "SIDEWAYS";
+      output.directionReason = "Engines disagree — stand aside";
+      output.entryLow = roundPrice(snap.currentPrice * 0.99);
+      output.entryHigh = roundPrice(snap.currentPrice * 1.01);
+      output.targetPrice = roundPrice(tech.resistance || snap.currentPrice * 1.02);
+      output.stopLoss = roundPrice(tech.support || snap.currentPrice * 0.98);
+      output.riskRewardRatio = 0;
+      output.protection = "No position — wait for engine consensus before risking capital.";
+      (output as any).waitReasons = [
+        consensus.standAsideReason || "Engines disagree",
+        `Calibrated probability: ${(consensus.calibratedProb * 100).toFixed(0)}% (need ≥58%)`,
+        `Agreement: ${(consensus.agreement * 100).toFixed(0)}% across ${consensus.engineCount} engines`,
+        `Expected R-multiple: ${consensus.expectedR.toFixed(2)}`,
+        ...((output as any).waitReasons || []),
+      ];
+    }
+
+    // Re-calibrate the displayed confidence to the calibrated probability
+    // (so the number the user sees is honest about how often this should win).
+    if (output.action !== "WAIT") {
+      const calibratedPct = Math.round(consensus.calibratedProb * 100);
+      output.confidence = Math.min(Number(output.confidence) || calibratedPct, calibratedPct + 5);
+    }
+    output.consensus = consensus.consensusLabel;
+    (output as any).providersUsed = consensus.engineCount;
+    (output as any).ensemble = consensus;
 
     console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%) | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 

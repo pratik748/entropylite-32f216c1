@@ -3,6 +3,7 @@ import { callAI, callAIParallel, fetchLiveWebContext } from "../_shared/callAI.t
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
+import { runConsensus, type EngineSignal, type ConsensusResult } from "../_shared/ensemble.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1857,6 +1858,83 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       console.log(`[desirable-assets] ODGS rerank applied to ${tiltApplied}/${scored.length} candidates (gen ${odgs.generation})`);
     }
 
+    // ── ENSEMBLE CONSENSUS per candidate ──────────────────────────────
+    // For each scored survivor, build an engine vote vector from the
+    // independent signals we already computed, then tilt the rank toward
+    // names where multiple engines agree. This is a SOFT gate: we never
+    // drop a candidate here (the user explicitly complained about empty
+    // lists). Instead we attach a `consensus` block the UI can surface,
+    // and we re-rank by quantScore × (0.6 + 0.6 × agreement) so the
+    // surviving top picks are the highest-conviction agreements.
+    const consensusByTicker = new Map<string, ConsensusResult>();
+    for (const s of scored) {
+      const sigs: EngineSignal[] = [
+        {
+          id: "sharpe",
+          label: "Sharpe quality",
+          direction: s.sharpeRatio >= 0.5 ? 1 : s.sharpeRatio <= -0.2 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(s.sharpeRatio) / 2),
+          reliability: 0.58,
+          hasSignal: Math.abs(s.sharpeRatio) >= 0.2,
+        },
+        {
+          id: "momentum",
+          label: "20-day momentum",
+          direction: s.momentum20d > 2 ? 1 : s.momentum20d < -2 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(s.momentum20d) / 15),
+          reliability: 0.56,
+          hasSignal: Math.abs(s.momentum20d) >= 2,
+        },
+        {
+          id: "trend",
+          label: "Trend strength",
+          direction: s.trendStrength >= 55 ? 1 : s.trendStrength <= 35 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(s.trendStrength - 50) / 35),
+          reliability: 0.55,
+          hasSignal: Math.abs(s.trendStrength - 50) >= 5,
+        },
+        {
+          id: "winrate",
+          label: "Monte-Carlo win rate",
+          direction: s.winRate >= 55 ? 1 : s.winRate <= 45 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(s.winRate - 50) / 25),
+          reliability: 0.60,
+          hasSignal: Math.abs(s.winRate - 50) >= 3,
+        },
+        {
+          id: "drawdown",
+          label: "Drawdown discipline",
+          direction: s.maxDrawdown <= 12 ? 1 : s.maxDrawdown >= 25 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(s.maxDrawdown - 18) / 18),
+          reliability: 0.52,
+          hasSignal: s.maxDrawdown >= 5,
+        },
+        {
+          id: "ai_confidence",
+          label: "AI confidence",
+          direction: (s.rec.confidence ?? 50) >= 60 ? 1 : (s.rec.confidence ?? 50) <= 40 ? -1 : 0,
+          confidence: Math.min(1, Math.abs(((s.rec.confidence ?? 50) - 50)) / 35),
+          reliability: 0.55,
+          hasSignal: typeof s.rec.confidence === "number",
+        },
+        {
+          id: "filter_tier",
+          label: "Quant filter tier",
+          direction: s.filterTier === "strict" ? 1 : s.filterTier === "relaxed" ? -1 : 0,
+          confidence: s.filterTier === "strict" ? 0.8 : 0.4,
+          reliability: 0.58,
+          hasSignal: true,
+        },
+      ];
+      const cons = runConsensus(sigs, { rUp: 2.2, rDown: 1.0 });
+      consensusByTicker.set(s.rec.ticker, cons);
+      // Soft re-rank: penalize SPLIT, reward UNANIMOUS — keep within ±25 pts.
+      const tilt = 0.6 + 0.6 * cons.agreement;
+      const adj = Math.round(s.quantScore * tilt);
+      s.quantScore = Math.max(s.quantScore - 25, Math.min(s.quantScore + 25, adj));
+    }
+    console.log(`[desirable-assets] ensemble consensus applied to ${scored.length} candidates`);
+
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
@@ -2169,6 +2247,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         earningsSignal: s.earningsSignal,
         sentimentHeadline: s.sentimentHeadline,
         sentimentArticleCount: s.sentimentArticleCount,
+        consensus: consensusByTicker.get(s.rec.ticker) || undefined,
       };
     });
 

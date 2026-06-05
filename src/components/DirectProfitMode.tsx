@@ -94,6 +94,18 @@ interface TradeResult {
     bearRange?: [number, number];
     sentiment?: number;
   };
+  ensemble?: {
+    decision: "BUY" | "SELL" | "STAND_ASIDE";
+    calibratedProb: number;
+    agreement: number;
+    engineCount: number;
+    expectedR: number;
+    consensusLabel: "UNANIMOUS" | "MAJORITY" | "SPLIT";
+    standAsideReason?: string;
+    agreeingEngines: { id: string; label: string; confidence: number }[];
+    disagreeingEngines: { id: string; label: string; confidence: number }[];
+    abstainingEngines: { id: string; label: string }[];
+  };
 }
 
 interface PortfolioItem {
@@ -228,6 +240,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     bullSignals: Array.isArray(value.bullSignals) ? value.bullSignals.map((s: any) => String(s)) : undefined,
     bearSignals: Array.isArray(value.bearSignals) ? value.bearSignals.map((s: any) => String(s)) : undefined,
     intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
+    ensemble: value.ensemble && typeof value.ensemble === "object" ? value.ensemble : undefined,
   };
 }
 
@@ -679,6 +692,24 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   Running on resilient rules fallback while live AI consensus is unavailable.
                 </div>
               )}
+              {result.ensemble && (
+                <div className="mt-3 mx-auto max-w-xs">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    <span>Calibrated win-prob</span>
+                    <span className="text-foreground font-semibold">{Math.round(result.ensemble.calibratedProb * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${result.action === "BUY" ? "bg-gain" : result.action === "SELL" ? "bg-loss" : "bg-muted-foreground/60"}`}
+                      style={{ width: `${Math.round(result.ensemble.calibratedProb * 100)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground/80">
+                    <span>{result.ensemble.engineCount} engines · {result.ensemble.consensusLabel.toLowerCase()}</span>
+                    <span>R≈{result.ensemble.expectedR.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── WAIT EXPLANATION ── */}
@@ -695,6 +726,49 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     </li>
                   ))}
                 </ul>
+                {result.ensemble && (
+                  <div className="mt-4 pt-3 border-t border-border/60">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                        Engine consensus
+                      </div>
+                      <div className="text-[10px] font-mono text-muted-foreground">
+                        {(result.ensemble.calibratedProb * 100).toFixed(0)}% calibrated · {(result.ensemble.agreement * 100).toFixed(0)}% agree
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-primary/70 transition-all"
+                        style={{ width: `${Math.round(result.ensemble.calibratedProb * 100)}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <div className="text-gain font-mono uppercase tracking-wider mb-1">
+                          ✓ Agreeing ({result.ensemble.agreeingEngines.length})
+                        </div>
+                        <ul className="space-y-0.5 text-muted-foreground">
+                          {result.ensemble.agreeingEngines.slice(0, 6).map((e) => (
+                            <li key={e.id} className="truncate">• {e.label}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="text-loss font-mono uppercase tracking-wider mb-1">
+                          ✗ Disagreeing ({result.ensemble.disagreeingEngines.length})
+                        </div>
+                        <ul className="space-y-0.5 text-muted-foreground">
+                          {result.ensemble.disagreeingEngines.slice(0, 6).map((e) => (
+                            <li key={e.id} className="truncate">• {e.label}</li>
+                          ))}
+                          {result.ensemble.disagreeingEngines.length === 0 && (
+                            <li className="italic opacity-60">none — but threshold not met</li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {(result.bullSignals?.length || result.bearSignals?.length) ? (
                   <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                     <div>
