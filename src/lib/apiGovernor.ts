@@ -79,6 +79,7 @@ const ENDPOINT_TIER: Record<string, Tier> = {
   "derivatives-intelligence":"heavy",
   "historical-prices":        "slow",
   "reflexivity-engine":      "reflexivity",
+  "symbol-search":           "slow",
   // company-intelligence removed, uses its own 24h localStorage cache
 };
 
