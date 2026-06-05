@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { searchSymbols, type SymbolEntry } from "@/lib/symbolDirectory";
+import { governedInvoke } from "@/lib/apiGovernor";
 
 const KIND_LABELS: Record<SymbolEntry["kind"], string> = {
   equity: "EQ",
@@ -27,14 +28,56 @@ export function useSymbolSuggest(
   const limit = opts.limit ?? 8;
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [remote, setRemote] = useState<SymbolEntry[]>([]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  const suggestions = useMemo<SymbolEntry[]>(
+  const local = useMemo<SymbolEntry[]>(
     () => (value.trim().length >= 1 ? searchSymbols(value, limit) : []),
     [value, limit],
   );
 
+  const suggestions = useMemo<SymbolEntry[]>(() => {
+    const seen = new Set<string>();
+    const merged: SymbolEntry[] = [];
+    for (const s of [...local, ...remote]) {
+      const key = s.ticker.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(s);
+      if (merged.length >= limit) break;
+    }
+    return merged;
+  }, [local, remote, limit]);
+
   useEffect(() => setActiveIdx(0), [value]);
+
+  // Debounced remote search — Yahoo Finance via edge function. Lets the user
+  // pick ANY listed symbol globally (small-cap Indian, ADRs, foreign exchanges)
+  // not just the curated directory.
+  useEffect(() => {
+    const q = value.trim();
+    if (q.length < 2) { setRemote([]); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await governedInvoke<{ results: any[] }>("symbol-search", {
+          tier: "slow",
+          body: { query: q, limit: 10 },
+        });
+        if (cancelled) return;
+        const rs = (data?.results || []).map((r: any) => ({
+          ticker: r.ticker,
+          name: r.name || r.ticker,
+          exchange: r.exchange || "",
+          kind: (r.kind || "equity") as SymbolEntry["kind"],
+        })) as SymbolEntry[];
+        setRemote(rs);
+      } catch {
+        if (!cancelled) setRemote([]);
+      }
+    }, 220);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [value]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
