@@ -692,6 +692,24 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   Running on resilient rules fallback while live AI consensus is unavailable.
                 </div>
               )}
+              {result.ensemble && (
+                <div className="mt-3 mx-auto max-w-xs">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                    <span>Calibrated win-prob</span>
+                    <span className="text-foreground font-semibold">{Math.round(result.ensemble.calibratedProb * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${result.action === "BUY" ? "bg-gain" : result.action === "SELL" ? "bg-loss" : "bg-muted-foreground/60"}`}
+                      style={{ width: `${Math.round(result.ensemble.calibratedProb * 100)}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground/80">
+                    <span>{result.ensemble.engineCount} engines · {result.ensemble.consensusLabel.toLowerCase()}</span>
+                    <span>R≈{result.ensemble.expectedR.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── WAIT EXPLANATION ── */}
