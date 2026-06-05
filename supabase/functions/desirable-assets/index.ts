@@ -2247,6 +2247,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         earningsSignal: s.earningsSignal,
         sentimentHeadline: s.sentimentHeadline,
         sentimentArticleCount: s.sentimentArticleCount,
+        consensus: consensusByTicker.get(s.rec.ticker) || undefined,
       };
     });
 
