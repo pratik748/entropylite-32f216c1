@@ -164,6 +164,12 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
         </div>
       ) : (
         <>
+          {result.insufficient && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-400">
+              <div className="font-semibold uppercase tracking-wider text-[10px] mb-1">Insufficient evidence — interpret with care</div>
+              Confidence band is {(result.ciWidth * 100).toFixed(0)}pp wide on {result.sampleN} days of data. The point estimate is shown for reference, but the bootstrap cannot pin a reliable forward return until the sample grows or volatility cools.
+            </div>
+          )}
           {/* Hero band */}
           <div className="rounded-lg border border-border bg-surface-2/40 p-5">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Suggested annual return</div>
