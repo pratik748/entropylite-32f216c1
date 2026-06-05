@@ -240,6 +240,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     bullSignals: Array.isArray(value.bullSignals) ? value.bullSignals.map((s: any) => String(s)) : undefined,
     bearSignals: Array.isArray(value.bearSignals) ? value.bearSignals.map((s: any) => String(s)) : undefined,
     intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
+    ensemble: value.ensemble && typeof value.ensemble === "object" ? value.ensemble : undefined,
   };
 }
 
