@@ -5,6 +5,7 @@ const corsHeaders = {
 
 import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
+import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
