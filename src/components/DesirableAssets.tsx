@@ -987,6 +987,20 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
                   {odgs.isHot && <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">ODGS ↑</span>}
+                  {rec.consensus && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                        rec.consensus.consensusLabel === "UNANIMOUS"
+                          ? "bg-gain/15 text-gain"
+                          : rec.consensus.consensusLabel === "MAJORITY"
+                            ? "bg-primary/15 text-primary"
+                            : "bg-loss/10 text-loss"
+                      }`}
+                      title={`${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated · R≈${rec.consensus.expectedR.toFixed(2)}`}
+                    >
+                      {rec.consensus.consensusLabel} {Math.round(rec.consensus.calibratedProb * 100)}%
+                    </span>
+                  )}
                   {disagreement && (
                     <span className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss flex items-center gap-0.5">
                       <AlertTriangle className="h-2.5 w-2.5" /> RISK CONFLICT
