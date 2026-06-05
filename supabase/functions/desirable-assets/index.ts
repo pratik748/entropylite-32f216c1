@@ -3,6 +3,7 @@ import { callAI, callAIParallel, fetchLiveWebContext } from "../_shared/callAI.t
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
+import { runConsensus, type EngineSignal, type ConsensusResult } from "../_shared/ensemble.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
