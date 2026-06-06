@@ -2266,6 +2266,11 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         sentimentHeadline: s.sentimentHeadline,
         sentimentArticleCount: s.sentimentArticleCount,
         consensus: consensusByTicker.get(s.rec.ticker) || undefined,
+        bucketConsensus: consensusByTicker.get(s.rec.ticker)?.bucketDecision?.consensus,
+        bucketDirs: consensusByTicker.get(s.rec.ticker)?.bucketDirs,
+        costHaircutPct: Number((costHaircut(s.rec.ticker) * 100).toFixed(2)),
+        liquidityTier: tickerClass(s.rec.ticker),
+        expectedRAfterCost: consensusByTicker.get(s.rec.ticker)?.expectedR,
       };
     });
 
