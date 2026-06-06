@@ -4,6 +4,8 @@ import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
 import { runConsensus, type EngineSignal, type ConsensusResult } from "../_shared/ensemble.ts";
+import { costHaircut, tickerClass } from "../_shared/costs.ts";
+import { loadCalibration } from "../_shared/calibration.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1867,6 +1869,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     // and we re-rank by quantScore × (0.6 + 0.6 × agreement) so the
     // surviving top picks are the highest-conviction agreements.
     const consensusByTicker = new Map<string, ConsensusResult>();
+    const calibration = await loadCalibration();
     for (const s of scored) {
       const sigs: EngineSignal[] = [
         {
@@ -1926,12 +1929,27 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           hasSignal: true,
         },
       ];
-      const cons = runConsensus(sigs, { rUp: 2.2, rDown: 1.0 });
+      const haircut = costHaircut(s.rec.ticker);
+      const cons = runConsensus(sigs, { rUp: 2.2, rDown: 1.0, costHaircut: haircut, calibration });
       consensusByTicker.set(s.rec.ticker, cons);
-      // Soft re-rank: penalize SPLIT, reward UNANIMOUS — keep within ±25 pts.
-      const tilt = 0.6 + 0.6 * cons.agreement;
+      // Soft re-rank: reward bucket-consensus + agreement, penalize
+      // expensive-to-trade tickers (cost haircut already eats the edge
+      // in expectedR but we also tilt the rank so cheaper names surface).
+      const bucketBonus = cons.bucketDecision.consensus === "ALL_3" ? 1.25
+        : cons.bucketDecision.consensus === "TWO_OF_3" ? 1.05
+        : cons.bucketDecision.consensus === "SPLIT" ? 0.80
+        : 0.70;
+      const costPenalty = clamp(1 - haircut * 8, 0.55, 1); // 150bps haircut → 0.88x; 50bps → 0.96x
+      const tilt = bucketBonus * costPenalty * (0.7 + 0.5 * cons.agreement);
       const adj = Math.round(s.quantScore * tilt);
-      s.quantScore = Math.max(s.quantScore - 25, Math.min(s.quantScore + 25, adj));
+      s.quantScore = Math.max(s.quantScore - 30, Math.min(s.quantScore + 25, adj));
+      // Attach for UI
+      (s.rec as any).consensus = cons.consensusLabel;
+      (s.rec as any).bucketConsensus = cons.bucketDecision.consensus;
+      (s.rec as any).calibratedProb = cons.calibratedProb;
+      (s.rec as any).expectedR = cons.expectedR;
+      (s.rec as any).costHaircutPct = Number((haircut * 100).toFixed(2));
+      (s.rec as any).liquidityTier = tickerClass(s.rec.ticker);
     }
     console.log(`[desirable-assets] ensemble consensus applied to ${scored.length} candidates`);
 
