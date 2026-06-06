@@ -105,6 +105,14 @@ interface TradeResult {
     agreeingEngines: { id: string; label: string; confidence: number }[];
     disagreeingEngines: { id: string; label: string; confidence: number }[];
     abstainingEngines: { id: string; label: string }[];
+    bucketDirs?: { A: -1 | 0 | 1; B: -1 | 0 | 1; C: -1 | 0 | 1 };
+    bucketDecision?: {
+      buckets: { bucket: "A" | "B" | "C"; direction: -1 | 0 | 1; agreement: number; engines: number }[];
+      votingBuckets: number;
+      agreeingBuckets: number;
+      consensus: "ALL_3" | "TWO_OF_3" | "SPLIT" | "INSUFFICIENT";
+    };
+    costHaircut?: number;
   };
 }
 
@@ -708,6 +716,29 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     <span>{result.ensemble.engineCount} engines · {result.ensemble.consensusLabel.toLowerCase()}</span>
                     <span>R≈{result.ensemble.expectedR.toFixed(2)}</span>
                   </div>
+                  {result.ensemble.bucketDirs && (
+                    <div className="mt-2 grid grid-cols-3 gap-1 text-[10px] font-mono">
+                      {(["A","B","C"] as const).map((b) => {
+                        const d = result.ensemble!.bucketDirs![b];
+                        const label = b === "A" ? "PRICE" : b === "B" ? "INTEL" : "REGIME";
+                        const cls = d === 1 ? "bg-gain/15 text-gain border-gain/30"
+                          : d === -1 ? "bg-loss/15 text-loss border-loss/30"
+                          : "bg-muted/20 text-muted-foreground/70 border-border";
+                        const sym = d === 1 ? "↑" : d === -1 ? "↓" : "—";
+                        return (
+                          <div key={b} className={`border rounded px-1.5 py-1 flex items-center justify-between ${cls}`}>
+                            <span className="opacity-80">{label}</span>
+                            <span className="font-bold">{sym}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {typeof result.ensemble.costHaircut === "number" && result.ensemble.costHaircut > 0.005 && (
+                    <div className="mt-1.5 text-[10px] text-amber-500/90 font-mono">
+                      ⚠ Round-trip cost ≈ {(result.ensemble.costHaircut * 100).toFixed(2)}% — eats into edge
+                    </div>
+                  )}
                 </div>
               )}
             </div>

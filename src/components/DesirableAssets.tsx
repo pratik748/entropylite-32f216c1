@@ -73,6 +73,11 @@ interface Recommendation {
     consensusLabel: "UNANIMOUS" | "MAJORITY" | "SPLIT";
     expectedR: number;
   };
+  bucketConsensus?: "ALL_3" | "TWO_OF_3" | "SPLIT" | "INSUFFICIENT";
+  bucketDirs?: { A: -1 | 0 | 1; B: -1 | 0 | 1; C: -1 | 0 | 1 };
+  costHaircutPct?: number;
+  liquidityTier?: string;
+  expectedRAfterCost?: number;
 }
 
 interface Props {
@@ -990,15 +995,23 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   {rec.consensus && (
                     <span
                       className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
-                        rec.consensus.consensusLabel === "UNANIMOUS"
+                        rec.bucketConsensus === "ALL_3"
                           ? "bg-gain/15 text-gain"
-                          : rec.consensus.consensusLabel === "MAJORITY"
+                          : rec.bucketConsensus === "TWO_OF_3"
                             ? "bg-primary/15 text-primary"
                             : "bg-loss/10 text-loss"
                       }`}
-                      title={`${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated · R≈${rec.consensus.expectedR.toFixed(2)}`}
+                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "—"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "—"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
                     >
-                      {rec.consensus.consensusLabel} {Math.round(rec.consensus.calibratedProb * 100)}%
+                      {rec.bucketConsensus === "ALL_3" ? "3/3" : rec.bucketConsensus === "TWO_OF_3" ? "2/3" : rec.bucketConsensus === "SPLIT" ? "SPLIT" : "1/3"} · {Math.round(rec.consensus.calibratedProb * 100)}%
+                    </span>
+                  )}
+                  {typeof rec.costHaircutPct === "number" && rec.costHaircutPct >= 1 && (
+                    <span
+                      className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-mono text-amber-400"
+                      title={`Round-trip cost ≈ ${rec.costHaircutPct}% (${rec.liquidityTier}) — eats into edge`}
+                    >
+                      ⚠ COST {rec.costHaircutPct}%
                     </span>
                   )}
                   {disagreement && (

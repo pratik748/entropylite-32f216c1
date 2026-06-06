@@ -6,6 +6,8 @@ const corsHeaders = {
 import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
+import { costHaircut, tickerClass } from "../_shared/costs.ts";
+import { loadCalibration, logSignalOutcome } from "../_shared/calibration.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -1184,9 +1186,13 @@ Deno.serve(async (req) => {
     ];
 
     const rrFromOutput = Number(output.riskRewardRatio);
+    const haircut = costHaircut(resolvedTicker);
+    const calibration = await loadCalibration();
     const consensus = runConsensus(engineSignals, {
       rUp: Number.isFinite(rrFromOutput) && rrFromOutput > 0 ? rrFromOutput : 2.0,
       rDown: 1.0,
+      costHaircut: haircut,
+      calibration,
     });
 
     // Apply the gate. If the ensemble says STAND_ASIDE and we currently
@@ -1202,11 +1208,23 @@ Deno.serve(async (req) => {
       output.stopLoss = roundPrice(tech.support || snap.currentPrice * 0.98);
       output.riskRewardRatio = 0;
       output.protection = "No position — wait for engine consensus before risking capital.";
+      const bd = consensus.bucketDecision;
+      const dirLabel = (d: number) => d === 1 ? "BUY" : d === -1 ? "SELL" : "—";
+      const bucketLine = `Buckets: A(price)=${dirLabel(consensus.bucketDirs.A)} · B(intel)=${dirLabel(consensus.bucketDirs.B)} · C(regime)=${dirLabel(consensus.bucketDirs.C)}`;
+      const flipHint = (() => {
+        if (bd.consensus === "TWO_OF_3" || bd.consensus === "ALL_3") return null;
+        const silent = (["A","B","C"] as const).filter((b) => consensus.bucketDirs[b] === 0);
+        if (silent.length === 0) return null;
+        const labels: Record<string,string> = { A: "price/flow", B: "fundamental/intel", C: "regime/risk" };
+        return `Would flip to BUY/SELL if ${silent.map((b) => labels[b]).join(" or ")} bucket fires in the same direction.`;
+      })();
       (output as any).waitReasons = [
         consensus.standAsideReason || "Engines disagree",
+        bucketLine,
         `Calibrated probability: ${(consensus.calibratedProb * 100).toFixed(0)}% (need ≥58%)`,
-        `Agreement: ${(consensus.agreement * 100).toFixed(0)}% across ${consensus.engineCount} engines`,
-        `Expected R-multiple: ${consensus.expectedR.toFixed(2)}`,
+        haircut > 0.005 ? `Round-trip cost ${(haircut * 100).toFixed(2)}% (${tickerClass(resolvedTicker)})` : `Liquidity tier: ${tickerClass(resolvedTicker)}`,
+        `Expected R after costs: ${consensus.expectedR.toFixed(2)}`,
+        ...(flipHint ? [flipHint] : []),
         ...((output as any).waitReasons || []),
       ];
     }
@@ -1220,6 +1238,30 @@ Deno.serve(async (req) => {
     output.consensus = consensus.consensusLabel;
     (output as any).providersUsed = consensus.engineCount;
     (output as any).ensemble = consensus;
+
+    // Fire-and-forget: log every directional signal for the nightly
+    // walk-forward calibration job to mark to market T+5 days later.
+    if (output.action !== "WAIT") {
+      logSignalOutcome({
+        source: "direct-profit",
+        ticker: resolvedTicker,
+        tickerClass: tickerClass(resolvedTicker),
+        regime: vix > 30 ? "crisis" : vix > 22 ? "elevated" : vix > 15 ? "normal" : "calm",
+        action: String(output.action),
+        ensembleScore: consensus.ensembleScore,
+        agreement: consensus.agreement,
+        calibratedProb: consensus.calibratedProb,
+        expectedR: consensus.expectedR,
+        bucketADir: consensus.bucketDirs.A,
+        bucketBDir: consensus.bucketDirs.B,
+        bucketCDir: consensus.bucketDirs.C,
+        engines: engineSignals.map((s) => ({ id: s.id, direction: s.direction, confidence: Number(s.confidence.toFixed(2)) })),
+        entryPrice: snap.currentPrice,
+        targetPrice: Number(output.targetPrice) || null,
+        stopLoss: Number(output.stopLoss) || null,
+        costHaircut: haircut,
+      }).catch(() => {});
+    }
 
     console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%) | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 

@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.flow-intelligence]
 verify_jwt = false
 
+[functions.calibration-fit]
+verify_jwt = false
+
 [functions.portfolio-intelligence]
 verify_jwt = false
 
