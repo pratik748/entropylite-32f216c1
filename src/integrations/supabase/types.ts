@@ -97,6 +97,36 @@ export type Database = {
           },
         ]
       }
+      calibration_params: {
+        Row: {
+          alpha: number
+          beta: number
+          brier_score: number
+          fit_at: string
+          gamma: number
+          id: number
+          n_samples: number
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          brier_score?: number
+          fit_at?: string
+          gamma?: number
+          id?: number
+          n_samples?: number
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          brier_score?: number
+          fit_at?: string
+          gamma?: number
+          id?: number
+          n_samples?: number
+        }
+        Relationships: []
+      }
       clank_activation_events: {
         Row: {
           activated_at: string
@@ -163,6 +193,36 @@ export type Database = {
           last_updated?: string
           sample_count?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      engine_reliability: {
+        Row: {
+          engine_id: string
+          hit_rate: number
+          n: number
+          regime: string
+          ticker_class: string
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          engine_id: string
+          hit_rate?: number
+          n?: number
+          regime?: string
+          ticker_class?: string
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          engine_id?: string
+          hit_rate?: number
+          n?: number
+          regime?: string
+          ticker_class?: string
+          updated_at?: string
+          wins?: number
         }
         Relationships: []
       }
@@ -421,6 +481,87 @@ export type Database = {
           ticker?: string
           user_id?: string
           vol_bucket?: string
+        }
+        Relationships: []
+      }
+      signal_outcomes: {
+        Row: {
+          action: string
+          agreement: number
+          bucket_a_dir: number
+          bucket_b_dir: number
+          bucket_c_dir: number
+          calibrated_prob: number
+          cost_haircut: number
+          engines: Json
+          ensemble_score: number
+          entry_price: number
+          expected_r: number
+          fired_at: string
+          id: string
+          outcome_at: string | null
+          outcome_pct: number | null
+          outcome_price: number | null
+          outcome_won: number | null
+          regime: string
+          source: string
+          stop_loss: number | null
+          target_price: number | null
+          ticker: string
+          ticker_class: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          agreement?: number
+          bucket_a_dir?: number
+          bucket_b_dir?: number
+          bucket_c_dir?: number
+          calibrated_prob?: number
+          cost_haircut?: number
+          engines?: Json
+          ensemble_score?: number
+          entry_price?: number
+          expected_r?: number
+          fired_at?: string
+          id?: string
+          outcome_at?: string | null
+          outcome_pct?: number | null
+          outcome_price?: number | null
+          outcome_won?: number | null
+          regime?: string
+          source?: string
+          stop_loss?: number | null
+          target_price?: number | null
+          ticker: string
+          ticker_class?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          agreement?: number
+          bucket_a_dir?: number
+          bucket_b_dir?: number
+          bucket_c_dir?: number
+          calibrated_prob?: number
+          cost_haircut?: number
+          engines?: Json
+          ensemble_score?: number
+          entry_price?: number
+          expected_r?: number
+          fired_at?: string
+          id?: string
+          outcome_at?: string | null
+          outcome_pct?: number | null
+          outcome_price?: number | null
+          outcome_won?: number | null
+          regime?: string
+          source?: string
+          stop_loss?: number | null
+          target_price?: number | null
+          ticker?: string
+          ticker_class?: string
+          user_id?: string | null
         }
         Relationships: []
       }
