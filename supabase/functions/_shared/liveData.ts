@@ -390,6 +390,73 @@ export async function fetchMoneycontrolNews(query: string, limit = 8): Promise<N
   return setCached(key, items);
 }
 
+function dedupeNews(items: NewsItem[]): NewsItem[] {
+  const seen = new Set<string>();
+  const out: NewsItem[] = [];
+  for (const it of items) {
+    const key = (it.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out;
+}
+
+// ─── Yahoo Finance per-ticker RSS news (global + Indian fallback) ─────────────
+export async function fetchYahooTickerNews(ticker: string, limit = 8): Promise<NewsItem[]> {
+  const key = `yahoo-news:${ticker.toUpperCase()}`;
+  const cached = getCached<NewsItem[]>(key);
+  if (cached) return cached;
+  const url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(ticker)}&region=US&lang=en-US`;
+  const xml = await fetchHTML(url);
+  const items: NewsItem[] = [];
+  if (xml) {
+    const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+    let m;
+    while ((m = itemRe.exec(xml)) !== null && items.length < limit) {
+      const block = m[1];
+      const title = stripTags((block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "")
+        .replace(/<!\[CDATA\[|\]\]>/g, "")).trim();
+      const link = (block.match(/<link>([\s\S]*?)<\/link>/i)?.[1] ?? "").trim();
+      const pub = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] ?? "").trim();
+      const desc = stripTags((block.match(/<description>([\s\S]*?)<\/description>/i)?.[1] ?? "")
+        .replace(/<!\[CDATA\[|\]\]>/g, "")).trim();
+      if (title.length > 8 && link) {
+        items.push({ title, url: link, source: "Yahoo Finance", publishedAt: pub || undefined, summary: desc.slice(0, 240) || undefined });
+      }
+    }
+  }
+  return setCached(key, items);
+}
+
+// ─── Google News RSS query (broad fallback for any ticker) ────────────────────
+export async function fetchGoogleNewsQuery(query: string, limit = 8): Promise<NewsItem[]> {
+  const key = `gnews:${query.toLowerCase()}`;
+  const cached = getCached<NewsItem[]>(key);
+  if (cached) return cached;
+  const q = `${query} stock`;
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`;
+  const xml = await fetchHTML(url);
+  const items: NewsItem[] = [];
+  if (xml) {
+    const itemRe = /<item>([\s\S]*?)<\/item>/gi;
+    let m;
+    while ((m = itemRe.exec(xml)) !== null && items.length < limit) {
+      const block = m[1];
+      const title = stripTags((block.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "")
+        .replace(/<!\[CDATA\[|\]\]>/g, "")).trim();
+      const link = (block.match(/<link>([\s\S]*?)<\/link>/i)?.[1] ?? "").trim();
+      const pub = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] ?? "").trim();
+      const srcMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/i);
+      const source = srcMatch ? stripTags(srcMatch[1]) : "Google News";
+      if (title.length > 8 && link) {
+        items.push({ title, url: link, source, publishedAt: pub || undefined });
+      }
+    }
+  }
+  return setCached(key, items);
+}
+
 // ─── BSE corporate announcements (Indian filings) ─────────────────────────────
 export async function fetchBSEAnnouncements(scripCodeOrName: string, limit = 6): Promise<NewsItem[]> {
   const key = `bse-ann:${scripCodeOrName.toLowerCase()}`;
@@ -520,13 +587,21 @@ export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean
     tasks.push(fetchYahooSummary(ticker.endsWith(".NS") || ticker.endsWith(".BO") ? ticker : `${baseSymbol}.NS`));
     tasks.push(Promise.resolve(null)); // no Finviz for IN
     tasks.push(fetchBSEAnnouncements(baseSymbol));
-    tasks.push(fetchMoneycontrolNews(baseSymbol));
+    // Combine Moneycontrol + Yahoo (.NS) + Google News so the table is never empty.
+    tasks.push(Promise.all([
+      fetchMoneycontrolNews(baseSymbol).catch(() => [] as NewsItem[]),
+      fetchYahooTickerNews(`${baseSymbol}.NS`).catch(() => [] as NewsItem[]),
+      fetchGoogleNewsQuery(baseSymbol).catch(() => [] as NewsItem[]),
+    ]).then(([a, b, c]) => dedupeNews([...a, ...b, ...c]).slice(0, 10)));
   } else {
     tasks.push(Promise.resolve(null)); // no Screener for global
     tasks.push(fetchYahooSummary(ticker));
     tasks.push(fetchFinviz(ticker));
     tasks.push(fetchEDGARFilings(ticker));
-    tasks.push(Promise.resolve([] as NewsItem[]));
+    tasks.push(Promise.all([
+      fetchYahooTickerNews(ticker).catch(() => [] as NewsItem[]),
+      fetchGoogleNewsQuery(ticker).catch(() => [] as NewsItem[]),
+    ]).then(([a, b]) => dedupeNews([...a, ...b]).slice(0, 10)));
   }
 
   const [screener, yahoo, finviz, filings, news] = await Promise.all(tasks);
