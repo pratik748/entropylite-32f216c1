@@ -1200,6 +1200,76 @@ Deno.serve(async (req) => {
       },
     ];
 
+    // ── REAL-MATH EDGE engines (4 levers from institutional audit) ───
+    // L1: Engle-Granger cointegration vs benchmark → genuine mean-reversion gate
+    // L3: Merton-proxy structural credit             → regime/risk veto
+    // L4: Walk-forward forward-return edge           → historical evidence veto
+    let cointEngine: EngineSignal | null = null;
+    let mertonEngine: EngineSignal | null = null;
+    let wfEngine: EngineSignal | null = null;
+    let momentSkew = 0, momentKurt = 0;
+    try {
+      const benchCloses = await fetchBenchmarkCloses(isIndian);
+      // Cointegration (L1)
+      if (benchCloses.length >= 60 && snap.closes.length >= 60) {
+        const eg = engleGrangerLite(snap.closes, benchCloses);
+        if (eg.cointegrated && Math.abs(eg.residZ) >= 1.5 && Number.isFinite(eg.halfLife) && eg.halfLife > 1 && eg.halfLife < 60) {
+          // spread far from equilibrium AND mean-reverting ⇒ trade towards the mean
+          const dir: -1 | 0 | 1 = eg.residZ > 0 ? -1 : 1;
+          cointEngine = {
+            id: "cointegration",
+            label: `Cointegration vs ${isIndian ? "NIFTY" : "SPY"} (z=${eg.residZ.toFixed(2)}, t½=${eg.halfLife.toFixed(0)}d)`,
+            direction: dir,
+            confidence: Math.min(1, Math.abs(eg.residZ) / 3),
+            reliability: 0.64,
+            hasSignal: true,
+          };
+        }
+      }
+      // Skew & kurtosis for CF (L2 — passed to runConsensus)
+      const moments = returnMoments(snap.closes);
+      momentSkew = moments.skew;
+      momentKurt = moments.excessKurt;
+      // Structural credit proxy (L3)
+      const ddPct = riskMetrics.maxDrawdown / 100;
+      const sigmaAnnual = tech.annualizedVol / 100;
+      const trendSlope = tech.sma5 > tech.sma20 ? 1 : tech.sma5 < tech.sma20 ? -1 : 0;
+      const mp = mertonProxy({ sigmaAnnual, drawdownPct: ddPct, trendSlope });
+      if (mp.signal !== 0 || mp.severity !== "OK") {
+        mertonEngine = {
+          id: "structural_credit",
+          label: `Structural credit DD=${mp.dd}σ (${mp.severity})`,
+          direction: mp.signal,
+          confidence: mp.severity === "DISTRESS" ? 0.85 : mp.severity === "STRESS" ? 0.55 : 0.4,
+          reliability: 0.62,
+          hasSignal: mp.severity === "DISTRESS" || mp.signal !== 0,
+        };
+      }
+      // Walk-forward edge (L4) — vetoes signals against the asset's own history
+      const wf = walkForwardEdge(snap.closes, 5);
+      if (wf.n >= 40) {
+        const dominantSide: -1 | 0 | 1 = String(output.action) === "BUY" ? 1 : String(output.action) === "SELL" ? -1 : 0;
+        // For BUY: hitRate > 0.52 supports, < 0.48 vetoes. Symmetric for SELL.
+        let dir: -1 | 0 | 1 = 0;
+        if (dominantSide === 1) dir = wf.hitRate >= 0.52 ? 1 : wf.hitRate <= 0.45 ? -1 : 0;
+        else if (dominantSide === -1) dir = wf.hitRate <= 0.48 ? -1 : wf.hitRate >= 0.55 ? 1 : 0;
+        else dir = wf.fwdSharpe > 0.5 ? 1 : wf.fwdSharpe < -0.5 ? -1 : 0;
+        wfEngine = {
+          id: "walkforward",
+          label: `Walk-forward T+5 (hit=${(wf.hitRate * 100).toFixed(0)}% n=${wf.n})`,
+          direction: dir,
+          confidence: Math.min(1, Math.abs(wf.hitRate - 0.5) * 4),
+          reliability: 0.68,
+          hasSignal: dir !== 0,
+        };
+      }
+    } catch (e) {
+      console.warn("mathEdge engines failed:", (e as Error).message);
+    }
+    if (cointEngine) engineSignals.push(cointEngine);
+    if (mertonEngine) engineSignals.push(mertonEngine);
+    if (wfEngine) engineSignals.push(wfEngine);
+
     const rrFromOutput = Number(output.riskRewardRatio);
     const haircut = costHaircut(resolvedTicker);
     const calibration = await loadCalibration();
@@ -1208,6 +1278,8 @@ Deno.serve(async (req) => {
       rDown: 1.0,
       costHaircut: haircut,
       calibration,
+      skew: momentSkew,
+      excessKurt: momentKurt,
     });
 
     // Apply the gate. If the ensemble says STAND_ASIDE and we currently
