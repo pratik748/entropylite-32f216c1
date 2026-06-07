@@ -22,6 +22,7 @@
 //   • Wilson (1927) lower bound for small-sample win-rate
 
 import { bucketOf, type Bucket, type BucketVote, type BucketDecision } from "./buckets.ts";
+import { cfExpectedR } from "./mathEdge.ts";
 
 export type EngineDirection = -1 | 0 | 1; // -1=bearish, 0=neutral, +1=bullish
 
@@ -73,6 +74,8 @@ export interface ConsensusResult {
   bucketDirs: { A: -1 | 0 | 1; B: -1 | 0 | 1; C: -1 | 0 | 1 };
   /** Cost haircut applied (decimal, e.g. 0.015 = 1.5%) */
   costHaircut: number;
+  /** Cornish-Fisher tail multiplier applied to rDown (≥1 for fat left tail) */
+  tailMultiplier?: number;
 }
 
 const DEFAULT_RELIABILITY = 0.55;
@@ -120,6 +123,10 @@ export function runConsensus(
     costHaircut?: number;
     /** Platt scaling params; defaults to v1 constants if absent */
     calibration?: CalibrationParams;
+    /** Realised daily-return skew of the underlying; enables CF-adjusted rDown */
+    skew?: number;
+    /** Realised daily-return excess kurtosis; enables CF-adjusted rDown */
+    excessKurt?: number;
   },
 ): ConsensusResult {
   const active = signals.filter((s) => s.hasSignal !== false && s.direction !== 0);
@@ -194,7 +201,20 @@ export function runConsensus(
   // feature. Cost in R-units = haircut/avgLoss% ≈ haircut/(0.02) for a
   // typical 2% stop.
   const haircutInR = haircut > 0 ? haircut / 0.02 : 0;
-  const expectedR = calibratedProb * rUp - (1 - calibratedProb) * rDown - haircutInR;
+  // Cornish-Fisher fat-tail aware expected R.  When skew is negative or
+  // kurtosis is fat (small caps with crash risk) the rDown leg is scaled
+  // up so the trade no longer fires on raw mean-revert math.
+  const cf = cfExpectedR({
+    p: calibratedProb,
+    rUp,
+    rDown,
+    skew: Number.isFinite(opts?.skew as number) ? (opts!.skew as number) : 0,
+    excessKurt: Number.isFinite(opts?.excessKurt as number) ? (opts!.excessKurt as number) : 0,
+    haircutInR,
+    conf: 0.95,
+  });
+  const expectedR = cf.expectedR;
+  const tailMultiplier = cf.tailMultiplier;
 
   // ── Bucket aggregation (decorrelation layer) ─────────────────
   const bucketMap = new Map<Bucket, { signed: number; weight: number; engines: number }>();
@@ -276,6 +296,7 @@ export function runConsensus(
     bucketDecision,
     bucketDirs,
     costHaircut: haircut,
+    tailMultiplier: Number(tailMultiplier.toFixed(2)),
   };
 }
 
