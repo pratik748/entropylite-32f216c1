@@ -26,6 +26,8 @@ export const BUCKET_ASSIGNMENT: Record<string, Bucket> = {
   winrate: "A",
   drawdown: "A",
   filter_tier: "A",
+  cointegration: "A",
+  walkforward: "A",
   // ── Bucket B ── fundamental/intel
   ai_verdict: "B",
   ai_confidence: "B",
@@ -38,6 +40,7 @@ export const BUCKET_ASSIGNMENT: Record<string, Bucket> = {
   reflexivity: "C",
   veracity: "C",
   regime: "C",
+  structural_credit: "C",
 };
 
 export function bucketOf(engineId: string): Bucket {

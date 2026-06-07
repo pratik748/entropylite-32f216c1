@@ -113,6 +113,7 @@ interface TradeResult {
       consensus: "ALL_3" | "TWO_OF_3" | "SPLIT" | "INSUFFICIENT";
     };
     costHaircut?: number;
+    tailMultiplier?: number;
   };
 }
 
@@ -737,6 +738,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   {typeof result.ensemble.costHaircut === "number" && result.ensemble.costHaircut > 0.005 && (
                     <div className="mt-1.5 text-[10px] text-amber-500/90 font-mono">
                       ⚠ Round-trip cost ≈ {(result.ensemble.costHaircut * 100).toFixed(2)}% — eats into edge
+                    </div>
+                  )}
+                  {typeof result.ensemble.tailMultiplier === "number" && result.ensemble.tailMultiplier > 1.2 && (
+                    <div className="mt-1 text-[10px] text-amber-500/90 font-mono">
+                      ⚠ Left tail {result.ensemble.tailMultiplier.toFixed(2)}× normal — Cornish-Fisher adjusted downside
                     </div>
                   )}
                 </div>
