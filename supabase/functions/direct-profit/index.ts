@@ -8,6 +8,7 @@ import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../
 import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
 import { loadCalibration, logSignalOutcome } from "../_shared/calibration.ts";
+import { engleGrangerLite, mertonProxy, walkForwardEdge, returnMoments } from "../_shared/mathEdge.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -223,6 +224,20 @@ async function fetchVIX(): Promise<number> {
     const data = await res.json();
     return data?.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
   } catch { return 0; }
+}
+
+/** Fetch 1y daily closes for a benchmark index, used as the cointegration
+ *  reference series.  Cached implicitly by Yahoo CDN. */
+async function fetchBenchmarkCloses(isIndian: boolean): Promise<number[]> {
+  const sym = isIndian ? "%5ENSEI" : "SPY"; // ^NSEI / SPY
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1y`;
+    const res = await fetch(url, { headers: { "User-Agent": UA } });
+    if (!res.ok) { await res.text(); return []; }
+    const data = await res.json();
+    const raw = data?.chart?.result?.[0];
+    return (raw?.indicators?.quote?.[0]?.close || []).filter((v: any) => v != null);
+  } catch { return []; }
 }
 
 async function fetchRecentNews(ticker: string): Promise<string[]> {
