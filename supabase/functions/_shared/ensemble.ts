@@ -276,9 +276,13 @@ export function runConsensus(
     standAsideReason = `Engine agreement only ${(agreement * 100).toFixed(0)}% — too split to trade.`;
   } else if (expectedR < MIN_EXPECTED_R) {
     decision = "STAND_ASIDE";
-    standAsideReason = haircut > 0.005
-      ? `Expected R after costs only ${expectedR.toFixed(2)} — ${(haircut * 100).toFixed(2)}% round-trip cost eats the edge.`
-      : `Expected R-multiple ${expectedR.toFixed(2)} below threshold — risk/reward insufficient.`;
+    if (tailMultiplier > 1.25) {
+      standAsideReason = `Expected R after fat-tail adjustment only ${expectedR.toFixed(2)} — left-tail ${tailMultiplier.toFixed(2)}× normal (negative skew / fat kurtosis).`;
+    } else if (haircut > 0.005) {
+      standAsideReason = `Expected R after costs only ${expectedR.toFixed(2)} — ${(haircut * 100).toFixed(2)}% round-trip cost eats the edge.`;
+    } else {
+      standAsideReason = `Expected R-multiple ${expectedR.toFixed(2)} below threshold — risk/reward insufficient.`;
+    }
   }
 
   return {
