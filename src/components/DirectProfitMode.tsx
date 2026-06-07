@@ -113,6 +113,7 @@ interface TradeResult {
       consensus: "ALL_3" | "TWO_OF_3" | "SPLIT" | "INSUFFICIENT";
     };
     costHaircut?: number;
+    tailMultiplier?: number;
   };
 }
 
