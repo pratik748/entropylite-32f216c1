@@ -390,6 +390,18 @@ export async function fetchMoneycontrolNews(query: string, limit = 8): Promise<N
   return setCached(key, items);
 }
 
+function dedupeNews(items: NewsItem[]): NewsItem[] {
+  const seen = new Set<string>();
+  const out: NewsItem[] = [];
+  for (const it of items) {
+    const key = (it.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 80);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out;
+}
+
 // ─── Yahoo Finance per-ticker RSS news (global + Indian fallback) ─────────────
 export async function fetchYahooTickerNews(ticker: string, limit = 8): Promise<NewsItem[]> {
   const key = `yahoo-news:${ticker.toUpperCase()}`;
