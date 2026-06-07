@@ -6,6 +6,7 @@ import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
 import { runConsensus, type EngineSignal, type ConsensusResult } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
 import { loadCalibration } from "../_shared/calibration.ts";
+import { returnMoments, walkForwardEdge, mertonProxy } from "../_shared/mathEdge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
