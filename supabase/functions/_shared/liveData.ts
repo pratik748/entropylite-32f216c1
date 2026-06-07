@@ -575,13 +575,21 @@ export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean
     tasks.push(fetchYahooSummary(ticker.endsWith(".NS") || ticker.endsWith(".BO") ? ticker : `${baseSymbol}.NS`));
     tasks.push(Promise.resolve(null)); // no Finviz for IN
     tasks.push(fetchBSEAnnouncements(baseSymbol));
-    tasks.push(fetchMoneycontrolNews(baseSymbol));
+    // Combine Moneycontrol + Yahoo (.NS) + Google News so the table is never empty.
+    tasks.push(Promise.all([
+      fetchMoneycontrolNews(baseSymbol).catch(() => [] as NewsItem[]),
+      fetchYahooTickerNews(`${baseSymbol}.NS`).catch(() => [] as NewsItem[]),
+      fetchGoogleNewsQuery(baseSymbol).catch(() => [] as NewsItem[]),
+    ]).then(([a, b, c]) => dedupeNews([...a, ...b, ...c]).slice(0, 10)));
   } else {
     tasks.push(Promise.resolve(null)); // no Screener for global
     tasks.push(fetchYahooSummary(ticker));
     tasks.push(fetchFinviz(ticker));
     tasks.push(fetchEDGARFilings(ticker));
-    tasks.push(Promise.resolve([] as NewsItem[]));
+    tasks.push(Promise.all([
+      fetchYahooTickerNews(ticker).catch(() => [] as NewsItem[]),
+      fetchGoogleNewsQuery(ticker).catch(() => [] as NewsItem[]),
+    ]).then(([a, b]) => dedupeNews([...a, ...b]).slice(0, 10)));
   }
 
   const [screener, yahoo, finviz, filings, news] = await Promise.all(tasks);
