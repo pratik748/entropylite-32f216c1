@@ -56,13 +56,13 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
             <img alt="Entropy" className="h-14 sm:h-16 object-contain flex-shrink-0" src="/brand/entropy-mark.jpg" />
           )}
           <span className="hidden lg:inline font-mono text-[8px] text-muted-foreground/40 uppercase tracking-[0.2em] leading-tight max-w-[220px]">Economic Neural Trading &amp; Risk Optimisation via Predictive Yield</span>
-          <div className="hidden md:flex items-center gap-3 ml-3 pl-3 border-l border-border/60">
+          <div className="flex items-center gap-1.5 sm:gap-3 ml-1.5 sm:ml-3 pl-1.5 sm:pl-3 border-l border-border/60">
             {markets.map(m => {
               const open = isMarketOpen(m.tz, m.open, m.close);
               return (
-                <div key={m.name} className="flex items-center gap-1.5">
+                <div key={m.name} className="flex items-center gap-0.5 sm:gap-1.5" title={`${m.name} ${open ? "open" : "closed"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${open ? "bg-gain animate-pulse" : "bg-muted-foreground/30"}`} />
-                  <span className="font-mono text-[10px] text-muted-foreground">{m.name}</span>
+                  <span className="hidden sm:inline font-mono text-[10px] text-muted-foreground">{m.name}</span>
                 </div>
               );
             })}
