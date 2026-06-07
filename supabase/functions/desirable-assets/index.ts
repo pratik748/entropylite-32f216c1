@@ -1930,8 +1930,45 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           hasSignal: true,
         },
       ];
+      // ── REAL-MATH EDGE engines (L3 + L4 from institutional audit) ──
+      // Per-asset cointegration (L1) is skipped here to avoid an O(N)
+      // benchmark-fetch storm; direct-profit handles L1 for single-name calls.
+      const closes = Array.isArray(s.closes) ? s.closes : [];
+      const moments = returnMoments(closes);
+      const ddPct = (s.maxDrawdown || 0) / 100;
+      const sigmaAnnual = (s.volatility || 0) / 100;
+      const mp = mertonProxy({ sigmaAnnual, drawdownPct: ddPct, trendSlope: s.momentum20d > 0 ? 1 : s.momentum20d < 0 ? -1 : 0 });
+      if (mp.signal !== 0 || mp.severity === "DISTRESS") {
+        sigs.push({
+          id: "structural_credit",
+          label: `Credit ${mp.severity} (DD=${mp.dd}σ)`,
+          direction: mp.signal,
+          confidence: mp.severity === "DISTRESS" ? 0.85 : 0.55,
+          reliability: 0.62,
+          hasSignal: true,
+        });
+      }
+      const wf = walkForwardEdge(closes, 5);
+      if (wf.n >= 25) {
+        const dir: -1 | 0 | 1 = wf.hitRate >= 0.55 ? 1 : wf.hitRate <= 0.45 ? -1 : 0;
+        sigs.push({
+          id: "walkforward",
+          label: `WF T+5 hit=${(wf.hitRate * 100).toFixed(0)}%`,
+          direction: dir,
+          confidence: Math.min(1, Math.abs(wf.hitRate - 0.5) * 4),
+          reliability: 0.66,
+          hasSignal: dir !== 0,
+        });
+      }
       const haircut = costHaircut(s.rec.ticker);
-      const cons = runConsensus(sigs, { rUp: 2.2, rDown: 1.0, costHaircut: haircut, calibration });
+      const cons = runConsensus(sigs, {
+        rUp: 2.2,
+        rDown: 1.0,
+        costHaircut: haircut,
+        calibration,
+        skew: moments.skew,
+        excessKurt: moments.excessKurt,
+      });
       consensusByTicker.set(s.rec.ticker, cons);
       // Soft re-rank: reward bucket-consensus + agreement, penalize
       // expensive-to-trade tickers (cost haircut already eats the edge
