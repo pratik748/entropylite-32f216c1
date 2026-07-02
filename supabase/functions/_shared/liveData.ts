@@ -680,6 +680,13 @@ export interface TickerLiveBundle {
 export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean): Promise<TickerLiveBundle> {
   const ticker = rawTicker.toUpperCase();
   const baseSymbol = ticker.replace(/\.(NS|BO)$/, "");
+  const resolved = resolveTickerName(baseSymbol);
+  // Prefer the full company name in generic queries (Google News / Moneycontrol
+  // slug). Fall back to the raw base symbol only if we don't know the name.
+  const nameQuery = resolved.displayName !== resolved.base ? resolved.displayName : baseSymbol;
+  const mcSlug = resolved.displayName !== resolved.base
+    ? resolved.displayName.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : baseSymbol.toLowerCase();
 
   const tasks: Promise<unknown>[] = [];
   if (isIndian) {
@@ -689,10 +696,10 @@ export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean
     tasks.push(fetchBSEAnnouncements(baseSymbol));
     // Combine Moneycontrol + Yahoo (.NS) + Google News so the table is never empty.
     tasks.push(Promise.all([
-      fetchMoneycontrolNews(baseSymbol).catch(() => [] as NewsItem[]),
+      fetchMoneycontrolNews(mcSlug).catch(() => [] as NewsItem[]),
       fetchYahooTickerNews(`${baseSymbol}.NS`).catch(() => [] as NewsItem[]),
-      fetchGoogleNewsQuery(baseSymbol).catch(() => [] as NewsItem[]),
-    ]).then(([a, b, c]) => dedupeNews([...a, ...b, ...c]).slice(0, 10)));
+      fetchGoogleNewsQuery(`"${nameQuery}" NSE OR BSE`).catch(() => [] as NewsItem[]),
+    ]).then(([a, b, c]) => filterNewsByRelevance(dedupeNews([...a, ...b, ...c]), resolved).slice(0, 10)));
   } else {
     tasks.push(Promise.resolve(null)); // no Screener for global
     tasks.push(fetchYahooSummary(ticker));
@@ -700,8 +707,8 @@ export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean
     tasks.push(fetchEDGARFilings(ticker));
     tasks.push(Promise.all([
       fetchYahooTickerNews(ticker).catch(() => [] as NewsItem[]),
-      fetchGoogleNewsQuery(ticker).catch(() => [] as NewsItem[]),
-    ]).then(([a, b]) => dedupeNews([...a, ...b]).slice(0, 10)));
+      fetchGoogleNewsQuery(`"${nameQuery}" stock`).catch(() => [] as NewsItem[]),
+    ]).then(([a, b]) => filterNewsByRelevance(dedupeNews([...a, ...b]), resolved).slice(0, 10)));
   }
 
   const [screener, yahoo, finviz, filings, news] = await Promise.all(tasks);
