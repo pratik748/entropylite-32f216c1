@@ -402,6 +402,106 @@ function dedupeNews(items: NewsItem[]): NewsItem[] {
   return out;
 }
 
+// ─── Ticker → Company Name resolver (for accurate news search / filtering) ────
+// Short/ambiguous tickers like "LT", "M&M", "SBIN" match unrelated companies on
+// generic news queries. We resolve to the full brand name so queries and post-
+// filters key off something specific.
+const TICKER_NAME_MAP: Record<string, { name: string; aliases: string[] }> = {
+  // Indian large-caps
+  LT: { name: "Larsen & Toubro", aliases: ["Larsen", "Toubro", "L&T"] },
+  "M&M": { name: "Mahindra & Mahindra", aliases: ["Mahindra"] },
+  MM: { name: "Mahindra & Mahindra", aliases: ["Mahindra"] },
+  SBIN: { name: "State Bank of India", aliases: ["SBI", "State Bank"] },
+  HDFCBANK: { name: "HDFC Bank", aliases: ["HDFC Bank"] },
+  ICICIBANK: { name: "ICICI Bank", aliases: ["ICICI Bank"] },
+  KOTAKBANK: { name: "Kotak Mahindra Bank", aliases: ["Kotak Mahindra", "Kotak Bank"] },
+  AXISBANK: { name: "Axis Bank", aliases: ["Axis Bank"] },
+  BAJFINANCE: { name: "Bajaj Finance", aliases: ["Bajaj Finance"] },
+  BAJAJFINSV: { name: "Bajaj Finserv", aliases: ["Bajaj Finserv"] },
+  RELIANCE: { name: "Reliance Industries", aliases: ["Reliance", "RIL"] },
+  TCS: { name: "Tata Consultancy Services", aliases: ["TCS", "Tata Consultancy"] },
+  INFY: { name: "Infosys", aliases: ["Infosys"] },
+  WIPRO: { name: "Wipro", aliases: ["Wipro"] },
+  HCLTECH: { name: "HCL Technologies", aliases: ["HCL Tech", "HCL Technologies"] },
+  TECHM: { name: "Tech Mahindra", aliases: ["Tech Mahindra"] },
+  ITC: { name: "ITC", aliases: ["ITC Ltd"] },
+  HINDUNILVR: { name: "Hindustan Unilever", aliases: ["Hindustan Unilever", "HUL"] },
+  MARUTI: { name: "Maruti Suzuki", aliases: ["Maruti Suzuki", "Maruti"] },
+  TATAMOTORS: { name: "Tata Motors", aliases: ["Tata Motors"] },
+  TATASTEEL: { name: "Tata Steel", aliases: ["Tata Steel"] },
+  ADANIENT: { name: "Adani Enterprises", aliases: ["Adani Enterprises"] },
+  ADANIPORTS: { name: "Adani Ports", aliases: ["Adani Ports"] },
+  SUNPHARMA: { name: "Sun Pharmaceutical", aliases: ["Sun Pharma", "Sun Pharmaceutical"] },
+  ONGC: { name: "Oil and Natural Gas Corporation", aliases: ["ONGC"] },
+  NTPC: { name: "NTPC", aliases: ["NTPC Ltd"] },
+  POWERGRID: { name: "Power Grid Corporation", aliases: ["Power Grid"] },
+  COALINDIA: { name: "Coal India", aliases: ["Coal India"] },
+  ULTRACEMCO: { name: "UltraTech Cement", aliases: ["UltraTech Cement", "UltraTech"] },
+  ASIANPAINT: { name: "Asian Paints", aliases: ["Asian Paints"] },
+  NESTLEIND: { name: "Nestle India", aliases: ["Nestle India"] },
+  BHARTIARTL: { name: "Bharti Airtel", aliases: ["Bharti Airtel", "Airtel"] },
+  JSWSTEEL: { name: "JSW Steel", aliases: ["JSW Steel"] },
+  DRREDDY: { name: "Dr. Reddy's Laboratories", aliases: ["Dr Reddy", "Dr. Reddy"] },
+  DIVISLAB: { name: "Divi's Laboratories", aliases: ["Divi's Labs", "Divis Lab"] },
+  CIPLA: { name: "Cipla", aliases: ["Cipla"] },
+  GRASIM: { name: "Grasim Industries", aliases: ["Grasim"] },
+  EICHERMOT: { name: "Eicher Motors", aliases: ["Eicher Motors"] },
+  HEROMOTOCO: { name: "Hero MotoCorp", aliases: ["Hero MotoCorp"] },
+  BAJAJ_AUTO: { name: "Bajaj Auto", aliases: ["Bajaj Auto"] },
+  BAJAJAUTO: { name: "Bajaj Auto", aliases: ["Bajaj Auto"] },
+  BRITANNIA: { name: "Britannia Industries", aliases: ["Britannia"] },
+  TITAN: { name: "Titan Company", aliases: ["Titan Company"] },
+  INDUSINDBK: { name: "IndusInd Bank", aliases: ["IndusInd Bank"] },
+  HDFCLIFE: { name: "HDFC Life Insurance", aliases: ["HDFC Life"] },
+  SBILIFE: { name: "SBI Life Insurance", aliases: ["SBI Life"] },
+  UPL: { name: "UPL Limited", aliases: ["UPL Ltd"] },
+  HINDALCO: { name: "Hindalco Industries", aliases: ["Hindalco"] },
+  APOLLOHOSP: { name: "Apollo Hospitals", aliases: ["Apollo Hospitals"] },
+};
+
+export interface ResolvedName {
+  base: string;
+  displayName: string;
+  aliases: string[];
+  tokens: string[]; // lowercased words ≥4 chars used for relevance filter
+}
+
+export function resolveTickerName(rawTicker: string): ResolvedName {
+  const base = rawTicker.toUpperCase().replace(/\.(NS|BO|NSE|BSE)$/i, "");
+  const hit = TICKER_NAME_MAP[base];
+  const displayName = hit?.name ?? base;
+  const aliases = hit?.aliases ?? [];
+  const tokenSource = [displayName, ...aliases, base].join(" ").toLowerCase();
+  const tokens = Array.from(new Set(
+    tokenSource
+      .replace(/[^a-z0-9& ]+/g, " ")
+      .split(/\s+/)
+      .filter(t => t.length >= 3 && !["ltd", "inc", "corp", "the", "and", "for"].includes(t)),
+  ));
+  return { base, displayName, aliases, tokens };
+}
+
+/**
+ * Drop news items whose title/summary don't mention any known name-token,
+ * alias, or the ticker itself. Prevents "L" and "LT" prefix matches from
+ * leaking generic articles about unrelated companies.
+ */
+export function filterNewsByRelevance(items: NewsItem[], resolved: ResolvedName): NewsItem[] {
+  if (items.length === 0) return items;
+  const tokens = resolved.tokens;
+  if (tokens.length === 0) return items;
+  const kept: NewsItem[] = [];
+  for (const it of items) {
+    const hay = `${it.title || ""} ${it.summary || ""}`.toLowerCase();
+    if (!hay) continue;
+    // Match: any alias substring, any token as whole-word, or the ticker
+    const aliasHit = resolved.aliases.some(a => hay.includes(a.toLowerCase()));
+    const tokenHit = tokens.some(t => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i").test(hay));
+    if (aliasHit || tokenHit) kept.push(it);
+  }
+  return kept;
+}
+
 // ─── Yahoo Finance per-ticker RSS news (global + Indian fallback) ─────────────
 export async function fetchYahooTickerNews(ticker: string, limit = 8): Promise<NewsItem[]> {
   const key = `yahoo-news:${ticker.toUpperCase()}`;
