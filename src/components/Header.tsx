@@ -3,6 +3,7 @@ import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Zap, Share2 } from "lucide-react";
+import AlertCenter from "@/components/AlertCenter";
 
 interface HeaderProps {
   directProfitMode?: boolean;
@@ -117,6 +118,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit, onOpenBrief }: HeaderP
           <span className="text-[9px] text-muted-foreground/45 font-mono tracking-wider hidden lg:inline">
             by <span className="text-muted-foreground/80 font-medium">Pratik Sehwag</span>
           </span>
+          <AlertCenter />
           <button
             onClick={() => supabase.auth.signOut()}
             className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
