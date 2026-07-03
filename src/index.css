@@ -33,7 +33,9 @@
 
     --border: 0 0% 14%;
     --input: 0 0% 10%;
-    --ring: 0 0% 80%;
+    /* Institutional accent — signal green (matches --gain) drives focus rings
+       and interactive highlights, per the Behavioral OS visual language. */
+    --ring: 152 90% 45%;
 
     --radius: 0.5rem;
 
@@ -102,7 +104,8 @@
 
     --border: 0 0% 90%;
     --input: 0 0% 88%;
-    --ring: 0 0% 30%;
+    /* Institutional accent — signal green (matches light --gain). */
+    --ring: 152 70% 35%;
 
     --gain: 152 70% 35%;
     --loss: 0 75% 48%;

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain } from "lucide-react";
+import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Sunrise } from "lucide-react";
+import DailyBriefing from "@/components/briefing/DailyBriefing";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -55,12 +56,13 @@ import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
+type Tab = "briefing" | "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
 const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+  { id: "briefing", label: "Briefing", shortLabel: "Brief", icon: <Sunrise className="h-3.5 w-3.5" /> },
   { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
   { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
   { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
@@ -73,7 +75,7 @@ const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode 
 ];
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>("briefing");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
@@ -514,7 +516,7 @@ const IndexContent = () => {
                   style={{ scrollSnapAlign: "start" }}
                   className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 rounded-t ${
                     activeTab === tab.id
-                      ? "border-foreground text-foreground bg-surface-2/60"
+                      ? "border-gain text-foreground bg-surface-2/60"
                       : "border-transparent text-muted-foreground/80 hover:text-foreground hover:bg-surface-2/40"
                   }`}
                 >
@@ -542,6 +544,14 @@ const IndexContent = () => {
           {/* Main Content, fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
+              {activeTab === "briefing" && (
+                <ModuleErrorBoundary
+                  title="Briefing module recovered"
+                  description="The daily briefing hit a render error. Retry remounts just this module."
+                >
+                  <DailyBriefing stocks={stocks} refreshKey={refreshKey} />
+                </ModuleErrorBoundary>
+              )}
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
