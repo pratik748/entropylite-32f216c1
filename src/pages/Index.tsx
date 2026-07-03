@@ -397,6 +397,7 @@ const IndexContent = () => {
     }
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
+    if (stock) unregisterWatch(stock.ticker);
   };
   if (!loaded) {
     return (
