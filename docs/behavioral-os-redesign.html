@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EntropyLite — Behavioral Operating System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>document.documentElement.className="js";</script>
+<style>
+  :root{
+    color-scheme:dark;
+    /* ── ground + surfaces · Palantir-black, cool-neutral ── */
+    --bg:#08090a; --panel:#0d0f11; --panel-2:#131619; --panel-3:#1a1e22;
+    --ink:#f5f7f8; --ink-dim:#9b9fa6; --ink-faint:#5a5f66;
+    --line:#1c2024; --line-bright:#2a2f35; --line-soft:#141719;
+    /* ── two accents only: institutional green + red ── */
+    --grn:#25e07f; --grn-2:#12b566; --grn-dim:#0f6f42; --grn-ghost:#25e07f12;
+    --red:#ff4d43; --red-2:#e83a30; --red-dim:#8f2b25; --red-ghost:#ff4d4310;
+    /* neutral "quiet" chip for structural/regime info (no third hue) */
+    --quiet:#c3c7cd; --quiet-ghost:#c3c7cd0e;
+    --glass:linear-gradient(160deg,#ffffff07,#ffffff01);
+    --shadow:0 1px 1px #0006, 0 18px 50px #00000055;
+    --shadow-lift:0 2px 4px #0007, 0 30px 70px #00000066;
+    --radius:14px;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,"Segoe UI",Inter,sans-serif;
+    --maxw:1260px;
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --ease-out:cubic-bezier(.16,1,.3,1);
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      color-scheme:light;
+      --bg:#fbfbfc; --panel:#ffffff; --panel-2:#f6f7f8; --panel-3:#eef0f2;
+      --ink:#0a0b0d; --ink-dim:#5a5f66; --ink-faint:#9297a0;
+      --line:#e7e9ec; --line-bright:#d7dade; --line-soft:#f0f1f3;
+      --grn:#0f9d58; --grn-2:#0c8a4d; --grn-dim:#9bdcbb; --grn-ghost:#0f9d580c;
+      --red:#e0362c; --red-2:#c72d24; --red-dim:#eeaba6; --red-ghost:#e0362c0a;
+      --quiet:#4b5058; --quiet-ghost:#4b50580a;
+      --glass:linear-gradient(160deg,#00000004,#00000001);
+      --shadow:0 1px 2px #0000000a, 0 14px 40px #0000000d;
+      --shadow-lift:0 2px 6px #0000000f, 0 26px 60px #00000014;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#08090a; --panel:#0d0f11; --panel-2:#131619; --panel-3:#1a1e22;
+    --ink:#f5f7f8; --ink-dim:#9b9fa6; --ink-faint:#5a5f66;
+    --line:#1c2024; --line-bright:#2a2f35; --line-soft:#141719;
+    --grn:#25e07f; --grn-2:#12b566; --grn-dim:#0f6f42; --grn-ghost:#25e07f12;
+    --red:#ff4d43; --red-2:#e83a30; --red-dim:#8f2b25; --red-ghost:#ff4d4310;
+    --quiet:#c3c7cd; --quiet-ghost:#c3c7cd0e;
+    --glass:linear-gradient(160deg,#ffffff07,#ffffff01);
+    --shadow:0 1px 1px #0006, 0 18px 50px #00000055;
+    --shadow-lift:0 2px 4px #0007, 0 30px 70px #00000066;
+  }
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#fbfbfc; --panel:#ffffff; --panel-2:#f6f7f8; --panel-3:#eef0f2;
+    --ink:#0a0b0d; --ink-dim:#5a5f66; --ink-faint:#9297a0;
+    --line:#e7e9ec; --line-bright:#d7dade; --line-soft:#f0f1f3;
+    --grn:#0f9d58; --grn-2:#0c8a4d; --grn-dim:#9bdcbb; --grn-ghost:#0f9d580c;
+    --red:#e0362c; --red-2:#c72d24; --red-dim:#eeaba6; --red-ghost:#e0362c0a;
+    --quiet:#4b5058; --quiet-ghost:#4b50580a;
+    --glass:linear-gradient(160deg,#00000004,#00000001);
+    --shadow:0 1px 2px #0000000a, 0 14px 40px #0000000d;
+    --shadow-lift:0 2px 6px #0000000f, 0 26px 60px #00000014;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16.5px; line-height:1.62; font-weight:400;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    letter-spacing:-0.011em;
+  }
+  ::selection{background:var(--grn); color:#04140c}
+
+  /* ── typography · Apple-restraint scale ── */
+  h1,h2,h3,h4{text-wrap:balance; margin:0; line-height:1.05; letter-spacing:-0.035em; font-weight:600}
+  .mono{font-family:var(--mono)}
+  .eyebrow{
+    font-family:var(--mono); font-size:.68rem; font-weight:500;
+    text-transform:uppercase; letter-spacing:.28em; color:var(--ink-faint);
+  }
+  .id-code{
+    font-family:var(--mono); font-size:.64rem; font-weight:500; letter-spacing:.14em;
+    color:var(--grn); border:1px solid var(--line-bright); border-radius:6px;
+    padding:3px 7px; white-space:nowrap;
+  }
+  p{margin:0 0 1rem}
+  a{color:var(--grn); text-decoration:none}
+  a:hover{opacity:.75}
+  :focus-visible{outline:2px solid var(--grn); outline-offset:3px; border-radius:4px}
+
+  /* ── shell ── */
+  .shell{display:grid; grid-template-columns:248px minmax(0,1fr); max-width:var(--maxw); margin:0 auto}
+  .rail{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:30px 20px 40px; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; gap:1px;
+  }
+  .rail-brand{display:flex; align-items:center; gap:11px; margin-bottom:28px}
+  .rail-mark{width:26px; height:26px; flex:none}
+  .rail-brand b{font-size:.98rem; letter-spacing:-0.02em; font-weight:600}
+  .rail-brand span{font-family:var(--mono); font-size:.58rem; color:var(--ink-faint); letter-spacing:.2em; display:block; margin-top:1px}
+  .rail a{
+    display:flex; gap:11px; align-items:baseline; color:var(--ink-dim);
+    font-size:.83rem; padding:7px 10px; border-radius:8px; letter-spacing:-0.012em;
+    transition:background .25s var(--ease), color .25s var(--ease);
+  }
+  .rail a:hover{background:var(--panel-2); color:var(--ink)}
+  .rail a:hover{opacity:1}
+  .rail a .n{font-family:var(--mono); font-size:.6rem; color:var(--ink-faint); width:24px; flex:none}
+  .rail-sep{font-family:var(--mono); font-size:.56rem; letter-spacing:.24em; color:var(--ink-faint); padding:20px 10px 7px; text-transform:uppercase}
+
+  main{padding:0 clamp(22px,4.4vw,68px) 130px; min-width:0}
+  section{padding:78px 0 8px; scroll-margin-top:24px}
+
+  /* ── top status bar ── */
+  .topbar{
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:16px;
+    padding:12px 0; margin-bottom:6px; background:color-mix(in srgb,var(--bg) 82%,transparent);
+    backdrop-filter:blur(14px) saturate(1.4); -webkit-backdrop-filter:blur(14px) saturate(1.4);
+    border-bottom:1px solid var(--line);
+    font-family:var(--mono); font-size:.66rem; color:var(--ink-dim); letter-spacing:.1em;
+  }
+  .topbar .dot{width:7px; height:7px; border-radius:50%; background:var(--grn); box-shadow:0 0 0 0 var(--grn); animation:ring 2.4s var(--ease) infinite}
+  @keyframes ring{0%{box-shadow:0 0 0 0 var(--grn-ghost)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .topbar .spacer{flex:1}
+  .topbar .g{color:var(--grn)}
+  .theme-btn{
+    font-family:var(--mono); font-size:.64rem; letter-spacing:.14em; color:var(--ink-dim);
+    background:transparent; border:1px solid var(--line-bright); border-radius:7px;
+    padding:6px 11px; cursor:pointer; transition:all .25s var(--ease);
+  }
+  .theme-btn:hover{color:var(--ink); border-color:var(--grn)}
+
+  /* ── reveal animation ── */
+  .js .reveal{opacity:0; transform:translateY(18px); transition:opacity .7s var(--ease-out), transform .7s var(--ease-out)}
+  .js .reveal.in{opacity:1; transform:none}
+  .js .stagger>*{opacity:0; transform:translateY(16px); transition:opacity .6s var(--ease-out), transform .6s var(--ease-out)}
+  .js .stagger.in>*{opacity:1; transform:none}
+  .js .stagger.in>*:nth-child(2){transition-delay:.06s}
+  .js .stagger.in>*:nth-child(3){transition-delay:.12s}
+  .js .stagger.in>*:nth-child(4){transition-delay:.18s}
+  .js .stagger.in>*:nth-child(5){transition-delay:.24s}
+  .js .stagger.in>*:nth-child(6){transition-delay:.30s}
+  .js .stagger.in>*:nth-child(7){transition-delay:.36s}
+  .js .stagger.in>*:nth-child(8){transition-delay:.42s}
+
+  /* ── hero ── */
+  .hero{padding-top:40px}
+  .hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:38px; align-items:center}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr; gap:28px}}
+  .hero h1{font-size:clamp(2.7rem,6.6vw,5.1rem); font-weight:600; letter-spacing:-0.05em; line-height:.98}
+  .hero h1 .g{color:var(--grn)}
+  .hero h1 .r{color:var(--red)}
+  .hero .lede{font-size:clamp(1.08rem,2.1vw,1.42rem); color:var(--ink-dim); max-width:42ch; margin-top:24px; font-weight:400; letter-spacing:-0.015em}
+  .hero-load>*{opacity:0; transform:translateY(22px); animation:heroUp .9s var(--ease-out) forwards}
+  .hero-load>*:nth-child(1){animation-delay:.05s}
+  .hero-load>*:nth-child(2){animation-delay:.16s}
+  .hero-load>*:nth-child(3){animation-delay:.27s}
+  @keyframes heroUp{to{opacity:1; transform:none}}
+
+  /* ── panel primitive ── */
+  .panel{
+    background:var(--panel); background-image:var(--glass);
+    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .panel-hd{
+    display:flex; align-items:center; gap:10px; padding:12px 15px;
+    border-bottom:1px solid var(--line); background:var(--panel-2);
+    font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim);
+  }
+  .panel-hd .tag{margin-left:auto; color:var(--ink-faint); letter-spacing:.1em}
+  .panel-bd{padding:17px}
+  .hero-panel{animation:floaty 7s ease-in-out infinite}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+
+  /* ── briefing mock ── */
+  .briefing .row{display:flex; align-items:center; gap:11px; padding:10px 0; border-bottom:1px solid var(--line-soft); font-size:.86rem}
+  .briefing .row:last-child{border-bottom:0}
+  .briefing .k{font-family:var(--mono); font-size:.62rem; color:var(--ink-faint); width:60px; flex:none; letter-spacing:.1em}
+  .briefing .v{flex:1; color:var(--ink)}
+  .cursor::after{content:"▋"; color:var(--grn); animation:blink 1.1s steps(1) infinite; margin-left:2px}
+  @keyframes blink{50%{opacity:0}}
+
+  .pill{font-family:var(--mono); font-size:.6rem; font-weight:500; letter-spacing:.08em; padding:3px 9px; border-radius:20px; white-space:nowrap}
+  .pill.s{color:var(--grn); background:var(--grn-ghost); border:1px solid var(--grn-dim)}
+  .pill.q{color:var(--quiet); background:var(--quiet-ghost); border:1px solid var(--line-bright)}
+  .pill.r{color:var(--red); background:var(--red-ghost); border:1px solid var(--red-dim)}
+
+  /* self-drawing sparkline */
+  .spark{width:100%; height:52px; margin:2px 0 10px; display:block}
+  .spark path{fill:none; stroke:var(--grn); stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+    stroke-dasharray:520; stroke-dashoffset:520}
+  .spark.in path{animation:draw 1.6s var(--ease-out) .3s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .spark .area{fill:url(#sg); stroke:none; opacity:0; animation:none}
+  .spark.in .area{animation:fadein .8s ease 1.1s forwards}
+  @keyframes fadein{to{opacity:.14}}
+  .spark circle{fill:var(--grn); opacity:0}
+  .spark.in circle{animation:fadein 0.5s ease 1.6s forwards}
+
+  /* streak meter */
+  .streak{display:flex; gap:4px; margin-top:5px}
+  .streak i{flex:1; height:6px; border-radius:2px; background:var(--panel-3)}
+  .streak i.on{background:var(--grn)}
+  .streak i.today{background:var(--grn); box-shadow:0 0 10px var(--grn-dim); animation:pulseg 2.2s ease-in-out infinite}
+  @keyframes pulseg{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* ── section headers ── */
+  .sec-hd{display:flex; align-items:flex-start; gap:15px; margin-bottom:10px}
+  .sec-hd h2{font-size:clamp(1.7rem,3.6vw,2.5rem); font-weight:600; letter-spacing:-0.04em}
+  .sec-hd .id-code{margin-top:8px}
+  .sec-sub{color:var(--ink-dim); max-width:64ch; margin:8px 0 34px; font-size:1.05rem; font-weight:400}
+
+  /* ── doctrine ── */
+  .doctrine{display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:15px}
+  .dcard{padding:20px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); background-image:var(--glass); transition:transform .4s var(--ease), border-color .4s var(--ease), box-shadow .4s var(--ease)}
+  .dcard:hover{transform:translateY(-4px); border-color:var(--line-bright); box-shadow:var(--shadow-lift)}
+  .dcard .num{font-family:var(--mono); font-size:.7rem; color:var(--grn); letter-spacing:.12em}
+  .dcard h4{font-size:1.05rem; margin:10px 0 8px; letter-spacing:-0.025em; font-weight:600}
+  .dcard p{font-size:.88rem; color:var(--ink-dim); margin:0}
+  .dcard.guard{border-color:var(--red-dim); background:linear-gradient(160deg,var(--red-ghost),transparent)}
+  .dcard.guard .num{color:var(--red)}
+
+  /* ── systems ── */
+  .sys-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(288px,1fr)); gap:15px}
+  .sys{padding:20px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); background-image:var(--glass); transition:transform .4s var(--ease), border-color .4s var(--ease), box-shadow .4s var(--ease)}
+  .sys:hover{transform:translateY(-4px); border-color:var(--grn-dim); box-shadow:var(--shadow-lift)}
+  .sys-top{display:flex; align-items:center; gap:11px; margin-bottom:12px}
+  .sys-ico{width:34px; height:34px; border-radius:9px; display:grid; place-items:center; font-family:var(--mono); font-weight:600; font-size:.78rem; flex:none; color:var(--grn); background:var(--grn-ghost); border:1px solid var(--grn-dim)}
+  .sys-ico.r{color:var(--red); background:var(--red-ghost); border-color:var(--red-dim)}
+  .sys-ico.q{color:var(--quiet); background:var(--quiet-ghost); border-color:var(--line-bright)}
+  .sys h4{font-size:1.02rem; letter-spacing:-0.025em; font-weight:600}
+  .sys .maps{font-family:var(--mono); font-size:.58rem; color:var(--ink-faint); letter-spacing:.06em; margin-top:3px}
+  .sys p{font-size:.87rem; color:var(--ink-dim); margin:0 0 11px}
+  .sys .loop{font-family:var(--mono); font-size:.68rem; color:var(--ink-dim); border-top:1px solid var(--line-soft); padding-top:10px; letter-spacing:.01em; line-height:1.7}
+  .sys .loop b{color:var(--grn); font-weight:500}
+
+  /* ── screens ── */
+  .screen{border:1px solid var(--line); border-radius:16px; background:var(--panel); margin-bottom:16px; overflow:hidden; transition:border-color .35s var(--ease)}
+  .screen[open]{border-color:var(--line-bright)}
+  .screen-hd{display:flex; align-items:center; gap:13px; padding:17px 20px; border-bottom:1px solid transparent; background:var(--panel-2); cursor:pointer; list-style:none; transition:background .3s var(--ease)}
+  .screen-hd::-webkit-details-marker{display:none}
+  .screen[open] .screen-hd{border-bottom-color:var(--line)}
+  .screen-hd:hover{background:var(--panel-3)}
+  .screen-hd h3{font-size:1.16rem; letter-spacing:-0.028em; font-weight:600}
+  .screen-hd .chev{margin-left:auto; color:var(--ink-faint); font-family:var(--mono); font-size:1rem; transition:transform .3s var(--ease)}
+  .screen[open] .screen-hd .chev{transform:rotate(90deg); color:var(--grn)}
+  .screen-bd{padding:20px}
+  .screen-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media(max-width:760px){.screen-grid{grid-template-columns:1fr}}
+  .col-lbl{font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:8px}
+  .col-lbl.bad{color:var(--red)} .col-lbl.good{color:var(--grn)}
+  .col-lbl::before{content:""; width:7px; height:7px; border-radius:2px; background:currentColor}
+  ul.tight{margin:0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:9px}
+  ul.tight li{font-size:.88rem; color:var(--ink-dim); padding-left:19px; position:relative; line-height:1.52}
+  ul.tight li::before{content:"→"; position:absolute; left:0; color:var(--ink-faint); font-family:var(--mono); font-size:.8rem}
+  ul.tight.good li::before{content:"+"; color:var(--grn)}
+  .screen-foot{display:grid; grid-template-columns:repeat(auto-fit,minmax(162px,1fr)); gap:11px; margin-top:20px; padding-top:18px; border-top:1px solid var(--line-soft)}
+  .mini{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:12px 13px}
+  .mini .ml{font-family:var(--mono); font-size:.56rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); display:block; margin-bottom:6px}
+  .mini .mv{font-size:.82rem; color:var(--ink); line-height:1.42}
+
+  /* wireframe */
+  .wire{border:1px solid var(--line-bright); border-radius:11px; overflow:hidden; font-family:var(--mono); font-size:.66rem; margin-top:14px; background:var(--panel-2)}
+  .wire-hd{display:flex; gap:6px; align-items:center; padding:9px 11px; border-bottom:1px solid var(--line); color:var(--ink-faint); letter-spacing:.12em}
+  .wire-hd i{width:8px; height:8px; border-radius:50%; background:var(--line-bright)}
+  .wire-bd{padding:12px; display:flex; flex-direction:column; gap:8px}
+  .wbar{height:9px; border-radius:3px; background:var(--panel-3); transform-origin:left; transition:transform .8s var(--ease-out)}
+  .js .screen[open] .wbar{transform:scaleX(1)}
+  .wrow{display:flex; gap:7px; align-items:center; flex-wrap:wrap}
+  .wchip{padding:3px 8px; border-radius:6px; font-size:.58rem; letter-spacing:.06em}
+  .wchip.s{color:var(--grn); background:var(--grn-ghost)} .wchip.q{color:var(--quiet); background:var(--quiet-ghost)}
+  .wchip.r{color:var(--red); background:var(--red-ghost)}
+
+  /* ── journey ── */
+  .journey{display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin-top:10px; overflow-x:auto}
+  @media(max-width:840px){.journey{grid-template-columns:repeat(5,minmax(188px,1fr))}}
+  .jstep{padding:18px 18px 22px; border-left:1px solid var(--line); position:relative}
+  .jstep:first-child{border-left:0}
+  .jstep::before{content:""; position:absolute; top:0; left:-4px; width:7px; height:7px; border-radius:50%; background:var(--grn); box-shadow:0 0 0 4px var(--grn-ghost)}
+  .jstep .day{font-family:var(--mono); font-size:.6rem; letter-spacing:.16em; color:var(--grn); text-transform:uppercase}
+  .jstep h4{font-size:1rem; margin:10px 0 8px; letter-spacing:-0.025em; font-weight:600}
+  .jstep p{font-size:.81rem; color:var(--ink-dim); margin:0 0 11px}
+  .jstep .feel{font-family:var(--mono); font-size:.63rem; color:var(--ink-faint); letter-spacing:.03em}
+  .jstep .feel b{color:var(--grn); font-weight:500}
+
+  /* ── loops ── */
+  .loops{display:grid; grid-template-columns:repeat(auto-fit,minmax(252px,1fr)); gap:15px}
+  .loop-c{border:1px solid var(--line); border-radius:var(--radius); padding:18px; background:var(--panel); background-image:var(--glass); transition:transform .4s var(--ease), border-color .4s var(--ease)}
+  .loop-c:hover{transform:translateY(-3px); border-color:var(--grn-dim)}
+  .loop-c .lt{font-family:var(--mono); font-size:.58rem; letter-spacing:.16em; text-transform:uppercase; color:var(--grn)}
+  .loop-c h4{font-size:1.02rem; margin:8px 0 11px; letter-spacing:-0.025em; font-weight:600}
+  .loop-flow{font-family:var(--mono); font-size:.72rem; color:var(--ink-dim); line-height:2}
+  .loop-flow b{color:var(--ink); font-weight:500}
+  .loop-flow .arw{color:var(--grn)}
+
+  /* ── table ── */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius)}
+  table{border-collapse:collapse; width:100%; font-size:.85rem; min-width:600px}
+  th,td{text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-family:var(--mono); font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; background:var(--panel-2)}
+  td{color:var(--ink-dim)} td b{color:var(--ink); font-weight:600}
+  tr:last-child td{border-bottom:0}
+  tbody tr{transition:background .25s var(--ease)}
+  tbody tr:hover{background:var(--panel-2)}
+  .tnum{font-variant-numeric:tabular-nums; font-family:var(--mono)}
+
+  /* ── premium ── */
+  .prem{display:grid; grid-template-columns:1.25fr 1fr; gap:17px; align-items:start}
+  @media(max-width:760px){.prem{grid-template-columns:1fr}}
+  .prem-list{display:flex; flex-direction:column; gap:13px}
+  .trigger{display:flex; gap:14px; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); transition:transform .35s var(--ease), border-color .35s var(--ease)}
+  .trigger:hover{transform:translateX(4px); border-color:var(--grn-dim)}
+  .trigger .t-i{font-family:var(--mono); font-size:.64rem; color:var(--grn); border:1px solid var(--grn-dim); border-radius:7px; padding:4px 8px; height:fit-content; letter-spacing:.08em; white-space:nowrap}
+  .trigger h4{font-size:.96rem; margin:0 0 6px; font-weight:600} .trigger p{font-size:.84rem; color:var(--ink-dim); margin:0}
+  .tier{border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .tier-row{display:flex; justify-content:space-between; align-items:center; padding:14px 17px; border-bottom:1px solid var(--line); font-size:.85rem}
+  .tier-row:last-child{border-bottom:0}
+  .tier-row.free{color:var(--ink-dim)} .tier-row.pro{background:var(--grn-ghost)} .tier-row.pro b{color:var(--ink)}
+  .tier-row .price{font-family:var(--mono); font-size:.72rem}
+
+  /* ── design language ── */
+  .dl-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(228px,1fr)); gap:15px}
+  .swatches{display:flex; gap:9px; margin-top:12px; flex-wrap:wrap}
+  .sw{flex:1; min-width:66px}
+  .sw i{display:block; height:48px; border-radius:9px; border:1px solid var(--line)}
+  .sw span{font-family:var(--mono); font-size:.56rem; color:var(--ink-faint); display:block; margin-top:7px; letter-spacing:.06em}
+  .typerow{display:flex; align-items:baseline; gap:15px; padding:11px 0; border-bottom:1px solid var(--line-soft)}
+  .typerow:last-child{border-bottom:0}
+  .typerow .tl{font-family:var(--mono); font-size:.58rem; color:var(--ink-faint); width:92px; flex:none; letter-spacing:.12em}
+
+  /* ── build ── */
+  .phase{display:flex; gap:16px; padding:17px 0; border-bottom:1px solid var(--line-soft)}
+  .phase:last-child{border-bottom:0}
+  .phase .pn{font-family:var(--mono); font-size:.92rem; color:var(--grn); width:46px; flex:none; font-weight:600}
+  .phase h4{font-size:1.02rem; margin:0 0 6px; font-weight:600}
+  .phase p{font-size:.86rem; color:var(--ink-dim); margin:0}
+  .phase .effort{font-family:var(--mono); font-size:.6rem; color:var(--ink-faint); margin-top:7px; letter-spacing:.1em}
+
+  .callout{border-left:2px solid var(--grn); background:var(--grn-ghost); padding:18px 20px; border-radius:0 12px 12px 0; margin:24px 0}
+  .callout p{margin:0; font-size:.98rem; color:var(--ink)}
+  .callout .who{font-family:var(--mono); font-size:.62rem; color:var(--grn); letter-spacing:.14em; text-transform:uppercase; margin-bottom:8px}
+
+  footer{margin-top:80px; padding-top:26px; border-top:1px solid var(--line); color:var(--ink-faint); font-family:var(--mono); font-size:.66rem; letter-spacing:.08em; display:flex; gap:18px; flex-wrap:wrap}
+
+  @media(max-width:900px){
+    .shell{grid-template-columns:1fr}
+    .rail{position:static; height:auto; flex-direction:row; overflow-x:auto; border-right:0; border-bottom:1px solid var(--line); padding:12px; gap:2px}
+    .rail-brand,.rail-sep{display:none}
+    .rail a{white-space:nowrap; padding:7px 11px}
+    .rail a .n{display:none}
+    .hero-panel{animation:none}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{animation:none!important; transition:none!important}
+    .js .reveal,.js .stagger>*,.hero-load>*{opacity:1!important; transform:none!important}
+    .spark path{stroke-dashoffset:0} .spark .area,.spark circle{opacity:.14}
+    .spark circle{opacity:1}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Sections">
+    <div class="rail-brand">
+      <svg class="rail-mark" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <rect x="1.2" y="1.2" width="23.6" height="23.6" rx="6" stroke="var(--grn)" stroke-width="1.4"/>
+        <path d="M6 16.5 L10.5 9 L14.5 13.5 L20 6.5" stroke="var(--grn)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div><b>EntropyLite</b><span>BEHAVIORAL OS</span></div>
+    </div>
+    <a href="#thesis"><span class="n">00</span> Thesis</a>
+    <a href="#doctrine"><span class="n">01</span> Doctrine</a>
+    <a href="#systems"><span class="n">02</span> Behavioral OS</a>
+    <div class="rail-sep">Screen redesigns</div>
+    <a href="#screens"><span class="n">03</span> All 10 screens</a>
+    <div class="rail-sep">Operating layer</div>
+    <a href="#habit"><span class="n">04</span> Daily habit engine</a>
+    <a href="#notify"><span class="n">05</span> Notifications</a>
+    <a href="#journey"><span class="n">06</span> Journey map</a>
+    <a href="#loops"><span class="n">07</span> Retention loops</a>
+    <a href="#premium"><span class="n">08</span> Premium psychology</a>
+    <a href="#language"><span class="n">09</span> Visual language</a>
+    <a href="#build"><span class="n">10</span> Build priority</a>
+  </nav>
+
+  <main>
+    <div class="topbar">
+      <span class="dot" aria-hidden="true"></span>
+      <span>MARKETS · LIVE</span>
+      <span class="g">STREAK 14</span>
+      <span>CALIBRATION 0.71</span>
+      <span class="spacer"></span>
+      <button class="theme-btn" id="themeBtn" type="button">◐ THEME</button>
+    </div>
+
+    <!-- 00 THESIS -->
+    <section id="thesis" class="hero">
+      <div class="hero-grid">
+        <div class="hero-load">
+          <p class="eyebrow" style="margin-bottom:22px">Behavioral UX Redesign · v1</p>
+          <h1>An intelligence habit,<br>not a <span class="r">trading</span> <span class="g">habit</span>.</h1>
+          <p class="lede">Bloomberg won because people felt uninformed without it. EntropyLite should win the same way — an institutional daily ritual that makes users measurably sharper, not one that nudges them to overtrade.</p>
+        </div>
+
+        <div class="panel briefing hero-panel" aria-label="Daily briefing mock">
+          <div class="panel-hd">◇ Morning Briefing <span class="tag">06:45 · SCR-01</span></div>
+          <div class="panel-bd">
+            <div style="font-family:var(--mono); font-size:.6rem; color:var(--ink-faint); letter-spacing:.12em; margin-bottom:3px">CALIBRATION · 14-DAY TREND</div>
+            <svg class="spark" id="spark" viewBox="0 0 260 52" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--grn)"/><stop offset="1" stop-color="var(--grn)" stop-opacity="0"/>
+              </linearGradient></defs>
+              <path class="area" d="M0,40 L18,38 L45,36 L72,30 L100,31 L128,24 L156,22 L184,15 L212,14 L240,9 L260,7 L260,52 L0,52 Z"/>
+              <path d="M0,40 L18,38 L45,36 L72,30 L100,31 L128,24 L156,22 L184,15 L212,14 L240,9 L260,7"/>
+              <circle cx="260" cy="7" r="3.5"/>
+            </svg>
+            <div style="font-family:var(--mono); font-size:.6rem; color:var(--ink-faint); letter-spacing:.12em; margin-bottom:3px">STREAK · DAY 14 — READING, NOT TRADING</div>
+            <div class="streak" aria-hidden="true">
+              <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+              <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+              <i class="on"></i><i class="on"></i><i class="on"></i><i class="today"></i>
+            </div>
+            <div style="height:12px"></div>
+            <div class="row"><span class="k">REGIME</span><span class="v">Risk-off, vol expanding</span><span class="pill q">HMM · 0.68</span></div>
+            <div class="row"><span class="k">CLANK</span><span class="v">Vol-control sell pressure</span><span class="pill r">CASCADE 62</span></div>
+            <div class="row"><span class="k">FOR YOU</span><span class="v">3 holdings crossed a line</span><span class="pill s">REVIEW</span></div>
+            <div class="row"><span class="k">SCAR</span><span class="v cursor">Avoided a repeat of NVDA·Mar</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 01 DOCTRINE -->
+    <section id="doctrine">
+      <div class="sec-hd reveal">
+        <div><p class="eyebrow">The non-negotiables</p><h2>Design doctrine</h2></div>
+        <span class="id-code">DOC-01</span>
+      </div>
+      <p class="sec-sub reveal">The brief lists 23 persuasion levers. In a money app, half turn predatory the moment they're aimed at <em>trade frequency</em>. This doctrine re-aims every one at <em>informedness</em> — the only engagement that compounds trust instead of spending it.</p>
+      <div class="doctrine stagger reveal">
+        <div class="dcard"><span class="num">P1</span><h4>Reward the read, not the trade</h4><p>Streaks, XP, and variable rewards attach to <b>reviewing intelligence</b> and <b>logging decisions</b> — never to placing orders. The daily win is “I understood the market,” gated behind zero transactions.</p></div>
+        <div class="dcard"><span class="num">P2</span><h4>Every claim shows its work</h4><p>Authority is <b>earned by transparency</b>. Confidence numbers link to the TWRD source posterior and the calibration curve behind them. No black-box “87% BUY.”</p></div>
+        <div class="dcard"><span class="num">P3</span><h4>Calibration is the scoreboard</h4><p>The core progression metric is <b>Brier / reliability</b> — “were your confident calls actually right?” Overconfidence costs points, aligning the dopamine loop with real skill.</p></div>
+        <div class="dcard guard"><span class="num">P4</span><h4>Loss aversion serves protection</h4><p>Loss framing is allowed <b>only pointed at risk avoided</b> (Fortress, ODG scar blocks), never “you’ll miss out — buy now.” Scarcity is reserved for genuinely time-boxed events, always dated.</p></div>
+        <div class="dcard"><span class="num">P5</span><h4>The user can always turn it off</h4><p>Every gamified layer has a “just the terminal” switch. Habit through <b>value</b>, retained by trust; a prosumer who feels manipulated churns to a spreadsheet.</p></div>
+      </div>
+    </section>
+
+    <!-- 02 SYSTEMS -->
+    <section id="systems">
+      <div class="sec-hd reveal">
+        <div><p class="eyebrow">Cross-cutting engagement architecture</p><h2>The behavioral operating system</h2></div>
+        <span class="id-code">SYS·00</span>
+      </div>
+      <p class="sec-sub reveal">Eight persistent systems that live <em>above</em> the screens. Each maps to a module already in the codebase — this is instrumentation and surfacing, not new science. These are what the user carries between screens and between days.</p>
+      <div class="sys-grid stagger reveal">
+        <div class="sys"><div class="sys-top"><div class="sys-ico q">DQ</div><div><h4>Decision Quality Score</h4><div class="maps">maps → useOutcomeGradient · ODG G_new</div></div></div><p>Every logged decision scored on <b>process</b>, not outcome: did you respect the drawdown gate, the scar memory, the regime? A good call that lost still scores well.</p><div class="loop"><b>Trigger</b> log decision → <b>Action</b> ODG grades → <b>Reward</b> DQ delta + reason → <b>Investment</b> streak++</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico">CB</div><div><h4>Calibration Belt</h4><div class="maps">maps → reliabilityCurve · Brier (new)</div></div></div><p>A rank (Novice → Oracle) earned only by <b>being right when you said you were sure</b>. Powered by the calibration layer shipped in the quant upgrade.</p><div class="loop"><b>Trigger</b> prediction resolves → <b>Action</b> Brier update → <b>Reward</b> belt progress → <b>Investment</b> more predictions</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico r">SM</div><div><h4>Scar Journal</h4><div class="maps">maps → ScarMemory · odg-validator</div></div></div><p>Your ledger of <b>failure patterns avoided and repeated</b>. The Zeigarnik hook: an open scar stays pinned until you review the pattern that caused it.</p><div class="loop"><b>Trigger</b> scar match → <b>Action</b> read the past loss → <b>Reward</b> “pattern broken” → <b>Investment</b> endowment in history</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico r">PH</div><div><h4>Portfolio Health</h4><div class="maps">maps → quant-engine · Fortress · VaR</div></div></div><p>A single 0–100 vital sign (diversification, tail risk, regime-fit, crowding). Progress-bias done honestly: users return to <b>keep the number green</b>, a defensive habit.</p><div class="loop"><b>Trigger</b> health drifts → <b>Action</b> diagnose → <b>Reward</b> restored vital → <b>Investment</b> tuned portfolio</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico">DB</div><div><h4>Daily Briefing</h4><div class="maps">maps → useQuantSnapshot · regime · CLANK</div></div></div><p>The anchor ritual. A one-screen, 90-second synthesis personalized to <b>your</b> holdings. Variable content = variable reward; same slot every morning = habit.</p><div class="loop"><b>Trigger</b> 06:45 push → <b>Action</b> read → <b>Reward</b> “ahead of the open” → <b>Investment</b> streak + saved cards</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico">CF</div><div><h4>Confidence Progression</h4><div class="maps">maps → TWRD · veracity gate</div></div></div><p>Sources you trust build a <b>track record you can see</b>. TWRD’s Beta posteriors become “this analyst was right 63% on your names,” turning credibility into collectible reputation.</p><div class="loop"><b>Trigger</b> source resolves → <b>Action</b> posterior update → <b>Reward</b> trust delta → <b>Investment</b> curated sources</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico">OD</div><div><h4>Opportunity Discovery</h4><div class="maps">maps → StatArb · CLANK · scanner</div></div></div><p>Milestones for <b>finding</b>, not chasing. “Spotted a CLANK cascade before it fired.” Curiosity-gap teasers reveal the <em>reasoning</em>, not just a ticker.</p><div class="loop"><b>Trigger</b> scan surfaces edge → <b>Action</b> inspect the why → <b>Reward</b> discovery badge → <b>Investment</b> saved thesis</div></div>
+        <div class="sys"><div class="sys-top"><div class="sys-ico q">FW</div><div><h4>Future-Wealth Simulator</h4><div class="maps">maps → FGM · Monte Carlo</div></div></div><p>Counters hyperbolic discounting: renders the <b>probabilistic cone</b> of where disciplined process leads. Median + P10/P90, never a single fake number.</p><div class="loop"><b>Trigger</b> milestone → <b>Action</b> re-run cone → <b>Reward</b> future self advances → <b>Investment</b> commitment to plan</div></div>
+      </div>
+    </section>
+
+    <!-- 03 SCREENS -->
+    <section id="screens">
+      <div class="sec-hd reveal">
+        <div><p class="eyebrow">Screen-by-screen redesign · 10 surfaces</p><h2>The cockpit, rebuilt</h2></div>
+        <span class="id-code">SCR·ALL</span>
+      </div>
+      <p class="sec-sub reveal">Each screen: its current psychological weakness, the behavioral opportunity, a layout sketch, and the habit / trust / premium mechanics wired in. Tap any header to expand. BlackRock density, Palantir restraint, Apple feedback.</p>
+
+      <div class="reveal">
+      <details class="screen" open>
+        <summary class="screen-hd"><span class="id-code">SCR-01</span><h3>Home Dashboard → Daily Briefing</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd">
+          <div class="screen-grid">
+            <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+              <li>A wall of panels with no “what changed since yesterday,” so there’s no reason to return <em>today</em> specifically.</li>
+              <li>No peak-end moment — users leave on whatever panel they last scrolled.</li>
+              <li>Everything weighted equally; the availability heuristic buries the one thing that matters.</li></ul></div>
+            <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+              <li>Opens as a <b>90-second briefing</b>: regime, your-holdings deltas, top CLANK pressure, one scar avoided. Fresh daily = variable reward.</li>
+              <li>Ends on a deliberate peak: “You’re ahead of the open” + streak tick (peak-end rule).</li>
+              <li>Single <b>Portfolio Health</b> vital anchors the session.</li></ul></div>
+          </div>
+          <div class="wire" aria-hidden="true"><div class="wire-hd"><i></i><i></i><i></i> SCR-01 · MORNING BRIEFING</div>
+            <div class="wire-bd">
+              <div class="wrow"><span class="wchip s">HEALTH 78</span><span class="wchip q">REGIME risk-off</span><span class="wchip r">CLANK 62</span><span style="margin-left:auto" class="wchip s">STREAK 14</span></div>
+              <div class="wbar" style="width:100%"></div><div class="wbar" style="width:82%"></div>
+              <div class="wrow"><span class="wchip s">3 holdings to review</span><span class="wchip s">1 scar avoided</span></div>
+              <div class="wbar" style="width:64%"></div></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Fixed 06:45 slot + streak on <em>reading</em></span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Every number links to its source panel</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Free: 1 briefing/day · Pro: intraday re-briefs</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">“Informed and ahead” before coffee</span></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-02</span><h3>Portfolio Screen → Living Health System</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Static holdings table — a spreadsheet you check when anxious, not a place you return to with intent.</li>
+            <li>P&L in red triggers panic-selling; no framing of <em>process</em> vs outcome.</li>
+            <li>No sense of ownership over the <em>intelligence</em>, only the positions.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li><b>Portfolio Health 0–100</b> as the hero vital with 4 sub-gauges (diversification, tail risk, regime-fit, crowding).</li>
+            <li>Each holding shows a <b>Decision Quality</b> chip from when you bought — separating skill from luck.</li>
+            <li>Endowment: “your” calibrated risk model, tuned over time, shown as an asset you built.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Keep the health vital green</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Sub-gauges expand to the real VaR/ERC math</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: Ledoit-Wolf + HRP optimizer, EVT tail</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Custodian, not gambler</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-03</span><h3>Prediction Center → The Calibration Arena</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Forecasts are shown <em>to</em> the user; the user never commits, so there’s no accountability and no learning loop.</li>
+            <li>No record of whether platform or user was right — trust can’t compound.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>User makes a <b>light, timed prediction</b> (direction + confidence) — a commitment device that stays “open” until it resolves.</li>
+            <li>Resolution updates the <b>Calibration Belt</b> and a personal reliability curve; overconfidence costs rank.</li>
+            <li>Curiosity gap: “See what the FGM cone said vs. what you said.”</li></ul></div></div>
+          <div class="wire" aria-hidden="true"><div class="wire-hd"><i></i><i></i><i></i> SCR-03 · OPEN PREDICTIONS</div>
+            <div class="wire-bd">
+              <div class="wrow"><span class="wchip q">NVDA ↑ 5d</span><span class="wchip s">you 70%</span><span style="margin-left:auto" class="wchip r">resolves 3d</span></div>
+              <div class="wrow"><span class="wchip q">SPY ↓ 10d</span><span class="wchip s">you 55%</span><span style="margin-left:auto" class="wchip r">resolves 8d</span></div>
+              <div class="wbar" style="width:71%"></div>
+              <div class="wrow"><span class="wchip s">BELT · Analyst III</span><span class="wchip s">calibration 0.71</span></div></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Open prediction = unclosed loop pulling return</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Platform logs its own accuracy beside yours</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: unlimited horizons + regime-conditioned odds</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">“I’m getting measurably sharper”</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-04</span><h3>Opportunity Scanner → Discovery Engine</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>A results list reads like ads — low trust, easy to ignore, encourages impulsive chasing.</li>
+            <li>No sense of rarity, so a genuine edge feels the same as noise.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>Reframed as <b>discovery</b>: each hit is a card you “uncover,” revealing the <em>reasoning</em> before the ticker — curiosity gap + authority.</li>
+            <li><b>Honest scarcity</b>: “Significant setups are rare — 2 today,” with the false-discovery count shown (BH-FDR from the validation layer).</li>
+            <li>Discovery milestones + a collection of theses you’ve saved.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Variable-ratio: some days the scan is gold</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Shows expected false positives, not just hits</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: full universe + real-time CLANK proximity</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Prospector, rewarded for rigor</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-05</span><h3>Risk Center → Fortress Command</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Risk shown as abstract VaR numbers users don’t feel until it’s too late.</li>
+            <li>No positive reinforcement for <em>defensive</em> discipline — the least dopaminergic, most valuable behavior.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li><b>Fortress integrity</b> meter + scenario “war-games” (EVT/stress scenarios rendered as survivable-or-not).</li>
+            <li>Rewards for <b>losses avoided</b>: “Fortress saved an est. −8% in the March vol spike.” Loss aversion aimed at protection (P4).</li>
+            <li>Peak-end: sessions ending on “you’re protected” build calm return, not anxiety.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Weekly stress-test ritual + integrity streak</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">EVT tail numbers with confidence bands</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: regime-conditional VaR + custom scenarios</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Protected, in control</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-06</span><h3>Alerts &amp; Notifications → Signal, not noise</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Undifferentiated pings train users to mute everything (alert fatigue = churn).</li>
+            <li>Alerts drive to <em>act</em>, not to <em>understand</em>.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>Three tiers: <b>Briefing</b> (daily habit), <b>Watch</b> (your thresholds), <b>Critical</b> (CLANK/Fortress, rare & earned).</li>
+            <li>Every alert opens the <em>reasoning</em> screen, not a buy button (P1).</li>
+            <li>Scarcity kept honest: Critical alerts are rate-limited so they stay meaningful.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Predictable briefing + rare high-value ping</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">User sets thresholds; nothing is dark-sent</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: custom multi-condition CLANK alerts</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Respected attention</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-07</span><h3>Performance Reports → Process Report Card</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>P&L-only reports reward luck and punish good process that got unlucky — the exact wrong lesson.</li>
+            <li>No narrative; numbers don’t become memory.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>Dual scorecard: <b>outcome</b> (returns, deflated Sharpe) <em>and</em> <b>process</b> (decision quality, calibration, discipline).</li>
+            <li>Weekly <b>peak-end</b> recap card, shareable as percentiles — social proof without leaking positions.</li>
+            <li>Ties losses to scar patterns → routes to the Journal to close the loop.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Sunday recap ritual → next-week intention</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Deflated Sharpe — honest about overfitting</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: full attribution (Brinson) + PBO report</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Growth you can point to</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-08</span><h3>Watchlists → Living Theses</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>A static list of tickers with prices — no reason it’s <em>yours</em>, no reason to come back to it.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>Each entry carries <b>your thesis + the trigger you’re waiting for</b> (endowment + commitment). The app tells you when your <em>own</em> condition fires.</li>
+            <li>Collection mechanics: watchlists become curated “decks” you refine, with a quality score.</li>
+            <li>Curiosity: “2 of your watched names entered the regime you flagged.”</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">Return to check your own pending triggers</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Triggers are your rules, transparently evaluated</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Pro: unlimited lists + cross-asset triggers</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">Authorship</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-09</span><h3>Learning Hub → Mastery Path</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Docs/glossary nobody opens twice; concepts stay abstract and disconnected from the user’s live portfolio.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li><b>Skill tree</b>: “Understand cointegration,” “Read a VaR band,” unlocked <em>using your own holdings</em> as the worked example (goal-gradient, competence loop).</li>
+            <li>Each concept mastered unlocks the matching pro feature — learning <em>is</em> the funnel.</li>
+            <li>Mastery ranks feed the status system (Novice → Oracle).</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">One lesson/day, goal-gradient progress bar</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Teaches the real math the engines use</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">Mastery unlocks the advanced engines</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">“I actually understand this now”</span></div></div>
+        </div>
+      </details>
+
+      <details class="screen">
+        <summary class="screen-hd"><span class="id-code">SCR-10</span><h3>Onboarding → First Aha in 3 minutes</h3><span class="chev mono">›</span></summary>
+        <div class="screen-bd"><div class="screen-grid">
+          <div><div class="col-lbl bad">Current weakness</div><ul class="tight">
+            <li>Feature tours before value — users bounce before the platform proves it knows something they don’t.</li>
+            <li>Empty states everywhere on day one.</li></ul></div>
+          <div><div class="col-lbl good">Redesign</div><ul class="tight good">
+            <li>Ask for <b>one holding or watchlist ticker</b>, then immediately show a real insight about it (regime, one scar-type risk) — instant authority + availability.</li>
+            <li><b>Default effect</b>: sensible risk profile + first watchlist pre-seeded, one tap to keep.</li>
+            <li>Ends by having them make their <b>first prediction</b> — commitment on day zero seeds the whole retention loop.</li></ul></div></div>
+          <div class="screen-foot">
+            <div class="mini"><span class="ml">Habit loop</span><span class="mv">First streak tick + first open prediction</span></div>
+            <div class="mini"><span class="ml">Trust</span><span class="mv">Shows real analysis before asking for money</span></div>
+            <div class="mini"><span class="ml">Premium</span><span class="mv">14-day Pro trial: “calibrate with full data”</span></div>
+            <div class="mini"><span class="ml">Emotion</span><span class="mv">“This already told me something new”</span></div></div>
+        </div>
+      </details>
+      </div>
+    </section>
+
+    <!-- 04 HABIT -->
+    <section id="habit">
+      <div class="sec-hd reveal"><div><p class="eyebrow">The daily loop</p><h2>Daily habit engine</h2></div><span class="id-code">HAB-04</span></div>
+      <p class="sec-sub reveal">One anchored ritual per day, built on the Hook model (Trigger → Action → Variable Reward → Investment). The whole loop completes in under two minutes and requires <em>zero trades</em> to “win.”</p>
+      <div class="loops stagger reveal">
+        <div class="loop-c"><div class="lt">Trigger</div><h4>06:45 briefing push</h4><div class="loop-flow"><b>External:</b> pre-open notification<br><span class="arw">→</span> <b>Internal:</b> “what did I miss overnight?”</div></div>
+        <div class="loop-c"><div class="lt">Action</div><h4>Read the 90-sec briefing</h4><div class="loop-flow"><b>Regime</b> <span class="arw">→</span> <b>your deltas</b> <span class="arw">→</span> <b>one CLANK</b> <span class="arw">→</span> <b>one scar</b></div></div>
+        <div class="loop-c"><div class="lt">Variable reward</div><h4>Different every day</h4><div class="loop-flow">Some days calm, some days a rare CLANK cascade or a resolved prediction. <b>Unpredictable value</b> = the return pull.</div></div>
+        <div class="loop-c"><div class="lt">Investment</div><h4>Log one decision</h4><div class="loop-flow"><b>Streak++</b> <span class="arw">→</span> calibration updates <span class="arw">→</span> tomorrow’s briefing gets smarter about <b>you</b></div></div>
+      </div>
+      <div class="callout reveal"><div class="who">The moat</div><p>The investment step is what compounds: every logged decision improves the personalization <em>and</em> the user’s own calibration record. After 30 days the user has a track record they can’t get anywhere else — the switching cost is their own history. That’s Bloomberg’s lock-in, earned honestly.</p></div>
+    </section>
+
+    <!-- 05 NOTIFY -->
+    <section id="notify">
+      <div class="sec-hd reveal"><div><p class="eyebrow">Attention budget</p><h2>Notification strategy</h2></div><span class="id-code">NTF-05</span></div>
+      <p class="sec-sub reveal">Three tiers, strict rate limits, and a hard rule: notifications route to <em>understanding</em>, never straight to an order ticket. Frequency is a trust budget you spend carefully.</p>
+      <div class="tbl-wrap reveal">
+        <table>
+          <thead><tr><th>Tier</th><th>Cadence</th><th>Trigger</th><th>Opens to</th><th>Behavioral role</th></tr></thead>
+          <tbody>
+            <tr><td><b>Briefing</b><br><span class="pill s">habit</span></td><td class="tnum">1×/day · 06:45</td><td>Always fires (the ritual)</td><td>SCR-01 briefing</td><td>Anchor habit; predictable trigger</td></tr>
+            <tr><td><b>Watch</b><br><span class="pill s">earned</span></td><td class="tnum">≤ 3×/day</td><td><b>User-set</b> thresholds &amp; watchlist triggers</td><td>The reasoning screen</td><td>Commitment &amp; consistency (their rules)</td></tr>
+            <tr><td><b>Critical</b><br><span class="pill r">rare</span></td><td class="tnum">≤ 2×/week</td><td>CLANK cascade / Fortress breach only</td><td>SCR-05 Fortress</td><td>Honest scarcity; stays meaningful</td></tr>
+            <tr><td><b>Resolution</b><br><span class="pill q">reward</span></td><td class="tnum">On event</td><td>A prediction or thesis resolves</td><td>SCR-03 calibration</td><td>Closes Zeigarnik loop; dopamine</td></tr>
+            <tr><td><b>Streak-save</b><br><span class="pill s">gentle</span></td><td class="tnum">≤ 1×/day · opt-in</td><td>Streak at risk near day’s end</td><td>SCR-01</td><td>Loss aversion — pointed at the habit, not a trade</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:.82rem; color:var(--ink-faint); margin-top:14px; font-family:var(--mono); letter-spacing:.04em">RULE · No notification contains a price target framed as urgency. No “last chance.” Every push has a one-tap “fewer like this.”</p>
+    </section>
+
+    <!-- 06 JOURNEY -->
+    <section id="journey">
+      <div class="sec-hd reveal"><div><p class="eyebrow">Zero → habit → advocate</p><h2>User journey map</h2></div><span class="id-code">JRN-06</span></div>
+      <p class="sec-sub reveal">The through-line: each phase makes the user feel one notch <em>smarter, more informed, more confident, more in control</em> — and hands them a reason the next session exists.</p>
+      <div class="journey panel reveal">
+        <div class="jstep"><div class="day">Day 0 · Onboard</div><h4>The first aha</h4><p>One ticker in → real insight out. Default risk profile accepted. First prediction made.</p><div class="feel">feels: <b>“it knows something”</b></div></div>
+        <div class="jstep"><div class="day">Day 1–7 · Ritual</div><h4>Forming the anchor</h4><p>Morning briefing lands daily. Streak reaches 7. First prediction resolves — calibration begins.</p><div class="feel">feels: <b>informed daily</b></div></div>
+        <div class="jstep"><div class="day">Day 8–30 · Investment</div><h4>Building the record</h4><p>Scar Journal fills; Calibration Belt ranks up; Portfolio Health becomes a thing they tend.</p><div class="feel">feels: <b>measurably sharper</b></div></div>
+        <div class="jstep"><div class="day">Day 30–90 · Mastery</div><h4>Competence &amp; lock-in</h4><p>Mastery path unlocks pro engines. Track record is now irreplaceable. Trial converts on calibration data.</p><div class="feel">feels: <b>in control</b></div></div>
+        <div class="jstep"><div class="day">Day 90+ · Advocate</div><h4>Identity &amp; proof</h4><p>Shareable process recaps (percentiles). “I don’t open the market without it.” Status rank displayed.</p><div class="feel">feels: <b>uninformed without it</b></div></div>
+      </div>
+    </section>
+
+    <!-- 07 LOOPS -->
+    <section id="loops">
+      <div class="sec-hd reveal"><div><p class="eyebrow">What compounds</p><h2>Retention loops</h2></div><span class="id-code">RET-07</span></div>
+      <p class="sec-sub reveal">Four self-reinforcing loops. Each turn increases the value of the next — the definition of a moat.</p>
+      <div class="loops stagger reveal">
+        <div class="loop-c"><div class="lt">Loop A · Daily</div><h4>The information ritual</h4><div class="loop-flow">briefing <span class="arw">→</span> insight <span class="arw">→</span> <b>streak</b> <span class="arw">→</span> return tomorrow <span class="arw">↺</span></div></div>
+        <div class="loop-c"><div class="lt">Loop B · Weekly</div><h4>Calibration flywheel</h4><div class="loop-flow">predict <span class="arw">→</span> resolve <span class="arw">→</span> <b>belt rank</b> <span class="arw">→</span> predict more <span class="arw">↺</span></div></div>
+        <div class="loop-c"><div class="lt">Loop C · Compounding</div><h4>Personal track record</h4><div class="loop-flow">log decision <span class="arw">→</span> <b>history grows</b> <span class="arw">→</span> switching cost ↑ <span class="arw">→</span> log more <span class="arw">↺</span></div></div>
+        <div class="loop-c"><div class="lt">Loop D · Social</div><h4>Proof &amp; identity</h4><div class="loop-flow">recap <span class="arw">→</span> <b>share percentile</b> <span class="arw">→</span> status <span class="arw">→</span> re-engage <span class="arw">↺</span></div></div>
+      </div>
+    </section>
+
+    <!-- 08 PREMIUM -->
+    <section id="premium">
+      <div class="sec-hd reveal"><div><p class="eyebrow">Conversion without coercion</p><h2>Premium upgrade psychology</h2></div><span class="id-code">PRM-08</span></div>
+      <p class="sec-sub reveal">The free tier must deliver a <em>complete daily habit</em> — the funnel is depth and history, not withholding the core loop. Users upgrade to see <em>more of their own edge</em>, not to unlock basic function.</p>
+      <div class="prem">
+        <div class="prem-list reveal">
+          <div class="trigger"><span class="t-i">TRG·1</span><div><h4>Calibration ceiling</h4><p>Free caps prediction horizons; once a user is climbing the Belt, Pro unlocks regime-conditioned odds and unlimited horizons. They pay to keep improving a number they own.</p></div></div>
+          <div class="trigger"><span class="t-i">TRG·2</span><div><h4>The full universe</h4><p>Scanner shows 2 discoveries free/day with the false-positive count; Pro opens the full universe + live CLANK proximity. Scarcity that’s real, not manufactured.</p></div></div>
+          <div class="trigger"><span class="t-i">TRG·3</span><div><h4>Your history, deeper</h4><p>Free keeps 30 days of Scar Journal &amp; reports; Pro is unlimited + Brinson attribution + PBO. Endowment: it’s <em>their</em> data behind the wall.</p></div></div>
+          <div class="trigger"><span class="t-i">TRG·4</span><div><h4>Institutional optimizer</h4><p>Pro portfolio tab runs Ledoit-Wolf + HRP + EVT tail (the quant-upgrade layer) vs. free equal-weight. Authority-driven, mastery-gated.</p></div></div>
+        </div>
+        <div class="tier reveal">
+          <div class="tier-row" style="background:var(--panel-2)"><b>Feature</b><span class="price">Free / Pro</span></div>
+          <div class="tier-row free">Morning briefing<span class="price">1× / intraday</span></div>
+          <div class="tier-row free">Predictions<span class="price">capped / ∞</span></div>
+          <div class="tier-row free">Scanner discoveries<span class="price">2·day / full</span></div>
+          <div class="tier-row free">History retention<span class="price">30d / ∞</span></div>
+          <div class="tier-row pro"><b>Institutional optimizer</b><span class="price">— / ✓</span></div>
+          <div class="tier-row pro"><b>Regime-conditional risk</b><span class="price">— / ✓</span></div>
+          <div class="tier-row pro"><b>Custom CLANK alerts</b><span class="price">— / ✓</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 LANGUAGE -->
+    <section id="language">
+      <div class="sec-hd reveal"><div><p class="eyebrow">Extending the terminal</p><h2>Visual design language</h2></div><span class="id-code">VDL-09</span></div>
+      <p class="sec-sub reveal">Palantir restraint, BlackRock institutional clarity, Apple motion. Two accents only — <b>green</b> and <b>red</b> — over a near-black / true-white ground, so gamification reads as <em>instrumentation</em>, never arcade.</p>
+      <div class="dl-grid">
+        <div class="panel reveal"><div class="panel-hd">Palette <span class="tag">white · black · green · red</span></div><div class="panel-bd">
+          <div class="swatches">
+            <div class="sw"><i style="background:var(--ink)"></i><span>INK · structure</span></div>
+            <div class="sw"><i style="background:var(--grn)"></i><span>GREEN · signal, competence</span></div>
+            <div class="sw"><i style="background:var(--red)"></i><span>RED · risk, loss</span></div>
+            <div class="sw"><i style="background:var(--quiet); opacity:.5"></i><span>QUIET · neutral data</span></div>
+          </div>
+          <p style="font-size:.8rem; color:var(--ink-dim); margin:15px 0 0">No third hue. Green <em>always</em> means competence/positive; red always means risk. A neutral grey carries structural data so color stays meaningful.</p>
+        </div></div>
+        <div class="panel reveal"><div class="panel-hd">Type system</div><div class="panel-bd">
+          <div class="typerow"><span class="tl">DISPLAY</span><span style="font-size:1.6rem; font-weight:600; letter-spacing:-0.045em">Sharper daily</span></div>
+          <div class="typerow"><span class="tl">BODY</span><span style="font-size:.95rem; color:var(--ink-dim)">SF Pro / system, 1.62 line-height</span></div>
+          <div class="typerow"><span class="tl">DATA/LABEL</span><span class="mono" style="font-size:.72rem; letter-spacing:.12em; color:var(--grn)">SCR-01 · CALIB 0.71</span></div>
+          <p style="font-size:.8rem; color:var(--ink-dim); margin:15px 0 0">Light display weights + generous air (Apple). Monospace carries every ID, metric, eyebrow (Palantir). Tabular-nums wherever digits align.</p>
+        </div></div>
+      </div>
+      <div class="dl-grid" style="margin-top:15px">
+        <div class="panel reveal"><div class="panel-hd">Motion</div><div class="panel-bd"><p style="font-size:.85rem; color:var(--ink-dim); margin:0">Orchestrated, not scattered. Hero staggers up on load; sections reveal on scroll; data <em>draws itself</em> (the calibration sparkline). A streak tick pulses once; cards lift 4px on hover with a green edge. Everything honors <span class="mono" style="font-size:.72rem">prefers-reduced-motion</span>. No confetti — premium comes from precision, not sparkle.</p></div></div>
+        <div class="panel reveal"><div class="panel-hd">Component voice</div><div class="panel-bd"><p style="font-size:.85rem; color:var(--ink-dim); margin:0">Reuses the product’s glass <span class="mono" style="font-size:.72rem">PanelWrapper</span>: mono header with an ID code, hairline border, faint glass gradient. Gamified widgets (belt, streak, health) are <em>panels</em>, visually equal to the quant panels — continuity, not a bolted-on game.</p></div></div>
+      </div>
+    </section>
+
+    <!-- 10 BUILD -->
+    <section id="build">
+      <div class="sec-hd reveal"><div><p class="eyebrow">Ship order · reuse what exists</p><h2>Build priority</h2></div><span class="id-code">BLD-10</span></div>
+      <p class="sec-sub reveal">Sequenced by habit-formation leverage per unit of build. Most data already lives in the hooks — this is surfacing and instrumentation before net-new modeling.</p>
+      <div class="panel reveal"><div class="panel-bd" style="padding:8px 20px">
+        <div class="phase"><div class="pn">P1</div><div><h4>Daily Briefing + streak on reading</h4><p>The anchor ritual. Composes existing useQuantSnapshot / regime / CLANK into one 90-sec screen + a streak table. Highest retention leverage, lowest new math.</p><div class="effort">EFFORT S · REUSE useQuantSnapshot, useMarketRegime, clank-engine</div></div></div>
+        <div class="phase"><div class="pn">P2</div><div><h4>Prediction Center + Calibration Belt</h4><p>Commitment device + the scoreboard. Powered directly by the calibration layer (reliabilityCurve, Brier) already shipped. Opens the core weekly loop.</p><div class="effort">EFFORT M · REUSE quant/calibration.ts, new predictions table</div></div></div>
+        <div class="phase"><div class="pn">P3</div><div><h4>Decision Quality + Scar Journal</h4><p>Turns useOutcomeGradient &amp; ScarMemory into a scored, journaled loop. The compounding switching-cost engine.</p><div class="effort">EFFORT M · REUSE useOutcomeGradient, odg-validator</div></div></div>
+        <div class="phase"><div class="pn">P4</div><div><h4>Portfolio Health + Fortress rewards</h4><p>Single vital from existing VaR/ERC/Fortress; defensive-discipline reinforcement. Wires the P4 doctrine (loss aversion → protection).</p><div class="effort">EFFORT M · REUSE quant-engine, fortress-engine, quant/evt.ts</div></div></div>
+        <div class="phase"><div class="pn">P5</div><div><h4>Mastery path + premium gating</h4><p>Learning Hub as a skill tree that unlocks the institutional engines. Converts the trial on owned calibration data, not withheld basics.</p><div class="effort">EFFORT L · ties to quant/allocation.ts, validation.ts</div></div></div>
+      </div>
+      <div class="callout reveal"><div class="who">One-line summary</div><p>Make users feel uninformed without it. Reward the read, score the calibration, journal the scars, and let the personal track record become the lock-in. Every lever in the brief, re-aimed from “trade more” to “know more” — which is the durable business.</p></div>
+    </section>
+
+    <footer>
+      <span>ENTROPYLITE · BEHAVIORAL OS v1</span>
+      <span>10 SCREENS · 8 SYSTEMS · 4 LOOPS</span>
+      <span>PALANTIR · BLACKROCK · APPLE</span>
+    </footer>
+  </main>
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement;
+    document.getElementById('themeBtn').addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+      root.setAttribute('data-theme',cur==='dark'?'light':'dark');
+    });
+    var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    },{threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.reveal,.stagger').forEach(function(el){
+      if(reduce){el.classList.add('in');} else {io.observe(el);}
+    });
+    // draw the hero sparkline once visible
+    var sp=document.getElementById('spark');
+    if(sp){ var so=new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); so.unobserve(e.target);} }); },{threshold:.3});
+      so.observe(sp); }
+  })();
+</script>
+</body>
+</html>
