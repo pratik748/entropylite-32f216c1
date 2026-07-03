@@ -307,12 +307,14 @@ const IndexContent = () => {
       setStocks((prev) => prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s)));
       setActiveStockId(existing.id);
       analyzeStock(existing.id, normalizedTicker, buyPrice, quantity);
+      registerWatch(normalizedTicker, buyPrice, quantity);
     } else {
       const newId = crypto.randomUUID();
       const newStock: PortfolioStock = { id: newId, ticker: normalizedTicker, buyPrice, quantity, isLoading: false };
       setStocks((prev) => [...prev, newStock]);
       setActiveStockId(newId);
       analyzeStock(newId, normalizedTicker, buyPrice, quantity);
+      registerWatch(normalizedTicker, buyPrice, quantity);
       logTrade({
         ticker: normalizedTicker,
         action: "BUY",
