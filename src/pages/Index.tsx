@@ -100,6 +100,16 @@ const IndexContent = () => {
     } catch {}
   }, [loaded]);
 
+  // Backfill Portfolio Sentinel with any positions loaded from cloud so
+  // pre-existing holdings are monitored without re-adding them manually.
+  const sentinelSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || sentinelSyncedRef.current) return;
+    if (!stocks || stocks.length === 0) { sentinelSyncedRef.current = true; return; }
+    sentinelSyncedRef.current = true;
+    stocks.forEach((s) => registerWatch(s.ticker, s.buyPrice, s.quantity));
+  }, [loaded, stocks]);
+
   // Press "?" to replay tour
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
