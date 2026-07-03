@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.portfolio-sentinel]
 verify_jwt = false
+
+[functions.send-transactional-email]
+verify_jwt = false

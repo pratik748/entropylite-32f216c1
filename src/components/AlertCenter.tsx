@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, X, ShieldAlert, TrendingDown, Split, Target as TargetIcon, RefreshCcw, AlertTriangle, Mail } from "lucide-react";
+import { Bell, X, ShieldAlert, TrendingDown, Split, Target as TargetIcon, RefreshCcw, AlertTriangle, Mail, WifiOff } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -14,6 +14,7 @@ const icons: Record<string, any> = {
   max_profit: TargetIcon,
   verdict_flip: ShieldAlert,
   stale: RefreshCcw,
+  analysis_failing: WifiOff,
 };
 
 export default function AlertCenter() {
@@ -102,8 +103,9 @@ export default function AlertCenter() {
                   <div className="text-[11px] text-muted-foreground mt-0.5">{a.message}</div>
                   <div className="flex items-center gap-2 mt-1 text-[9px] text-muted-foreground/70 font-mono">
                     <span>{new Date(a.created_at).toLocaleString()}</span>
-                    {a.email_status === "queued" && <span className="flex items-center gap-0.5 text-primary"><Mail className="h-2.5 w-2.5" />sent</span>}
+                    {a.email_status === "sent" && <span className="flex items-center gap-0.5 text-primary"><Mail className="h-2.5 w-2.5" />sent</span>}
                     {a.email_status === "pending" && <span className="opacity-60">email pending</span>}
+                    {a.email_status === "failed" && <span className="text-loss">email failed</span>}
                   </div>
                 </div>
               </div>

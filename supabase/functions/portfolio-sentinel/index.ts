@@ -44,10 +44,12 @@ async function fetchQuote(symbol: string) {
   } catch { return null; }
 }
 
-// ------- alert enqueue via transactional email -------
+// ------- alert delivery via transactional email -------
 async function enqueueEmail(supabase: any, recipient: string, subject: string, ticker: string, alerts: any[]) {
   try {
-    await supabase.functions.invoke("send-transactional-email", {
+    // functions.invoke resolves (does not throw) on non-2xx responses — the
+    // real outcome lives in `error`/`data`, so it must be checked explicitly.
+    const { data, error } = await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "portfolio-risk-alert",
         recipientEmail: recipient,
@@ -55,9 +57,13 @@ async function enqueueEmail(supabase: any, recipient: string, subject: string, t
         templateData: { ticker, subject, alerts },
       },
     });
-    return "queued";
+    if (error) {
+      console.error("email send failed", error);
+      return "failed";
+    }
+    return data?.status === "duplicate" ? "duplicate" : "sent";
   } catch (e) {
-    console.error("email enqueue failed", e);
+    console.error("email send failed", e);
     return "failed";
   }
 }
@@ -78,6 +84,7 @@ type Watch = {
   peak_drawdown_pct: number;
   muted: boolean;
   alert_state: Record<string, string>; // trigger -> ISO ts of last fire
+  consecutive_analysis_failures: number;
 };
 
 function withinCooldown(state: Record<string, string>, key: string, minutes: number): boolean {
@@ -149,31 +156,44 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
   const bigMove = Math.abs(q.changePct) >= 3;
   let newVerdict = w.last_verdict;
   let newTarget = w.last_max_profit_target;
+  let analysisRefreshed = false;
+  let failureCount = w.consecutive_analysis_failures || 0;
   if (stale || bigMove) {
     try {
-      const dp = await supabase.functions.invoke("direct-profit", {
-        body: { ticker: w.ticker },
-      });
-      const v = dp?.data?.action || dp?.data?.verdict || null;
-      const conv = dp?.data?.consensus?.conviction ?? null;
+      const dp = await supabase.functions.invoke("direct-profit", { body: { ticker: w.ticker } });
+      if (dp?.error) throw new Error(dp.error.message || "direct-profit invoke failed");
+      const v = dp?.data?.action || null;
+      // direct-profit returns confidence as a 0-100 number; `consensus` is a
+      // plain string ("UNANIMOUS"/"MAJORITY"/"SPLIT"), not an object — there is
+      // no `.conviction` field. Reading confidence directly fixes an alert that
+      // otherwise silently never fires (always null >= 0.5 === false).
+      const conf = typeof dp?.data?.confidence === "number" ? dp.data.confidence : null;
       newVerdict = v;
-      newTarget = dp?.data?.targetPrice || dp?.data?.priceTarget || w.last_max_profit_target;
+      newTarget = dp?.data?.targetPrice || w.last_max_profit_target;
+      analysisRefreshed = true;
+      failureCount = 0;
       // 6) Verdict flip
-      if (w.last_verdict && w.last_verdict !== v && (v === "SELL" || v === "STAND_ASIDE") && conv >= 0.5 && !withinCooldown(state, "verdict_flip", cooldown)) {
+      if (w.last_verdict && w.last_verdict !== v && v === "SELL" && conf !== null && conf >= 50 && !withinCooldown(state, "verdict_flip", cooldown)) {
         alerts.push({
           type: "verdict_flip",
           severity: "critical",
           title: `${w.ticker} — Consensus flipped to ${v}`,
-          message: `Previous verdict: ${w.last_verdict}. New verdict: ${v} (conviction ${(conv * 100).toFixed(0)}%). Re-evaluate the position.`,
+          message: `Previous verdict: ${w.last_verdict}. New verdict: ${v} (confidence ${conf.toFixed(0)}%). Re-evaluate the position.`,
         });
         state.verdict_flip = new Date().toISOString();
       }
-    } catch (e) { console.warn("direct-profit refresh failed", w.ticker, (e as Error).message); }
+    } catch (e) {
+      // Do NOT stamp last_analysis_at here — a failed refresh must not look
+      // "fresh". Track consecutive failures so a broken upstream call surfaces
+      // as an alert instead of silently masquerading as an up-to-date position.
+      failureCount += 1;
+      console.warn("direct-profit refresh failed", w.ticker, (e as Error).message);
+    }
   }
 
   // 7) Staleness (only if no re-analysis happened and >24h old)
   const stalenessCutoff = Date.now() - 24 * 3600_000;
-  if (lastAnalysis && lastAnalysis < stalenessCutoff && !stale && !withinCooldown(state, "stale", 24 * 60)) {
+  if (lastAnalysis && lastAnalysis < stalenessCutoff && !analysisRefreshed && !withinCooldown(state, "stale", 24 * 60)) {
     alerts.push({
       type: "stale",
       severity: "info",
@@ -183,13 +203,27 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     state.stale = new Date().toISOString();
   }
 
+  // 8) Repeated analysis failures — surfaced so a broken upstream call is
+  // never mistaken for "nothing wrong". Fires after 3 consecutive misses
+  // (~90 min at the default 30-min scan cadence).
+  if (failureCount >= 3 && !withinCooldown(state, "analysis_failing", 6 * 60)) {
+    alerts.push({
+      type: "analysis_failing",
+      severity: "warning",
+      title: `${w.ticker} — Re-analysis failing`,
+      message: `${failureCount} consecutive analysis attempts have failed. Verdict and profit-ceiling data may be out of date — check the position manually.`,
+    });
+    state.analysis_failing = new Date().toISOString();
+  }
+
   // persist watch state
   await supabase.from("portfolio_watch").update({
     last_price: price,
     peak_price: peak,
-    last_analysis_at: (stale || bigMove) ? new Date().toISOString() : w.last_analysis_at,
+    last_analysis_at: analysisRefreshed ? new Date().toISOString() : w.last_analysis_at,
     last_verdict: newVerdict,
     last_max_profit_target: newTarget,
+    consecutive_analysis_failures: failureCount,
     alert_state: state,
   }).eq("id", w.id);
 
