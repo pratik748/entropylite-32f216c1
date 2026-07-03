@@ -43,6 +43,7 @@ import TerminalTour from "@/components/tour/TerminalTour";
 import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { registerWatch, unregisterWatch } from "@/lib/sentinel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
@@ -98,6 +99,16 @@ const IndexContent = () => {
       }
     } catch {}
   }, [loaded]);
+
+  // Backfill Portfolio Sentinel with any positions loaded from cloud so
+  // pre-existing holdings are monitored without re-adding them manually.
+  const sentinelSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || sentinelSyncedRef.current) return;
+    if (!stocks || stocks.length === 0) { sentinelSyncedRef.current = true; return; }
+    sentinelSyncedRef.current = true;
+    stocks.forEach((s) => registerWatch(s.ticker, s.buyPrice, s.quantity));
+  }, [loaded, stocks]);
 
   // Press "?" to replay tour
   useEffect(() => {
@@ -306,12 +317,14 @@ const IndexContent = () => {
       setStocks((prev) => prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s)));
       setActiveStockId(existing.id);
       analyzeStock(existing.id, normalizedTicker, buyPrice, quantity);
+      registerWatch(normalizedTicker, buyPrice, quantity);
     } else {
       const newId = crypto.randomUUID();
       const newStock: PortfolioStock = { id: newId, ticker: normalizedTicker, buyPrice, quantity, isLoading: false };
       setStocks((prev) => [...prev, newStock]);
       setActiveStockId(newId);
       analyzeStock(newId, normalizedTicker, buyPrice, quantity);
+      registerWatch(normalizedTicker, buyPrice, quantity);
       logTrade({
         ticker: normalizedTicker,
         action: "BUY",
@@ -394,6 +407,7 @@ const IndexContent = () => {
     }
     setStocks((prev) => prev.filter((s) => s.id !== id));
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
+    if (stock) unregisterWatch(stock.ticker);
   };
   if (!loaded) {
     return (

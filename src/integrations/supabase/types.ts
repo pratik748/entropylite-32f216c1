@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      alert_preferences: {
+        Row: {
+          cooldown_minutes: number
+          created_at: string
+          default_drawdown_pct: number
+          default_peak_drawdown_pct: number
+          email_enabled: boolean
+          refresh_hours: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cooldown_minutes?: number
+          created_at?: string
+          default_drawdown_pct?: number
+          default_peak_drawdown_pct?: number
+          email_enabled?: boolean
+          refresh_hours?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cooldown_minutes?: number
+          created_at?: string
+          default_drawdown_pct?: number
+          default_peak_drawdown_pct?: number
+          email_enabled?: boolean
+          refresh_hours?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cadence_entries: {
         Row: {
           concept: string
@@ -438,6 +471,108 @@ export type Database = {
           return_abs?: number
           source?: string
           trade_timestamp?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      portfolio_watch: {
+        Row: {
+          alert_state: Json
+          created_at: string
+          drawdown_pct: number
+          entry_price: number
+          id: string
+          last_analysis_at: string | null
+          last_conviction: number | null
+          last_max_profit_target: number | null
+          last_price: number | null
+          last_verdict: string | null
+          muted: boolean
+          peak_drawdown_pct: number
+          peak_price: number | null
+          quantity: number
+          ticker: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_state?: Json
+          created_at?: string
+          drawdown_pct?: number
+          entry_price: number
+          id?: string
+          last_analysis_at?: string | null
+          last_conviction?: number | null
+          last_max_profit_target?: number | null
+          last_price?: number | null
+          last_verdict?: string | null
+          muted?: boolean
+          peak_drawdown_pct?: number
+          peak_price?: number | null
+          quantity?: number
+          ticker: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_state?: Json
+          created_at?: string
+          drawdown_pct?: number
+          entry_price?: number
+          id?: string
+          last_analysis_at?: string | null
+          last_conviction?: number | null
+          last_max_profit_target?: number | null
+          last_price?: number | null
+          last_verdict?: string | null
+          muted?: boolean
+          peak_drawdown_pct?: number
+          peak_price?: number | null
+          quantity?: number
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      risk_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          dismissed: boolean
+          email_status: string
+          id: string
+          message: string
+          payload: Json
+          severity: string
+          ticker: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          dismissed?: boolean
+          email_status?: string
+          id?: string
+          message: string
+          payload?: Json
+          severity?: string
+          ticker: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          dismissed?: boolean
+          email_status?: string
+          id?: string
+          message?: string
+          payload?: Json
+          severity?: string
+          ticker?: string
+          title?: string
           user_id?: string
         }
         Relationships: []
