@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.symbol-search]
 verify_jwt = false
+
+[functions.portfolio-sentinel]
+verify_jwt = false
