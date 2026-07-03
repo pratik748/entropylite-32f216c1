@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CONSTRAINT_REGISTRY } from "@/lib/clank-engine";
+import { betaUpdate, betaMean } from "@/lib/quant/calibration";
 
 export interface ActivationEvent {
   id: string;
@@ -114,12 +115,25 @@ export function useClankLearning() {
     } as any).eq("id", eventId);
     if (evErr) return false;
 
-    // Update confidence override using running average
+    // Update confidence via a prior-anchored Beta posterior with a bounded
+    // effective sample size (fixed-gain Bayesian update):
+    //   - the registry confidence acts as a Beta prior with strength N0
+    //   - evidence weight is capped at NCAP, so the learning gain floors at
+    //     1/(N0+NCAP+1) ≈ 0.02 and the estimate keeps adapting to regime
+    //     change instead of freezing as n → ∞ (the flaw of a running mean)
+    const N0 = 10;   // prior equivalent sample size
+    const NCAP = 40; // max effective evidence count
     const existing = overrides[ev.constraint_id];
     const defaultConf = CONSTRAINT_REGISTRY.find(c => c.id === ev.constraint_id)?.confidenceScore ?? 0.5;
     const oldConf = existing?.adjusted_confidence ?? defaultConf;
     const n = (existing?.sample_count ?? 0) + 1;
-    const newConf = Math.max(0.05, Math.min(0.99, (oldConf * (n - 1) + accuracy) / n));
+    const strength = N0 + Math.min(n - 1, NCAP);
+    const posterior = betaUpdate(
+      { alpha: oldConf * strength, beta: (1 - oldConf) * strength },
+      accuracy,
+      1, // decay handled by the strength cap above
+    );
+    const newConf = Math.max(0.05, Math.min(0.99, betaMean(posterior)));
 
     const { error: ovErr } = await supabase.from("clank_confidence_overrides" as any).upsert({
       user_id: userIdRef.current,
