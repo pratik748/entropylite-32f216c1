@@ -4,6 +4,7 @@
  */
 
 import { hurstRS as _hurstRS } from "@/lib/quant/institutional";
+import { riskParityWeights as ercRiskParityWeights } from "@/lib/portfolio-math";
 
 // ─── Random / Utility ───────────────────────────────────────────────
 
@@ -447,9 +448,16 @@ export function markowitzFrontier(
   };
 }
 
-/** Risk Parity: allocate so each asset contributes equal risk */
+/**
+ * Risk Parity: allocate so each asset contributes equal risk.
+ * Delegates to the true Equal-Risk-Contribution solver (Maillard et al. 2010,
+ * Newton/fixed-point iteration in portfolio-math.ts) which accounts for
+ * correlations; inverse-vol (correlation-blind) is only the fallback when the
+ * iteration cannot converge (degenerate Σ).
+ */
 export function riskParityWeights(covMatrix: number[][]): number[] {
-  const n = covMatrix.length;
+  const erc = ercRiskParityWeights(covMatrix);
+  if (erc) return erc;
   const vols = covMatrix.map((_, i) => Math.sqrt(covMatrix[i][i]));
   const invVols = vols.map(v => 1 / (v || 0.01));
   const sum = invVols.reduce((a, b) => a + b, 0);

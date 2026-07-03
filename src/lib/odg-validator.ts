@@ -139,24 +139,26 @@ function simulatePaths(
   const isLong = signalType === "invest" || signalType === "scale_up" || signalType === "pair";
   const dirMult = isLong ? 1 : -1;
 
-  // Regime tilts
+  // Regime / stress indicator features
   const r = (regime || "").toLowerCase();
-  const bullTilt = r.includes("bull") || r.includes("rally") || r.includes("low") ? 0.10 : 0;
-  const crisisTilt = r.includes("crisis") || r.includes("bear") ? 0.15 : 0;
+  const bull = r.includes("bull") || r.includes("rally") || r.includes("low") ? 1 : 0;
+  const crisis = r.includes("crisis") || r.includes("bear") ? 1 : 0;
+  const vixStress = typeof vix === "number" && vix > 22 ? 1 : 0;
 
-  const vixStress = typeof vix === "number" && vix > 22 ? 0.10 : 0;
-
-  let pFav = 0.35 + bullTilt - crisisTilt;
-  let pDrift = 0.40 - 0.05 * crowding;
-  let pAdv = 0.25 + crowding * 0.15 + vixStress + crisisTilt - bullTilt;
-
-  // Normalise
-  const total = pFav + pDrift + pAdv;
-  pFav = clamp(pFav / total, 0.05, 0.85);
-  pDrift = clamp(pDrift / total, 0.05, 0.85);
-  pAdv = clamp(pAdv / total, 0.05, 0.85);
-  const norm = pFav + pDrift + pAdv;
-  pFav /= norm; pDrift /= norm; pAdv /= norm;
+  // Softmax path model: p_k = exp(z_k) / Σ exp(z_j).
+  // Base logits ln(0.35), ln(0.40), ln(0.25) reproduce the historical
+  // baseline exactly; feature coefficients are the old probability tilts
+  // mapped to logit space (Δz ≈ Δp / (p(1−p)) at the baseline). Softmax
+  // guarantees a valid simplex with no clamp/renormalise pass, and the
+  // coefficient vector is the calibration target for OnlineLogit once
+  // enough realised path outcomes are recorded (see QUANT_UPGRADE_SPEC §ODG).
+  const zFav = Math.log(0.35) + 0.45 * bull - 0.65 * crisis;
+  const zDrift = Math.log(0.40) - 0.22 * crowding;
+  const zAdv = Math.log(0.25) + 0.65 * crowding + 0.45 * vixStress + 0.65 * crisis - 0.45 * bull;
+  const zMax = Math.max(zFav, zDrift, zAdv);
+  const eFav = Math.exp(zFav - zMax), eDrift = Math.exp(zDrift - zMax), eAdv = Math.exp(zAdv - zMax);
+  const Z = eFav + eDrift + eAdv;
+  const pFav = eFav / Z, pDrift = eDrift / Z, pAdv = eAdv / Z;
 
   const reflex = (label: string, conds: boolean[]): string[] =>
     [label, ...(conds[0] ? ["crowded"] : []), ...(conds[1] ? ["vix_stress"] : [])];
@@ -241,21 +243,43 @@ function checkTiming(
 
 // ─── 5. Scar lookup ───────────────────────────────────
 
+/**
+ * Similarity-weighted multiplicative failure hazard.
+ *
+ * Formalisation (replaces the previous count/denominator ratio):
+ * each past failure with a similar context contributes evidence weight
+ *   w = similarity × severity
+ * where similarity ∈ {1 full context match, 0.5 partial} and severity
+ * scales with realised loss, min(|pnl|/5, 2). Under a Poisson-hazard view,
+ * P(no repeat failure) = exp(−W/τ) with W = Σw and e-folding scale τ = 3
+ * weighted failures, so
+ *   scarFactor = clamp(exp(−W/τ), 0.3, 1)
+ * This is monotone in evidence, severity-aware, independent of the arbitrary
+ * per-ticker denominator, and keeps the original [0.3, 1] output range so no
+ * downstream gate changes.
+ */
 function scarFactor(scars: ScarRecord[], input: ValidateInput): { factor: number; similar: number } {
   if (!scars.length) return { factor: 1, similar: 0 };
   const vb = volBucket(input.features.vol);
   const sb = sentimentBucket(input.features.sentiment);
   const mb = momentumBucket(input.features.momentum);
-  const matches = scars.filter(s =>
-    s.ticker === input.ticker &&
-    s.regime === (input.regime || "unknown") &&
-    s.vol_bucket === vb &&
-    (s.sentiment_bucket === sb || s.momentum_bucket === mb)
-  );
-  const total = scars.filter(s => s.ticker === input.ticker).length;
-  const denom = Math.max(5, total);
-  const factor = clamp(1 - matches.length / denom, 0.3, 1);
-  return { factor, similar: matches.length };
+  const TAU = 3; // e-folding scale in weighted failures
+  let W = 0;
+  let similar = 0;
+  for (const s of scars) {
+    if (s.ticker !== input.ticker) continue;
+    if (s.regime !== (input.regime || "unknown")) continue;
+    if (s.vol_bucket !== vb) continue;
+    const sentMatch = s.sentiment_bucket === sb;
+    const momMatch = s.momentum_bucket === mb;
+    if (!sentMatch && !momMatch) continue;
+    similar++;
+    const similarity = sentMatch && momMatch ? 1 : 0.5;
+    const severity = clamp(Math.abs(s.realized_pnl_pct) / 5, 0.25, 2);
+    W += similarity * severity;
+  }
+  const factor = clamp(Math.exp(-W / TAU), 0.3, 1);
+  return { factor, similar };
 }
 
 // ─── Main entry point ─────────────────────────────────
