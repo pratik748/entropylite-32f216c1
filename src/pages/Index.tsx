@@ -43,6 +43,7 @@ import TerminalTour from "@/components/tour/TerminalTour";
 import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { registerWatch, unregisterWatch } from "@/lib/sentinel";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
