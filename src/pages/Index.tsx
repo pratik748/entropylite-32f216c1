@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper } from "lucide-react";
 import { springLayout } from "@/lib/motion";
 import CommandPalette from "@/components/CommandPalette";
-import DailyBriefing from "@/components/briefing/DailyBriefing";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
