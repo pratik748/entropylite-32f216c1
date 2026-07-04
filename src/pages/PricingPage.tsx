@@ -49,7 +49,7 @@ export default function PricingPage() {
           <div className="bg-ink text-white p-8 sm:p-12 relative overflow-hidden">
             <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
             <div className="relative">
-              <p className="mkt-label text-[9px] text-capital-soft mb-6">Founding membership</p>
+              <p className="mkt-label text-[9px] text-white/60 mb-6">Founding membership</p>
               <div className="flex items-baseline gap-3">
                 <span className="text-5xl sm:text-6xl font-bold tracking-tight">Free</span>
                 <span className="mkt-label text-[9px] text-white/40">during founding</span>

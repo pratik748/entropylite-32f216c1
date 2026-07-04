@@ -78,7 +78,7 @@ export function PageHeader({
       <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-14 sm:pt-20 pb-14 sm:pb-16">
         <div className="flex items-center gap-3 mb-7">
           <span className="h-px w-8 bg-white/25" />
-          <span className="mkt-label text-[9px] text-capital-soft">{label}</span>
+          <span className="mkt-label text-[9px] text-white/60">{label}</span>
         </div>
         <h1 className="mkt-display text-white max-w-3xl">{title}</h1>
         {lede && (

@@ -44,7 +44,7 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
               <ChevronRight className="h-3 w-3 text-muted-foreground" />
             </motion.span>
           )}
-          <span className="h-3 w-[2px] rounded-full bg-info/80 shrink-0" aria-hidden="true" />
+          <span className="h-3 w-[2px] rounded-full bg-foreground/60 shrink-0" aria-hidden="true" />
           {icon && <span className="text-muted-foreground shrink-0">{icon}</span>}
           <span className="data-label !text-foreground/80 truncate">{title}</span>
         </div>

@@ -41,7 +41,7 @@ export default function ResetPasswordPage() {
     <div className="relative min-h-screen bg-white text-ink flex items-center justify-center p-5">
       <div className="absolute inset-0 paper-grid grid-vignette" aria-hidden="true" />
       <div className="relative w-full max-w-sm">
-        <EntropyGlyph className="h-9 w-9 mb-6" />
+        <EntropyGlyph className="h-10 w-auto mb-6" />
         <h1 className="text-[24px] font-bold tracking-tight mb-2">Reset credentials</h1>
         <p className="text-[13.5px] text-ink/50 leading-relaxed mb-8">
           Choose a new password for your account. You will be signed in immediately.

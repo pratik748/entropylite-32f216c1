@@ -25,7 +25,7 @@ const NotFound = () => {
         <div className="max-w-6xl mx-auto w-full px-5 sm:px-6 pb-24">
           <div className="flex items-center gap-3 mb-7">
             <span className="h-px w-8 bg-white/25" />
-            <span className="mkt-label text-[9px] text-capital-soft">Error 404</span>
+            <span className="mkt-label text-[9px] text-white/60">Error 404</span>
           </div>
           <h1 className="mkt-display">
             This route does not resolve.

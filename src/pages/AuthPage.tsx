@@ -47,7 +47,7 @@ export default function AuthPage() {
         <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
         <div
           className="absolute -bottom-48 -left-24 h-[420px] w-[640px] rounded-full opacity-20 blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(closest-side, #1E5EDB 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(closest-side, rgba(255,255,255,0.16) 0%, transparent 70%)" }}
           aria-hidden="true"
         />
 
@@ -59,7 +59,7 @@ export default function AuthPage() {
         <div className="relative flex-1 flex flex-col justify-center px-7 sm:px-10 py-10 lg:py-0">
           <div className="flex items-center gap-3 mb-7">
             <span className="h-px w-8 bg-white/25" />
-            <span className="mkt-label text-[9px] text-capital-soft">Secure gateway</span>
+            <span className="mkt-label text-[9px] text-white/60">Secure gateway</span>
           </div>
           <h1 className="mkt-display-2 max-w-md">
             The operating system
@@ -90,7 +90,7 @@ export default function AuthPage() {
       <div className="flex items-center justify-center px-5 py-14 lg:py-0">
         <div className="w-full max-w-sm">
           <div className="mb-10">
-            <EntropyGlyph className="h-9 w-9 mb-6" />
+            <EntropyGlyph className="h-10 w-auto mb-6" />
             <h2 className="text-[24px] font-bold tracking-tight mb-2">Authenticate</h2>
             <p className="text-[13.5px] text-ink/50 leading-relaxed">
               Sign in to open your terminal. Sessions are encrypted end-to-end

@@ -107,7 +107,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
         <div
           className="absolute -top-40 left-1/2 -translate-x-1/2 h-[480px] w-[900px] rounded-full opacity-25 blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(closest-side, #1E5EDB 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(closest-side, rgba(255,255,255,0.16) 0%, transparent 70%)" }}
           aria-hidden="true"
         />
 
@@ -116,7 +116,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-3 mb-7">
               <span className="mkt-label text-[9px] text-white/40">Est. for operators</span>
               <span className="h-px w-8 bg-white/25" />
-              <span className="mkt-label text-[9px] text-capital-soft">Probabilistic market infrastructure</span>
+              <span className="mkt-label text-[9px] text-white/60">Probabilistic market infrastructure</span>
             </div>
 
             <h1 className="mkt-display text-white">
@@ -340,7 +340,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-3 mb-8">
             <span className="mkt-label text-[9px] text-white/40">06</span>
             <span className="h-px w-8 bg-white/25" />
-            <span className="mkt-label text-[9px] text-capital-soft">CLANK · Constraint detection</span>
+            <span className="mkt-label text-[9px] text-white/60">CLANK · Constraint detection</span>
           </div>
 
           <h2 className="mkt-display max-w-4xl">

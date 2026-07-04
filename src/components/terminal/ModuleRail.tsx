@@ -51,7 +51,7 @@ const ModuleRail = ({ modules, activeId, onSelect }: ModuleRailProps) => {
               <motion.span
                 layoutId="rail-index"
                 transition={springLayout}
-                className="absolute -left-2 top-1/2 h-5 w-[2.5px] -translate-y-1/2 rounded-full bg-info"
+                className="absolute -left-2 top-1/2 h-5 w-[2.5px] -translate-y-1/2 rounded-full bg-foreground"
               />
             )}
             <span className="relative z-10 flex h-6 w-6 items-center justify-center">

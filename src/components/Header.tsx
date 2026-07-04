@@ -3,19 +3,21 @@ import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Search, Zap } from "lucide-react";
+import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
 interface HeaderProps {
   directProfitMode?: boolean;
   onToggleDirectProfit?: () => void;
 }
 
-/** Theme-aware terminal mark — the entropy bars, inverted with the palette. */
+/** The brand wordmark, inverting with the terminal theme via .logo-adaptive. */
 const TerminalMark = () => (
-  <span className="flex h-7 w-7 flex-col items-start justify-center gap-[3px] rounded-[8px] bg-primary px-[7px] shrink-0">
-    <span className="h-[2px] w-full rounded-full bg-primary-foreground" />
-    <span className="h-[2px] w-3/4 rounded-full bg-primary-foreground/75" />
-    <span className="h-[2px] w-1/2 rounded-full bg-primary-foreground/45" />
-  </span>
+  <img
+    src={wordmarkBlack}
+    alt="Entropy"
+    draggable={false}
+    className="h-7 w-auto logo-adaptive select-none shrink-0"
+  />
 );
 
 const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
@@ -58,10 +60,9 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
         {/* Identity */}
         <div className="flex items-center gap-2.5 min-w-0 shrink-0">
           <TerminalMark />
-          <div className="hidden lg:flex flex-col justify-center leading-none">
-            <span className="text-[12px] font-semibold tracking-[0.16em] text-foreground">ENTROPY</span>
-            <span className="mt-[3px] text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70">Terminal</span>
-          </div>
+          <span className="hidden lg:inline text-[8px] font-semibold uppercase tracking-[0.26em] text-muted-foreground/70 border-l border-border/60 pl-2.5">
+            Terminal
+          </span>
         </div>
 
         {/* Market session cluster */}

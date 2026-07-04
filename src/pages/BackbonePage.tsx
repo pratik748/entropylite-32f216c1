@@ -202,7 +202,7 @@ export default function BackbonePage() {
           <div>
             <div className="flex items-center gap-3 mb-6">
               <FileText className="h-4 w-4 text-white/50" />
-              <p className="mkt-label text-[9px] text-capital-soft">The full manuscript</p>
+              <p className="mkt-label text-[9px] text-white/60">The full manuscript</p>
             </div>
             <h2 className="mkt-display-2 mb-4">
               Read every page of the research that powers the system.
