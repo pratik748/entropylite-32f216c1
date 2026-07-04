@@ -33,7 +33,7 @@ export default function AccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       <PublicNav />
 
       <PageHeader
@@ -48,39 +48,37 @@ export default function AccessPage() {
         lede="Join independent investors using Entropy for market-structure analysis, probabilistic modelling and quantitative risk intelligence previously reserved for institutional research desks."
       />
 
-      <main className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
         {/* Pillars */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-l border-ink/[0.07] mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-l border-hairline mb-16">
           {PILLARS.map((p) => (
-            <div key={p.title} className="border-b border-r border-ink/[0.07] p-8">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-ink/10 mb-5">
-                <p.icon className="h-4 w-4 text-ink/60" strokeWidth={1.75} />
-              </div>
-              <h3 className="text-[15px] font-semibold tracking-tight mb-2">{p.title}</h3>
-              <p className="text-[13px] text-ink/55 leading-relaxed">{p.desc}</p>
+            <div key={p.title} className="border-b border-r border-hairline p-8 bg-carbon-900">
+              <p.icon className="h-4 w-4 text-white/40 mb-5" strokeWidth={1.5} />
+              <h3 className="text-[14.5px] font-semibold tracking-tight mb-2 text-white">{p.title}</h3>
+              <p className="text-[13px] text-white/50 leading-relaxed">{p.desc}</p>
             </div>
           ))}
         </div>
 
-        {/* Access card */}
+        {/* Access panel */}
         <div className="max-w-lg mx-auto text-center">
-          <div className="border border-ink/[0.09] rounded-xl p-8 sm:p-10">
-            <p className="mkt-label text-[9px] text-ink/40 mb-3">Founding access</p>
-            <h2 className="text-[22px] font-bold tracking-tight mb-2">
+          <div className="border border-hairline bg-carbon-900 p-8 sm:p-10">
+            <p className="mkt-label text-[10px] text-white/40 mb-3">Founding access</p>
+            <h2 className="text-[21px] font-semibold tracking-tight mb-2 text-white">
               Full platform access during the founding period
             </h2>
-            <p className="text-[13px] text-ink/50 mb-8">
+            <p className="text-[13px] text-white/45 mb-8">
               All intelligence modules. No feature restrictions.
             </p>
             <InkButton onClick={() => navigate("/dashboard")} className="w-full">
               Create account <ArrowRight className="h-4 w-4" />
             </InkButton>
           </div>
-          <p className="mt-6 text-[12.5px] text-ink/45">
+          <p className="mt-6 text-[12.5px] text-white/40">
             Already have an account?{" "}
             <button
               onClick={() => navigate("/dashboard")}
-              className="inline-btn font-semibold text-ink underline underline-offset-4 decoration-ink/25 hover:decoration-ink"
+              className="inline-btn font-medium text-white underline underline-offset-4 decoration-white/25 hover:decoration-white transition-colors duration-150 ease-out"
             >
               Sign in
             </button>

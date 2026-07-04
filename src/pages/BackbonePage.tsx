@@ -103,7 +103,7 @@ export default function BackbonePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       <PublicNav />
 
       <PageHeader
@@ -117,8 +117,8 @@ export default function BackbonePage() {
         }
         lede="Entropy is not a wrapper around a chatbot. Every screen in the terminal traces back to a specific paper, a specific formula, and a specific data pipeline. This page is the audit trail."
       >
-        {/* Stats band inside the ink header */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 border-t border-white/10 mt-12">
+        {/* Stats band inside the header */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 border-t border-hairline mt-12">
           {[
             { k: "Models implemented", v: "30+" },
             { k: "Backend functions", v: "30+" },
@@ -127,31 +127,31 @@ export default function BackbonePage() {
           ].map((s, i) => (
             <div
               key={s.k}
-              className={`py-6 pr-6 ${i > 0 ? "lg:border-l lg:border-white/10 lg:pl-8" : ""} ${i % 2 === 1 ? "border-l border-white/10 pl-6 lg:pl-8" : ""}`}
+              className={`py-6 pr-6 ${i > 0 ? "lg:border-l lg:border-hairline lg:pl-8" : ""} ${i % 2 === 1 ? "border-l border-hairline pl-6 lg:pl-8" : ""}`}
             >
-              <div className="text-2xl font-bold tracking-tight tabular-nums">{s.v}</div>
-              <div className="mkt-label text-[9px] text-white/40 mt-2">{s.k}</div>
+              <div className="mkt-num text-2xl text-white">{s.v}</div>
+              <div className="mkt-label text-[9px] text-white/35 mt-2">{s.k}</div>
             </div>
           ))}
         </div>
       </PageHeader>
 
       {/* Pipeline */}
-      <section className="border-b border-ink/[0.07]">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
+      <section className="border-b border-hairline">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
           <SectionIntro
             index="01"
             label="End-to-end pipeline"
             title={<>From raw signal to executable decision.</>}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-12 border-t border-l border-ink/[0.07]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-12 border-t border-l border-hairline">
             {PIPELINE.map((p) => (
-              <div key={p.step} className="border-b border-r border-ink/[0.07] p-6">
+              <div key={p.step} className="border-b border-r border-hairline p-6 hover:bg-carbon-900 transition-colors duration-150 ease-out">
                 <div className="flex items-baseline gap-2.5 mb-3">
-                  <span className="mkt-label text-[9px] text-ink/30">{p.step}</span>
-                  <span className="text-[13px] font-semibold tracking-tight">{p.label}</span>
+                  <span className="mkt-label text-[10px] text-white/30">{p.step}</span>
+                  <span className="text-[13px] font-semibold tracking-tight text-white">{p.label}</span>
                 </div>
-                <p className="text-[12.5px] text-ink/55 leading-relaxed">{p.body}</p>
+                <p className="text-[12.5px] text-white/50 leading-relaxed">{p.body}</p>
               </div>
             ))}
           </div>
@@ -159,31 +159,29 @@ export default function BackbonePage() {
       </section>
 
       {/* Engineering stack */}
-      <section className="border-b border-ink/[0.07] bg-[#FAFBFC]">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
+      <section className="border-b border-hairline bg-carbon-900">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
           <SectionIntro
             index="02"
             label="Engineering stack"
             title={<>Six subsystems, one terminal.</>}
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 mt-12 border-t border-l border-ink/[0.07] bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-2 mt-12 border-t border-l border-hairline">
             {STACK.map((s) => (
-              <article key={s.title} className="border-b border-r border-ink/[0.07] p-7 sm:p-8">
+              <article key={s.title} className="border-b border-r border-hairline bg-carbon-950 p-7 sm:p-8">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/10">
-                    <s.icon className="h-4 w-4 text-ink/60" strokeWidth={1.75} />
-                  </div>
-                  <h3 className="text-[15px] font-semibold tracking-tight">{s.title}</h3>
+                  <s.icon className="h-4 w-4 text-white/40" strokeWidth={1.5} />
+                  <h3 className="text-[14.5px] font-semibold tracking-tight text-white">{s.title}</h3>
                 </div>
                 <ul className="space-y-2 mb-5">
                   {s.items.map((it) => (
-                    <li key={it} className="text-[12.5px] text-ink/60 leading-relaxed flex gap-2.5">
-                      <span className="text-ink/25 mt-px">—</span>
+                    <li key={it} className="text-[12.5px] text-white/55 leading-relaxed flex gap-2.5">
+                      <span className="text-white/20 mt-px">—</span>
                       <span>{it}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="mkt-label text-[8px] text-ink/35 border-t border-ink/[0.07] pt-3 normal-case tracking-normal font-mono text-[10px]">
+                <p className="mkt-num text-[10px] text-white/30 border-t border-hairline pt-3">
                   {s.file}
                 </p>
               </article>
@@ -196,18 +194,17 @@ export default function BackbonePage() {
       <MathResearch />
 
       {/* Manuscript CTA */}
-      <section className="relative overflow-hidden bg-ink text-white border-t border-ink/[0.07]">
-        <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
-        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+      <section className="bg-carbon-900 border-t border-hairline">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           <div>
             <div className="flex items-center gap-3 mb-6">
-              <FileText className="h-4 w-4 text-white/50" />
-              <p className="mkt-label text-[9px] text-white/60">The full manuscript</p>
+              <FileText className="h-4 w-4 text-white/45" />
+              <p className="mkt-label text-[10px] text-white/55">The full manuscript</p>
             </div>
-            <h2 className="mkt-display-2 mb-4">
+            <h2 className="mkt-display-2 mb-4 text-white">
               Read every page of the research that powers the system.
             </h2>
-            <p className="text-[14px] text-white/55 leading-relaxed max-w-md">
+            <p className="text-[13.5px] text-white/50 leading-relaxed max-w-md">
               30 pages. Structural lock manifold, reflexivity paradox, latency &amp; yield
               strength, failure-modes catalogue. Every section maps to a working module
               in the terminal.
@@ -218,7 +215,7 @@ export default function BackbonePage() {
               href="/research/clank-theory-sehwag-2026.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-white text-ink text-[13px] font-semibold tracking-tight hover:bg-white/90 transition-colors"
+              className="inline-flex h-11 items-center justify-center gap-2 bg-white text-carbon-950 text-[13px] font-semibold tracking-tight hover:bg-white/85 transition-colors duration-150 ease-out"
             >
               <Download className="h-4 w-4" />
               Download the full PDF
@@ -227,11 +224,11 @@ export default function BackbonePage() {
               href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6464440"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-white/20 text-white/85 text-[13px] font-semibold tracking-tight hover:border-white/45 hover:text-white transition-colors"
+              className="inline-flex h-11 items-center justify-center gap-2 border border-hairline-strong text-white/75 text-[13px] font-medium tracking-tight hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
             >
               View citation on SSRN
             </a>
-            <LineButton dark onClick={() => navigate("/access")}>
+            <LineButton onClick={() => navigate("/access")}>
               Get access to the terminal <ArrowRight className="h-4 w-4" />
             </LineButton>
           </div>

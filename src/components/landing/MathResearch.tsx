@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Sigma, FunctionSquare, BookOpen, Activity, GitCompareArrows, ShieldAlert, FileText, Download, Quote } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 
 /* -------------------- Deterministic PRNG so the page renders identically every load -------------------- */
 function mulberry32(a: number) {
@@ -15,6 +15,27 @@ function boxMuller(rng: () => number) {
   while (u === 0) u = rng();
   while (v === 0) v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* Shared chart palette — monochrome structure, muted pos/neg, nothing else */
+const MONO = "rgba(255,255,255,0.85)";
+const MONO_SOFT = "rgba(255,255,255,0.38)";
+const MONO_FAINT = "rgba(255,255,255,0.16)";
+const GRID = "rgba(255,255,255,0.06)";
+const POS = "rgba(78,158,114,";
+const NEG = "rgba(196,86,79,";
+const FONT = "IBM Plex Mono, ui-monospace, monospace";
+
+function PanelHeader({ eyebrow, title, right }: { eyebrow: string; title: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between mb-3 gap-3">
+      <div>
+        <p className="mkt-label text-[9px] text-white/35 mb-1">{eyebrow}</p>
+        <h4 className="font-semibold text-sm text-white tracking-tight">{title}</h4>
+      </div>
+      {right}
+    </div>
+  );
 }
 
 /* -------------------- 1. Monte Carlo GBM paths (mini) -------------------- */
@@ -54,40 +75,35 @@ function MonteCarloMini() {
   const var95 = -sorted[Math.floor(0.05 * sorted.length)] * 100;
 
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 mb-1">Monte Carlo · GBM</p>
-          <h4 className="font-semibold text-sm">10,000 paths per asset</h4>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] text-ink/40">profit prob</p>
-          <p className="font-mono text-sm font-bold text-gain">{profitProb.toFixed(0)}%</p>
-        </div>
-      </div>
+    <div className="border border-hairline bg-carbon-900 p-4 sm:p-5">
+      <PanelHeader
+        eyebrow="Monte Carlo · GBM"
+        title="10,000 paths per asset"
+        right={
+          <div className="text-right">
+            <p className="mkt-label text-[9px] text-white/35">profit prob</p>
+            <p className="mkt-num text-sm text-pos">{profitProb.toFixed(0)}%</p>
+          </div>
+        }
+      />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
-        {/* Y axis grid */}
         {[0.25, 0.5, 0.75].map((p, i) => (
-          <line key={i} x1={padL} x2={W - padR} y1={padT + p * (H - padT - padB)} y2={padT + p * (H - padT - padB)} stroke="rgba(0,0,0,0.05)" />
+          <line key={i} x1={padL} x2={W - padR} y1={padT + p * (H - padT - padB)} y2={padT + p * (H - padT - padB)} stroke={GRID} />
         ))}
-        {/* Baseline (S0) */}
-        <line x1={padL} x2={W - padR} y1={y(100)} y2={y(100)} stroke="rgba(0,0,0,0.4)" strokeDasharray="2 3" strokeWidth={0.7} />
-        {/* Paths */}
+        <line x1={padL} x2={W - padR} y1={y(100)} y2={y(100)} stroke={MONO_SOFT} strokeDasharray="2 3" strokeWidth={0.7} />
         {paths.map((path, idx) => {
           const last = path[path.length - 1];
-          const stroke = last >= 100 ? "rgba(16,185,129,0.32)" : "rgba(239,68,68,0.32)";
+          const stroke = last >= 100 ? `${POS}0.30)` : `${NEG}0.30)`;
           const d = path.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
           return <path key={idx} d={d} fill="none" stroke={stroke} strokeWidth={0.8} />;
         })}
-        {/* Y labels */}
-        <text x={4} y={y(100) + 3} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.45)">S₀</text>
-        <text x={4} y={y(maxV) + 8} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">+{((maxV - 100)).toFixed(0)}%</text>
-        <text x={4} y={y(minV) - 2} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">{((minV - 100)).toFixed(0)}%</text>
-        {/* X labels */}
-        <text x={padL} y={H - 6} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">t=0</text>
-        <text x={W - padR - 32} y={H - 6} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">t=252d</text>
+        <text x={4} y={y(100) + 3} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>S₀</text>
+        <text x={4} y={y(maxV) + 8} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>+{((maxV - 100)).toFixed(0)}%</text>
+        <text x={4} y={y(minV) - 2} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>{((minV - 100)).toFixed(0)}%</text>
+        <text x={padL} y={H - 6} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>t=0</text>
+        <text x={W - padR - 38} y={H - 6} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>t=252d</text>
       </svg>
-      <p className="font-mono text-[9px] text-ink/45 mt-2 leading-relaxed">
+      <p className="mkt-num text-[9px] text-white/40 mt-2 leading-relaxed">
         S<sub>t+1</sub> = S<sub>t</sub> · exp((μ − σ²/2)Δt + σ√Δt · Z),  Z ~ N(0,1).  Implied 1-day VaR<sub>95</sub> ≈ {var95.toFixed(1)}%.
       </p>
     </div>
@@ -123,17 +139,17 @@ function VaRDistribution() {
   const bw = (W - padL - padR) / bins.length;
 
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 mb-1">Risk · VaR + CVaR</p>
-          <h4 className="font-semibold text-sm">5,000-sample return distribution</h4>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] text-ink/40">CVaR<sub>95</sub></p>
-          <p className="font-mono text-sm font-bold text-loss">{(cvarMean * 100).toFixed(2)}%</p>
-        </div>
-      </div>
+    <div className="border border-hairline bg-carbon-900 p-4 sm:p-5">
+      <PanelHeader
+        eyebrow="Risk · VaR + CVaR"
+        title="5,000-sample return distribution"
+        right={
+          <div className="text-right">
+            <p className="mkt-label text-[9px] text-white/35">CVaR₉₅</p>
+            <p className="mkt-num text-sm text-neg">{(cvarMean * 100).toFixed(2)}%</p>
+          </div>
+        }
+      />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
         {bins.map((c, i) => {
           const h = (c / maxC) * (H - padT - padB);
@@ -145,27 +161,25 @@ function VaRDistribution() {
               y={H - padB - h}
               width={bw - 1}
               height={h}
-              fill={inTail ? "rgba(239,68,68,0.55)" : "rgba(0,0,0,0.55)"}
+              fill={inTail ? `${NEG}0.55)` : "rgba(255,255,255,0.35)"}
             />
           );
         })}
-        {/* VaR cutoff line */}
         <line
           x1={padL + (var95Idx + 1) * bw}
           x2={padL + (var95Idx + 1) * bw}
           y1={padT}
           y2={H - padB}
-          stroke="rgb(239,68,68)"
-          strokeWidth={1.5}
+          stroke={`${NEG}0.9)`}
+          strokeWidth={1.2}
           strokeDasharray="3 3"
         />
-        <text x={padL + (var95Idx + 1) * bw + 4} y={padT + 10} fontSize="10" fontFamily="ui-monospace" fill="rgb(239,68,68)" fontWeight="bold">VaR₉₅</text>
-        {/* axis labels */}
-        <text x={padL} y={H - 6} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">−8%</text>
-        <text x={W / 2 - 6} y={H - 6} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">0</text>
-        <text x={W - padR - 18} y={H - 6} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.35)">+8%</text>
+        <text x={padL + (var95Idx + 1) * bw + 4} y={padT + 10} fontSize="10" fontFamily={FONT} fill={`${NEG}1)`}>VaR₉₅</text>
+        <text x={padL} y={H - 6} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>−8%</text>
+        <text x={W / 2 - 6} y={H - 6} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>0</text>
+        <text x={W - padR - 22} y={H - 6} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>+8%</text>
       </svg>
-      <p className="font-mono text-[9px] text-ink/45 mt-2 leading-relaxed">
+      <p className="mkt-num text-[9px] text-white/40 mt-2 leading-relaxed">
         Historical VaR<sub>α</sub> = −quantile(returns, 1−α).  CVaR<sub>α</sub> = E[r | r ≤ −VaR<sub>α</sub>].  Computed live on 252-day windows per holding.
       </p>
     </div>
@@ -191,42 +205,42 @@ function CovarianceHeatmap() {
   const colorFor = (v: number) => {
     if (v >= 0) {
       const a = Math.min(1, v);
-      return `rgba(16,185,129,${0.12 + a * 0.7})`;
+      return `${POS}${(0.08 + a * 0.55).toFixed(2)})`;
     }
     const a = Math.min(1, -v);
-    return `rgba(239,68,68,${0.12 + a * 0.7})`;
+    return `${NEG}${(0.08 + a * 0.55).toFixed(2)})`;
   };
 
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 mb-1">Covariance · ρ matrix</p>
-          <h4 className="font-semibold text-sm">Real cross-asset correlation</h4>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] text-ink/40">σ<sub>p</sub> = √(wᵀΣw)</p>
-        </div>
-      </div>
+    <div className="border border-hairline bg-carbon-900 p-4 sm:p-5">
+      <PanelHeader
+        eyebrow="Covariance · ρ matrix"
+        title="Real cross-asset correlation"
+        right={
+          <div className="text-right">
+            <p className="mkt-label text-[9px] text-white/35">σ<sub>p</sub> = √(wᵀΣw)</p>
+          </div>
+        }
+      />
       <div className="overflow-x-auto -mx-2 px-2">
-        <table className="border-collapse mx-auto" style={{ fontFamily: "ui-monospace,monospace" }}>
+        <table className="border-collapse mx-auto" style={{ fontFamily: FONT }}>
           <thead>
             <tr>
               <th className="w-10" />
               {tickers.map((t) => (
-                <th key={t} className="px-2 py-1 text-[9px] text-ink/45 font-normal">{t}</th>
+                <th key={t} className="px-2 py-1 text-[9px] text-white/40 font-normal">{t}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {corr.map((row, i) => (
               <tr key={i}>
-                <td className="px-2 py-1 text-[9px] text-ink/45 text-right">{tickers[i]}</td>
+                <td className="px-2 py-1 text-[9px] text-white/40 text-right">{tickers[i]}</td>
                 {row.map((v, j) => (
                   <td
                     key={j}
-                    className="text-[9px] text-center w-10 h-7 border border-white"
-                    style={{ background: colorFor(v), color: Math.abs(v) > 0.55 ? "white" : "rgba(0,0,0,0.7)" }}
+                    className="text-[9px] text-center w-10 h-7 border border-carbon-900"
+                    style={{ background: colorFor(v), color: Math.abs(v) > 0.55 ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.6)" }}
                   >
                     {v.toFixed(2)}
                   </td>
@@ -236,7 +250,7 @@ function CovarianceHeatmap() {
           </tbody>
         </table>
       </div>
-      <p className="font-mono text-[9px] text-ink/45 mt-3 leading-relaxed">
+      <p className="mkt-num text-[9px] text-white/40 mt-3 leading-relaxed">
         Pearson ρ from log-returns, 252d window.  Portfolio σ uses true covariance Σ, not a weighted average, so concentration and diversification are scored honestly.
       </p>
     </div>
@@ -245,11 +259,11 @@ function CovarianceHeatmap() {
 
 /* -------------------- 4. Merton distance-to-default -------------------- */
 function MertonDD() {
-  // Simple visual: probability of default vs distance-to-default (Φ(-DD))
+  // Probability of default vs distance-to-default (Φ(−DD))
   const points = useMemo(() => {
     const pts: { dd: number; pd: number }[] = [];
     for (let dd = 0; dd <= 6; dd += 0.1) {
-      // Φ(-dd) using Abramowitz & Stegun approximation
+      // Φ(−dd) using Abramowitz & Stegun approximation
       const z = -dd;
       const t = 1 / (1 + 0.2316419 * Math.abs(z));
       const d = 0.3989422804 * Math.exp((-z * z) / 2);
@@ -266,7 +280,6 @@ function MertonDD() {
 
   const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.dd).toFixed(1)},${y(p.pd).toFixed(1)}`).join(" ");
 
-  // Sample issuers
   const issuers = [
     { name: "AAA · 4.8σ", dd: 4.8 },
     { name: "BBB · 2.6σ", dd: 2.6 },
@@ -274,40 +287,40 @@ function MertonDD() {
   ];
 
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 mb-1">Credit · Merton 1974</p>
-          <h4 className="font-semibold text-sm">Distance-to-default → PD</h4>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] text-ink/40">PD = Φ(−DD)</p>
-        </div>
-      </div>
+    <div className="border border-hairline bg-carbon-900 p-4 sm:p-5">
+      <PanelHeader
+        eyebrow="Credit · Merton 1974"
+        title="Distance-to-default → PD"
+        right={
+          <div className="text-right">
+            <p className="mkt-label text-[9px] text-white/35">PD = Φ(−DD)</p>
+          </div>
+        }
+      />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
         {[0.1, 0.2, 0.3, 0.4].map((p) => (
           <g key={p}>
-            <line x1={padL} x2={W - padR} y1={y(p)} y2={y(p)} stroke="rgba(0,0,0,0.06)" />
-            <text x={4} y={y(p) + 3} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.4)">{(p * 100).toFixed(0)}%</text>
+            <line x1={padL} x2={W - padR} y1={y(p)} y2={y(p)} stroke={GRID} />
+            <text x={4} y={y(p) + 3} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>{(p * 100).toFixed(0)}%</text>
           </g>
         ))}
-        <path d={d} fill="none" stroke="rgb(0,0,0)" strokeWidth={1.6} />
+        <path d={d} fill="none" stroke={MONO} strokeWidth={1.4} />
         {issuers.map((iss) => {
           const px = x(iss.dd);
           const py = y(points.find(p => Math.abs(p.dd - iss.dd) < 0.06)?.pd ?? 0);
           return (
             <g key={iss.name}>
-              <circle cx={px} cy={py} r={3.5} fill="rgb(239,68,68)" />
-              <text x={px + 6} y={py - 4} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.6)">{iss.name}</text>
+              <circle cx={px} cy={py} r={3} fill={`${NEG}0.9)`} />
+              <text x={px + 6} y={py - 4} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>{iss.name}</text>
             </g>
           );
         })}
         {[0, 1, 2, 3, 4, 5, 6].map(d => (
-          <text key={d} x={x(d) - 3} y={H - 8} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.4)">{d}σ</text>
+          <text key={d} x={x(d) - 3} y={H - 8} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>{d}σ</text>
         ))}
-        <text x={W / 2 - 30} y={H - 0} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.45)">distance-to-default</text>
+        <text x={W / 2 - 30} y={H - 0} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>distance-to-default</text>
       </svg>
-      <p className="font-mono text-[9px] text-ink/45 mt-2 leading-relaxed">
+      <p className="mkt-num text-[9px] text-white/40 mt-2 leading-relaxed">
         DD = (ln(V/D) + (μ − σ²/2)T) / (σ√T).  Replaces ratings with a structural, equity-vol-driven probability of default per holding.
       </p>
     </div>
@@ -340,32 +353,31 @@ function StatArbMini() {
   const path = series.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
 
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
-        <div>
-          <p className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 mb-1">Stat-arb · Ornstein–Uhlenbeck</p>
-          <h4 className="font-semibold text-sm">Mean-reversion z-score & half-life</h4>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] text-ink/40">half-life</p>
-          <p className="font-mono text-sm font-bold">~12d</p>
-        </div>
-      </div>
+    <div className="border border-hairline bg-carbon-900 p-4 sm:p-5">
+      <PanelHeader
+        eyebrow="Stat-arb · Ornstein–Uhlenbeck"
+        title="Mean-reversion z-score & half-life"
+        right={
+          <div className="text-right">
+            <p className="mkt-label text-[9px] text-white/35">half-life</p>
+            <p className="mkt-num text-sm text-white/90">~12d</p>
+          </div>
+        }
+      />
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
-        {/* z bands */}
         {[2, -2].map(z => (
-          <line key={z} x1={padL} x2={W - padR} y1={y(z)} y2={y(z)} stroke="rgba(239,68,68,0.35)" strokeDasharray="3 3" />
+          <line key={z} x1={padL} x2={W - padR} y1={y(z)} y2={y(z)} stroke={`${NEG}0.4)`} strokeDasharray="3 3" />
         ))}
         {[1, -1].map(z => (
-          <line key={z} x1={padL} x2={W - padR} y1={y(z)} y2={y(z)} stroke="rgba(0,0,0,0.1)" strokeDasharray="2 4" />
+          <line key={z} x1={padL} x2={W - padR} y1={y(z)} y2={y(z)} stroke={MONO_FAINT} strokeDasharray="2 4" />
         ))}
-        <line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} stroke="rgba(0,0,0,0.5)" />
-        <path d={path} fill="none" stroke="rgb(0,0,0)" strokeWidth={1.3} />
+        <line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} stroke={MONO_SOFT} />
+        <path d={path} fill="none" stroke={MONO} strokeWidth={1.2} />
         {[2, 1, 0, -1, -2].map(z => (
-          <text key={z} x={4} y={y(z) + 3} fontSize="9" fontFamily="ui-monospace" fill="rgba(0,0,0,0.4)">{z > 0 ? `+${z}σ` : z === 0 ? "μ" : `${z}σ`}</text>
+          <text key={z} x={4} y={y(z) + 3} fontSize="9" fontFamily={FONT} fill={MONO_SOFT}>{z > 0 ? `+${z}σ` : z === 0 ? "μ" : `${z}σ`}</text>
         ))}
       </svg>
-      <p className="font-mono text-[9px] text-ink/45 mt-2 leading-relaxed">
+      <p className="mkt-num text-[9px] text-white/40 mt-2 leading-relaxed">
         dS<sub>t</sub> = θ(μ − S<sub>t</sub>)dt + σ dW<sub>t</sub>.  Half-life = ln(2)/θ.  Triggers fire only when |z| ≥ 2 and half-life is short enough to round-trip inside the regime.
       </p>
     </div>
@@ -376,42 +388,27 @@ function StatArbMini() {
 const RESEARCH = [
   { tag: "Risk", title: "Value at Risk & Expected Shortfall", cite: "Acerbi & Tasche (2002), Rockafellar & Uryasev (2000)", desc: "Why CVaR is the coherent risk measure VaR isn't, and why we report both at 95% and 99%." },
   { tag: "Credit", title: "Pricing of Corporate Debt", cite: "Merton (1974), J. of Finance 29(2)", desc: "Equity as a call option on assets. Distance-to-default replaces the rating-agency black box with a structural number." },
-  { tag: "Vol", title: "GARCH & stochastic volatility", cite: "Bollerslev (1986), Heston (1993)", desc: "Why a single σ is a lie, and how we feed clustered, regime-aware vol into Monte Carlo paths." },
-  { tag: "Stat-arb", title: "Pairs trading: performance of a relative-value strategy", cite: "Gatev, Goetzmann & Rouwenhorst (2006)", desc: "The empirical foundation under our cointegration + OU mean-reversion engine." },
-  { tag: "Portfolio", title: "Portfolio selection", cite: "Markowitz (1952), J. of Finance 7(1)", desc: "The reason Σ matters more than σᵢ alone, and why we always solve √(wᵀΣw)." },
-  { tag: "Reflexivity", title: "The Alchemy of Finance", cite: "Soros (1987)", desc: "Markets aren't a mirror of fundamentals; they shape them. Our reflexivity engine quantifies the feedback loop." },
+  { tag: "Vol", title: "GARCH & stochastic volatility", cite: "Bollerslev (1986), Heston (1993)", desc: "Why a single σ is insufficient, and how clustered, regime-aware vol feeds the Monte Carlo paths." },
+  { tag: "Stat-arb", title: "Pairs trading: performance of a relative-value strategy", cite: "Gatev, Goetzmann & Rouwenhorst (2006)", desc: "The empirical foundation under the cointegration + OU mean-reversion engine." },
+  { tag: "Portfolio", title: "Portfolio selection", cite: "Markowitz (1952), J. of Finance 7(1)", desc: "The reason Σ matters more than σᵢ alone, and why the system always solves √(wᵀΣw)." },
+  { tag: "Reflexivity", title: "The Alchemy of Finance", cite: "Soros (1987)", desc: "Markets aren't a mirror of fundamentals; they shape them. The reflexivity engine quantifies the feedback loop." },
 ];
 
 export default function MathResearch() {
   return (
-    <section className="border-t border-ink/5 bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <span className="h-px w-8 bg-ink/20" />
-            <span className="mkt-label text-[9px] text-ink/55">Under the hood</span>
-            <span className="h-px w-8 bg-ink/20" />
-          </div>
-          <h2 className="mkt-display-2 text-ink mb-3">
-            The math is real. <span className="text-ink/40">Here's what it looks like.</span>
-          </h2>
-          <p className="mkt-lede text-ink/55 max-w-2xl mx-auto">
-            Every model below runs live in the terminal on your real holdings. No proxies, no sine-wave placeholders, no rating-agency hand-waving.
-          </p>
-        </div>
-
+    <section className="bg-carbon-950">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-20">
         {/* Capability strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-ink/5 rounded-xl overflow-hidden border border-ink/10 mb-8 sm:mb-10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-l border-hairline mb-8 sm:mb-10">
           {[
-            { icon: Sigma, label: "1-year daily history", sub: "per holding, log-returns" },
-            { icon: FunctionSquare, label: "True σ, μ, ρ, Σ", sub: "no proxy, no heuristic" },
-            { icon: Activity, label: "10,000 GBM paths", sub: "with jump-diffusion" },
-            { icon: ShieldAlert, label: "Merton 1974", sub: "structural credit DD/PD" },
+            { label: "1-year daily history", sub: "per holding, log-returns" },
+            { label: "True σ, μ, ρ, Σ", sub: "no proxy, no heuristic" },
+            { label: "10,000 GBM paths", sub: "with jump-diffusion" },
+            { label: "Merton 1974", sub: "structural credit DD/PD" },
           ].map((c) => (
-            <div key={c.label} className="bg-white p-4 sm:p-5">
-              <c.icon className="h-4 w-4 text-ink/45 mb-2" />
-              <p className="font-semibold text-xs sm:text-sm">{c.label}</p>
-              <p className="font-mono text-[9px] sm:text-[10px] text-ink/45 mt-1">{c.sub}</p>
+            <div key={c.label} className="border-b border-r border-hairline bg-carbon-900 p-4 sm:p-5">
+              <p className="font-semibold text-xs sm:text-sm text-white tracking-tight">{c.label}</p>
+              <p className="mkt-num text-[9px] sm:text-[10px] text-white/40 mt-1">{c.sub}</p>
             </div>
           ))}
         </div>
@@ -428,93 +425,91 @@ export default function MathResearch() {
         </div>
 
         {/* Research / reading list */}
-        <div className="mt-12 sm:mt-16 pt-10 border-t border-ink/10">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <BookOpen className="h-4 w-4 text-ink/45" />
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-ink/45">The research it's built on</p>
+        <div className="mt-12 sm:mt-16 pt-10 border-t border-hairline">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="h-px w-8 bg-hairline-strong" />
+            <p className="mkt-label text-[10px] text-white/55">The research it's built on</p>
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-center mb-2">
-            What you're missing if you're trading without it
+          <h3 className="mkt-display-2 text-white mb-3">
+            Six foundations, <span className="text-white/40">wired into production.</span>
           </h3>
-          <p className="text-sm text-ink/55 max-w-2xl mx-auto text-center mb-8">
-            Six papers and books that quietly underpin most of what an institutional desk does.  Every one of them is wired into a layer of the terminal.
+          <p className="text-sm text-white/50 max-w-2xl mb-10 leading-relaxed">
+            The papers and books that underpin what an institutional desk does daily.
+            Every one of them is implemented in a layer of the terminal.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-hairline">
             {RESEARCH.map((r) => (
-              <article key={r.title} className="rounded-lg border border-ink/10 bg-white p-5 hover:border-ink/25 transition-colors">
-                <div className="flex items-center gap-2 mb-2">
-                  <GitCompareArrows className="h-3.5 w-3.5 text-ink/40" />
-                  <span className="font-mono text-[9px] tracking-wider uppercase text-ink/40">{r.tag}</span>
-                </div>
-                <h4 className="font-semibold text-sm mb-1.5 leading-snug">{r.title}</h4>
-                <p className="font-mono text-[10px] text-ink/45 mb-2 leading-snug">{r.cite}</p>
-                <p className="text-xs text-ink/60 leading-relaxed">{r.desc}</p>
+              <article key={r.title} className="border-b border-r border-hairline bg-carbon-900 p-5 hover:bg-carbon-800 transition-colors duration-150 ease-out">
+                <span className="mkt-label text-[9px] text-white/35">{r.tag}</span>
+                <h4 className="font-semibold text-sm text-white tracking-tight mt-2 mb-1.5 leading-snug">{r.title}</h4>
+                <p className="mkt-num text-[10px] text-white/40 mb-2 leading-snug">{r.cite}</p>
+                <p className="text-xs text-white/55 leading-relaxed">{r.desc}</p>
               </article>
             ))}
           </div>
 
-          <p className="font-mono text-[10px] text-ink/35 text-center mt-8 max-w-2xl mx-auto leading-relaxed">
-            All formulas above are implemented in <span className="text-ink/60">src/lib/quant-engine.ts</span> and surfaced through the Methodology panel on every metric in the terminal.
+          <p className="mkt-num text-[10px] text-white/30 mt-8 max-w-2xl leading-relaxed">
+            All formulas above are implemented in <span className="text-white/55">src/lib/quant-engine.ts</span> and surfaced through the Methodology panel on every metric in the terminal.
           </p>
         </div>
 
-        {/* Original Research, CLANK Theory whitepaper */}
-        <div className="mt-12 sm:mt-16 pt-10 border-t border-ink/10">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <FileText className="h-4 w-4 text-ink/45" />
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-ink/45">Original research</p>
+        {/* Original research — CLANK manuscript */}
+        <div className="mt-12 sm:mt-16 pt-10 border-t border-hairline">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="h-px w-8 bg-hairline-strong" />
+            <p className="mkt-label text-[10px] text-white/55">Original research</p>
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-center mb-2">
-            We didn't just borrow the math. We wrote some of it.
+          <h3 className="mkt-display-2 text-white mb-3">
+            The CLANK manuscript.
           </h3>
-          <p className="text-sm text-ink/55 max-w-2xl mx-auto text-center mb-8">
-            The CLANK engine inside the terminal is built on a structural theory of deterministic
-            opportunity in complex systems, formalised in a peer-distributed manuscript on SSRN.
+          <p className="text-sm text-white/50 max-w-2xl mb-10 leading-relaxed">
+            The constraint engine inside the terminal is built on a structural theory of
+            deterministic opportunity in complex systems, formalised in a working paper
+            distributed on SSRN.
           </p>
 
-          <article className="rounded-xl border border-ink/10 bg-gradient-to-br from-white to-black/[0.02] p-6 sm:p-8 max-w-4xl mx-auto">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40 px-2 py-0.5 border border-ink/10 rounded">Working Paper · 2026</span>
-              <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-ink/40">SSRN · 6464440</span>
+          <article className="border border-hairline bg-carbon-900 p-6 sm:p-8 max-w-4xl">
+            <div className="flex items-center gap-4 mb-4 flex-wrap">
+              <span className="mkt-label text-[9px] text-white/40 px-2 py-1 border border-hairline">Working Paper · 2026</span>
+              <span className="mkt-label text-[9px] text-white/40">SSRN · 6464440</span>
             </div>
-            <h4 className="text-lg sm:text-2xl font-bold tracking-tight mb-2 leading-tight">
+            <h4 className="text-lg sm:text-2xl font-semibold tracking-tight mb-2 leading-tight text-white">
               CLANK: A Structural Theory of Deterministic Opportunity in Complex Systems
             </h4>
-            <p className="font-mono text-[11px] text-ink/55 mb-5">Pratik Sehwag · March 2026 · 30 pages</p>
+            <p className="mkt-num text-[11px] text-white/50 mb-6">Pratik Sehwag · March 2026 · 30 pages</p>
 
-            <div className="border-l-2 border-ink/15 pl-4 mb-5">
-              <Quote className="h-3.5 w-3.5 text-ink/30 mb-1.5" />
-              <p className="text-xs sm:text-sm text-ink/65 leading-relaxed italic">
+            <blockquote className="border-l border-hairline-strong pl-4 mb-6">
+              <p className="text-xs sm:text-sm text-white/60 leading-relaxed italic">
                 "Within many complex systems there exist fleeting intervals during which probabilistic rules
                 are suspended in favour of rigid structural determinism. The system 'clanks' into a state of
                 temporary, absolute certainty, a deterministic opportunity where the future state is no
                 longer a matter of probability, but of structural necessity."
               </p>
-            </div>
+            </blockquote>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-ink/5 rounded-lg overflow-hidden border border-ink/10 mb-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-l border-hairline mb-6">
               {[
                 { k: "Latent Asymmetry α", v: "the gradient of the possible" },
                 { k: "Internal Pressure Π", v: "interaction density / throughput" },
                 { k: "Boundary Constraints B", v: "the structural walls" },
               ].map((x) => (
-                <div key={x.k} className="bg-white p-3 sm:p-4">
-                  <p className="font-mono text-[9px] tracking-[0.15em] uppercase text-ink/40 mb-1">{x.k}</p>
-                  <p className="text-[11px] sm:text-xs text-ink/70 leading-snug">{x.v}</p>
+                <div key={x.k} className="border-b border-r border-hairline bg-carbon-950 p-3 sm:p-4">
+                  <p className="mkt-label text-[9px] text-white/35 mb-1">{x.k}</p>
+                  <p className="text-[11px] sm:text-xs text-white/60 leading-snug">{x.v}</p>
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
               {[
                 "Structural lock manifold",
                 "Reflexivity paradox",
                 "Latency & yield strength",
                 "Failure modes catalogue",
               ].map((t) => (
-                <div key={t} className="text-[11px] text-ink/60 leading-snug">
-                  <span className="text-ink/30 mr-1">§</span>{t}
+                <div key={t} className="text-[11px] text-white/55 leading-snug">
+                  <span className="text-white/25 mr-1">§</span>{t}
                 </div>
               ))}
             </div>
@@ -524,7 +519,7 @@ export default function MathResearch() {
                 href="/research/clank-theory-sehwag-2026.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-ink text-white text-xs font-semibold tracking-wide rounded-md hover:bg-ink/85 transition-colors"
+                className="inline-flex h-11 items-center justify-center gap-2 px-5 bg-white text-carbon-950 text-xs font-semibold tracking-tight hover:bg-white/85 transition-colors duration-150 ease-out"
               >
                 <Download className="h-3.5 w-3.5" />
                 Read the manuscript (PDF)
@@ -533,28 +528,30 @@ export default function MathResearch() {
                 href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6464440"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-ink/15 text-ink/75 text-xs font-semibold tracking-wide rounded-md hover:border-ink/40 hover:text-ink transition-colors"
+                className="inline-flex h-11 items-center justify-center gap-2 px-5 border border-hairline-strong text-white/70 text-xs font-medium tracking-tight hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
               >
                 View on SSRN
               </a>
             </div>
 
-            <div className="mt-6 rounded-lg overflow-hidden border border-ink/10 bg-white">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-ink/10 px-4 py-3">
+            <div className="mt-7 border border-hairline bg-carbon-950">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-hairline px-4 py-3">
                 <div>
-                  <p className="font-semibold text-sm">Read the paper inside the page</p>
-                  <p className="font-mono text-[10px] text-ink/40">Embedded PDF viewer</p>
+                  <p className="font-semibold text-sm text-white tracking-tight">Read the paper inside the page</p>
+                  <p className="mkt-label text-[9px] text-white/35 mt-0.5 inline-flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Embedded PDF viewer
+                  </p>
                 </div>
                 <a
                   href="/research/clank-theory-sehwag-2026.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-ink/65 hover:text-ink transition-colors"
+                  className="text-xs font-medium text-white/55 hover:text-white transition-colors duration-150 ease-out"
                 >
                   Open full screen
                 </a>
               </div>
-              <div className="relative w-full h-[520px] sm:h-[720px] bg-neutral-100 overflow-hidden">
+              <div className="relative w-full h-[520px] sm:h-[720px] bg-carbon-850 overflow-hidden">
                 <iframe
                   title="CLANK research paper"
                   src="/research/clank-theory-sehwag-2026.pdf#view=Fit&zoom=page-fit&toolbar=1&navpanes=0&scrollbar=1"
@@ -564,8 +561,8 @@ export default function MathResearch() {
               </div>
             </div>
 
-            <p className="font-mono text-[10px] text-ink/35 mt-5 leading-relaxed">
-              Wired into the terminal as the <span className="text-ink/60">CLANK Structural Constraint Engine</span> ,
+            <p className="mkt-num text-[10px] text-white/30 mt-5 leading-relaxed">
+              Wired into the terminal as the <span className="text-white/55">CLANK Structural Constraint Engine</span>,
               identifying institutional pressure points, structural locks and deterministic windows
               before the rest of the market sees them.
             </p>

@@ -47,8 +47,8 @@ export default function CadenceEntryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white text-ink flex items-center justify-center">
-        <div className="flex items-center gap-2 text-ink/40 font-mono text-sm">
+      <div className="site-public min-h-screen bg-carbon-950 text-white flex items-center justify-center">
+        <div className="flex items-center gap-2 text-white/40 mkt-num text-sm">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading entry…
         </div>
       </div>
@@ -57,11 +57,11 @@ export default function CadenceEntryPage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen bg-white text-ink flex flex-col items-center justify-center px-6">
-        <p className="font-mono text-sm text-ink/50 mb-5">Entry not found.</p>
+      <div className="site-public min-h-screen bg-carbon-950 text-white flex flex-col items-center justify-center px-6">
+        <p className="mkt-num text-sm text-white/45 mb-5">Entry not found.</p>
         <button
           onClick={() => navigate("/cadence")}
-          className="inline-flex h-11 items-center gap-2 rounded-lg border border-ink/15 px-6 text-[13px] font-semibold tracking-tight text-ink/75 hover:border-ink/40 hover:text-ink transition-colors"
+          className="inline-flex h-11 items-center gap-2 border border-hairline-strong px-6 text-[13px] font-medium tracking-tight text-white/70 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
         >
           <ArrowLeft className="h-4 w-4" /> Back to Cadence
         </button>
@@ -86,28 +86,28 @@ export default function CadenceEntryPage() {
   const liUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       {/* Reading chrome */}
-      <header className="border-b border-ink/[0.07] sticky top-0 z-40 bg-white/88 backdrop-blur-2xl">
+      <header className="border-b border-hairline sticky top-0 z-40 bg-carbon-950/95 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between">
           <button
             onClick={() => navigate("/cadence")}
-            className="inline-flex items-center gap-2 text-[12px] font-semibold tracking-tight text-ink/50 hover:text-ink transition-colors"
+            className="inline-flex items-center gap-2 text-[12px] font-medium tracking-tight text-white/45 hover:text-white transition-colors duration-150 ease-out"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Cadence
           </button>
           <button onClick={() => navigate("/")} aria-label="Entropy home">
-            <Wordmark compact />
+            <Wordmark light compact />
           </button>
           <div className="flex items-center gap-1">
-            <a href={xUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-ink/50 hover:text-ink transition-colors" aria-label="Share on X">
+            <a href={xUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-white/45 hover:text-white transition-colors duration-150 ease-out" aria-label="Share on X">
               <Twitter className="h-3.5 w-3.5" />
             </a>
-            <a href={liUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-ink/50 hover:text-ink transition-colors" aria-label="Share on LinkedIn">
+            <a href={liUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-white/45 hover:text-white transition-colors duration-150 ease-out" aria-label="Share on LinkedIn">
               <Linkedin className="h-3.5 w-3.5" />
             </a>
-            <button onClick={onCopy} className="p-2 text-ink/50 hover:text-ink transition-colors" aria-label="Copy link">
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
+            <button onClick={onCopy} className="p-2 text-white/45 hover:text-white transition-colors duration-150 ease-out" aria-label="Copy link">
+              {copied ? <Check className="h-3.5 w-3.5 text-pos" /> : <Link2 className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
@@ -115,18 +115,18 @@ export default function CadenceEntryPage() {
 
       <article className="max-w-3xl mx-auto px-5 sm:px-6 py-12 sm:py-16">
         {/* Title block */}
-        <div className="mb-14 pb-10 border-b border-ink/[0.08]">
+        <div className="mb-14 pb-10 border-b border-hairline">
           <div className="flex items-center gap-3 mb-6">
-            <span className="h-px w-8 bg-ink/20" />
-            <span className="mkt-label text-[9px] text-ink/55">
+            <span className="h-px w-8 bg-hairline-strong" />
+            <span className="mkt-label text-[10px] text-white/55">
               Cadence · {formatPublishDate(entry.publishDate)} · {entry.discipline}
             </span>
           </div>
-          <h1 className="mkt-display-2 mb-5">{entry.concept}</h1>
-          <p className="text-lg sm:text-xl text-ink/55 leading-snug mb-7 max-w-2xl tracking-tight">
+          <h1 className="mkt-display-2 mb-5 text-white">{entry.concept}</h1>
+          <p className="text-lg sm:text-xl text-white/50 leading-snug mb-7 max-w-2xl tracking-tight">
             {entry.tagline}
           </p>
-          <div className="flex items-center gap-4 mkt-label text-[9px] text-ink/40 flex-wrap">
+          <div className="flex items-center gap-4 mkt-label text-[9px] text-white/35 flex-wrap">
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-3 w-3" /> {entry.readMinutes} min read
             </span>
@@ -140,32 +140,32 @@ export default function CadenceEntryPage() {
         </div>
 
         <Section label="01" title="Why it matters">
-          <p className="text-base sm:text-[17px] leading-[1.7] text-ink/75 whitespace-pre-line">
+          <p className="text-base sm:text-[16px] leading-[1.7] text-white/70 whitespace-pre-line">
             {entry.whyItMatters}
           </p>
         </Section>
 
         <Section label="02" title="Inside the system">
           {entry.insideTheSystem.image ? (
-            <figure className="border border-ink/10 rounded-xl bg-[#FAFBFC] overflow-hidden mb-4">
+            <figure className="border border-hairline bg-carbon-900 overflow-hidden mb-4">
               <img
                 src={entry.insideTheSystem.image}
                 alt={entry.insideTheSystem.caption}
                 className="w-full h-auto block"
                 loading="lazy"
               />
-              <figcaption className="px-4 py-2.5 border-t border-ink/10 mkt-label text-[8px] text-ink/45">
+              <figcaption className="px-4 py-2.5 border-t border-hairline mkt-label text-[8px] text-white/40">
                 Fig. — {entry.insideTheSystem.caption}
               </figcaption>
             </figure>
           ) : (
-            <div className="border border-ink/10 rounded-xl bg-[#FAFBFC] p-6 mb-4">
-              <p className="mkt-label text-[8px] text-ink/40">
+            <div className="border border-hairline bg-carbon-900 p-6 mb-4">
+              <p className="mkt-label text-[8px] text-white/35">
                 Fig. — {entry.insideTheSystem.caption}
               </p>
             </div>
           )}
-          <p className="text-base leading-[1.7] text-ink/70 whitespace-pre-line">
+          <p className="text-base leading-[1.7] text-white/65 whitespace-pre-line">
             {entry.insideTheSystem.annotation}
           </p>
         </Section>
@@ -174,10 +174,10 @@ export default function CadenceEntryPage() {
           <div className="space-y-8">
             {entry.mathematicalCore.map((s, i) => (
               <div key={i}>
-                <h4 className="text-[15px] font-semibold tracking-tight text-ink mb-2">{s.heading}</h4>
-                <p className="text-base leading-[1.7] text-ink/70 mb-3 whitespace-pre-line">{s.body}</p>
+                <h4 className="text-[15px] font-semibold tracking-tight text-white mb-2">{s.heading}</h4>
+                <p className="text-base leading-[1.7] text-white/65 mb-3 whitespace-pre-line">{s.body}</p>
                 {s.equation && (
-                  <pre className="bg-ink text-white font-mono text-[13px] leading-[1.7] px-5 py-4 rounded-xl overflow-x-auto whitespace-pre">
+                  <pre className="bg-carbon-900 border border-hairline text-white/90 mkt-num text-[13px] leading-[1.7] px-5 py-4 overflow-x-auto whitespace-pre">
 {s.equation}
                   </pre>
                 )}
@@ -187,10 +187,10 @@ export default function CadenceEntryPage() {
         </Section>
 
         <Section label="04" title="Failure modes & limits">
-          <ul className="border-t border-ink/[0.07]">
+          <ul className="border-t border-hairline">
             {entry.failureModes.map((f, i) => (
-              <li key={i} className="grid grid-cols-[40px_1fr] gap-3 py-4 border-b border-ink/[0.07] text-base leading-[1.65] text-ink/70">
-                <span className="mkt-label text-[9px] text-ink/30 mt-1.5">
+              <li key={i} className="grid grid-cols-[40px_1fr] gap-3 py-4 border-b border-hairline text-base leading-[1.65] text-white/65">
+                <span className="mkt-label text-[9px] text-white/25 mt-1.5">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="whitespace-pre-line">{f}</span>
@@ -200,14 +200,14 @@ export default function CadenceEntryPage() {
         </Section>
 
         {/* Share block */}
-        <div className="mt-16 pt-10 border-t border-ink/[0.08]">
-          <p className="mkt-label text-[9px] text-ink/40 mb-5">Share this entry</p>
+        <div className="mt-16 pt-10 border-t border-hairline">
+          <p className="mkt-label text-[10px] text-white/35 mb-5">Share this entry</p>
           <div className="flex flex-wrap gap-2">
             <a
               href={xUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-ink/15 px-4 text-[12px] font-semibold tracking-tight text-ink/70 hover:border-ink/40 hover:text-ink transition-colors"
+              className="inline-flex h-10 items-center gap-2 border border-hairline-strong px-4 text-[12px] font-medium tracking-tight text-white/65 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
             >
               <Twitter className="h-3.5 w-3.5" /> Post on X
             </a>
@@ -215,22 +215,22 @@ export default function CadenceEntryPage() {
               href={liUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-ink/15 px-4 text-[12px] font-semibold tracking-tight text-ink/70 hover:border-ink/40 hover:text-ink transition-colors"
+              className="inline-flex h-10 items-center gap-2 border border-hairline-strong px-4 text-[12px] font-medium tracking-tight text-white/65 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
             >
               <Linkedin className="h-3.5 w-3.5" /> Share on LinkedIn
             </a>
             <button
               onClick={onCopy}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-ink/15 px-4 text-[12px] font-semibold tracking-tight text-ink/70 hover:border-ink/40 hover:text-ink transition-colors"
+              className="inline-flex h-10 items-center gap-2 border border-hairline-strong px-4 text-[12px] font-medium tracking-tight text-white/65 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out"
             >
               {copied ? (
-                <><Check className="h-3.5 w-3.5 text-emerald-600" /> Link copied</>
+                <><Check className="h-3.5 w-3.5 text-pos" /> Link copied</>
               ) : (
                 <><Share2 className="h-3.5 w-3.5" /> Copy link</>
               )}
             </button>
           </div>
-          <p className="mt-6 text-[12px] text-ink/45 leading-relaxed">
+          <p className="mt-6 text-[12px] text-white/40 leading-relaxed">
             Cadence is published by Entropy. Free to read, free to share, no login required. If you
             find an error in the math or the framing, we want to hear about it.
           </p>
@@ -246,9 +246,9 @@ function Section({ label, title, children }: { label: string; title: string; chi
   return (
     <section className="mb-14">
       <div className="flex items-center gap-3 mb-6">
-        <span className="mkt-label text-[9px] text-ink/35">{label}</span>
-        <span className="h-px w-8 bg-ink/20" />
-        <h3 className="text-xl sm:text-2xl font-semibold tracking-tight">{title}</h3>
+        <span className="mkt-label text-[10px] text-white/30">{label}</span>
+        <span className="h-px w-8 bg-hairline-strong" />
+        <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">{title}</h3>
       </div>
       {children}
     </section>

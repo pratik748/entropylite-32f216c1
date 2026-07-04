@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
-import Wordmark, { EntropyGlyph } from "@/components/marketing/Wordmark";
+import Wordmark from "@/components/marketing/Wordmark";
 
 const CAPABILITY_ROWS = [
   { k: "Monte Carlo engine", v: "10,000 paths / asset" },
   { k: "Risk surface", v: "VaR · CVaR · 95 / 99" },
-  { k: "Constraint detection", v: "CLANK · live" },
+  { k: "Constraint detection", v: "CLANK · continuous" },
   { k: "Intelligence layers", v: "12 in parallel" },
 ];
 
@@ -41,58 +41,42 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-ink grid grid-cols-1 lg:grid-cols-2">
+    <div className="site-public min-h-screen bg-carbon-950 text-white grid grid-cols-1 lg:grid-cols-2">
       {/* ── Left · the institution ── */}
-      <div className="relative overflow-hidden bg-ink text-white flex flex-col">
-        <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
-        <div
-          className="absolute -bottom-48 -left-24 h-[420px] w-[640px] rounded-full opacity-20 blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(closest-side, rgba(255,255,255,0.16) 0%, transparent 70%)" }}
-          aria-hidden="true"
-        />
-
-        <div className="relative flex items-center justify-between px-7 sm:px-10 h-16 sm:h-20">
-          <Wordmark light />
-          <span className="mkt-label text-[9px] text-white/35 tabular-nums hidden sm:inline">{utc} UTC</span>
+      <div className="bg-carbon-950 lg:border-r border-hairline flex flex-col">
+        <div className="flex items-center justify-between px-7 sm:px-10 h-14 sm:h-16 border-b border-hairline">
+          <Wordmark light compact />
+          <span className="mkt-num text-[10px] text-white/35 hidden sm:inline">{utc} UTC</span>
         </div>
 
-        <div className="relative flex-1 flex flex-col justify-center px-7 sm:px-10 py-10 lg:py-0">
+        <div className="flex-1 flex flex-col justify-center px-7 sm:px-10 py-10 lg:py-0">
           <div className="flex items-center gap-3 mb-7">
-            <span className="h-px w-8 bg-white/25" />
-            <span className="mkt-label text-[9px] text-white/60">Secure gateway</span>
+            <span className="h-px w-8 bg-hairline-strong" />
+            <span className="mkt-label text-[10px] text-white/55">Secure gateway</span>
           </div>
-          <h1 className="mkt-display-2 max-w-md">
-            The operating system
+          <h1 className="mkt-display-2 max-w-md text-white">
+            Probabilistic market
             <br />
-            <span className="text-white/40">of finance.</span>
+            <span className="text-white/40">infrastructure.</span>
           </h1>
 
-          <div className="mt-10 max-w-sm border-t border-white/10 hidden sm:block">
+          <div className="mt-10 max-w-sm border-t border-hairline hidden sm:block">
             {CAPABILITY_ROWS.map((r) => (
-              <div key={r.k} className="flex items-baseline justify-between border-b border-white/10 py-3.5">
-                <span className="text-[12.5px] tracking-tight text-white/55">{r.k}</span>
-                <span className="font-mono text-[11px] tabular-nums text-white/85">{r.v}</span>
+              <div key={r.k} className="flex items-baseline justify-between border-b border-hairline py-3.5">
+                <span className="text-[12.5px] tracking-tight text-white/50">{r.k}</span>
+                <span className="mkt-num text-[11px] text-white/80">{r.v}</span>
               </div>
             ))}
           </div>
         </div>
-
-        <div className="relative px-7 sm:px-10 pb-7 hidden lg:flex items-center gap-2">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          </span>
-          <span className="mkt-label text-[9px] text-white/40">All systems operational</span>
-        </div>
       </div>
 
       {/* ── Right · authentication ── */}
-      <div className="flex items-center justify-center px-5 py-14 lg:py-0">
+      <div className="flex items-center justify-center px-5 py-14 lg:py-0 max-lg:border-t border-hairline">
         <div className="w-full max-w-sm">
           <div className="mb-10">
-            <EntropyGlyph className="h-10 w-auto mb-6" />
-            <h2 className="text-[24px] font-bold tracking-tight mb-2">Authenticate</h2>
-            <p className="text-[13.5px] text-ink/50 leading-relaxed">
+            <h2 className="text-[22px] font-semibold tracking-tight mb-2 text-white">Authenticate</h2>
+            <p className="text-[13.5px] text-white/45 leading-relaxed">
               Sign in to open your terminal. Sessions are encrypted end-to-end
               and your portfolio never trains shared models.
             </p>
@@ -102,7 +86,7 @@ export default function AuthPage() {
             <button
               onClick={() => handleOAuth("google")}
               disabled={!!loading}
-              className="flex w-full h-12 items-center justify-center gap-3 rounded-lg border border-ink/12 bg-white text-[13.5px] font-semibold tracking-tight text-ink hover:border-ink/35 hover:bg-ink/[0.015] transition-all disabled:opacity-60"
+              className="flex w-full h-12 items-center justify-center gap-3 bg-white text-[13.5px] font-semibold tracking-tight text-carbon-950 hover:bg-white/85 transition-colors duration-150 ease-out disabled:opacity-60"
             >
               {loading === "google" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -120,7 +104,7 @@ export default function AuthPage() {
             <button
               onClick={() => handleOAuth("apple")}
               disabled={!!loading}
-              className="flex w-full h-12 items-center justify-center gap-3 rounded-lg bg-ink text-[13.5px] font-semibold tracking-tight text-white hover:bg-ink-700 transition-all disabled:opacity-60"
+              className="flex w-full h-12 items-center justify-center gap-3 border border-hairline-strong text-[13.5px] font-medium tracking-tight text-white/85 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out disabled:opacity-60"
             >
               {loading === "apple" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -133,9 +117,9 @@ export default function AuthPage() {
             </button>
           </div>
 
-          <div className="mt-10 flex items-center gap-2.5 border-t border-ink/[0.07] pt-6">
-            <Lock className="h-3 w-3 text-ink/35" />
-            <p className="mkt-label text-[8px] text-ink/35">
+          <div className="mt-10 flex items-center gap-2.5 border-t border-hairline pt-6">
+            <Lock className="h-3 w-3 text-white/30" />
+            <p className="mkt-label text-[8px] text-white/30">
               Encrypted session · No card required · Founding access
             </p>
           </div>

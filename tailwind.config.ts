@@ -62,6 +62,30 @@ export default {
           bright: "#D9D9DE",
           soft: "#A3A3AB",
         },
+        /* ── Public-site institutional dark system (fixed, theme-independent) ──
+           Elevation is expressed through surface steps, never shadows. */
+        carbon: {
+          950: "#050505", // page base
+          900: "#0A0A0A", // raised band / global chrome
+          850: "#0E0E0E", // panel
+          800: "#121212", // elevated panel
+          750: "#171717", // hover / active surface
+        },
+        hairline: {
+          faint: "#161616",
+          DEFAULT: "#1F1F1F",
+          strong: "#2B2B2B",
+        },
+        /* Functional accents only. signal = live/active market data (amber);
+           pos/neg = gains/losses; gilt = premium/strategic, used rarely. */
+        signal: {
+          DEFAULT: "#E8912D",
+          bright: "#F5A83C",
+          dim: "#8A5E24",
+        },
+        pos: "#4E9E72",
+        neg: "#C4564F",
+        gilt: "#9E7E3C",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
