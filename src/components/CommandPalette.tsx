@@ -10,7 +10,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, LogOut, Zap } from "lucide-react";
+import { LogOut, Zap } from "lucide-react";
 
 export interface PaletteTab {
   id: string;
