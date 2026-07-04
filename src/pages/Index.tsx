@@ -522,7 +522,7 @@ const IndexContent = () => {
                     data-tour-tab={tab.id}
                     style={{ scrollSnapAlign: "start" }}
                     aria-current={active ? "page" : undefined}
-                    className={`relative flex items-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1.5 text-[12px] sm:text-[13px] font-medium tracking-tight whitespace-nowrap flex-shrink-0 transition-colors duration-200 ${
+                    className={`relative flex items-center gap-1.5 rounded-full pl-1 pr-2.5 sm:pr-3.5 py-1 text-[12px] sm:text-[13px] font-semibold tracking-tight whitespace-nowrap flex-shrink-0 transition-colors duration-200 ${
                       active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -533,12 +533,14 @@ const IndexContent = () => {
                         className="absolute inset-0 rounded-full border border-border/70 bg-surface-3/90 shadow-soft"
                       />
                     )}
-                    <span className="relative z-10 sm:hidden">
-                      {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3.5 w-3.5" })}
+                    {/* Skeuomorphic tinted SF-Symbol tile — like Settings.app */}
+                    <span
+                      className={`relative z-10 inline-flex h-5 w-5 items-center justify-center rounded-[6px] bg-gradient-to-b ${tab.tint} text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.35)] ring-1 ring-black/20`}
+                    >
+                      {tab.icon}
                     </span>
-                    <span className="relative z-10 hidden sm:block">{tab.icon}</span>
-                    <span className="relative z-10 hidden sm:inline">{tab.label}</span>
-                    <span className="relative z-10 sm:hidden">{tab.shortLabel}</span>
+                    <span className="relative z-10 hidden sm:inline ml-0.5">{tab.label}</span>
+                    <span className="relative z-10 sm:hidden ml-0.5">{tab.shortLabel}</span>
                   </button>
                 );
               })}
