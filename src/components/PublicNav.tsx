@@ -48,6 +48,7 @@ export default function PublicNav() {
   const utcDate = new Date().toISOString().slice(0, 10);
 
   return (
+    <>
     <div className="sticky top-0 z-50">
       {/* Utility strip — session facts only */}
       <div className="bg-carbon-950 border-b border-hairline-faint hidden sm:block">
@@ -120,37 +121,42 @@ export default function PublicNav() {
             </button>
           </div>
         </div>
-
-        {/* Mobile sheet */}
-        {open && (
-          <div className="md:hidden fixed inset-x-0 top-14 sm:top-[5.5rem] bottom-0 z-50 bg-carbon-950 border-t border-hairline px-5 pt-2 pb-8 overflow-auto">
-            {[...NAV_LINKS, { label: "Client access", path: "/access" }].map((l, i) => (
-              <button
-                key={l.path}
-                onClick={() => {
-                  navigate(l.path);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center justify-between py-4 border-b border-hairline text-left ${
-                  location.pathname === l.path ? "text-white" : "text-white/60"
-                }`}
-              >
-                <span className="text-[16px] font-medium tracking-tight">{l.label}</span>
-                <span className="mkt-label text-[10px] text-white/30">{String(i + 1).padStart(2, "0")}</span>
-              </button>
-            ))}
-            <button
-              onClick={() => {
-                navigate("/dashboard");
-                setOpen(false);
-              }}
-              className="mt-6 flex w-full h-12 items-center justify-center gap-2 bg-white text-carbon-950 text-[14px] font-semibold tracking-tight"
-            >
-              Open Terminal
-            </button>
-          </div>
-        )}
       </nav>
     </div>
+
+    {/* Mobile sheet — rendered outside the backdrop-blurred <nav> on purpose.
+        A backdrop-filter ancestor becomes the containing block for fixed
+        descendants, which would trap this sheet inside the 56px nav bar and
+        collapse it to nothing. As a sibling of the sticky chrome, its fixed
+        positioning resolves against the viewport as intended. */}
+    {open && (
+      <div className="md:hidden fixed inset-x-0 top-14 sm:top-[5.5rem] bottom-0 z-40 bg-carbon-950 border-t border-hairline px-5 pt-2 pb-8 overflow-auto">
+        {[...NAV_LINKS, { label: "Client access", path: "/access" }].map((l, i) => (
+          <button
+            key={l.path}
+            onClick={() => {
+              navigate(l.path);
+              setOpen(false);
+            }}
+            className={`flex w-full items-center justify-between py-4 border-b border-hairline text-left ${
+              location.pathname === l.path ? "text-white" : "text-white/60"
+            }`}
+          >
+            <span className="text-[16px] font-medium tracking-tight">{l.label}</span>
+            <span className="mkt-label text-[10px] text-white/30">{String(i + 1).padStart(2, "0")}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => {
+            navigate("/dashboard");
+            setOpen(false);
+          }}
+          className="mt-6 flex w-full h-12 items-center justify-center gap-2 bg-white text-carbon-950 text-[14px] font-semibold tracking-tight"
+        >
+          Open Terminal
+        </button>
+      </div>
+    )}
+    </>
   );
 }

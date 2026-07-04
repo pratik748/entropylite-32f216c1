@@ -4,6 +4,7 @@ import { ArrowRight, Database, Filter, GitMerge, Scale, Repeat, ShieldCheck, Ale
 import PublicNav from "@/components/PublicNav";
 import SiteFooter from "@/components/marketing/SiteFooter";
 import { PageHeader, SectionIntro, InkButton, LineButton } from "@/components/marketing/Section";
+import { usePrefersLight } from "@/hooks/use-prefers-light";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   AreaChart, Area,
@@ -59,19 +60,25 @@ const STATS = [
   { v: "Online SGD", l: "Self-correcting weights" },
 ];
 
-const tipStyle = {
-  background: "#0E0E0E",
-  border: "1px solid #2B2B2B",
-  borderRadius: 0,
-  fontSize: 11,
-  color: "rgba(255,255,255,0.85)",
-};
-const AXIS_TICK = { fill: "rgba(255,255,255,0.4)", fontSize: 10 };
-const AXIS_LINE = { stroke: "rgba(255,255,255,0.12)" };
-const GRID_STROKE = "rgba(255,255,255,0.05)";
-
 export default function DataAggregationPage() {
   const navigate = useNavigate();
+  const light = usePrefersLight();
+
+  // Chart colours live in JS (Recharts style props) so they can't ride the
+  // --pub-* CSS variables the rest of the site flips through — derive them
+  // from the system theme here. `fg` is the ink/paper foreground triplet.
+  const fg = light ? "10,10,11" : "255,255,255";
+  const ink = (a: number) => `rgba(${fg},${a})`;
+  const tipStyle = {
+    background: light ? "#F0F0F1" : "#0E0E0E",
+    border: `1px solid ${light ? "#D0D0D3" : "#2B2B2B"}`,
+    borderRadius: 0,
+    fontSize: 11,
+    color: ink(0.85),
+  };
+  const AXIS_TICK = { fill: ink(0.4), fontSize: 10 };
+  const AXIS_LINE = { stroke: ink(0.12) };
+  const GRID_STROKE = ink(0.05);
 
   useEffect(() => {
     document.title = "Data · TWRD veracity layer | Entropy";
@@ -213,10 +220,10 @@ export default function DataAggregationPage() {
                   <BarChart data={credibilityCurve} layout="vertical" margin={{ left: 90 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
                     <XAxis type="number" domain={[0, 100]} tick={AXIS_TICK} axisLine={AXIS_LINE} />
-                    <YAxis dataKey="name" type="category" tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10 }} axisLine={AXIS_LINE} width={88} />
-                    <Tooltip contentStyle={tipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} formatter={(v: number) => [`${v}%`, "Credibility"]} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: ink(0.55), fontSize: 10 }} axisLine={AXIS_LINE} width={88} />
+                    <Tooltip contentStyle={tipStyle} cursor={{ fill: ink(0.04) }} formatter={(v: number) => [`${v}%`, "Credibility"]} />
                     <Bar dataKey="credibility">
-                      {credibilityCurve.map((_, i) => <Cell key={i} fill={`rgba(255,255,255,${(0.75 - i * 0.1).toFixed(2)})`} />)}
+                      {credibilityCurve.map((_, i) => <Cell key={i} fill={ink(Number((0.75 - i * 0.1).toFixed(2)))} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -234,17 +241,17 @@ export default function DataAggregationPage() {
                 <ResponsiveContainer>
                   <AreaChart data={decayCurve} margin={{ left: 0, right: 10 }}>
                     <defs>
-                      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,255,255,0.35)" /><stop offset="100%" stopColor="rgba(255,255,255,0)" /></linearGradient>
-                      <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,255,255,0.18)" /><stop offset="100%" stopColor="rgba(255,255,255,0)" /></linearGradient>
-                      <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,255,255,0.08)" /><stop offset="100%" stopColor="rgba(255,255,255,0)" /></linearGradient>
+                      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={ink(0.35)} /><stop offset="100%" stopColor={ink(0)} /></linearGradient>
+                      <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={ink(0.18)} /><stop offset="100%" stopColor={ink(0)} /></linearGradient>
+                      <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={ink(0.08)} /><stop offset="100%" stopColor={ink(0)} /></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-                    <XAxis dataKey="hours" tick={AXIS_TICK} axisLine={AXIS_LINE} label={{ value: "Hours since claim", position: "insideBottom", offset: -4, fill: "rgba(255,255,255,0.35)", fontSize: 10 }} />
+                    <XAxis dataKey="hours" tick={AXIS_TICK} axisLine={AXIS_LINE} label={{ value: "Hours since claim", position: "insideBottom", offset: -4, fill: ink(0.35), fontSize: 10 }} />
                     <YAxis domain={[0, 100]} tick={AXIS_TICK} axisLine={AXIS_LINE} />
                     <Tooltip contentStyle={tipStyle} />
-                    <Area type="monotone" dataKey="structural" stroke="rgba(255,255,255,0.3)" strokeWidth={1.2} fill="url(#g3)" />
-                    <Area type="monotone" dataKey="macro" stroke="rgba(255,255,255,0.55)" strokeWidth={1.2} fill="url(#g2)" />
-                    <Area type="monotone" dataKey="breaking" stroke="rgba(255,255,255,0.9)" strokeWidth={1.6} fill="url(#g1)" />
+                    <Area type="monotone" dataKey="structural" stroke={ink(0.3)} strokeWidth={1.2} fill="url(#g3)" />
+                    <Area type="monotone" dataKey="macro" stroke={ink(0.55)} strokeWidth={1.2} fill="url(#g2)" />
+                    <Area type="monotone" dataKey="breaking" stroke={ink(0.9)} strokeWidth={1.6} fill="url(#g1)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
