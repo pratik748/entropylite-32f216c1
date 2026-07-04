@@ -103,6 +103,22 @@
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 0 0% 12%;
     --sidebar-ring: 0 0% 62%;
+
+    /* ── Public-site palette (space-separated RGB channels) ──
+       The marketing site's fixed monochrome system flows through these
+       variables so it can flip to a light "lite mode" under the device's
+       system theme (see the prefers-color-scheme block at the end of this
+       file). Defaults below are the original institutional dark values, so
+       the default look is byte-for-byte unchanged. */
+    --pub-white: 255 255 255;
+    --pub-carbon-950: 5 5 5;
+    --pub-carbon-900: 10 10 10;
+    --pub-carbon-850: 14 14 14;
+    --pub-carbon-800: 18 18 18;
+    --pub-carbon-750: 23 23 23;
+    --pub-hairline-faint: 22 22 22;
+    --pub-hairline: 31 31 31;
+    --pub-hairline-strong: 43 43 43;
   }
 
   .light {
@@ -816,3 +832,39 @@
 }
 
 #edit-badge, #lovable-badge, [id^="lovable-"], [class*="lovable-badge"] { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PUBLIC-SITE LITE MODE · follows the device system theme automatically
+   ───────────────────────────────────────────────────────────────────────
+   When the operating system is set to light, the fixed monochrome public
+   site inverts: carbon surfaces become paper, white ink becomes near-black.
+   Every public colour resolves through the --pub-* variables, so this single
+   block re-skins the entire marketing site — no per-component changes.
+
+   Kept intentionally unlayered so it outranks the layered dark defaults
+   (including the .site-public canvas rule above) whenever the query matches.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (prefers-color-scheme: light) {
+  .site-public {
+    --pub-white: 10 10 11;          /* ink text on paper */
+    --pub-carbon-950: 255 255 255;  /* page base → paper white */
+    --pub-carbon-900: 244 244 245;  /* raised band / global chrome */
+    --pub-carbon-850: 240 240 241;  /* panel */
+    --pub-carbon-800: 236 236 238;  /* elevated panel */
+    --pub-carbon-750: 230 230 232;  /* hover / active surface */
+    --pub-hairline-faint: 236 236 238;
+    --pub-hairline: 226 226 229;
+    --pub-hairline-strong: 208 208 211;
+  }
+
+  /* Match the pre-paint canvas so light users never flash the dark base */
+  html:has(.site-public),
+  html:has(.site-public) body {
+    background-color: #ffffff;
+  }
+
+  /* The brand wordmark ships as white artwork; invert it to ink on paper */
+  .site-public .mkt-logo {
+    filter: invert(1);
+  }
+}

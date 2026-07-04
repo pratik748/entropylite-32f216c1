@@ -21,7 +21,7 @@ export function EntropyGlyph({
     <img
       src={light ? wordmarkWhite : wordmarkBlack}
       alt="Entropy"
-      className={`${className} select-none`}
+      className={`${className} mkt-logo select-none`}
       draggable={false}
     />
   );
@@ -39,7 +39,7 @@ export default function Wordmark({
       <img
         src={light ? wordmarkWhite : wordmarkBlack}
         alt="Entropy"
-        className={`${compact ? "h-7" : "h-9"} w-auto`}
+        className={`${compact ? "h-7" : "h-9"} w-auto mkt-logo`}
         draggable={false}
       />
       {!compact && (

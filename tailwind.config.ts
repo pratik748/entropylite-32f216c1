@@ -45,6 +45,10 @@ export default {
         spring: "cubic-bezier(0.34, 1.3, 0.64, 1)",
       },
       colors: {
+        /* Public-site foreground. Routed through a CSS var (default pure
+           white) so the marketing site can invert to ink under the device's
+           light system theme without touching any component. */
+        white: "rgb(var(--pub-white) / <alpha-value>)",
         /* Fixed institutional palette for the public site (theme-independent).
            Pure monochrome: ink blacks, paper white — no accent hue. */
         ink: {
@@ -65,16 +69,16 @@ export default {
         /* ── Public-site institutional dark system (fixed, theme-independent) ──
            Elevation is expressed through surface steps, never shadows. */
         carbon: {
-          950: "#050505", // page base
-          900: "#0A0A0A", // raised band / global chrome
-          850: "#0E0E0E", // panel
-          800: "#121212", // elevated panel
-          750: "#171717", // hover / active surface
+          950: "rgb(var(--pub-carbon-950) / <alpha-value>)", // page base
+          900: "rgb(var(--pub-carbon-900) / <alpha-value>)", // raised band / global chrome
+          850: "rgb(var(--pub-carbon-850) / <alpha-value>)", // panel
+          800: "rgb(var(--pub-carbon-800) / <alpha-value>)", // elevated panel
+          750: "rgb(var(--pub-carbon-750) / <alpha-value>)", // hover / active surface
         },
         hairline: {
-          faint: "#161616",
-          DEFAULT: "#1F1F1F",
-          strong: "#2B2B2B",
+          faint: "rgb(var(--pub-hairline-faint) / <alpha-value>)",
+          DEFAULT: "rgb(var(--pub-hairline) / <alpha-value>)",
+          strong: "rgb(var(--pub-hairline-strong) / <alpha-value>)",
         },
         /* Functional accents only. signal = live/active market data (amber);
            pos/neg = gains/losses; gilt = premium/strategic, used rarely. */
