@@ -69,7 +69,7 @@ export default function DisclaimerPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       <PublicNav />
 
       <PageHeader
@@ -78,16 +78,16 @@ export default function DisclaimerPage() {
         lede="Read this before relying on any output of the platform. Entropy is a research instrument — every decision remains yours."
       />
 
-      <main className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
         <div className="lg:max-w-2xl">
           {SECTIONS.map((s) => (
-            <section key={s.n} className="border-t border-ink/[0.07] py-10 first:border-t-0 first:pt-0">
+            <section key={s.n} className="border-t border-hairline py-10 first:border-t-0 first:pt-0">
               <div className="flex items-center gap-3 mb-4">
-                <span className="mkt-label text-[9px] text-ink/30">{s.n}</span>
-                <h2 className="text-[17px] font-semibold tracking-tight">{s.title}</h2>
+                <span className="mkt-label text-[10px] text-white/30">{s.n}</span>
+                <h2 className="text-[17px] font-semibold tracking-tight text-white">{s.title}</h2>
               </div>
               {s.body.map((p, i) => (
-                <p key={i} className="text-[14.5px] text-ink/60 leading-relaxed mb-4 last:mb-0">
+                <p key={i} className="text-[14.5px] text-white/55 leading-relaxed mb-4 last:mb-0">
                   {p}
                 </p>
               ))}

@@ -639,27 +639,30 @@
     padding-bottom: clamp(1.5rem, 4vw, 3rem);
   }
 
-  /* ════════ Marketing layer · fixed institutional palette ════════
-     The public site does not follow the terminal theme: it is always
-     paper-white with deep-ink sections, set in an editorial serif. */
+  /* ════════ Public-site layer · fixed institutional dark ════════
+     The public site does not follow the terminal theme. It is a fixed
+     system: carbon surfaces (#050505–#171717), hairline structure,
+     IBM Plex Sans display, IBM Plex Mono data. Elevation through
+     surface steps, never shadows. Motion 150–250ms ease-out only. */
   .mkt-display {
-    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-    font-size: clamp(2.375rem, 5.6vw, 4.5rem);
-    line-height: 1.04;
-    letter-spacing: -0.015em;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: clamp(2.25rem, 4.8vw, 4rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
     font-weight: 600;
   }
   .mkt-display-2 {
-    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-    font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: clamp(1.5rem, 2.8vw, 2.375rem);
     line-height: 1.12;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.025em;
     font-weight: 600;
   }
   .mkt-lede {
-    font-size: clamp(1rem, 1.4vw, 1.1875rem);
-    line-height: 1.55;
+    font-size: clamp(0.9375rem, 1.2vw, 1.0625rem);
+    line-height: 1.6;
     letter-spacing: -0.011em;
+    font-weight: 400;
   }
   /* Brand wordmark inverts with the terminal theme (dark default → white) */
   .logo-adaptive {
@@ -674,25 +677,27 @@
     font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.18em;
   }
-  /* Fine engineering grid for ink sections */
-  .ink-grid {
-    background-image:
-      linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
-    background-size: 56px 56px;
+  /* Data voice: every numeral on the public site is tabular mono */
+  .mkt-num {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
-  .paper-grid {
-    background-image:
-      linear-gradient(to right, rgb(10 15 26 / 0.035) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(10 15 26 / 0.035) 1px, transparent 1px);
-    background-size: 56px 56px;
+  /* While a public page is mounted, the document canvas itself is carbon —
+     otherwise the terminal's light theme flashes on overscroll and route load. */
+  html:has(.site-public),
+  html:has(.site-public) body {
+    background-color: #050505;
   }
-  /* Radial vignette so grids fade toward the edges */
-  .grid-vignette {
-    -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 35%, black 30%, transparent 100%);
-    mask-image: radial-gradient(ellipse 90% 80% at 50% 35%, black 30%, transparent 100%);
+  /* Reveal, don't perform: single entry animation for data surfaces */
+  @keyframes mkt-reveal {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .mkt-reveal {
+    animation: mkt-reveal 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
   }
 }
 

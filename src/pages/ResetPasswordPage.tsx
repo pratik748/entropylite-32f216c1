@@ -31,24 +31,23 @@ export default function ResetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-white text-ink flex items-center justify-center p-4">
-        <p className="text-[14px] text-ink/50">Invalid or expired reset link.</p>
+      <div className="site-public min-h-screen bg-carbon-950 text-white flex items-center justify-center p-4">
+        <p className="text-[14px] text-white/45">Invalid or expired reset link.</p>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-white text-ink flex items-center justify-center p-5">
-      <div className="absolute inset-0 paper-grid grid-vignette" aria-hidden="true" />
-      <div className="relative w-full max-w-sm">
-        <EntropyGlyph className="h-10 w-auto mb-6" />
-        <h1 className="text-[24px] font-bold tracking-tight mb-2">Reset credentials</h1>
-        <p className="text-[13.5px] text-ink/50 leading-relaxed mb-8">
+    <div className="site-public min-h-screen bg-carbon-950 text-white flex items-center justify-center p-5">
+      <div className="w-full max-w-sm border border-hairline bg-carbon-900 p-8">
+        <EntropyGlyph light className="h-9 w-auto mb-6" />
+        <h1 className="text-[22px] font-semibold tracking-tight mb-2 text-white">Reset credentials</h1>
+        <p className="text-[13.5px] text-white/45 leading-relaxed mb-8">
           Choose a new password for your account. You will be signed in immediately.
         </p>
         <form onSubmit={handleReset} className="space-y-4">
           <div>
-            <label htmlFor="password" className="mkt-label text-[9px] text-ink/45 block mb-2">
+            <label htmlFor="password" className="mkt-label text-[9px] text-white/40 block mb-2">
               New password
             </label>
             <input
@@ -59,13 +58,13 @@ export default function ResetPasswordPage() {
               required
               minLength={6}
               placeholder="••••••••"
-              className="w-full h-12 rounded-lg border border-ink/12 bg-white px-4 text-[14px] tracking-tight text-ink placeholder:text-ink/25 focus:outline-none focus:border-ink/45 transition-colors"
+              className="w-full h-12 border border-hairline-strong bg-carbon-950 px-4 text-[14px] tracking-tight text-white placeholder:text-white/20 focus:outline-none focus:border-white/45 transition-colors duration-150 ease-out"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full h-12 items-center justify-center gap-2 rounded-lg bg-ink text-[13.5px] font-semibold tracking-tight text-white hover:bg-ink-700 transition-colors disabled:opacity-60"
+            className="flex w-full h-12 items-center justify-center gap-2 bg-white text-[13.5px] font-semibold tracking-tight text-carbon-950 hover:bg-white/85 transition-colors duration-150 ease-out disabled:opacity-60"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Update password

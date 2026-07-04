@@ -28,7 +28,7 @@ export default function PricingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       <PublicNav />
 
       <PageHeader
@@ -43,41 +43,36 @@ export default function PricingPage() {
         lede="Full institutional intelligence during the founding period. Founding members keep founding terms permanently once paid tiers launch."
       />
 
-      <main className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 border border-ink/[0.09] rounded-xl overflow-hidden">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 border border-hairline">
           {/* Plan identity */}
-          <div className="bg-ink text-white p-8 sm:p-12 relative overflow-hidden">
-            <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
-            <div className="relative">
-              <p className="mkt-label text-[9px] text-white/60 mb-6">Founding membership</p>
-              <div className="flex items-baseline gap-3">
-                <span className="text-5xl sm:text-6xl font-bold tracking-tight">Free</span>
-                <span className="mkt-label text-[9px] text-white/40">during founding</span>
-              </div>
-              <p className="text-[14px] text-white/55 leading-relaxed mt-6 max-w-sm">
-                Early-access terms. Pricing increases at general availability —
-                founding members are grandfathered for life.
-              </p>
-              <div className="mt-10">
-                <InkButton dark onClick={() => navigate("/dashboard")} className="w-full sm:w-auto">
-                  Get founding access <ArrowRight className="h-4 w-4" />
-                </InkButton>
-              </div>
-              <p className="mkt-label text-[9px] text-white/30 mt-5">
-                No credit card · Google or email sign-in · 30-second setup
-              </p>
+          <div className="bg-carbon-900 p-8 sm:p-12 lg:border-r border-hairline max-lg:border-b">
+            <p className="mkt-label text-[10px] text-white/55 mb-6">Founding membership</p>
+            <div className="flex items-baseline gap-3">
+              <span className="mkt-num text-5xl sm:text-6xl text-white">0.00</span>
+              <span className="mkt-label text-[9px] text-white/35">USD / month · founding period</span>
             </div>
+            <p className="text-[13.5px] text-white/50 leading-relaxed mt-6 max-w-sm">
+              Early-access terms. Pricing increases at general availability —
+              founding members are grandfathered for life.
+            </p>
+            <div className="mt-10">
+              <InkButton onClick={() => navigate("/dashboard")} className="w-full sm:w-auto">
+                Get founding access <ArrowRight className="h-4 w-4" />
+              </InkButton>
+            </div>
+            <p className="mkt-label text-[9px] text-white/25 mt-5">
+              No credit card · Google or email sign-in · 30-second setup
+            </p>
           </div>
 
           {/* Inclusions */}
-          <div className="p-8 sm:p-12">
-            <p className="mkt-label text-[9px] text-ink/40 mb-6">Included capability</p>
-            <ul className="grid grid-cols-1 gap-0 border-t border-ink/[0.07]">
+          <div className="p-8 sm:p-12 bg-carbon-950">
+            <p className="mkt-label text-[10px] text-white/35 mb-6">Included capability</p>
+            <ul className="grid grid-cols-1 gap-0 border-t border-hairline">
               {FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-3.5 py-3.5 border-b border-ink/[0.07] text-[13.5px] tracking-tight text-ink/70">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-ink/15 flex-shrink-0">
-                    <Check className="h-3 w-3 text-ink/60" strokeWidth={2.25} />
-                  </span>
+                <li key={f} className="flex items-center gap-3.5 py-3.5 border-b border-hairline text-[13px] tracking-tight text-white/65">
+                  <Check className="h-3.5 w-3.5 text-white/40 flex-shrink-0" strokeWidth={2} />
                   {f}
                 </li>
               ))}
@@ -85,8 +80,8 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <p className="text-center mkt-label text-[9px] text-ink/35 mt-10">
-          No feature restrictions · No usage walls · Cancel anytime — it is free
+        <p className="text-center mkt-label text-[9px] text-white/30 mt-10">
+          No feature restrictions · No usage walls · Cancel anytime
         </p>
       </main>
 

@@ -70,7 +70,7 @@ export default function AboutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-ink">
+    <div className="site-public min-h-screen bg-carbon-950 text-white">
       <PublicNav />
 
       <PageHeader
@@ -85,20 +85,20 @@ export default function AboutPage() {
         lede="Entropy combines quantitative risk analytics, regime detection, liquidity-flow analysis and probabilistic modelling into a single, institutional-grade research terminal."
       />
 
-      <main className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-24">
+      <main className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Sticky index */}
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-32">
-              <p className="mkt-label text-[9px] text-ink/40 mb-5">Contents</p>
-              <ul className="space-y-3 border-l border-ink/[0.08]">
+              <p className="mkt-label text-[10px] text-white/35 mb-5">Contents</p>
+              <ul className="space-y-3 border-l border-hairline">
                 {SECTIONS.map((s) => (
                   <li key={s.n}>
                     <a
                       href={`#s-${s.n}`}
-                      className="flex items-baseline gap-3 pl-4 -ml-px border-l border-transparent hover:border-ink/40 text-[12.5px] tracking-tight text-ink/50 hover:text-ink transition-colors"
+                      className="flex items-baseline gap-3 pl-4 -ml-px border-l border-transparent hover:border-white/40 text-[12.5px] tracking-tight text-white/45 hover:text-white transition-colors duration-150 ease-out"
                     >
-                      <span className="mkt-label text-[8px] text-ink/30">{s.n}</span>
+                      <span className="mkt-label text-[9px] text-white/25">{s.n}</span>
                       {s.title}
                     </a>
                   </li>
@@ -110,25 +110,25 @@ export default function AboutPage() {
           {/* Body */}
           <div className="lg:col-span-9 lg:max-w-2xl">
             {SECTIONS.map((s) => (
-              <section key={s.n} id={`s-${s.n}`} className="border-t border-ink/[0.07] py-10 first:border-t-0 first:pt-0 scroll-mt-28">
+              <section key={s.n} id={`s-${s.n}`} className="border-t border-hairline py-10 first:border-t-0 first:pt-0 scroll-mt-28">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="mkt-label text-[9px] text-ink/30">{s.n}</span>
-                  <h2 className="text-[19px] font-semibold tracking-tight">{s.title}</h2>
+                  <span className="mkt-label text-[10px] text-white/30">{s.n}</span>
+                  <h2 className="text-[18px] font-semibold tracking-tight text-white">{s.title}</h2>
                 </div>
                 {s.body.map((p, i) => (
-                  <p key={i} className="text-[15px] text-ink/60 leading-relaxed mb-4 last:mb-0">
+                  <p key={i} className="text-[14.5px] text-white/55 leading-relaxed mb-4 last:mb-0">
                     {p}
                   </p>
                 ))}
               </section>
             ))}
 
-            <section className="border-t border-ink/[0.07] py-10">
+            <section className="border-t border-hairline py-10">
               <div className="flex items-center gap-3 mb-4">
-                <span className="mkt-label text-[9px] text-ink/30">08</span>
-                <h2 className="text-[19px] font-semibold tracking-tight">Built by Pratik Sehwag</h2>
+                <span className="mkt-label text-[10px] text-white/30">08</span>
+                <h2 className="text-[18px] font-semibold tracking-tight text-white">Built by Pratik Sehwag</h2>
               </div>
-              <p className="text-[15px] text-ink/60 leading-relaxed">
+              <p className="text-[14.5px] text-white/55 leading-relaxed">
                 Entropy is designed and engineered as a research-grade intelligence system. Every
                 module — from the statistical-arbitrage engine to the causal-effects simulator — is
                 grounded in quantitative methodology and real market data. The platform provides
@@ -140,8 +140,8 @@ export default function AboutPage() {
       </main>
 
       {/* CTA band */}
-      <section className="border-t border-ink/[0.07] bg-[#FAFBFC]">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 sm:py-20">
+      <section className="border-t border-hairline bg-carbon-900">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
           <SectionIntro
             label="Next"
             align="center"

@@ -12,34 +12,32 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="relative min-h-screen bg-ink text-white flex flex-col overflow-hidden">
-      <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
-
-      <header className="relative max-w-6xl mx-auto w-full px-5 sm:px-6 h-16 flex items-center">
+    <div className="site-public min-h-screen bg-carbon-950 text-white flex flex-col">
+      <header className="max-w-7xl mx-auto w-full px-5 sm:px-8 h-14 flex items-center border-b border-hairline">
         <button onClick={() => navigate("/")} aria-label="Entropy home">
-          <Wordmark light />
+          <Wordmark light compact />
         </button>
       </header>
 
-      <main className="relative flex-1 flex items-center">
-        <div className="max-w-6xl mx-auto w-full px-5 sm:px-6 pb-24">
+      <main className="flex-1 flex items-center">
+        <div className="max-w-7xl mx-auto w-full px-5 sm:px-8 pb-24">
           <div className="flex items-center gap-3 mb-7">
-            <span className="h-px w-8 bg-white/25" />
-            <span className="mkt-label text-[9px] text-white/60">Error 404</span>
+            <span className="h-px w-8 bg-hairline-strong" />
+            <span className="mkt-label text-[10px] text-white/55">Error 404</span>
           </div>
-          <h1 className="mkt-display">
+          <h1 className="mkt-display text-white">
             This route does not resolve.
             <br />
-            <span className="text-white/40">The market moved on.</span>
+            <span className="text-white/40">The page has moved or never existed.</span>
           </h1>
-          <p className="mkt-lede text-white/55 max-w-md mt-6">
-            The page you requested does not exist or has been relocated.
+          <p className="mkt-lede text-white/50 max-w-md mt-6">
+            Check the address, or return to the front page.
           </p>
           <button
             onClick={() => navigate("/")}
-            className="mt-10 inline-flex h-12 items-center gap-2 rounded-lg bg-white px-7 text-[13px] font-semibold tracking-tight text-ink hover:bg-white/90 transition-colors"
+            className="mt-10 inline-flex h-11 items-center gap-2 bg-white px-7 text-[13px] font-semibold tracking-tight text-carbon-950 hover:bg-white/85 transition-colors duration-150 ease-out"
           >
-            <ArrowLeft className="h-4 w-4" /> Return to base
+            <ArrowLeft className="h-4 w-4" /> Return home
           </button>
         </div>
       </main>

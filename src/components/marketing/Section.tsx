@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 
 /**
- * Shared section grammar for the public site. Every section on every page
- * opens with the same construction: an indexed rule line, an eyebrow, a
- * display headline, and an optional lede. Uniformity is the aesthetic.
+ * Shared section grammar for the public site — fixed institutional dark.
+ *
+ * Every section opens with the same construction: an indexed rule line,
+ * a mono eyebrow, a display headline, an optional lede. Panels are flat
+ * carbon surfaces separated by hairlines; corners are square; elevation
+ * is a surface step, never a shadow. Uniformity is the aesthetic.
  */
 
 export function SectionIntro({
@@ -11,7 +14,6 @@ export function SectionIntro({
   label,
   title,
   lede,
-  dark = false,
   align = "left",
   className = "",
 }: {
@@ -19,6 +21,7 @@ export function SectionIntro({
   label: string;
   title: ReactNode;
   lede?: ReactNode;
+  /** kept for call-site compatibility; the system is dark-only */
   dark?: boolean;
   align?: "left" | "center";
   className?: string;
@@ -26,30 +29,14 @@ export function SectionIntro({
   const centered = align === "center";
   return (
     <div className={`${centered ? "text-center" : ""} ${className}`}>
-      <div
-        className={`flex items-center gap-3 mb-6 ${centered ? "justify-center" : ""}`}
-      >
-        {index && (
-          <span
-            className={`mkt-label ${dark ? "text-white/40" : "text-ink/35"}`}
-          >
-            {index}
-          </span>
-        )}
-        <span className={`h-px w-8 ${dark ? "bg-white/25" : "bg-ink/20"}`} />
-        <span className={`mkt-label ${dark ? "text-white/60" : "text-ink/55"}`}>
-          {label}
-        </span>
+      <div className={`flex items-center gap-3 mb-6 ${centered ? "justify-center" : ""}`}>
+        {index && <span className="mkt-label text-[10px] text-white/30">{index}</span>}
+        <span className="h-px w-8 bg-hairline-strong" />
+        <span className="mkt-label text-[10px] text-white/55">{label}</span>
       </div>
-      <h2 className={`mkt-display-2 ${dark ? "text-white" : "text-ink"}`}>
-        {title}
-      </h2>
+      <h2 className="mkt-display-2 text-white">{title}</h2>
       {lede && (
-        <p
-          className={`mkt-lede mt-5 max-w-2xl ${centered ? "mx-auto" : ""} ${
-            dark ? "text-white/55" : "text-ink/55"
-          }`}
-        >
+        <p className={`mkt-lede mt-5 max-w-2xl text-white/50 ${centered ? "mx-auto" : ""}`}>
           {lede}
         </p>
       )}
@@ -58,8 +45,8 @@ export function SectionIntro({
 }
 
 /**
- * Uniform page opener for every sub-page: ink band, engineering grid,
- * indexed eyebrow, display title, lede. One construction, everywhere.
+ * Uniform page opener for every sub-page: carbon band, indexed eyebrow,
+ * display title, lede. One construction, everywhere.
  */
 export function PageHeader({
   label,
@@ -73,69 +60,58 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="relative overflow-hidden bg-ink text-white">
-      <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
-      <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-14 sm:pt-20 pb-14 sm:pb-16">
+    <header className="bg-carbon-950 text-white border-b border-hairline">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-14 sm:pt-20 pb-14 sm:pb-16">
         <div className="flex items-center gap-3 mb-7">
-          <span className="h-px w-8 bg-white/25" />
-          <span className="mkt-label text-[9px] text-white/60">{label}</span>
+          <span className="h-px w-8 bg-hairline-strong" />
+          <span className="mkt-label text-[10px] text-white/55">{label}</span>
         </div>
         <h1 className="mkt-display text-white max-w-3xl">{title}</h1>
-        {lede && (
-          <p className="mkt-lede text-white/55 max-w-2xl mt-6">{lede}</p>
-        )}
+        {lede && <p className="mkt-lede text-white/50 max-w-2xl mt-6">{lede}</p>}
         {children}
       </div>
     </header>
   );
 }
 
-/** Primary action — ink block button (or white on ink sections). */
+/** Primary action — solid white block, square corners. */
 export function InkButton({
   children,
   onClick,
-  dark = false,
   className = "",
 }: {
   children: ReactNode;
   onClick?: () => void;
+  /** kept for call-site compatibility; the system is dark-only */
   dark?: boolean;
   className?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`group inline-flex h-12 items-center justify-center gap-2 px-7 text-[13px] font-semibold tracking-tight transition-all duration-200 rounded-lg ${
-        dark
-          ? "bg-white text-ink hover:bg-white/90"
-          : "bg-ink text-white hover:bg-ink-700"
-      } ${className}`}
+      className={`group inline-flex h-11 items-center justify-center gap-2 px-7 text-[13px] font-semibold tracking-tight bg-white text-carbon-950 hover:bg-white/85 transition-colors duration-150 ease-out ${className}`}
     >
       {children}
     </button>
   );
 }
 
-/** Secondary action — hairline outline. */
+/** Secondary action — hairline outline, square corners. */
 export function LineButton({
   children,
   onClick,
-  dark = false,
   className = "",
 }: {
   children: ReactNode;
   onClick?: () => void;
+  /** kept for call-site compatibility; the system is dark-only */
   dark?: boolean;
   className?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex h-12 items-center justify-center gap-2 px-7 text-[13px] font-semibold tracking-tight rounded-lg border transition-all duration-200 ${
-        dark
-          ? "border-white/20 text-white/85 hover:border-white/45 hover:text-white"
-          : "border-ink/15 text-ink/75 hover:border-ink/40 hover:text-ink"
-      } ${className}`}
+      className={`inline-flex h-11 items-center justify-center gap-2 px-7 text-[13px] font-medium tracking-tight border border-hairline-strong text-white/75 hover:border-white/40 hover:text-white transition-colors duration-150 ease-out ${className}`}
     >
       {children}
     </button>
