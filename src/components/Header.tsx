@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES, getCurrencyLabel } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Zap, Share2 } from "lucide-react";
+import { LogOut, Zap } from "lucide-react";
 
 interface HeaderProps {
   directProfitMode?: boolean;
