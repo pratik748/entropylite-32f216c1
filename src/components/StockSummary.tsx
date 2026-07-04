@@ -1,6 +1,8 @@
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { getCurrencySymbol, formatCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
+import { springGentle } from "@/lib/motion";
 
 interface StockSummaryProps {
   ticker: string;
@@ -18,7 +20,6 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
   const pnl = currentValue - invested;
   const pnlPercent = ((pnl / invested) * 100);
   const isProfit = pnl >= 0;
-  const sym = getCurrencySymbol(assetCurrency);
 
   const showConverted = assetCurrency !== baseCurrency;
   const baseSym = getCurrencySymbol(baseCurrency);
@@ -27,53 +28,56 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
   const convertedPnl = showConverted ? convertToBase(pnl, assetCurrency) : null;
 
   return (
-    <div className="rounded-sm border border-border bg-card p-3 sm:p-5 animate-slide-up">
-      <div className="mb-3 sm:mb-4 flex items-center justify-between">
-        <div>
-          <p className="font-mono text-base sm:text-xl font-bold text-foreground">{ticker}</p>
-          <p className="text-xs sm:text-sm text-muted-foreground">{assetCurrency}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springGentle}
+      className="rounded-2xl border border-border/70 bg-card p-4 sm:p-6 shadow-soft"
+    >
+      {/* Ticker + live price, Apple Stocks hierarchy */}
+      <div className="mb-4 sm:mb-5 flex items-start justify-between">
+        <div className="min-w-0">
+          <p className="text-headline text-foreground">{ticker}</p>
+          <p className="mt-1.5 text-title-1 text-foreground tabular">{formatCurrency(currentPrice, assetCurrency)}</p>
+          <p className="mt-0.5 text-caption-1 text-muted-foreground">
+            {assetCurrency}
+            {convertedPrice !== null && (
+              <span className="text-muted-foreground/70"> · ≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+            )}
+          </p>
         </div>
-        <div className={`flex items-center gap-1 rounded-sm px-2 sm:px-3 py-1 sm:py-1.5 ${isProfit ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"}`}>
-          {isProfit ? <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4" />}
-          <span className="font-mono text-xs sm:text-sm font-semibold">
-            {isProfit ? "+" : ""}{pnlPercent.toFixed(2)}%
-          </span>
+        <div className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-semibold tabular ${isProfit ? "bg-gain/12 text-gain" : "bg-loss/12 text-loss"}`}>
+          {isProfit ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+          {isProfit ? "+" : ""}{pnlPercent.toFixed(2)}%
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
-        <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
-          <p className="text-[10px] sm:text-xs text-muted-foreground">Current Price</p>
-          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentPrice, assetCurrency)}</p>
-          {convertedPrice !== null && (
-            <p className="font-mono text-[9px] sm:text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-          )}
-        </div>
-        <MetricCard label="Buy Price" value={formatCurrency(buyPrice, assetCurrency)} />
-        <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
-          <p className="text-[10px] sm:text-xs text-muted-foreground">P&L</p>
-          <p className={`mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold ${isProfit ? "text-gain" : "text-loss"}`}>
-            {isProfit ? "+" : ""}{formatCurrency(Math.abs(pnl), assetCurrency)}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <MetricTile label="Buy price" value={formatCurrency(buyPrice, assetCurrency)} />
+        <div className="rounded-xl bg-surface-2 p-2.5 sm:p-3.5">
+          <p className="text-caption-1 text-muted-foreground">P&L</p>
+          <p className={`mt-1 text-subheadline font-semibold tabular ${isProfit ? "text-gain" : "text-loss"}`}>
+            {isProfit ? "+" : "−"}{formatCurrency(Math.abs(pnl), assetCurrency)}
           </p>
           {convertedPnl !== null && (
-            <p className={`font-mono text-[9px] sm:text-[10px] mt-0.5 ${isProfit ? "text-gain/60" : "text-loss/60"}`}>
-              ≈ {isProfit ? "+" : "-"}{baseSym}{Math.abs(convertedPnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            <p className={`mt-0.5 text-caption-2 tabular ${isProfit ? "text-gain/60" : "text-loss/60"}`}>
+              ≈ {isProfit ? "+" : "−"}{baseSym}{Math.abs(convertedPnl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </p>
           )}
         </div>
-        <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
-          <p className="text-[10px] sm:text-xs text-muted-foreground">Portfolio Value</p>
-          <p className="mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold text-foreground">{formatCurrency(currentValue, assetCurrency)}</p>
+        <div className="rounded-xl bg-surface-2 p-2.5 sm:p-3.5">
+          <p className="text-caption-1 text-muted-foreground">Value</p>
+          <p className="mt-1 text-subheadline font-semibold text-foreground tabular">{formatCurrency(currentValue, assetCurrency)}</p>
           {convertedValue !== null && (
-            <p className="font-mono text-[9px] sm:text-[10px] text-muted-foreground/70 mt-0.5">≈ {baseSym}{convertedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+            <p className="mt-0.5 text-caption-2 text-muted-foreground/70 tabular">≈ {baseSym}{convertedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
-const MetricCard = ({
+const MetricTile = ({
   label,
   value,
   highlight,
@@ -82,10 +86,10 @@ const MetricCard = ({
   value: string;
   highlight?: "gain" | "loss";
 }) => (
-  <div className="rounded-sm bg-surface-2 p-2 sm:p-3">
-    <p className="text-[10px] sm:text-xs text-muted-foreground">{label}</p>
+  <div className="rounded-xl bg-surface-2 p-2.5 sm:p-3.5">
+    <p className="text-caption-1 text-muted-foreground">{label}</p>
     <p
-      className={`mt-0.5 sm:mt-1 font-mono text-sm sm:text-lg font-semibold ${
+      className={`mt-1 text-subheadline font-semibold tabular ${
         highlight === "gain"
           ? "text-gain"
           : highlight === "loss"

@@ -18,18 +18,32 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "SF Pro Text",
+          "SF Pro Display",
+          "Inter",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: ["SF Mono", "ui-monospace", "JetBrains Mono", "monospace"],
       },
       letterSpacing: {
         tightest: "-0.04em",
         tighter: "-0.025em",
-        eyebrow: "0.3em",
+        eyebrow: "0.08em",
       },
       boxShadow: {
-        soft: "0 1px 2px hsl(0 0% 0% / 0.04), 0 4px 12px hsl(0 0% 0% / 0.04)",
-        "soft-lg": "0 4px 8px hsl(0 0% 0% / 0.05), 0 16px 40px hsl(0 0% 0% / 0.08)",
+        soft: "var(--shadow-1)",
+        "soft-lg": "var(--shadow-2)",
+        "soft-xl": "var(--shadow-3)",
         "ring-soft": "0 0 0 1px hsl(var(--border))",
+      },
+      transitionTimingFunction: {
+        "out-quart": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
+        spring: "cubic-bezier(0.34, 1.3, 0.64, 1)",
       },
       colors: {
         border: "hsl(var(--border))",
@@ -86,9 +100,13 @@ export default {
         },
       },
       borderRadius: {
+        "4xl": "2rem",
+        "3xl": "1.75rem",
+        "2xl": "1.375rem",
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
       },
       keyframes: {
         "accordion-down": {
@@ -104,20 +122,25 @@ export default {
           "50%": { opacity: "1" },
         },
         "slide-up": {
-          from: { opacity: "0", transform: "translateY(8px)" },
+          from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "fade-in": {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.96)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        "accordion-down": "accordion-down 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+        "accordion-up": "accordion-up 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
-        "slide-up": "slide-up 0.3s ease-out",
-        "fade-in": "fade-in 0.25s ease-out",
+        "slide-up": "slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+        "scale-in": "scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },

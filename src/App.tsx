@@ -75,7 +75,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground font-mono text-sm animate-pulse">Signing you in…</p>
+        <p className="text-muted-foreground text-sm tracking-tight animate-breathe">Signing you in…</p>
       </div>
     );
   }

@@ -37,23 +37,23 @@ const RiskIndicator = ({ level, keyRisks }: RiskIndicatorProps) => {
   const Icon = config.icon;
 
   return (
-    <div className={`rounded-xl border ${config.border} ${config.bg} p-6 animate-slide-up`}>
+    <div className={`rounded-2xl border ${config.border} ${config.bg} p-5 sm:p-6 shadow-soft animate-slide-up`}>
       <div className="mb-4 flex items-center gap-2">
-        <Icon className={`h-5 w-5 ${config.color}`} />
-        <h2 className="text-base font-semibold text-foreground">Risk Level</h2>
-        <span className={`ml-auto rounded-md px-2.5 py-1 font-mono text-sm font-bold ${config.color}`}>
+        <Icon className={`h-4 w-4 ${config.color}`} />
+        <h2 className="text-headline text-foreground">Risk</h2>
+        <span className={`ml-auto rounded-full px-3 py-1 text-[13px] font-semibold ${config.color}`}>
           {level}
         </span>
       </div>
 
-      <div className="mb-4 h-2 rounded-full bg-surface-3">
-        <div className={`h-2 rounded-full ${config.barColor} ${config.barWidth} transition-all duration-700`} />
+      <div className="mb-4 h-1.5 rounded-full bg-surface-3 overflow-hidden">
+        <div className={`h-full rounded-full ${config.barColor} ${config.barWidth} transition-all duration-700 ease-out-expo`} />
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Key Risk Events</p>
+        <p className="text-caption-1 font-medium text-muted-foreground">Key risk events</p>
         {keyRisks.map((risk, i) => (
-          <div key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
+          <div key={i} className="flex items-start gap-2.5 text-footnote leading-relaxed text-secondary-foreground">
             <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${config.barColor}`} />
             {risk}
           </div>

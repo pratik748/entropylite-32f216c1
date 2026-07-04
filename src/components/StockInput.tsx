@@ -134,19 +134,19 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3 sm:p-5 animate-slide-up">
-      <div className="mb-3 sm:mb-4 flex items-center gap-2">
-        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-primary/10">
-          <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
+    <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-soft animate-slide-up">
+      <div className="mb-3 sm:mb-4 flex items-center gap-2.5">
+        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-surface-2">
+          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
-        <h2 className="text-xs sm:text-sm font-semibold text-foreground">Analyze Asset</h2>
-        <span className="ml-auto text-[8px] sm:text-[9px] text-muted-foreground/60 font-mono">GLOBAL · ALL MARKETS</span>
+        <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Analyze an asset</h2>
+        <span className="ml-auto text-[10px] font-medium text-muted-foreground/60">All markets</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div ref={wrapRef} className="space-y-1.5 relative">
-          <Label htmlFor="ticker" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Ticker / Symbol
+          <Label htmlFor="ticker" className="text-[12px] font-medium tracking-tight text-muted-foreground">
+            Ticker or symbol
           </Label>
           <Input
             id="ticker"
@@ -165,13 +165,13 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
               onPick={pickSuggestion}
             />
           )}
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
             {QUICK_TICKERS.map((t) => (
               <button
                 key={t.ticker}
                 type="button"
                 onClick={() => setTicker(t.ticker)}
-                className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/20"
+                className="pressable rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-medium tracking-tight text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
               >
                 {t.label}
               </button>
@@ -181,8 +181,8 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
 
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
-            <Label htmlFor="buyPrice" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Buy Price
+            <Label htmlFor="buyPrice" className="text-[12px] font-medium tracking-tight text-muted-foreground">
+              Buy price
             </Label>
             <Input
               id="buyPrice"
@@ -195,7 +195,7 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="quantity" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <Label htmlFor="quantity" className="text-[12px] font-medium tracking-tight text-muted-foreground">
               Quantity
             </Label>
             <Input
@@ -212,10 +212,10 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
         <Button
           type="submit"
           disabled={!ticker || !buyPrice || !quantity || isLoading}
-          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium h-9 text-sm"
+          className="w-full h-10 text-sm"
         >
-          <Search className="mr-2 h-3.5 w-3.5" />
-          {isLoading ? "Processing..." : "Run Intelligence Analysis"}
+          <Search className="mr-1 h-3.5 w-3.5" />
+          {isLoading ? "Analyzing…" : "Analyze"}
         </Button>
       </form>
     </div>
@@ -245,7 +245,7 @@ interface SuggestListProps {
 const SuggestList = ({ suggestions, activeIdx, onPick, compact }: SuggestListProps) => {
   return (
     <div
-      className={`absolute z-50 mt-1 ${compact ? "left-0 w-64" : "left-0 right-0"} rounded-md border border-border bg-popover shadow-lg overflow-hidden animate-fade-in`}
+      className={`absolute z-50 mt-1.5 ${compact ? "left-0 w-64" : "left-0 right-0"} rounded-xl border border-border/70 glass-thick overflow-hidden animate-scale-in`}
     >
       <ul className="max-h-72 overflow-auto py-1">
         {suggestions.map((s, i) => {
