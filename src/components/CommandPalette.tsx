@@ -10,7 +10,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, LogOut, Zap } from "lucide-react";
+import { LogOut, Zap } from "lucide-react";
 
 export interface PaletteTab {
   id: string;
@@ -21,7 +21,7 @@ export interface PaletteTab {
 interface CommandPaletteProps {
   tabs: PaletteTab[];
   onSelectTab: (id: string) => void;
-  onOpenBrief: () => void;
+  onOpenBrief?: () => void;
   onToggleDirectProfit: () => void;
 }
 
@@ -63,10 +63,6 @@ const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit }
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Actions">
-          <CommandItem value="Entropy Brief" onSelect={() => run(onOpenBrief)}>
-            <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-            Open today's Brief
-          </CommandItem>
           <CommandItem value="Direct Profit Mode" onSelect={() => run(onToggleDirectProfit)}>
             <Zap className="mr-2 h-4 w-4 text-muted-foreground" />
             Toggle Direct Profit mode
