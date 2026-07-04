@@ -62,7 +62,7 @@ function MonteCarloMini() {
         </div>
         <div className="text-right">
           <p className="font-mono text-[9px] text-black/40">profit prob</p>
-          <p className="font-mono text-sm font-bold text-emerald-600">{profitProb.toFixed(0)}%</p>
+          <p className="font-mono text-sm font-bold text-gain">{profitProb.toFixed(0)}%</p>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
@@ -131,7 +131,7 @@ function VaRDistribution() {
         </div>
         <div className="text-right">
           <p className="font-mono text-[9px] text-black/40">CVaR<sub>95</sub></p>
-          <p className="font-mono text-sm font-bold text-rose-600">{(cvarMean * 100).toFixed(2)}%</p>
+          <p className="font-mono text-sm font-bold text-loss">{(cvarMean * 100).toFixed(2)}%</p>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">

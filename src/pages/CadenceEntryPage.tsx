@@ -99,7 +99,7 @@ export default function CadenceEntryPage() {
               <Linkedin className="h-3.5 w-3.5" />
             </a>
             <button onClick={onCopy} className="p-2 text-black/50 hover:text-black transition-colors" aria-label="Copy link">
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
+              {copied ? <Check className="h-3.5 w-3.5 text-gain" /> : <Link2 className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function CadenceEntryPage() {
             </Button>
             <Button onClick={onCopy} variant="outline" size="sm" className="font-mono text-xs">
               {copied ? (
-                <><Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" /> Link copied</>
+                <><Check className="h-3.5 w-3.5 mr-1.5 text-gain" /> Link copied</>
               ) : (
                 <><Share2 className="h-3.5 w-3.5 mr-1.5" /> Copy link</>
               )}

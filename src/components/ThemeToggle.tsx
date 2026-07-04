@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Sun, Moon, Hexagon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const THEMES = ["dark", "palantir", "light"] as const;
+const THEMES = ["light", "dark", "palantir"] as const;
 type Theme = (typeof THEMES)[number];
 
 const icons: Record<Theme, React.ReactNode> = {
@@ -23,7 +23,7 @@ const ThemeToggle = () => {
       const stored = localStorage.getItem("entropy-theme");
       if (stored === "light" || stored === "dark" || stored === "palantir") return stored;
     }
-    return "dark";
+    return "light";
   });
 
   useEffect(() => {

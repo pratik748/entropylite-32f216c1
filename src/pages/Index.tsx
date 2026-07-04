@@ -64,16 +64,16 @@ export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceF
 
 // Apple-style tinted SF-Symbol tiles: each tab gets a distinct hue rendered
 // as a raised, skeuomorphic gradient chip (like Settings.app icons).
-const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode; tint: string }[] = [
-  { id: "dashboard",    label: "Dashboard",   shortLabel: "Dash",  icon: <LayoutDashboard className="h-3 w-3" strokeWidth={2.5} />, tint: "from-[#0A84FF] to-[#0060DF]" },   // systemBlue
-  { id: "market",       label: "Markets",     shortLabel: "Mkt",   icon: <Landmark className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#30D158] to-[#1F9F42]" },   // systemGreen
-  { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo",   icon: <Globe className="h-3 w-3" strokeWidth={2.5} />,           tint: "from-[#64D2FF] to-[#0A84FF]" },   // systemTeal→Blue
-  { id: "desirable",    label: "Desirable",   shortLabel: "Picks", icon: <Target className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FF9F0A] to-[#E8730B]" },   // systemOrange
-  { id: "sandbox",      label: "Sandbox",     shortLabel: "Sim",   icon: <Eye className="h-3 w-3" strokeWidth={2.5} />,             tint: "from-[#BF5AF2] to-[#8944E0]" },   // systemPurple
-  { id: "statarb",      label: "Stat Arb",    shortLabel: "Stat",  icon: <ScatterChart className="h-3 w-3" strokeWidth={2.5} />,    tint: "from-[#5E5CE6] to-[#3634A3]" },   // systemIndigo
-  { id: "augment",      label: "Augment",     shortLabel: "Aug",   icon: <Sparkles className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#FF375F] to-[#C9184A]" },   // systemPink
-  { id: "risk",         label: "Risk",        shortLabel: "Risk",  icon: <Shield className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FFD60A] to-[#E8A50B]" },   // systemYellow
-  { id: "fortress",     label: "Fortress",    shortLabel: "Fort",  icon: <ShieldCheck className="h-3 w-3" strokeWidth={2.5} />,     tint: "from-[#FF453A] to-[#C81E13]" },   // systemRed
+const tabs: { id: Tab; label: string; icon: React.ReactNode; tint: string }[] = [
+  { id: "dashboard",    label: "Dashboard",   icon: <LayoutDashboard className="h-3 w-3" strokeWidth={2.5} />, tint: "from-[#0A84FF] to-[#0060DF]" },   // systemBlue
+  { id: "market",       label: "Markets",     icon: <Landmark className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#30D158] to-[#1F9F42]" },   // systemGreen
+  { id: "geopolitical", label: "Geopolitics", icon: <Globe className="h-3 w-3" strokeWidth={2.5} />,           tint: "from-[#64D2FF] to-[#0A84FF]" },   // systemTeal→Blue
+  { id: "desirable",    label: "Desirable",   icon: <Target className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FF9F0A] to-[#E8730B]" },   // systemOrange
+  { id: "sandbox",      label: "Sandbox",     icon: <Eye className="h-3 w-3" strokeWidth={2.5} />,             tint: "from-[#BF5AF2] to-[#8944E0]" },   // systemPurple
+  { id: "statarb",      label: "Stat Arb",    icon: <ScatterChart className="h-3 w-3" strokeWidth={2.5} />,    tint: "from-[#5E5CE6] to-[#3634A3]" },   // systemIndigo
+  { id: "augment",      label: "Augment",     icon: <Sparkles className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#FF375F] to-[#C9184A]" },   // systemPink
+  { id: "risk",         label: "Risk",        icon: <Shield className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FFD60A] to-[#E8A50B]" },   // systemYellow
+  { id: "fortress",     label: "Fortress",    icon: <ShieldCheck className="h-3 w-3" strokeWidth={2.5} />,     tint: "from-[#FF453A] to-[#C81E13]" },   // systemRed
 ];
 
 const IndexContent = () => {
@@ -508,10 +508,11 @@ const IndexContent = () => {
 
           {/* Tab Navigation — segmented control with a sliding glass pill */}
           <nav data-density="compact" data-tour="tab-bar" className="glass-panel border-b border-border/60 sticky top-0 z-30 shrink-0">
-            <div
-              className="px-2 sm:container flex items-center gap-0.5 overflow-x-auto scrollbar-hide relative py-1.5"
-              style={{ scrollSnapType: "x mandatory" }}
-            >
+            <div className="px-2 sm:container flex items-center gap-1 py-1.5">
+              <div
+                className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide mask-fade-x relative min-w-0 flex-1"
+                style={{ scrollSnapType: "x mandatory" }}
+              >
               {tabs.map((tab) => {
                 const active = activeTab === tab.id;
                 return (
@@ -538,17 +539,17 @@ const IndexContent = () => {
                     >
                       {tab.icon}
                     </span>
-                    <span className="relative z-10 hidden sm:inline ml-0.5">{tab.label}</span>
-                    <span className="relative z-10 sm:hidden ml-0.5">{tab.shortLabel}</span>
+                    <span className="relative z-10 ml-0.5">{tab.label}</span>
                   </button>
                 );
               })}
-              <div className="ml-auto flex items-center gap-2 pl-3 pr-1 flex-shrink-0">
+              </div>
+              <div className="ml-auto flex items-center gap-2 pl-3 flex-shrink-0 border-l border-border/60">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-50" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gain" />
                 </span>
-                <span className="text-[11px] font-medium text-muted-foreground">Live</span>
+                <span className="hidden sm:inline text-[11px] font-medium text-muted-foreground">Live</span>
                 <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-border/70 bg-surface-2/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80">
                   ⌘K
                 </span>

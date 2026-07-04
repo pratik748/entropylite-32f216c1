@@ -59,16 +59,16 @@
     }
     </script>
 
-    <!-- Apply theme before paint to avoid flash -->
+    <!-- Apply theme before paint to avoid flash. Default is Light — dark/palantir are opt-in. -->
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('entropy-theme') || 'palantir';
+          var t = localStorage.getItem('entropy-theme') || 'light';
           if (t === 'light' || t === 'palantir') {
             document.documentElement.classList.add(t);
           }
         } catch (e) {
-          document.documentElement.classList.add('palantir');
+          document.documentElement.classList.add('light');
         }
       })();
     </script>

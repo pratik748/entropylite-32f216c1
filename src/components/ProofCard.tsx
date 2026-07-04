@@ -202,12 +202,12 @@ export default function ProofCard({ open, onClose, stock }: Props) {
                 {/* Massive PnL */}
                 <div className="mt-6 sm:mt-8 flex items-baseline gap-3">
                   <TrendingUp
-                    className={`h-7 w-7 sm:h-9 sm:w-9 ${isWin ? "text-emerald-400" : "text-rose-400 rotate-180"}`}
+                    className={`h-7 w-7 sm:h-9 sm:w-9 ${isWin ? "text-gain" : "text-loss rotate-180"}`}
                     strokeWidth={2.5}
                   />
                   <div
                     className={`text-[56px] sm:text-[72px] font-bold leading-none tabular-nums ${
-                      isWin ? "text-emerald-400" : "text-rose-400"
+                      isWin ? "text-gain" : "text-loss"
                     }`}
                     style={{
                       textShadow: isWin
@@ -278,7 +278,7 @@ export default function ProofCard({ open, onClose, stock }: Props) {
             </button>
             <button
               onClick={shareWhatsApp}
-              className="flex items-center justify-center gap-1.5 h-10 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors text-xs font-medium"
+              className="flex items-center justify-center gap-1.5 h-10 rounded-md bg-gain text-white hover:bg-gain/90 transition-colors text-xs font-medium"
             >
               <MessageCircle className="h-3.5 w-3.5" />
               WhatsApp

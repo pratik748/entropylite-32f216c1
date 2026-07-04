@@ -145,13 +145,26 @@ const TickerStrip = () => {
         style={{ width: "max-content" }}
       >
         {items.map((t, i) => {
+          const loaded = t.price > 0;
           const positive = t.change >= 0;
-          const displayPrice = t.price > 0
+          const displayPrice = loaded
             ? isRatio(t.symbol)
               ? t.price
               : convertToBase(t.price, t.nativeCurrency)
             : 0;
           const priceSymbol = isRatio(t.symbol) ? "" : baseSym;
+
+          if (!loaded) {
+            return (
+              <div
+                key={`${t.symbol}-${i}`}
+                className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5"
+              >
+                <span className="text-[10px] font-medium tracking-tight text-muted-foreground">{t.name}</span>
+                <span className="h-3 w-14 rounded-full bg-muted-foreground/15 animate-breathe" />
+              </div>
+            );
+          }
 
           return (
             <div
@@ -160,7 +173,7 @@ const TickerStrip = () => {
             >
               <span className="text-[10px] font-medium tracking-tight text-muted-foreground">{t.name}</span>
               <span className="text-[11px] font-semibold tracking-tight text-foreground tabular-nums">
-                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                {priceSymbol}{displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <span className={`text-[10px] font-semibold tabular-nums ${positive ? "text-gain" : "text-loss"}`}>
                 {positive ? "▲" : "▼"} {Math.abs(t.change).toFixed(2)}%
