@@ -32,6 +32,19 @@ export default function PublicNav() {
     };
   }, [open]);
 
+  // Close the mobile menu once the viewport reaches desktop, otherwise the
+  // hidden sheet would keep the body scroll locked.
+  useEffect(() => {
+    if (!open) return;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handle = () => {
+      if (mq.matches) setOpen(false);
+    };
+    handle();
+    mq.addEventListener("change", handle);
+    return () => mq.removeEventListener("change", handle);
+  }, [open]);
+
   const utcDate = new Date().toISOString().slice(0, 10);
 
   return (
@@ -110,7 +123,7 @@ export default function PublicNav() {
 
         {/* Mobile sheet */}
         {open && (
-          <div className="md:hidden fixed inset-x-0 top-14 bottom-0 z-50 bg-carbon-950 border-t border-hairline px-5 pt-2 pb-8 overflow-auto">
+          <div className="md:hidden fixed inset-x-0 top-14 sm:top-[5.5rem] bottom-0 z-50 bg-carbon-950 border-t border-hairline px-5 pt-2 pb-8 overflow-auto">
             {[...NAV_LINKS, { label: "Client access", path: "/access" }].map((l, i) => (
               <button
                 key={l.path}
