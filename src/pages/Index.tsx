@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { motion } from "framer-motion";
-import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Sunrise } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark } from "lucide-react";
 import { springLayout } from "@/lib/motion";
 import CommandPalette from "@/components/CommandPalette";
 import DailyBriefing from "@/components/briefing/DailyBriefing";
@@ -40,7 +40,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
-import EntropyBrief from "@/components/EntropyBrief";
 import ProofCard from "@/components/ProofCard";
 import ModuleErrorBoundary from "@/components/ModuleErrorBoundary";
 import TerminalTour from "@/components/tour/TerminalTour";
@@ -59,28 +58,28 @@ import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 
-type Tab = "briefing" | "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
-const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
-  { id: "briefing", label: "Briefing", shortLabel: "Brief", icon: <Sunrise className="h-3.5 w-3.5" /> },
-  { id: "dashboard", label: "Dashboard", shortLabel: "Dash", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
-  { id: "market", label: "Markets", shortLabel: "Mkt", icon: <Globe className="h-3.5 w-3.5" /> },
-  { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo", icon: <Globe className="h-3.5 w-3.5" /> },
-  { id: "desirable", label: "Desirable", shortLabel: "Picks", icon: <Target className="h-3.5 w-3.5" /> },
-  { id: "sandbox", label: "Sandbox", shortLabel: "Sim", icon: <Eye className="h-3.5 w-3.5" /> },
-  { id: "statarb", label: "Stat Arb", shortLabel: "Stat", icon: <ScatterChart className="h-3.5 w-3.5" /> },
-  { id: "augment", label: "Augment", shortLabel: "Aug", icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { id: "risk", label: "Risk", shortLabel: "Risk", icon: <Shield className="h-3.5 w-3.5" /> },
-  { id: "fortress", label: "Fortress", shortLabel: "Fort", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+// Apple-style tinted SF-Symbol tiles: each tab gets a distinct hue rendered
+// as a raised, skeuomorphic gradient chip (like Settings.app icons).
+const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode; tint: string }[] = [
+  { id: "dashboard",    label: "Dashboard",   shortLabel: "Dash",  icon: <LayoutDashboard className="h-3 w-3" strokeWidth={2.5} />, tint: "from-[#0A84FF] to-[#0060DF]" },   // systemBlue
+  { id: "market",       label: "Markets",     shortLabel: "Mkt",   icon: <Landmark className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#30D158] to-[#1F9F42]" },   // systemGreen
+  { id: "geopolitical", label: "Geopolitics", shortLabel: "Geo",   icon: <Globe className="h-3 w-3" strokeWidth={2.5} />,           tint: "from-[#64D2FF] to-[#0A84FF]" },   // systemTeal→Blue
+  { id: "desirable",    label: "Desirable",   shortLabel: "Picks", icon: <Target className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FF9F0A] to-[#E8730B]" },   // systemOrange
+  { id: "sandbox",      label: "Sandbox",     shortLabel: "Sim",   icon: <Eye className="h-3 w-3" strokeWidth={2.5} />,             tint: "from-[#BF5AF2] to-[#8944E0]" },   // systemPurple
+  { id: "statarb",      label: "Stat Arb",    shortLabel: "Stat",  icon: <ScatterChart className="h-3 w-3" strokeWidth={2.5} />,    tint: "from-[#5E5CE6] to-[#3634A3]" },   // systemIndigo
+  { id: "augment",      label: "Augment",     shortLabel: "Aug",   icon: <Sparkles className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#FF375F] to-[#C9184A]" },   // systemPink
+  { id: "risk",         label: "Risk",        shortLabel: "Risk",  icon: <Shield className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FFD60A] to-[#E8A50B]" },   // systemYellow
+  { id: "fortress",     label: "Fortress",    shortLabel: "Fort",  icon: <ShieldCheck className="h-3 w-3" strokeWidth={2.5} />,     tint: "from-[#FF453A] to-[#C81E13]" },   // systemRed
 ];
 
 const IndexContent = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("briefing");
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
-  const [briefOpen, setBriefOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const tabSwitchCounter = useRef(0);
   const { stocks, setStocks, history, addHistoryEntry, clearHistory, loaded } = useCloudPortfolio();
@@ -427,13 +426,10 @@ const IndexContent = () => {
       <Header
         directProfitMode={directProfitMode}
         onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
-        onOpenBrief={() => setBriefOpen(true)}
       />
-      <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
       <CommandPalette
         tabs={tabs}
         onSelectTab={(id) => handleTabSwitch(id as Tab)}
-        onOpenBrief={() => setBriefOpen(true)}
         onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
       />
       <TerminalTour
