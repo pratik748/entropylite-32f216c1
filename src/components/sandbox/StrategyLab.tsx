@@ -191,23 +191,23 @@ const StrategyLab = ({ stocks }: Props) => {
     <div className="space-y-4">
       {/* Market Context Bar */}
       <div className="rounded border border-border bg-card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-foreground" />
+        <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <Brain className="h-5 w-5 text-foreground shrink-0" />
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Strategy Intelligence</h3>
             {regime && (
-              <span className="rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+              <span className="rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">
                 LIVE · {new Date(regime.timestamp).toLocaleTimeString()}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowMemory(!showMemory)} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setShowMemory(!showMemory)} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
               <History className="h-3 w-3" />
               History ({memory.length})
             </button>
-            <Button size="sm" variant="outline" onClick={generateInstructions} disabled={loading || !regime} className="h-7 gap-1 text-xs">
-              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            <Button size="sm" variant="outline" onClick={generateInstructions} disabled={loading || !regime} className="h-7 gap-1 text-xs whitespace-nowrap">
+              <RefreshCw className={`h-3 w-3 shrink-0 ${loading ? "animate-spin" : ""}`} />
               {loading ? "Analyzing…" : stocks.filter(s => s.analysis).length > 0 ? "Generate Trade Plan" : "Build Portfolio"}
             </Button>
           </div>

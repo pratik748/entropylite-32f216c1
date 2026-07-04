@@ -42,18 +42,18 @@ const COLORS = [
 ];
 
 function confidenceBadge(c: number) {
-  if (c >= 0.8) return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-400">HIGH</span>;
-  if (c >= 0.6) return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500/20 text-yellow-400">MED</span>;
-  return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400">LOW</span>;
+  if (c >= 0.8) return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gain/20 text-gain">HIGH</span>;
+  if (c >= 0.6) return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-warning/20 text-warning">MED</span>;
+  return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-loss/20 text-loss">LOW</span>;
 }
 
 function catalystBadge(catalyst: string) {
   const map: Record<string, { bg: string; text: string; icon: any }> = {
-    geopolitical: { bg: "bg-red-500/20", text: "text-red-400", icon: Globe },
-    news: { bg: "bg-blue-500/20", text: "text-blue-400", icon: Newspaper },
+    geopolitical: { bg: "bg-loss/20", text: "text-loss", icon: Globe },
+    news: { bg: "bg-info/20", text: "text-info", icon: Newspaper },
     macro: { bg: "bg-purple-500/20", text: "text-purple-400", icon: BarChart3 },
-    earnings: { bg: "bg-green-500/20", text: "text-green-400", icon: DollarSign },
-    structural: { bg: "bg-yellow-500/20", text: "text-yellow-400", icon: Zap },
+    earnings: { bg: "bg-gain/20", text: "text-gain", icon: DollarSign },
+    structural: { bg: "bg-warning/20", text: "text-warning", icon: Zap },
   };
   const c = map[catalyst] || map.structural;
   const Icon = c.icon;
@@ -240,7 +240,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
                 {catalystBadge(d.catalyst)}
               </div>
               <div className="flex items-center gap-2">
-                {d.urgency === "high" && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold animate-pulse">URGENT</span>}
+                {d.urgency === "high" && <span className="text-[8px] px-1.5 py-0.5 rounded bg-loss/20 text-loss font-bold animate-pulse">URGENT</span>}
                 {confidenceBadge(d.confidence)}
               </div>
             </div>
@@ -250,12 +250,12 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="glass-subtle rounded-lg px-3 py-2">
                 <div className="text-[8px] text-muted-foreground uppercase">Instrument A</div>
-                <div className="text-xs font-mono font-bold text-green-400">{d.instrument_a}</div>
+                <div className="text-xs font-mono font-bold text-gain">{d.instrument_a}</div>
                 <div className="text-[9px] text-muted-foreground">{d.asset_a}</div>
               </div>
               <div className="glass-subtle rounded-lg px-3 py-2">
                 <div className="text-[8px] text-muted-foreground uppercase">Instrument B</div>
-                <div className="text-xs font-mono font-bold text-blue-400">{d.instrument_b}</div>
+                <div className="text-xs font-mono font-bold text-info">{d.instrument_b}</div>
                 <div className="text-[9px] text-muted-foreground">{d.asset_b}</div>
               </div>
             </div>
@@ -349,7 +349,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
                         background: p.correlation > 0 ? "hsl(142, 71%, 45%)" : "hsl(0, 84%, 60%)",
                       }} />
                     </div>
-                    <span className={`text-xs font-mono font-bold ${p.correlation > 0 ? "text-green-400" : "text-red-400"}`}>
+                    <span className={`text-xs font-mono font-bold ${p.correlation > 0 ? "text-gain" : "text-loss"}`}>
                       {p.correlation.toFixed(2)}
                     </span>
                   </div>
@@ -362,22 +362,22 @@ const DerivativesEngine = ({ stocks }: Props) => {
         {divergences.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5 text-yellow-400" />
+              <Zap className="h-3.5 w-3.5 text-warning" />
               Divergence Signals
             </h3>
             <div className="space-y-2">
               {divergences.map((d, i) => (
-                <div key={i} className="glass-subtle rounded-lg px-3 py-2.5 border border-yellow-500/20">
+                <div key={i} className="glass-subtle rounded-lg px-3 py-2.5 border border-warning/20">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-mono font-bold text-foreground">{d.asset_a} / {d.asset_b}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-warning/20 text-warning font-bold">
                       Δ {d.divergence_magnitude.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex gap-4 text-[9px] text-muted-foreground">
                     <span>Historical: {d.historical_corr.toFixed(2)}</span>
                     <span>Current: {d.current_corr.toFixed(2)}</span>
-                    <span className="text-yellow-400">{d.signal.replace(/_/g, " ")}</span>
+                    <span className="text-warning">{d.signal.replace(/_/g, " ")}</span>
                   </div>
                 </div>
               ))}
@@ -397,17 +397,17 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
-                  <ArrowUpRight className="h-3.5 w-3.5 text-green-400" />
-                  <span className="text-sm font-mono font-bold text-green-400">{t.long}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-gain" />
+                  <span className="text-sm font-mono font-bold text-gain">{t.long}</span>
                 </div>
                 <span className="text-[9px] text-muted-foreground">/</span>
                 <div className="flex items-center gap-1.5">
-                  <ArrowDownRight className="h-3.5 w-3.5 text-red-400" />
-                  <span className="text-sm font-mono font-bold text-red-400">{t.short}</span>
+                  <ArrowDownRight className="h-3.5 w-3.5 text-loss" />
+                  <span className="text-sm font-mono font-bold text-loss">{t.short}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {t.sector_neutral && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">SECTOR NEUTRAL</span>}
+                {t.sector_neutral && <span className="text-[8px] px-1.5 py-0.5 rounded bg-info/20 text-info">SECTOR NEUTRAL</span>}
                 {confidenceBadge(t.reversion_prob)}
               </div>
             </div>
@@ -415,7 +415,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="mb-3">
               <div className="flex justify-between text-[9px] text-muted-foreground mb-1">
                 <span>Z-Score</span>
-                <span className={`font-bold ${Math.abs(t.z_score) > 2 ? "text-yellow-400" : "text-foreground"}`}>{t.z_score.toFixed(2)}</span>
+                <span className={`font-bold ${Math.abs(t.z_score) > 2 ? "text-warning" : "text-foreground"}`}>{t.z_score.toFixed(2)}</span>
               </div>
               <div className="h-2 bg-muted/30 rounded-full relative">
                 <div className="absolute top-0 left-1/2 w-0.5 h-2 bg-muted-foreground/30" />
@@ -444,7 +444,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
               </div>
               <div className="text-center">
                 <div className="text-[9px] text-muted-foreground">Exp. Return</div>
-                <div className="text-xs font-bold text-green-400">{pctFmt(t.expected_return)}</div>
+                <div className="text-xs font-bold text-gain">{pctFmt(t.expected_return)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[9px] text-muted-foreground">Spread μ</div>
@@ -644,12 +644,12 @@ const DerivativesEngine = ({ stocks }: Props) => {
         {n.hedge_suggestions?.length > 0 && (
           <div className="glass-panel rounded-xl p-4">
             <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-              <Shield className="h-3.5 w-3.5 text-blue-400" />
+              <Shield className="h-3.5 w-3.5 text-info" />
               Hedge Suggestions
             </h3>
             <div className="space-y-2">
               {n.hedge_suggestions.map((h, i) => (
-                <div key={i} className="glass-subtle rounded-lg px-3 py-2.5 border border-blue-500/10">
+                <div key={i} className="glass-subtle rounded-lg px-3 py-2.5 border border-info/10">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-foreground">{h.action} {h.instrument}</span>
                     <div className="flex items-center gap-2">
@@ -685,7 +685,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
                 <span className="text-sm font-bold text-foreground">{o.title}</span>
               </div>
               <div className="flex items-center gap-2">
-                {o.urgency === "high" && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">URGENT</span>}
+                {o.urgency === "high" && <span className="text-[8px] px-1.5 py-0.5 rounded bg-loss/20 text-loss font-bold">URGENT</span>}
                 {confidenceBadge(o.confidence)}
               </div>
             </div>
@@ -696,11 +696,11 @@ const DerivativesEngine = ({ stocks }: Props) => {
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Exp. Return</div>
-                <div className="text-xs font-bold text-green-400">{pctFmt(o.expected_return)}</div>
+                <div className="text-xs font-bold text-gain">{pctFmt(o.expected_return)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Max Loss</div>
-                <div className="text-xs font-bold text-red-400">{pctFmt(o.max_loss)}</div>
+                <div className="text-xs font-bold text-loss">{pctFmt(o.max_loss)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Capital Eff.</div>
@@ -755,7 +755,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="grid grid-cols-5 gap-2">
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Win Prob</div>
-                <div className="text-xs font-bold text-green-400">{pctFmt(s.win_probability)}</div>
+                <div className="text-xs font-bold text-gain">{pctFmt(s.win_probability)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Sharpe</div>
@@ -763,7 +763,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Max DD</div>
-                <div className="text-xs font-bold text-red-400">{pctFmt(s.max_dd)}</div>
+                <div className="text-xs font-bold text-loss">{pctFmt(s.max_dd)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Capital</div>
@@ -792,7 +792,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
 
     if (error && !data) {
       return (
-        <div className="glass-panel rounded-xl p-6 border border-red-500/20 text-center space-y-3">
+        <div className="glass-panel rounded-xl p-6 border border-loss/20 text-center space-y-3">
           <p className="text-sm font-semibold text-foreground">Derivatives engine failed to complete.</p>
           <p className="text-xs text-muted-foreground">{error}</p>
           <button
@@ -857,13 +857,13 @@ const DerivativesEngine = ({ stocks }: Props) => {
       </div>
 
       {error && data && (
-        <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400">
+        <div className="glass-subtle rounded-lg px-3 py-2 border border-warning/20 text-[10px] text-warning">
           Latest refresh failed, showing the most recent completed derivatives snapshot.
         </div>
       )}
 
       {data && optionsCount < assetCount && (
-        <div className="glass-subtle rounded-lg px-3 py-2 border border-yellow-500/20 text-[10px] text-yellow-400 flex items-center gap-2">
+        <div className="glass-subtle rounded-lg px-3 py-2 border border-warning/20 text-[10px] text-warning flex items-center gap-2">
           <Zap className="h-3 w-3" />
           AI covered {optionsCount}/{assetCount} assets. Click ANALYZE to refresh for full coverage.
         </div>

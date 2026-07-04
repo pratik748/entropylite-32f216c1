@@ -77,7 +77,7 @@ export default function DataAggregationPage() {
       <header className="border-b border-black/[0.06]">
         <div className="max-w-5xl mx-auto px-5 sm:px-6 pt-12 sm:pt-20 pb-12 sm:pb-16">
           <div className="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full border border-black/10 bg-black/[0.02]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
             <span className="font-mono text-[10px] tracking-[0.15em] text-black/55 uppercase">Veracity Layer · Live</span>
           </div>
           <h1 className="text-[2.4rem] sm:text-6xl font-bold tracking-tighter leading-[1.02] mb-5">

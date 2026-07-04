@@ -39,23 +39,38 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
 
   return (
     <header data-density="compact" className="glass-panel border-b border-border/60 relative shrink-0">
-      <div className="px-3 sm:container flex h-14 sm:h-16 items-center justify-between relative z-10">
-        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+      <div className="px-3 sm:container flex h-14 sm:h-16 items-center justify-between gap-2 relative z-10">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 overflow-hidden">
           <img alt="Entropy" className="h-11 sm:h-12 rounded-lg object-contain flex-shrink-0" src="/brand/entropy-mark.jpg" />
-          <div className="hidden lg:flex flex-col justify-center leading-tight">
+          <div className="hidden lg:flex flex-col justify-center leading-tight shrink-0">
             <span className="text-[13px] font-semibold tracking-tight text-foreground">Entropy</span>
             <span className="text-[10px] text-muted-foreground/70 tracking-tight">Predictive yield intelligence</span>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-3 ml-1.5 sm:ml-3 pl-2 sm:pl-4 border-l border-border/60">
+          {/* Progressive disclosure: one market on mobile, all four from sm+ (Apple HIG density principle) */}
+          <div className="hidden sm:flex items-center gap-3 ml-1.5 sm:ml-3 pl-2 sm:pl-4 border-l border-border/60 shrink-0">
             {markets.map(m => {
               const open = isMarketOpen(m.tz, m.open, m.close);
               return (
-                <div key={m.name} className="flex items-center gap-1 sm:gap-1.5" title={`${m.name} ${open ? "open" : "closed"}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${open ? "bg-gain shadow-[0_0_6px_hsl(var(--gain))] animate-breathe" : "bg-muted-foreground/25"}`} />
-                  <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground tracking-tight">{m.name}</span>
+                <div key={m.name} className="flex items-center gap-1.5 whitespace-nowrap" title={`${m.name} ${open ? "open" : "closed"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${open ? "bg-gain shadow-[0_0_6px_hsl(var(--gain))] animate-breathe" : "bg-muted-foreground/25"}`} />
+                  <span className="text-[11px] font-medium text-muted-foreground tracking-tight">{m.name}</span>
                 </div>
               );
             })}
+          </div>
+          <div
+            className="flex sm:hidden items-center gap-1 ml-1.5 pl-2 border-l border-border/60 shrink-0 whitespace-nowrap"
+            title={`${markets.filter(m => isMarketOpen(m.tz, m.open, m.close)).length} of ${markets.length} markets open`}
+          >
+            {(() => {
+              const openCount = markets.filter(m => isMarketOpen(m.tz, m.open, m.close)).length;
+              return (
+                <>
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${openCount > 0 ? "bg-gain shadow-[0_0_6px_hsl(var(--gain))] animate-breathe" : "bg-muted-foreground/25"}`} />
+                  <span className="text-[10px] font-medium text-muted-foreground tracking-tight">{openCount}/{markets.length}</span>
+                </>
+              );
+            })()}
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
