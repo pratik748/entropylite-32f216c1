@@ -5,83 +5,86 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ═══════════════════════════════════════════════════════════════
-   ENTROPY DESIGN SYSTEM — Apple HIG-inspired token foundation
-   Layered materials · soft depth · continuous geometry · calm motion
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   ENTROPY DESIGN SYSTEM · 2026
+   Institutional infrastructure with Apple craftsmanship.
+
+   One voice everywhere: blue-tinted obsidian surfaces, hairline structure,
+   a single capital-blue accent, tabular numerals, calm physical motion.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    /* ── Dark (default) · true-black elevated surfaces, iOS system colors ── */
-    --background: 240 10% 3%;
-    --foreground: 240 10% 96%;
+    /* ── Obsidian (default dark) · graphite with a cold blue undertone ── */
+    --background: 220 24% 4%;
+    --foreground: 218 18% 95%;
 
-    --card: 240 6% 8%;
-    --card-foreground: 240 10% 96%;
+    --card: 219 20% 7%;
+    --card-foreground: 218 18% 95%;
 
-    --popover: 240 6% 9%;
-    --popover-foreground: 240 10% 96%;
+    --popover: 219 20% 8%;
+    --popover-foreground: 218 18% 95%;
 
-    --primary: 240 8% 94%;
-    --primary-foreground: 240 10% 4%;
+    --primary: 218 16% 94%;
+    --primary-foreground: 220 24% 5%;
 
-    --secondary: 240 5% 11%;
-    --secondary-foreground: 240 5% 64%;
+    --secondary: 219 16% 11%;
+    --secondary-foreground: 218 10% 66%;
 
-    --muted: 240 5% 10%;
-    --muted-foreground: 240 4% 56%;
+    --muted: 219 16% 10%;
+    --muted-foreground: 218 10% 58%;
 
-    --accent: 240 5% 14%;
-    --accent-foreground: 240 10% 96%;
+    --accent: 219 16% 14%;
+    --accent-foreground: 218 18% 95%;
 
-    --destructive: 4 100% 59%;
+    --destructive: 4 88% 59%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 15%;
-    --input: 240 5% 12%;
-    /* Focus ring — Apple system blue */
-    --ring: 211 100% 52%;
+    --border: 219 16% 14%;
+    --input: 219 15% 12%;
+    /* Capital blue — the one accent in the whole system */
+    --ring: 214 100% 59%;
 
     /* Continuous-corner geometry */
-    --radius: 0.875rem;
+    --radius: 0.75rem;
 
-    /* Semantic system colors (iOS dark palette) */
-    --gain: 135 63% 50%;          /* systemGreen  #30D158 */
-    --loss: 4 100% 61%;           /* systemRed    #FF453A */
-    --warning: 36 100% 52%;       /* systemOrange #FF9F0A */
-    --info: 211 100% 52%;         /* systemBlue   #0A84FF */
+    /* Semantic system colors */
+    --gain: 145 66% 46%;
+    --loss: 4 92% 62%;
+    --warning: 34 96% 54%;
+    --info: 214 100% 59%;
 
-    --sentiment-positive: 135 63% 50%;
-    --sentiment-negative: 4 100% 61%;
-    --sentiment-neutral: 36 100% 52%;
+    --sentiment-positive: 145 66% 46%;
+    --sentiment-negative: 4 92% 62%;
+    --sentiment-neutral: 34 96% 54%;
 
     /* Elevated surface ladder */
-    --surface-1: 240 6% 7%;
-    --surface-2: 240 5% 10%;
-    --surface-3: 240 5% 14%;
+    --surface-1: 219 20% 6%;
+    --surface-2: 219 17% 9%;
+    --surface-3: 219 15% 13%;
 
-    /* ── Materials · layered translucency (thin → thick) ── */
-    --glass-bg: 240 8% 6% / 0.72;
-    --glass-border: 240 20% 80% / 0.10;
-    --glass-highlight: 240 30% 90% / 0.07;
-    --glass-refraction: 240 20% 70% / 0.03;
+    /* ── Materials · layered translucency ── */
+    --glass-bg: 220 22% 5% / 0.72;
+    --glass-border: 218 30% 82% / 0.09;
+    --glass-highlight: 218 40% 90% / 0.06;
+    --glass-refraction: 218 30% 70% / 0.03;
 
-    --material-thin: 240 8% 8% / 0.55;
-    --material-regular: 240 8% 7% / 0.72;
-    --material-thick: 240 9% 6% / 0.88;
+    --material-thin: 220 22% 6% / 0.55;
+    --material-regular: 220 22% 5% / 0.74;
+    --material-thick: 220 24% 4% / 0.90;
 
     /* ── Depth · diffuse ambient shadows, never harsh ── */
-    --shadow-1: 0 1px 2px hsl(240 20% 2% / 0.25), 0 2px 8px hsl(240 20% 2% / 0.20);
-    --shadow-2: 0 2px 4px hsl(240 20% 2% / 0.25), 0 8px 24px hsl(240 20% 2% / 0.30);
-    --shadow-3: 0 4px 12px hsl(240 20% 2% / 0.30), 0 20px 60px hsl(240 20% 2% / 0.40);
+    --shadow-1: 0 1px 2px hsl(222 40% 2% / 0.30), 0 2px 8px hsl(222 40% 2% / 0.22);
+    --shadow-2: 0 2px 4px hsl(222 40% 2% / 0.28), 0 8px 24px hsl(222 40% 2% / 0.32);
+    --shadow-3: 0 4px 12px hsl(222 40% 2% / 0.32), 0 20px 60px hsl(222 40% 2% / 0.44);
 
-    --glow-primary: 0 0 20px hsl(240 8% 90% / 0.08);
-    --glow-gain: 0 0 20px hsl(135 63% 50% / 0.16);
-    --glow-loss: 0 0 20px hsl(4 100% 61% / 0.16);
+    --glow-primary: 0 0 20px hsl(218 16% 90% / 0.07);
+    --glow-gain: 0 0 20px hsl(145 66% 46% / 0.16);
+    --glow-loss: 0 0 20px hsl(4 92% 62% / 0.16);
     --glow-glass: var(--shadow-1);
-    --glow-glass-primary: var(--shadow-2), inset 0 1px 0 hsl(240 30% 85% / 0.07);
-    --glow-glass-loss: 0 0 28px hsl(4 100% 61% / 0.12), inset 0 1px 0 hsl(4 80% 80% / 0.08);
-    --glow-glass-gain: 0 0 28px hsl(135 63% 50% / 0.12), inset 0 1px 0 hsl(135 60% 80% / 0.08);
+    --glow-glass-primary: var(--shadow-2), inset 0 1px 0 hsl(218 40% 85% / 0.06);
+    --glow-glass-loss: 0 0 28px hsl(4 92% 62% / 0.12), inset 0 1px 0 hsl(4 80% 80% / 0.08);
+    --glow-glass-gain: 0 0 28px hsl(145 66% 46% / 0.12), inset 0 1px 0 hsl(145 60% 80% / 0.08);
 
     /* ── Motion · Apple spring-adjacent curves ── */
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
@@ -91,89 +94,89 @@
     --duration-base: 320ms;
     --duration-slow: 550ms;
 
-    --sidebar-background: 240 10% 3%;
-    --sidebar-foreground: 240 4% 56%;
-    --sidebar-primary: 240 8% 94%;
-    --sidebar-primary-foreground: 240 10% 4%;
-    --sidebar-accent: 240 5% 11%;
-    --sidebar-accent-foreground: 240 10% 96%;
-    --sidebar-border: 240 6% 13%;
-    --sidebar-ring: 211 100% 52%;
+    --sidebar-background: 220 24% 4%;
+    --sidebar-foreground: 218 10% 58%;
+    --sidebar-primary: 218 16% 94%;
+    --sidebar-primary-foreground: 220 24% 5%;
+    --sidebar-accent: 219 16% 11%;
+    --sidebar-accent-foreground: 218 18% 95%;
+    --sidebar-border: 219 16% 12%;
+    --sidebar-ring: 214 100% 59%;
   }
 
   .light {
-    /* ── Light · Apple grouped background, white floating cards ── */
-    --background: 240 9% 96%;
-    --foreground: 240 8% 9%;
+    /* ── Platinum · cool institutional light, white floating panels ── */
+    --background: 220 24% 97%;
+    --foreground: 221 30% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 8% 9%;
+    --card-foreground: 221 30% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 8% 9%;
+    --popover-foreground: 221 30% 10%;
 
-    --primary: 240 8% 11%;
+    --primary: 221 30% 12%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 6% 92%;
-    --secondary-foreground: 240 5% 38%;
+    --secondary: 220 18% 93%;
+    --secondary-foreground: 220 12% 38%;
 
-    --muted: 240 6% 93%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 220 18% 94%;
+    --muted-foreground: 220 10% 44%;
 
-    --accent: 240 6% 90%;
-    --accent-foreground: 240 8% 9%;
+    --accent: 220 18% 91%;
+    --accent-foreground: 221 30% 10%;
 
-    --destructive: 3 84% 50%;
+    --destructive: 3 82% 48%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 88%;
-    --input: 240 6% 90%;
-    --ring: 211 100% 50%;
+    --border: 220 16% 88%;
+    --input: 220 16% 91%;
+    --ring: 219 84% 46%;
 
-    /* Semantic system colors (iOS light, darkened for text contrast) */
-    --gain: 140 62% 34%;          /* systemGreen  */
-    --loss: 3 84% 48%;            /* systemRed    */
-    --warning: 32 96% 42%;        /* systemOrange */
-    --info: 211 100% 45%;         /* systemBlue   */
+    /* Semantic system colors, darkened for text contrast on white */
+    --gain: 148 64% 30%;
+    --loss: 3 78% 44%;
+    --warning: 30 92% 38%;
+    --info: 219 84% 46%;
 
-    --sentiment-positive: 140 62% 34%;
-    --sentiment-negative: 3 84% 48%;
-    --sentiment-neutral: 32 96% 42%;
+    --sentiment-positive: 148 64% 30%;
+    --sentiment-negative: 3 78% 44%;
+    --sentiment-neutral: 30 92% 38%;
 
     --surface-1: 0 0% 100%;
-    --surface-2: 240 8% 97%;
-    --surface-3: 240 6% 92%;
+    --surface-2: 220 22% 98%;
+    --surface-3: 220 16% 93%;
 
     --glass-bg: 0 0% 100% / 0.78;
-    --glass-border: 240 10% 10% / 0.08;
+    --glass-border: 221 20% 10% / 0.08;
     --glass-highlight: 0 0% 100% / 0.60;
-    --glass-refraction: 240 10% 10% / 0.02;
+    --glass-refraction: 221 20% 10% / 0.02;
 
     --material-thin: 0 0% 100% / 0.55;
     --material-regular: 0 0% 100% / 0.75;
     --material-thick: 0 0% 100% / 0.90;
 
-    --shadow-1: 0 1px 2px hsl(240 20% 10% / 0.05), 0 2px 8px hsl(240 20% 10% / 0.05);
-    --shadow-2: 0 2px 4px hsl(240 20% 10% / 0.05), 0 10px 30px hsl(240 20% 10% / 0.08);
-    --shadow-3: 0 4px 12px hsl(240 20% 10% / 0.06), 0 24px 70px hsl(240 20% 10% / 0.12);
+    --shadow-1: 0 1px 2px hsl(221 30% 12% / 0.04), 0 2px 8px hsl(221 30% 12% / 0.04);
+    --shadow-2: 0 2px 4px hsl(221 30% 12% / 0.05), 0 10px 30px hsl(221 30% 12% / 0.07);
+    --shadow-3: 0 4px 12px hsl(221 30% 12% / 0.06), 0 24px 70px hsl(221 30% 12% / 0.11);
 
-    --glow-primary: 0 0 20px hsl(240 8% 10% / 0.05);
-    --glow-gain: 0 0 20px hsl(140 62% 34% / 0.10);
-    --glow-loss: 0 0 20px hsl(3 84% 48% / 0.10);
+    --glow-primary: 0 0 20px hsl(221 30% 12% / 0.05);
+    --glow-gain: 0 0 20px hsl(148 64% 30% / 0.10);
+    --glow-loss: 0 0 20px hsl(3 78% 44% / 0.10);
     --glow-glass: var(--shadow-1);
     --glow-glass-primary: var(--shadow-2), inset 0 1px 0 hsl(0 0% 100% / 0.6);
-    --glow-glass-loss: 0 0 15px hsl(3 84% 48% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.5);
-    --glow-glass-gain: 0 0 15px hsl(140 62% 34% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+    --glow-glass-loss: 0 0 15px hsl(3 78% 44% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+    --glow-glass-gain: 0 0 15px hsl(148 64% 30% / 0.08), inset 0 1px 0 hsl(0 0% 100% / 0.5);
 
-    --sidebar-background: 240 9% 96%;
-    --sidebar-foreground: 240 4% 46%;
-    --sidebar-primary: 240 8% 11%;
+    --sidebar-background: 220 24% 97%;
+    --sidebar-foreground: 220 10% 44%;
+    --sidebar-primary: 221 30% 12%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 6% 92%;
-    --sidebar-accent-foreground: 240 8% 9%;
-    --sidebar-border: 240 6% 86%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 220 18% 93%;
+    --sidebar-accent-foreground: 221 30% 10%;
+    --sidebar-border: 220 16% 86%;
+    --sidebar-ring: 219 84% 46%;
   }
 
   .palantir {
@@ -204,14 +207,14 @@
 
     --border: 0 0% 88%;
     --input: 0 0% 92%;
-    --ring: 211 100% 45%;
+    --ring: 219 84% 46%;
 
     --radius: 0.375rem;
 
     --gain: 152 55% 32%;
     --loss: 0 65% 45%;
     --warning: 38 75% 45%;
-    --info: 210 50% 45%;
+    --info: 219 60% 45%;
 
     --sentiment-positive: 152 55% 32%;
     --sentiment-negative: 0 65% 45%;
@@ -249,7 +252,7 @@
     --sidebar-accent: 0 0% 96%;
     --sidebar-accent-foreground: 0 0% 8%;
     --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 211 100% 45%;
+    --sidebar-ring: 219 84% 46%;
   }
 }
 
@@ -433,7 +436,7 @@
   }
 
   .gradient-border {
-    border-image: linear-gradient(135deg, hsl(211 100% 60% / 0.3), hsl(220 12% 13%)) 1;
+    border-image: linear-gradient(135deg, hsl(214 100% 60% / 0.3), hsl(220 12% 13%)) 1;
   }
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -509,7 +512,7 @@
     100% { background-position: -200% 0; }
   }
   .data-stream {
-    background: linear-gradient(90deg, transparent 0%, hsl(240 10% 60% / 0.04) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, hsl(218 10% 60% / 0.04) 50%, transparent 100%);
     background-size: 200% 100%;
     animation: data-stream 4s linear infinite;
   }
@@ -598,6 +601,15 @@
     color: hsl(var(--muted-foreground));
   }
 
+  /* Micro data label — the institutional voice for every field caption */
+  .data-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: hsl(var(--muted-foreground));
+  }
+
   /* ════════ Panel system ════════ */
   .panel-soft {
     background: hsl(var(--card));
@@ -624,6 +636,52 @@
   .section-pad-sm {
     padding-top: clamp(1.5rem, 4vw, 3rem);
     padding-bottom: clamp(1.5rem, 4vw, 3rem);
+  }
+
+  /* ════════ Marketing layer · fixed institutional palette ════════
+     The public site does not follow the terminal theme: it is always
+     paper-white with deep-ink sections and one capital-blue accent. */
+  .mkt-display {
+    font-size: clamp(2.5rem, 6vw, 4.75rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+  }
+  .mkt-display-2 {
+    font-size: clamp(1.75rem, 3.6vw, 2.875rem);
+    line-height: 1.08;
+    letter-spacing: -0.028em;
+    font-weight: 700;
+  }
+  .mkt-lede {
+    font-size: clamp(1rem, 1.4vw, 1.1875rem);
+    line-height: 1.55;
+    letter-spacing: -0.011em;
+  }
+  .mkt-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+  }
+  /* Fine engineering grid for ink sections */
+  .ink-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .paper-grid {
+    background-image:
+      linear-gradient(to right, rgb(10 15 26 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(10 15 26 / 0.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  /* Radial vignette so grids fade toward the edges */
+  .grid-vignette {
+    -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 35%, black 30%, transparent 100%);
+    mask-image: radial-gradient(ellipse 90% 80% at 50% 35%, black 30%, transparent 100%);
   }
 }
 
@@ -677,22 +735,22 @@
 
 /* Leaflet dark theme overrides */
 .leaflet-container {
-  background: hsl(240, 10%, 3%) !important;
+  background: hsl(220, 24%, 4%) !important;
   font-family: 'JetBrains Mono', monospace;
 }
 .leaflet-control-zoom a {
-  background: hsl(240, 5%, 10%) !important;
-  color: hsl(240, 4%, 65%) !important;
-  border-color: hsl(240, 6%, 15%) !important;
+  background: hsl(219, 17%, 9%) !important;
+  color: hsl(218, 10%, 65%) !important;
+  border-color: hsl(219, 16%, 14%) !important;
 }
 .leaflet-control-zoom a:hover {
-  background: hsl(240, 5%, 14%) !important;
-  color: hsl(240, 10%, 96%) !important;
+  background: hsl(219, 15%, 13%) !important;
+  color: hsl(218, 18%, 95%) !important;
 }
 .entropy-tooltip {
-  background: hsl(240, 6%, 8%) !important;
-  border: 1px solid hsl(240, 6%, 18%) !important;
-  color: hsl(240, 5%, 85%) !important;
+  background: hsl(219, 20%, 7%) !important;
+  border: 1px solid hsl(219, 16%, 17%) !important;
+  color: hsl(218, 12%, 85%) !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 9px !important;
   padding: 2px 6px !important;
@@ -700,32 +758,32 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
 }
 .entropy-tooltip::before {
-  border-right-color: hsl(240, 6%, 18%) !important;
+  border-right-color: hsl(219, 16%, 17%) !important;
 }
 .portfolio-tooltip {
-  color: hsl(240, 8%, 92%) !important;
+  color: hsl(218, 16%, 92%) !important;
   font-weight: 700 !important;
 }
   .entropy-popup .leaflet-popup-content-wrapper {
-  background: hsl(240, 6%, 8%) !important;
-  color: hsl(240, 5%, 85%) !important;
-  border: 1px solid hsl(240, 6%, 18%) !important;
+  background: hsl(219, 20%, 7%) !important;
+  color: hsl(218, 12%, 85%) !important;
+  border: 1px solid hsl(219, 16%, 17%) !important;
   border-radius: 10px !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 10px !important;
 }
 .leaflet-popup-content-wrapper {
-  background: hsl(240, 6%, 8%) !important;
-  color: hsl(240, 5%, 85%) !important;
-  border: 1px solid hsl(240, 6%, 18%) !important;
+  background: hsl(219, 20%, 7%) !important;
+  color: hsl(218, 12%, 85%) !important;
+  border: 1px solid hsl(219, 16%, 17%) !important;
   border-radius: 10px !important;
   font-size: 11px !important;
 }
 .leaflet-popup-tip {
-  background: hsl(240, 6%, 8%) !important;
+  background: hsl(219, 20%, 7%) !important;
 }
 .leaflet-popup-close-button {
-  color: hsl(240, 4%, 45%) !important;
+  color: hsl(218, 10%, 45%) !important;
 }
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.3; transform: scale(1); }

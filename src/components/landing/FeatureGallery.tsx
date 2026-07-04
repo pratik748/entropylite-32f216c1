@@ -131,20 +131,27 @@ export default function FeatureGallery() {
   }, []);
 
   return (
-    <section className="border-t border-black/5 bg-black/[0.015]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <div className="text-center mb-8 sm:mb-12">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Inside the terminal</p>
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-            Six core surfaces. Real screens. Real data.
+    <section className="border-t border-ink/[0.07] bg-white">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+        <div className="mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="mkt-label text-[9px] text-ink/35">03</span>
+            <span className="h-px w-8 bg-ink/20" />
+            <span className="mkt-label text-[9px] text-ink/55">Inside the terminal</span>
+          </div>
+          <h2 className="mkt-display-2 text-ink">
+            Six core surfaces.
+            <br />
+            <span className="text-ink/40">Real screens, real data.</span>
           </h2>
-          <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-            Each tab is a live capture from the running terminal. No mockups, no marketing renders.
+          <p className="mkt-lede mt-5 max-w-2xl text-ink/55">
+            Each capture below is taken from the running terminal. No mockups,
+            no marketing renders.
           </p>
         </div>
 
         {/* Tab strip */}
-        <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2 mb-6 sm:mb-8">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-8 border-b border-ink/[0.07] pb-6">
           {TABS.map((t) => {
             const Icon = t.icon;
             const isActive = t.id === active;
@@ -152,14 +159,14 @@ export default function FeatureGallery() {
               <button
                 key={t.id}
                 onClick={() => setActive(t.id)}
-                className={`inline-flex items-center gap-1.5 px-3 sm:px-4 h-9 rounded-full font-mono text-[10px] sm:text-xs tracking-wide transition-all border ${
+                className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-lg text-[12px] font-semibold tracking-tight transition-all border ${
                   isActive
-                    ? "bg-black text-white border-black shadow-sm"
-                    : "bg-white text-black/60 border-black/10 hover:border-black/30 hover:text-black"
+                    ? "bg-ink text-white border-ink"
+                    : "bg-white text-ink/55 border-ink/10 hover:border-ink/30 hover:text-ink"
                 }`}
                 aria-pressed={isActive}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
                 {t.label}
               </button>
             );
@@ -167,8 +174,8 @@ export default function FeatureGallery() {
         </div>
 
         {/* Active panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 sm:gap-8 items-start">
-          <figure className="lg:col-span-3 rounded-xl overflow-hidden border border-black/10 shadow-2xl shadow-black/15 bg-white">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 sm:gap-10 items-start">
+          <figure className="lg:col-span-3 rounded-xl overflow-hidden border border-ink/10 shadow-[0_24px_80px_-24px_rgba(10,15,26,0.35)] bg-white">
             <img
               key={tab.id}
               src={tab.img}
@@ -183,13 +190,13 @@ export default function FeatureGallery() {
           </figure>
 
           <div className="lg:col-span-2 lg:pl-2">
-            <p className="font-mono text-[10px] tracking-[0.25em] uppercase text-black/40 mb-3">{tab.label}</p>
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3 leading-tight">{tab.title}</h3>
-            <p className="text-sm sm:text-base text-black/60 leading-relaxed mb-5">{tab.desc}</p>
-            <ul className="space-y-2.5">
+            <p className="mkt-label text-[9px] text-ink/40 mb-4">{tab.label}</p>
+            <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3 leading-tight text-ink">{tab.title}</h3>
+            <p className="text-[14px] text-ink/55 leading-relaxed mb-6">{tab.desc}</p>
+            <ul className="border-t border-ink/[0.07]">
               {tab.bullets.map((b, i) => (
-                <li key={i} className="flex gap-3 text-sm text-black/70 leading-snug">
-                  <span className="font-mono text-[10px] text-black/30 mt-1 flex-shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                <li key={i} className="flex gap-4 text-[13px] text-ink/65 leading-relaxed py-3 border-b border-ink/[0.07]">
+                  <span className="mkt-label text-[9px] text-ink/30 mt-1 flex-shrink-0">{String(i + 1).padStart(2, "0")}</span>
                   <span>{b}</span>
                 </li>
               ))}

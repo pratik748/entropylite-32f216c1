@@ -1,497 +1,487 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Activity, Shield, Globe, Sparkles, Target, BarChart3,
-  TrendingUp, Layers, Zap, ArrowRight, ChevronRight,
-  Brain, LineChart, Cpu, Eye, GitBranch, Workflow,
-  Lock, Clock, Infinity as InfinityIcon
+  TrendingUp, Layers, Zap, ArrowRight, ArrowUpRight, Plus,
+  Lock, Clock, Infinity as InfinityIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import PublicNav from "@/components/PublicNav";
+import SiteFooter from "@/components/marketing/SiteFooter";
+import { SectionIntro, InkButton, LineButton } from "@/components/marketing/Section";
 import FeatureGallery from "@/components/landing/FeatureGallery";
 import MathResearch from "@/components/landing/MathResearch";
-import entropyLogoFull from "@/assets/entropy-logo-full.jpeg";
 import dashboardPreview from "@/assets/dashboard-preview.png";
 
 const STATS = [
   { value: "10,000", label: "Monte Carlo paths per asset" },
-  { value: "12", label: "Intelligence layers" },
-  { value: "Real time", label: "Price and news feeds" },
-  { value: "Always on", label: "Background scenario scan" },
+  { value: "12", label: "Analytical engines in parallel" },
+  { value: "95 / 99", label: "VaR & CVaR confidence levels" },
+  { value: "24 / 7", label: "Background scenario scan" },
+];
+
+const METHODS = [
+  "Monte Carlo · GBM",
+  "VaR / CVaR",
+  "Merton 1974",
+  "Ornstein–Uhlenbeck",
+  "Cointegration",
+  "Shannon entropy",
+  "Bayesian priors",
+  "CLANK constraints",
 ];
 
 const PRINCIPLES = [
-  { title: "Forecasts are fiction. Distributions are real.", desc: "We do not predict the next print. We show the range of plausible outcomes and the probability attached to each." },
-  { title: "Structure moves price. Narrative explains it later.", desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The model watches the cause." },
-  { title: "The system learns from you, not the crowd.", desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked and away from the ones that did not." },
-  { title: "Twelve engines. One quiet surface.", desc: "Twelve layers run underneath. One surface sits on top. The math stays out of the way until you ask for it." },
+  {
+    n: "01",
+    title: "Forecasts are fiction. Distributions are real.",
+    desc: "The system never predicts the next print. It computes the range of plausible outcomes and the probability attached to each, then keeps both honest against realized data.",
+  },
+  {
+    n: "02",
+    title: "Structure moves price. Narrative explains it later.",
+    desc: "Liquidity, positioning and constraint thresholds move markets. Headlines arrive after. The engines watch the cause, not the commentary.",
+  },
+  {
+    n: "03",
+    title: "The system learns from you, not the crowd.",
+    desc: "Every outcome you log adjusts the weights — biasing future analysis toward the patterns that worked for your book and away from the ones that did not.",
+  },
+  {
+    n: "04",
+    title: "Twelve engines. One quiet surface.",
+    desc: "Twelve layers run underneath. One surface sits on top. The mathematics stays out of the way until the moment you ask for it.",
+  },
 ];
 
-const FEATURES = [
-  { icon: Activity, title: "Quantitative risk engine", desc: "VaR and CVaR at 95% and 99%, liquidity adjusted, recomputed live for every position you hold." },
-  { icon: Shield, title: "CLANK constraint detection", desc: "Warns when structural limits in liquidity, positioning or derivatives gamma start to bend, before price reacts." },
-  { icon: Globe, title: "Geopolitical intelligence", desc: "A live read on global events with a market impact score and a regime label that adjusts the rest of the stack." },
-  { icon: TrendingUp, title: "10,000 path Monte Carlo", desc: "A probabilistic outcome distribution on every holding, run on real volatility, reported as profit probability and tail risk." },
-  { icon: Layers, title: "Statistical arbitrage", desc: "Mean reversion candidates, cointegrated pairs and Z score drift across the whole book, not a single ticker." },
-  { icon: Target, title: "Desirable asset discovery", desc: "A daily shortlist of setups scored on momentum, quality and how they would interact with your existing exposure." },
-  { icon: BarChart3, title: "Deep company dossiers", desc: "A twelve dimension read on any company: management, capital flows, narrative, structural risk and the rest." },
-  { icon: Sparkles, title: "Strategy factory", desc: "Spin up a scenario, calibrate to the current regime and paper test a hypothesis before risking real capital." },
-  { icon: Zap, title: "Causal effects simulator", desc: "First, second and third order cascade modelled before you place the trade, not after." },
+const CAPABILITIES = [
+  { icon: Activity, title: "Quantitative risk engine", desc: "VaR and CVaR at 95% and 99% confidence, liquidity-adjusted, recomputed live for every position held." },
+  { icon: Shield, title: "CLANK constraint detection", desc: "Flags structural limits in liquidity, positioning and dealer gamma as they begin to bend — before price reacts." },
+  { icon: Globe, title: "Geopolitical intelligence", desc: "A live read on global events with a market-impact score and a regime label that recalibrates the rest of the stack." },
+  { icon: TrendingUp, title: "Probabilistic simulation", desc: "10,000-path Monte Carlo on every holding, run on realized volatility, reported as profit probability and tail risk." },
+  { icon: Layers, title: "Statistical arbitrage", desc: "Mean-reversion candidates, cointegrated pairs and Z-score drift measured across the whole book, not a single ticker." },
+  { icon: Target, title: "Asset discovery", desc: "A daily shortlist of setups scored on momentum, quality and interaction with your existing exposure." },
+  { icon: BarChart3, title: "Company dossiers", desc: "A twelve-dimension read on any company: management, capital flows, narrative, structural risk and beyond." },
+  { icon: Sparkles, title: "Strategy factory", desc: "Spin up a scenario, calibrate it to the current regime, and paper-test the hypothesis before risking capital." },
+  { icon: Zap, title: "Causal cascade modelling", desc: "First-, second- and third-order effects propagated across sectors, currencies and asset classes — pre-trade." },
 ];
 
-const HOW_IT_WORKS = [
-  { icon: Eye, step: "01", title: "Live data in", desc: "Yahoo Finance prices, GDELT geopolitics, multi source news, FX and institutional flow signals stream in continuously, timestamped and normalised to your base currency." },
-  { icon: Cpu, step: "02", title: "Twelve engines run in parallel", desc: "CLANK, Monte Carlo, statistical arbitrage, regime classifier and the rest run side by side and resolve into a single composed view." },
-  { icon: Brain, step: "03", title: "Probabilistic alerts", desc: "Notified the moment portfolio VaR breaches your threshold, or a structural constraint moves close to activation." },
-  { icon: GitBranch, step: "04", title: "Causal cascade modelling", desc: "Each event is propagated across correlated sectors, currencies and asset classes through first, second and third order effects." },
-  { icon: LineChart, step: "05", title: "Strategy mapping", desc: "Strategy Factory turns the read into a concrete positioning idea with entry levels, projected ranges and an invalidation zone." },
-  { icon: Workflow, step: "06", title: "It learns from your outcomes", desc: "Every trade you log feeds Scar Memory and the Outcome Gradient, so the system biases toward your winners and away from your repeated losses." },
+const PIPELINE = [
+  { step: "01", title: "Ingest", desc: "Live prices, geopolitics, multi-source news, FX and institutional flow signals stream in continuously — timestamped, normalized to your base currency." },
+  { step: "02", title: "Quantify", desc: "Volatility, drift, correlation, covariance, VaR, CVaR and distance-to-default computed per holding, live." },
+  { step: "03", title: "Constrain", desc: "CLANK overlays structural limits — gamma walls, rebalance flows, liquidity vacuums — onto the probabilistic read." },
+  { step: "04", title: "Simulate", desc: "10,000-path Monte Carlo and causal cascades resolve each event into a distribution of outcomes with attached probabilities." },
+  { step: "05", title: "Decide", desc: "The strategy layer emits concrete positioning — entry levels, projected ranges, invalidation zones, risk-budgeted size." },
+  { step: "06", title: "Learn", desc: "Every logged outcome feeds Scar Memory and the Outcome Gradient, sharpening the next read against your realized results." },
 ];
 
 const FAQS = [
   { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens. No card, no trial timer, no upsell wall." },
-  { q: "Is this investment advice?", a: "No. Entropy Lite is a research and scenario modelling tool. Every output is an observation or a probability. Every decision is yours." },
-  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto and commodities. India Only mode locks the entire stack to NSE and BSE." },
-  { q: "How is this different from a broker app?", a: "Brokers show the price and the order ticket. Entropy Lite shows the distribution behind the price, the structural constraints shaping it and the cascade that follows an event." },
-  { q: "Will my data be used to train models?", a: "No. Your portfolio and trade history bias only your own AI context through the Outcome Gradient. It never leaves your account." },
+  { q: "Is this investment advice?", a: "No. Entropy is a research and scenario-modelling instrument. Every output is an observation or a probability. Every decision is yours." },
+  { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto and commodities. India-only mode locks the entire stack to NSE and BSE." },
+  { q: "How is this different from a broker app?", a: "Brokers show the price and the order ticket. Entropy shows the distribution behind the price, the structural constraints shaping it, and the cascade that follows an event." },
+  { q: "Will my data be used to train models?", a: "No. Your portfolio and trade history bias only your own analytical context through the Outcome Gradient. It never leaves your account." },
 ];
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    document.title = "EntropyLite | See what the market hasn't decided yet";
+    document.title = "Entropy — Institutional market intelligence";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "EntropyLite shows you what can happen — before the market decides. Probabilistic scenarios, structural constraints, twelve engines, one terminal.");
+    if (meta) meta.setAttribute("content", "Entropy is a probabilistic market-intelligence terminal. Twelve analytical engines — risk, constraint detection, simulation, flow — composed into one operational surface.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
-      setChecking(false);
     });
   }, [navigate]);
-
-  // Note: we intentionally render the page even while checking auth so SEO crawlers
-  // and slow connections always see the full content. Authed users are redirected via the effect.
 
   const goSignup = () => navigate("/dashboard");
 
   return (
-    <div className="min-h-screen bg-white text-black pb-20 sm:pb-0">
+    <div className="min-h-screen bg-white text-ink pb-20 sm:pb-0">
       <PublicNav />
 
-      {/* HERO */}
-      <header className="relative overflow-hidden">
-        <div className="max-w-4xl mx-auto px-5 sm:px-6 pt-10 sm:pt-20 pb-12 sm:pb-20 text-center">
-          <img
-            src={entropyLogoFull}
-            alt="Entropy Lite"
-            className="h-20 sm:h-36 lg:h-40 object-contain mx-auto mb-6 sm:mb-8"
-            loading="eager"
-          />
+      {/* ── HERO · deep ink, engineering grid, terminal in a frame ── */}
+      <header className="relative overflow-hidden bg-ink text-white">
+        <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
+        <div
+          className="absolute -top-40 left-1/2 -translate-x-1/2 h-[480px] w-[900px] rounded-full opacity-25 blur-3xl pointer-events-none"
+          style={{ background: "radial-gradient(closest-side, #1E5EDB 0%, transparent 70%)" }}
+          aria-hidden="true"
+        />
 
-          <h1 className="text-[2.5rem] sm:text-6xl md:text-7xl font-bold tracking-tighter leading-[1] sm:leading-[1.02] mb-5 sm:mb-7">
-            Every trade you've taken
-            <br />
-            <span className="text-black/45">was already too late.</span>
-          </h1>
-
-          <div className="text-[16px] sm:text-xl text-black/60 max-w-xl mx-auto mb-6 sm:mb-8 leading-relaxed space-y-1">
-            <p>Markets move before you act.</p>
-            <p>Information arrives delayed.</p>
-            <p>Retail reacts. Institutions position.</p>
-          </div>
-
-          <p className="text-[15px] sm:text-lg text-black max-w-2xl mx-auto mb-8 sm:mb-12 leading-relaxed font-medium">
-            EntropyLite doesn't tell you what will happen.<br className="hidden sm:block" />
-            <span className="text-black/55"> It shows you what </span><em className="not-italic text-black">can</em><span className="text-black/55"> happen — before the market decides.</span>
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
-            <Button
-              size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-lg shadow-black/20 rounded-full"
-              onClick={goSignup}
-            >
-              Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-            <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-full border border-black/15 bg-white text-black hover:bg-black/[0.03] hover:border-black/25 transition-all w-full sm:w-auto"
-              onClick={() => navigate("/about")}
-            >
-              See what is inside
-            </button>
-          </div>
-
-          <p className="font-mono text-[10px] text-black/35 tracking-[0.1em]">
-            Google sign in · 30 second setup · Cancel anytime, it is free
-          </p>
-
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 sm:gap-8 mt-12 sm:mt-20 pt-8 sm:pt-12 border-t border-black/[0.06]">
-            {STATS.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold tracking-tight">{s.value}</div>
-                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.15em] text-black/40 mt-1.5">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      {/* PRINCIPLES, quiet, classy positioning */}
-      <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-28">
-          <div className="text-center mb-10 sm:mb-14">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The shift</p>
-            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-5 leading-[1.05]">
-              You were taught to predict.
-            </h2>
-            <div className="text-base sm:text-lg text-black/60 max-w-2xl mx-auto leading-relaxed space-y-1">
-              <p>But markets don't move on predictions.</p>
-              <p className="text-black">They move on pressure. On positioning. On constraints.</p>
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-16 sm:pt-24 pb-0">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 mb-7">
+              <span className="mkt-label text-[9px] text-white/40">Est. for operators</span>
+              <span className="h-px w-8 bg-white/25" />
+              <span className="mkt-label text-[9px] text-capital-soft">Probabilistic market infrastructure</span>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-black/5 rounded-xl overflow-hidden border border-black/10">
-            {PRINCIPLES.map((p, i) => (
-              <div key={p.title} className="bg-white p-6 sm:p-8">
-                <p className="font-mono text-[10px] tracking-wider text-black/35 mb-3">{String(i + 1).padStart(2, "0")}</p>
-                <h3 className="text-base sm:text-lg font-semibold tracking-tight mb-2">{p.title}</h3>
-                <p className="text-sm text-black/55 leading-relaxed">{p.desc}</p>
-              </div>
-            ))}
-          </div>
+            <h1 className="mkt-display text-white">
+              The market is a distribution.
+              <br />
+              <span className="text-white/40">Operate it like one.</span>
+            </h1>
 
-          <div className="text-center mt-10 sm:mt-12">
-            <Button
-              size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
-              onClick={goSignup}
-            >
-              Step inside <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
+            <p className="mkt-lede text-white/55 max-w-xl mt-7">
+              Entropy composes twelve analytical engines — risk, structural
+              constraints, simulation, flow — into one terminal. Not what will
+              happen. What <em className="not-italic text-white font-medium">can</em> happen,
+              and with what probability.
+            </p>
 
-      {/* PRODUCT PREVIEW, real terminal screenshot */}
-      <section className="border-t border-black/5 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <div className="text-center mb-8 sm:mb-12">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The experience</p>
-            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              This is what you see when you stop guessing.
-            </h2>
-            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Four layers of perception, surfaced at once.
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-9">
+              <InkButton dark onClick={goSignup}>
+                Open the Terminal
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </InkButton>
+              <LineButton dark onClick={() => navigate("/backbone")}>
+                Examine the mathematics
+              </LineButton>
+            </div>
+
+            <p className="mkt-label text-[9px] text-white/30 mt-5">
+              Google sign-in · 30-second setup · Free during the founding period
             </p>
           </div>
 
-          <figure className="rounded-xl overflow-hidden border border-black/10 shadow-2xl shadow-black/15 bg-black">
-            <img
-              src={dashboardPreview}
-              alt="Entropy Lite terminal: live portfolio with SMH analysis, Monte Carlo Engine 10,000 paths, VaR 95% -17.1%, CVaR 99% -28.1%, Sharpe 0.36, multi-source intel feed, institutional flow detection radar"
-              loading="lazy"
-              width={1920}
-              height={1290}
-              className="w-full h-auto block"
-            />
-          </figure>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-10 pt-8 border-t border-black/5">
-            <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 01 · Position</p>
-              <p className="text-sm text-black/70 leading-snug">Multi currency and multi exchange, normalised to your base currency.</p>
-            </div>
-            <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 02 · Probability</p>
-              <p className="text-sm text-black/70 leading-snug">10,000 GBM paths, 252 day horizon, with profit probability and tail risk.</p>
-            </div>
-            <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 03 · Risk surface</p>
-              <p className="text-sm text-black/70 leading-snug">VaR and CVaR at 95% and 99% confidence, recomputed live per asset.</p>
-            </div>
-            <div>
-              <p className="font-mono text-[9px] tracking-wider text-black/40 uppercase mb-1">Layer 04 · Flow</p>
-              <p className="text-sm text-black/70 leading-snug">An institutional flow read across ETF rebalances, gamma and dark pools.</p>
-            </div>
-          </div>
-
-          <div className="text-center mt-10 sm:mt-12">
-            <Button
-              size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
-              onClick={goSignup}
-            >
-              Open the terminal <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* TABBED GALLERY, real screen captures of every core surface */}
-      <FeatureGallery />
-
-      {/* UNDER THE HOOD — proof intro band */}
-      <section className="border-t border-black/5 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-4 text-center">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Proof</p>
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-            This isn't opinion. This is math.
-          </h2>
-          <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-            Monte Carlo. VaR / CVaR. Merton. Ornstein–Uhlenbeck. Run on real history, not vibes.
-          </p>
-        </div>
-      </section>
-      <MathResearch />
-
-      {/* CLANK — the weapon */}
-      <section className="border-t border-black/5 bg-black text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-32">
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/40 mb-6 text-center">CLANK</p>
-          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-center leading-[1.05] mb-4">
-            Sometimes markets stop being probabilistic.
-          </h2>
-          <p className="text-4xl sm:text-6xl font-bold tracking-tighter text-center text-white/35 mb-14 sm:mb-20">
-            They lock.
-          </p>
-
-          <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6 text-center">
-            <p className="text-base sm:text-lg text-white/85 leading-relaxed">CLANK detects deterministic windows.</p>
-            <p className="text-base sm:text-lg text-white/85 leading-relaxed">Structural inevitabilities — gamma walls, ETF rebalances, liquidity vacuums.</p>
-            <p className="text-base sm:text-lg text-white leading-relaxed font-medium">When the math collapses to one outcome, you see it first.</p>
-          </div>
-
-          <p className="font-mono text-[10px] text-white/30 tracking-wider text-center mt-12 sm:mt-14">
-            Constraint detection across liquidity, positioning and dealer gamma.
-          </p>
-
-          <div className="text-center mt-10 sm:mt-12">
-            <Button
-              size="lg"
-              className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12"
-              onClick={goSignup}
-            >
-              See CLANK live <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES GRID */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-        <div className="text-center mb-10 sm:mb-14">
-
-          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The stack</p>
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-            While you're looking at one chart,<br className="hidden sm:block" /> twelve systems are already running.
-          </h2>
-          <p className="text-sm sm:text-base text-black/55 max-w-xl mx-auto">
-            Each one a separate engine. Composed into one read.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {FEATURES.map((f) => (
-            <article
-              key={f.title}
-              className="group rounded-2xl border border-black/[0.06] bg-white p-6 sm:p-7 hover:shadow-soft hover:border-black/15 active:bg-black/[0.02] transition-all"
-            >
-              <div className="w-9 h-9 rounded-xl bg-black/[0.04] flex items-center justify-center mb-4 group-hover:bg-black/[0.08] transition-colors">
-                <f.icon className="h-4 w-4 text-black/60 group-hover:text-black transition-colors" />
+          {/* Stats band */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 border-t border-white/10 mt-14">
+            {STATS.map((s, i) => (
+              <div
+                key={s.label}
+                className={`py-7 pr-6 ${i > 0 ? "lg:border-l lg:border-white/10 lg:pl-8" : ""} ${i % 2 === 1 ? "border-l border-white/10 pl-6 lg:pl-8" : ""}`}
+              >
+                <div className="text-2xl sm:text-[28px] font-bold tracking-tight tabular-nums">{s.value}</div>
+                <div className="mkt-label text-[9px] text-white/40 mt-2">{s.label}</div>
               </div>
-              <h3 className="font-semibold text-[15px] tracking-tight mb-2">{f.title}</h3>
-              <p className="text-sm text-black/55 leading-relaxed">{f.desc}</p>
-            </article>
+            ))}
+          </div>
+
+          {/* Terminal frame — bleeds into the next section */}
+          <figure className="relative mt-4 translate-y-14 sm:translate-y-20">
+            <div className="rounded-xl border border-white/[0.12] bg-ink-800/80 backdrop-blur-xl p-1.5 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+                <span className="mkt-label text-[8px] text-white/35 ml-2">entropy · live session</span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span className="mkt-label text-[8px] text-white/35">Streaming</span>
+                </span>
+              </div>
+              <img
+                src={dashboardPreview}
+                alt="Entropy terminal: live portfolio with Monte Carlo engine at 10,000 paths, VaR and CVaR risk surface, multi-source intelligence feed and institutional flow detection"
+                loading="eager"
+                width={1920}
+                height={1290}
+                className="w-full h-auto block rounded-lg"
+              />
+            </div>
+          </figure>
+        </div>
+      </header>
+
+      {/* Spacer that receives the overhanging terminal frame */}
+      <div className="h-14 sm:h-20 bg-white" />
+
+      {/* ── METHODS STRIP ── */}
+      <section className="border-b border-ink/[0.07]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-6 flex flex-wrap items-center gap-x-8 gap-y-3 justify-center">
+          {METHODS.map((m) => (
+            <span key={m} className="mkt-label text-[9px] text-ink/35 whitespace-nowrap">{m}</span>
           ))}
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="border-t border-black/5 bg-black/[0.015]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <div className="text-center mb-10 sm:mb-14">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">The pipeline</p>
-            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3">
-              From chaos. To decision.
-            </h2>
-            <p className="text-sm sm:text-base text-black/55 max-w-2xl mx-auto">
-              Six stages. Always running. You see only the conclusion.
-            </p>
+      {/* ── 01 · DOCTRINE ── */}
+      <section className="border-b border-ink/[0.07]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <SectionIntro
+            index="01"
+            label="Doctrine"
+            title={
+              <>
+                You were taught to predict.
+                <br />
+                <span className="text-ink/40">Markets move on pressure.</span>
+              </>
+            }
+            lede="Four operating principles govern every engine in the stack. They are not slogans — each one is enforced in code."
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 mt-14 border-t border-l border-ink/[0.07]">
+            {PRINCIPLES.map((p) => (
+              <article key={p.n} className="border-b border-r border-ink/[0.07] p-8 sm:p-10 group hover:bg-ink/[0.015] transition-colors">
+                <p className="mkt-label text-[9px] text-ink/30 mb-5">{p.n}</p>
+                <h3 className="text-[17px] sm:text-[19px] font-semibold tracking-tight leading-snug mb-3">{p.title}</h3>
+                <p className="text-[14px] text-ink/55 leading-relaxed">{p.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 02 · THE SURFACE ── */}
+      <section className="border-b border-ink/[0.07] bg-[#FAFBFC]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <SectionIntro
+            index="02"
+            label="The surface"
+            title={
+              <>
+                Four layers of perception,
+                <br />
+                <span className="text-ink/40">surfaced at once.</span>
+              </>
+            }
+          />
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 mt-12 border-t border-l border-ink/[0.07] bg-white">
+            {[
+              { n: "Layer 01", t: "Position", d: "Multi-currency, multi-exchange — normalized to your base currency in real time." },
+              { n: "Layer 02", t: "Probability", d: "10,000 GBM paths over a 252-day horizon, with profit probability and tail risk." },
+              { n: "Layer 03", t: "Risk surface", d: "VaR and CVaR at 95% and 99% confidence, recomputed live per asset." },
+              { n: "Layer 04", t: "Flow", d: "An institutional flow read across ETF rebalances, dealer gamma and dark pools." },
+            ].map((l) => (
+              <div key={l.n} className="border-b border-r border-ink/[0.07] p-6 sm:p-7">
+                <p className="mkt-label text-[9px] text-ink/30 mb-3">{l.n}</p>
+                <h3 className="text-[14px] font-semibold tracking-tight mb-2">{l.t}</h3>
+                <p className="text-[12.5px] text-ink/55 leading-relaxed">{l.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 03 · MODULES (screenshots gallery) ── */}
+      <FeatureGallery />
+
+      {/* ── 04 · CAPABILITIES ── */}
+      <section className="border-t border-b border-ink/[0.07]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <SectionIntro
+            index="04"
+            label="Capabilities"
+            title={
+              <>
+                While you read one chart,
+                <br />
+                <span className="text-ink/40">twelve systems are already running.</span>
+              </>
+            }
+            lede="Each capability is a separate engine with its own mathematics. All of them resolve into a single composed read."
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mt-14 border-t border-l border-ink/[0.07]">
+            {CAPABILITIES.map((f) => (
+              <article
+                key={f.title}
+                className="group border-b border-r border-ink/[0.07] p-7 sm:p-8 hover:bg-ink/[0.015] transition-colors"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink/10 bg-white mb-5 group-hover:border-ink/25 transition-colors">
+                  <f.icon className="h-4 w-4 text-ink/60" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-[15px] font-semibold tracking-tight mb-2">{f.title}</h3>
+                <p className="text-[13px] text-ink/55 leading-relaxed">{f.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 05 · ARCHITECTURE ── */}
+      <section className="border-b border-ink/[0.07] bg-[#FAFBFC]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="lg:col-span-4">
+              <SectionIntro
+                index="05"
+                label="Architecture"
+                title={
+                  <>
+                    From raw signal
+                    <br />
+                    <span className="text-ink/40">to sized decision.</span>
+                  </>
+                }
+                lede="Six stages, always running. You see only the conclusion — the pipeline is there when you want to audit it."
+              />
+              <div className="mt-8">
+                <LineButton onClick={() => navigate("/backbone")}>
+                  Read the full backbone <ArrowUpRight className="h-3.5 w-3.5" />
+                </LineButton>
+              </div>
+            </div>
+
+            <div className="lg:col-span-8">
+              <ol className="border-t border-ink/[0.07]">
+                {PIPELINE.map((s) => (
+                  <li key={s.step} className="grid grid-cols-[64px_140px_1fr] max-sm:grid-cols-[48px_1fr] items-baseline gap-x-4 border-b border-ink/[0.07] py-6 group hover:bg-white transition-colors px-2 -mx-2">
+                    <span className="mkt-label text-[9px] text-ink/30">{s.step}</span>
+                    <span className="text-[15px] font-semibold tracking-tight max-sm:block">{s.title}</span>
+                    <p className="text-[13.5px] text-ink/55 leading-relaxed max-sm:col-span-2 max-sm:col-start-2 max-sm:mt-1.5">{s.desc}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 06 · CLANK — the constraint engine ── */}
+      <section className="relative overflow-hidden bg-ink text-white">
+        <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 py-24 sm:py-36">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="mkt-label text-[9px] text-white/40">06</span>
+            <span className="h-px w-8 bg-white/25" />
+            <span className="mkt-label text-[9px] text-capital-soft">CLANK · Constraint detection</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            {HOW_IT_WORKS.map((step) => (
-              <div key={step.step} className="flex gap-4 sm:gap-5">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full border border-black/10 bg-white flex items-center justify-center">
-                    <span className="font-mono text-[10px] font-bold text-black/50">{step.step}</span>
-                  </div>
+          <h2 className="mkt-display max-w-4xl">
+            Sometimes markets stop being probabilistic.
+            <br />
+            <span className="text-white/35">They lock.</span>
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/10 border border-white/10 rounded-xl overflow-hidden mt-14 max-w-4xl">
+            {[
+              { t: "Gamma walls", d: "Dealer hedging pins price into a corridor. The corridor is computable." },
+              { t: "Rebalance flows", d: "Index and ETF rebalances create forced, calendar-known order flow." },
+              { t: "Liquidity vacuums", d: "Thin books turn small orders into large moves. Depth is measurable." },
+            ].map((c) => (
+              <div key={c.t} className="bg-ink p-7">
+                <h3 className="text-[14px] font-semibold tracking-tight mb-2 text-white">{c.t}</h3>
+                <p className="text-[12.5px] text-white/50 leading-relaxed">{c.d}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mkt-lede text-white/55 max-w-xl mt-12">
+            CLANK monitors these deterministic windows continuously. When the
+            mathematics collapses to one outcome, you see it first.
+          </p>
+
+          <div className="mt-9">
+            <InkButton dark onClick={goSignup}>
+              See CLANK live <ArrowRight className="h-4 w-4" />
+            </InkButton>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 07 · PROOF ── */}
+      <section className="border-b border-ink/[0.07]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-4">
+          <SectionIntro
+            index="07"
+            label="Proof"
+            align="center"
+            title={<>This is not opinion. This is mathematics.</>}
+            lede="Monte Carlo. VaR and CVaR. Merton. Ornstein–Uhlenbeck. Run on real history — every figure below is reproducible."
+          />
+        </div>
+      </section>
+      <MathResearch />
+
+      {/* ── 08 · ACCESS ── */}
+      <section className="border-t border-b border-ink/[0.07] bg-[#FAFBFC]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <SectionIntro
+            index="08"
+            label="Access"
+            align="center"
+            title={<>Institutional capability. Founding terms.</>}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 mt-14 border-t border-l border-ink/[0.07] bg-white max-w-4xl mx-auto">
+            {[
+              { icon: Lock, t: "No credit card", d: "Sign in with Google or email and the full terminal opens. Nothing is withheld." },
+              { icon: Clock, t: "Thirty-second setup", d: "Add your tickers, set a base currency, and the engines begin their first pass." },
+              { icon: InfinityIcon, t: "Founding pricing, for life", d: "Founding members keep founding terms permanently once paid tiers launch." },
+            ].map((c) => (
+              <div key={c.t} className="border-b border-r border-ink/[0.07] p-8 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg border border-ink/10 mb-5">
+                  <c.icon className="h-4 w-4 text-ink/60" strokeWidth={1.75} />
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <step.icon className="h-4 w-4 text-black/40 flex-shrink-0" />
-                    <h3 className="font-semibold text-sm">{step.title}</h3>
-                  </div>
-                  <p className="text-sm text-black/55 leading-relaxed">{step.desc}</p>
-                </div>
+                <h3 className="text-[14px] font-semibold tracking-tight mb-2">{c.t}</h3>
+                <p className="text-[12.5px] text-ink/55 leading-relaxed">{c.d}</p>
               </div>
             ))}
           </div>
 
           <div className="text-center mt-12">
-            <Button
-              size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12"
-              onClick={goSignup}
-            >
-              Run it on your portfolio <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* WHY NOW, risk reversal */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-        <div className="rounded-2xl border border-black/10 bg-gradient-to-br from-black/[0.02] to-transparent p-6 sm:p-10">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
-                <Lock className="h-4 w-4 text-black/60" />
-              </div>
-              <p className="font-semibold text-sm mb-1">No credit card</p>
-              <p className="text-xs text-black/50 leading-relaxed">Sign in with Google or email and the full terminal opens.</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
-                <Clock className="h-4 w-4 text-black/60" />
-              </div>
-              <p className="font-semibold text-sm mb-1">Thirty second setup</p>
-              <p className="text-xs text-black/50 leading-relaxed">Add your tickers, set a base currency, and you are running.</p>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center mb-3">
-                <InfinityIcon className="h-4 w-4 text-black/60" />
-              </div>
-              <p className="font-semibold text-sm mb-1">Free during founding</p>
-              <p className="text-xs text-black/50 leading-relaxed">Founding members keep founding pricing for life once paid tiers launch.</p>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-3">
-              The terminal sharpens with every decision you make
-            </h3>
-            <p className="text-sm text-black/55 mb-6 max-w-lg mx-auto">
-              Your trade history quietly biases the AI toward the patterns that worked, and away from the ones that did not.
+            <InkButton onClick={goSignup}>
+              Begin now <ArrowRight className="h-4 w-4" />
+            </InkButton>
+            <p className="mkt-label text-[9px] text-ink/35 mt-4">
+              The terminal sharpens with every decision you log
             </p>
-            <Button
-              size="lg"
-              className="bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide px-8 h-12 shadow-lg shadow-black/20"
-              onClick={goSignup}
-            >
-              Start free now <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
           </div>
         </div>
       </section>
 
-      {/* IDENTITY SHIFT */}
-      <section className="border-t border-black/5 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-24 sm:py-36 text-center">
-          <h2 className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05]">
-            You're not trading anymore.
-          </h2>
-          <p className="text-3xl sm:text-5xl font-bold tracking-tighter leading-[1.05] text-black/35 mt-2">
-            You're operating.
-          </p>
-        </div>
-      </section>
+      {/* ── 09 · FAQ ── */}
+      <section className="border-b border-ink/[0.07]">
+        <div className="max-w-3xl mx-auto px-5 sm:px-6 py-20 sm:py-28">
+          <SectionIntro
+            index="09"
+            label="Before you sign in"
+            title={<>Last questions.</>}
+          />
 
-      {/* FAQ, kill objections */}
-      <section className="border-t border-black/5">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <div className="text-center mb-10 sm:mb-12">
-            <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-black/40 mb-3">Last questions</p>
-            <h2 className="text-2xl sm:text-4xl font-bold tracking-tight">
-              Before you sign in
-            </h2>
-          </div>
-
-          <div className="space-y-3">
+          <div className="mt-12 border-t border-ink/[0.07]">
             {FAQS.map((f) => (
-              <details key={f.q} className="group rounded-2xl border border-black/[0.06] bg-white p-5 sm:p-6 open:border-black/15 hover:border-black/12 transition-all">
-                <summary className="flex items-center justify-between cursor-pointer list-none">
-                  <span className="font-semibold text-[15px] tracking-tight pr-4">{f.q}</span>
-                  <ChevronRight className="h-4 w-4 text-black/40 flex-shrink-0 group-open:rotate-90 transition-transform" />
+              <details key={f.q} className="group border-b border-ink/[0.07]">
+                <summary className="flex items-center justify-between cursor-pointer list-none py-6 gap-4">
+                  <span className="text-[15px] font-semibold tracking-tight">{f.q}</span>
+                  <Plus className="h-4 w-4 text-ink/40 flex-shrink-0 transition-transform duration-200 group-open:rotate-45" />
                 </summary>
-                <p className="text-sm text-black/55 leading-relaxed mt-4">{f.a}</p>
+                <p className="text-[14px] text-ink/55 leading-relaxed pb-6 max-w-xl">{f.a}</p>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="border-t border-black/5 bg-black text-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 leading-[1.05]">
+      {/* ── FINAL STATEMENT ── */}
+      <section className="relative overflow-hidden bg-ink text-white">
+        <div className="absolute inset-0 ink-grid grid-vignette" aria-hidden="true" />
+        <div className="relative max-w-4xl mx-auto px-5 sm:px-6 py-24 sm:py-36 text-center">
+          <h2 className="mkt-display">
             Most people will keep reacting.
+            <br />
+            <span className="text-white/35">You don't have to.</span>
           </h2>
-          <p className="text-2xl sm:text-3xl text-white/55 mb-10 font-semibold tracking-tight">
-            You don't have to.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
-            <Button
-              size="lg"
-              className="bg-white text-black hover:bg-white/90 font-mono text-xs tracking-wide px-8 h-12 w-full sm:w-auto shadow-xl"
-              onClick={goSignup}
-            >
-              Enter EntropyLite <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-            <button
-              className="font-mono text-xs tracking-wide px-8 h-12 rounded-md border border-white/20 text-white hover:bg-white/5 transition-colors w-full sm:w-auto"
-              onClick={() => navigate("/pricing")}
-            >
-              View Pricing
-            </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12">
+            <InkButton dark onClick={goSignup}>
+              Open the Terminal <ArrowRight className="h-4 w-4" />
+            </InkButton>
+            <LineButton dark onClick={() => navigate("/pricing")}>
+              View pricing
+            </LineButton>
           </div>
-          <p className="font-mono text-[10px] text-white/35 tracking-wide">
-            Founding members lock in founding pricing for life
+          <p className="mkt-label text-[9px] text-white/30 mt-6">
+            Founding members lock in founding terms for life
           </p>
         </div>
       </section>
 
-      <footer className="border-t border-black/5 py-6">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <p className="font-mono text-[9px] text-black/25 leading-relaxed mb-4 max-w-4xl">
-            EntropyLite is a market intelligence and probabilistic scenario engine. It does not provide investment advice, trading recommendations, or portfolio management services. All outputs are research-based observations and scenario projections. Users make independent investment decisions at their own risk.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="font-mono text-[10px] text-black/30 tracking-wider">
-              © {new Date().getFullYear()} EntropyLite. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
-              <button onClick={() => navigate("/about")} className="font-mono text-[10px] text-black/30 hover:text-black/60">About</button>
-              <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Pricing</button>
-              <button onClick={() => navigate("/access")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Access</button>
-              <button onClick={() => navigate("/disclaimer")} className="font-mono text-[10px] text-black/30 hover:text-black/60">Disclaimer</button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
 
-      {/* STICKY MOBILE CTA, always one tap from signup */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-xl border-t border-black/[0.08] px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
-        <Button
-          className="w-full bg-black text-white hover:bg-black/85 font-mono text-xs tracking-wide h-12 rounded-full"
+      {/* Sticky mobile CTA — always one tap from the terminal */}
+      <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/92 backdrop-blur-xl border-t border-ink/[0.08] px-4 py-3">
+        <button
           onClick={goSignup}
+          className="flex w-full h-12 items-center justify-center gap-2 rounded-lg bg-ink text-white text-[14px] font-semibold tracking-tight"
         >
-          Enter the Terminal <ArrowRight className="ml-1 h-4 w-4" />
-        </Button>
+          Open the Terminal <ArrowRight className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

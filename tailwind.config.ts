@@ -46,6 +46,22 @@ export default {
         spring: "cubic-bezier(0.34, 1.3, 0.64, 1)",
       },
       colors: {
+        /* Fixed institutional palette for the public site (theme-independent) */
+        ink: {
+          DEFAULT: "#0A0F1A",
+          950: "#05080F",
+          900: "#0A0F1A",
+          800: "#101726",
+          700: "#182033",
+          600: "#222E47",
+          500: "#31405F",
+        },
+        paper: "#FFFFFF",
+        capital: {
+          DEFAULT: "#1E5EDB",
+          bright: "#4D8DFF",
+          soft: "#9DBEF5",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
