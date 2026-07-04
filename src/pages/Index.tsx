@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper } from "lucide-react";
 import { springLayout } from "@/lib/motion";
 import CommandPalette from "@/components/CommandPalette";
 import DailyBriefing from "@/components/briefing/DailyBriefing";
@@ -561,14 +561,6 @@ const IndexContent = () => {
           {/* Main Content, fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
-              {activeTab === "briefing" && (
-                <ModuleErrorBoundary
-                  title="Briefing module recovered"
-                  description="The daily briefing hit a render error. Retry remounts just this module."
-                >
-                  <DailyBriefing stocks={stocks} refreshKey={refreshKey} />
-                </ModuleErrorBoundary>
-              )}
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
