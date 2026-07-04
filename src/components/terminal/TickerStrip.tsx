@@ -135,13 +135,13 @@ const TickerStrip = () => {
 
   return (
     <div
-      className="border-b border-border bg-surface-1 overflow-hidden relative shrink-0"
+      className="border-b border-border/50 bg-surface-1/60 overflow-hidden relative shrink-0 mask-fade-x"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       <div
         ref={scrollRef}
-        className={`flex items-center gap-0 ticker-scroll ${paused ? "ticker-paused" : ""}`}
+        className={`flex items-center gap-1 px-2 py-1 ticker-scroll ${paused ? "ticker-paused" : ""}`}
         style={{ width: "max-content" }}
       >
         {items.map((t, i) => {
@@ -156,14 +156,14 @@ const TickerStrip = () => {
           return (
             <div
               key={`${t.symbol}-${i}`}
-              className="flex items-center gap-1.5 px-2.5 py-0.5 border-r border-border/30 hover:bg-surface-2 transition-colors"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 hover:bg-surface-2/80 transition-colors duration-200"
             >
-              <span className="font-mono text-[9px] text-muted-foreground font-semibold">{t.name}</span>
-              <span className="font-mono text-[10px] text-foreground font-medium tabular-nums">
-                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ","}
+              <span className="text-[10px] font-medium tracking-tight text-muted-foreground">{t.name}</span>
+              <span className="text-[11px] font-semibold tracking-tight text-foreground tabular-nums">
+                {displayPrice > 0 ? `${priceSymbol}${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </span>
-              <span className={`font-mono text-[9px] font-semibold tabular-nums ${positive ? "text-gain" : "text-loss"}`}>
-                {positive ? "+" : ""}{t.change.toFixed(2)}%
+              <span className={`text-[10px] font-semibold tabular-nums ${positive ? "text-gain" : "text-loss"}`}>
+                {positive ? "▲" : "▼"} {Math.abs(t.change).toFixed(2)}%
               </span>
               <MiniSparkline data={t.history} positive={positive} />
             </div>

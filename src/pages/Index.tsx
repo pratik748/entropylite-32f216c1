@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
+import { motion } from "framer-motion";
 import { Activity, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Newspaper, BarChart3, Brain, Sunrise } from "lucide-react";
+import { springLayout } from "@/lib/motion";
+import CommandPalette from "@/components/CommandPalette";
 import DailyBriefing from "@/components/briefing/DailyBriefing";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
@@ -414,7 +417,7 @@ const IndexContent = () => {
   if (!loaded) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground font-mono text-sm animate-pulse">Loading portfolio...</p>
+        <p className="text-subheadline text-muted-foreground animate-breathe">Loading your portfolio…</p>
       </div>
     );
   }
@@ -427,6 +430,12 @@ const IndexContent = () => {
         onOpenBrief={() => setBriefOpen(true)}
       />
       <EntropyBrief open={briefOpen} onClose={() => setBriefOpen(false)} stocks={stocks} />
+      <CommandPalette
+        tabs={tabs}
+        onSelectTab={(id) => handleTabSwitch(id as Tab)}
+        onOpenBrief={() => setBriefOpen(true)}
+        onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
+      />
       <TerminalTour
         open={tourOpen}
         onClose={() => setTourOpen(false)}
@@ -491,49 +500,61 @@ const IndexContent = () => {
         <>
           {/* Refresh Banner */}
           {isRefreshing && (
-            <div className="border-b border-primary/20 bg-primary/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
-              <RefreshCw className="h-3 w-3 text-primary animate-spin" />
-              <span className="text-[10px] font-mono text-primary tracking-wider">
-                UPDATING INTELLIGENCE: LIVE RECOMPUTATION IN PROGRESS
+            <div className="border-b border-info/15 bg-info/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
+              <RefreshCw className="h-3 w-3 text-info animate-spin" />
+              <span className="text-[11px] font-medium tracking-tight text-info">
+                Updating intelligence…
               </span>
-              <div className="ml-auto h-1 w-24 rounded-full bg-primary/20 overflow-hidden">
-                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
+              <div className="ml-auto h-1 w-24 rounded-full bg-info/15 overflow-hidden">
+                <div className="h-full bg-info rounded-full animate-pulse" style={{ width: "60%" }} />
               </div>
             </div>
           )}
 
-          {/* Tab Navigation */}
-          <nav data-density="compact" data-tour="tab-bar" className="border-b border-border/70 bg-surface-1/95 backdrop-blur-md sticky top-0 z-30 shrink-0">
+          {/* Tab Navigation — segmented control with a sliding glass pill */}
+          <nav data-density="compact" data-tour="tab-bar" className="glass-panel border-b border-border/60 sticky top-0 z-30 shrink-0">
             <div
-              className="px-2 sm:container flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide relative"
+              className="px-2 sm:container flex items-center gap-0.5 overflow-x-auto scrollbar-hide relative py-1.5"
               style={{ scrollSnapType: "x mandatory" }}
             >
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabSwitch(tab.id)}
-                  data-tour-tab={tab.id}
-                  style={{ scrollSnapAlign: "start" }}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-[10px] sm:text-[11px] font-mono font-medium transition-all whitespace-nowrap flex-shrink-0 border-b-2 rounded-t ${
-                    activeTab === tab.id
-                      ? "border-gain text-foreground bg-surface-2/60"
-                      : "border-transparent text-muted-foreground/80 hover:text-foreground hover:bg-surface-2/40"
-                  }`}
-                >
-                  <span className="sm:hidden">
-                    {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3 w-3" })}
-                  </span>
-                  <span className="hidden sm:block">{tab.icon}</span>
-                  <span className="hidden sm:inline uppercase tracking-wider">{tab.label}</span>
-                  <span className="sm:hidden uppercase tracking-wider">{tab.shortLabel}</span>
-                </button>
-              ))}
-              <div className="ml-auto flex items-center gap-1.5 pl-2 pr-2 flex-shrink-0">
-                <span className="relative flex h-1 w-1">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-60" />
-                  <span className="relative inline-flex h-1 w-1 rounded-full bg-gain" />
+              {tabs.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabSwitch(tab.id)}
+                    data-tour-tab={tab.id}
+                    style={{ scrollSnapAlign: "start" }}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative flex items-center gap-1.5 rounded-full px-2.5 sm:px-3.5 py-1.5 text-[12px] sm:text-[13px] font-medium tracking-tight whitespace-nowrap flex-shrink-0 transition-colors duration-200 ${
+                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="tab-pill"
+                        transition={springLayout}
+                        className="absolute inset-0 rounded-full border border-border/70 bg-surface-3/90 shadow-soft"
+                      />
+                    )}
+                    <span className="relative z-10 sm:hidden">
+                      {React.cloneElement(tab.icon as React.ReactElement, { className: "h-3.5 w-3.5" })}
+                    </span>
+                    <span className="relative z-10 hidden sm:block">{tab.icon}</span>
+                    <span className="relative z-10 hidden sm:inline">{tab.label}</span>
+                    <span className="relative z-10 sm:hidden">{tab.shortLabel}</span>
+                  </button>
+                );
+              })}
+              <div className="ml-auto flex items-center gap-2 pl-3 pr-1 flex-shrink-0">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-50" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gain" />
                 </span>
-                <span className="text-[8px] font-mono text-gain/80 uppercase tracking-[0.2em]">Live</span>
+                <span className="text-[11px] font-medium text-muted-foreground">Live</span>
+                <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-border/70 bg-surface-2/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80">
+                  ⌘K
+                </span>
               </div>
             </div>
           </nav>
@@ -643,14 +664,17 @@ const IndexContent = () => {
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
                             {!effectiveLoading && !analysis && (
-                              <div className="flex flex-col items-center justify-center rounded-sm border border-border bg-card py-16 animate-fade-in">
-                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-sm bg-primary/10">
-                                  <Activity className="h-7 w-7 text-primary" />
+                              <div className="flex flex-col items-center justify-center rounded-2xl border border-border/70 bg-card py-16 shadow-soft animate-scale-in">
+                                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2 shadow-soft">
+                                  <Activity className="h-7 w-7 text-muted-foreground animate-breathe" />
                                 </div>
-                                <h2 className="mb-2 text-base font-semibold text-foreground">Ready to Analyze</h2>
-                                <p className="max-w-md text-center text-xs text-muted-foreground px-4">
-                                  Enter any global asset: stocks (AAPL, TCS.NS), crypto (BTC-USD), forex (EURUSD=X), or
-                                  commodities (GC=F) for deep analysis with real-time pricing.
+                                <h2 className="mb-1.5 text-title-3 text-foreground">Ready when you are</h2>
+                                <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
+                                  Add any global asset — stocks, crypto, forex, or commodities — and Entropy will run a
+                                  full analysis with live pricing.
+                                </p>
+                                <p className="mt-4 text-caption-1 text-muted-foreground/60">
+                                  Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere
                                 </p>
                               </div>
                             )}
@@ -800,19 +824,23 @@ const IndexContent = () => {
           </main>
 
           {showMobileDashboardDock && (
-            <div className="fixed inset-x-0 bottom-6 z-30 border-t border-border/80 bg-surface-1/95 backdrop-blur-xl shadow-[0_-8px_28px_hsl(var(--foreground)/0.08)]">
-              <div className="grid grid-cols-2 gap-px bg-border/60">
+            <motion.div
+              initial={{ y: 32, opacity: 0 }}
+              animate={{ y: 0, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 30 } }}
+              className="fixed inset-x-0 bottom-9 z-30 flex justify-center px-6 pointer-events-none"
+            >
+              <div className="pointer-events-auto flex items-center gap-1 rounded-full glass-thick p-1.5 shadow-soft-xl">
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                    <button className="pressable flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium tracking-tight text-foreground/90 active:bg-surface-3/70">
                       <LayoutDashboard className="h-4 w-4" />
                       <span>Portfolio</span>
                     </button>
                   </SheetTrigger>
                   <SheetContent side="left" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
-                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
-                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
-                        <LayoutDashboard className="h-3.5 w-3.5 text-primary" /> Portfolio
+                    <SheetHeader className="shrink-0 border-b border-border/70 px-4 py-3">
+                      <SheetTitle className="flex items-center gap-2 text-headline text-foreground">
+                        <LayoutDashboard className="h-4 w-4 text-muted-foreground" /> Portfolio
                       </SheetTitle>
                     </SheetHeader>
                     <div className="min-h-0 flex-1 overflow-auto">
@@ -832,17 +860,19 @@ const IndexContent = () => {
                   </SheetContent>
                 </Sheet>
 
+                <div className="h-5 w-px bg-border/70" />
+
                 <Sheet>
                   <SheetTrigger asChild>
-                    <button className="flex min-h-14 flex-col items-center justify-center gap-1 bg-surface-1 px-2 py-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground transition-all active:bg-surface-2 active:text-foreground">
+                    <button className="pressable flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium tracking-tight text-foreground/90 active:bg-surface-3/70">
                       <Newspaper className="h-4 w-4" />
                       <span>News</span>
                     </button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-[88vw] max-w-sm border-border bg-background p-0 flex flex-col">
-                    <SheetHeader className="shrink-0 border-b border-border px-3 py-2">
-                      <SheetTitle className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-foreground">
-                        <Newspaper className="h-3.5 w-3.5 text-primary" /> Live Intel
+                    <SheetHeader className="shrink-0 border-b border-border/70 px-4 py-3">
+                      <SheetTitle className="flex items-center gap-2 text-headline text-foreground">
+                        <Newspaper className="h-4 w-4 text-muted-foreground" /> Live Intel
                       </SheetTitle>
                     </SheetHeader>
                     <div className="min-h-0 flex-1 overflow-auto">
@@ -850,9 +880,8 @@ const IndexContent = () => {
                     </div>
                   </SheetContent>
                 </Sheet>
-
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* System Status Bar */}
