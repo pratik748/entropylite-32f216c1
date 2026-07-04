@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { motion } from "framer-motion";
 import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper } from "lucide-react";
-import { springLayout } from "@/lib/motion";
 import CommandPalette from "@/components/CommandPalette";
+import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -62,18 +62,18 @@ type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopoli
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
-// Apple-style tinted SF-Symbol tiles: each tab gets a distinct hue rendered
-// as a raised, skeuomorphic gradient chip (like Settings.app icons).
-const tabs: { id: Tab; label: string; icon: React.ReactNode; tint: string }[] = [
-  { id: "dashboard",    label: "Dashboard",   icon: <LayoutDashboard className="h-3 w-3" strokeWidth={2.5} />, tint: "from-[#0A84FF] to-[#0060DF]" },   // systemBlue
-  { id: "market",       label: "Markets",     icon: <Landmark className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#30D158] to-[#1F9F42]" },   // systemGreen
-  { id: "geopolitical", label: "Geopolitics", icon: <Globe className="h-3 w-3" strokeWidth={2.5} />,           tint: "from-[#64D2FF] to-[#0A84FF]" },   // systemTeal→Blue
-  { id: "desirable",    label: "Desirable",   icon: <Target className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FF9F0A] to-[#E8730B]" },   // systemOrange
-  { id: "sandbox",      label: "Sandbox",     icon: <Eye className="h-3 w-3" strokeWidth={2.5} />,             tint: "from-[#BF5AF2] to-[#8944E0]" },   // systemPurple
-  { id: "statarb",      label: "Stat Arb",    icon: <ScatterChart className="h-3 w-3" strokeWidth={2.5} />,    tint: "from-[#5E5CE6] to-[#3634A3]" },   // systemIndigo
-  { id: "augment",      label: "Augment",     icon: <Sparkles className="h-3 w-3" strokeWidth={2.5} />,        tint: "from-[#FF375F] to-[#C9184A]" },   // systemPink
-  { id: "risk",         label: "Risk",        icon: <Shield className="h-3 w-3" strokeWidth={2.5} />,          tint: "from-[#FFD60A] to-[#E8A50B]" },   // systemYellow
-  { id: "fortress",     label: "Fortress",    icon: <ShieldCheck className="h-3 w-3" strokeWidth={2.5} />,     tint: "from-[#FF453A] to-[#C81E13]" },   // systemRed
+// Monochrome instrument set — one voice, no candy. The active module is
+// indicated by position and weight, not by hue.
+const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "dashboard",    label: "Desk",        icon: <LayoutDashboard className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "market",       label: "Markets",     icon: <Landmark className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "geopolitical", label: "Geo",         icon: <Globe className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "desirable",    label: "Discover",    icon: <Target className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "sandbox",      label: "Sandbox",     icon: <Eye className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "statarb",      label: "Stat Arb",    icon: <ScatterChart className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "augment",      label: "Augment",     icon: <Sparkles className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "risk",         label: "Risk",        icon: <Shield className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "fortress",     label: "Fortress",    icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.75} /> },
 ];
 
 const IndexContent = () => {
@@ -506,59 +506,26 @@ const IndexContent = () => {
             </div>
           )}
 
-          {/* Tab Navigation — segmented control with a sliding glass pill */}
-          <nav data-density="compact" data-tour="tab-bar" className="glass-panel border-b border-border/60 sticky top-0 z-30 shrink-0">
-            <div className="px-2 sm:container flex items-center gap-1 py-1.5">
-              <div
-                className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide mask-fade-x relative min-w-0 flex-1"
-                style={{ scrollSnapType: "x mandatory" }}
-              >
-              {tabs.map((tab) => {
-                const active = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabSwitch(tab.id)}
-                    data-tour-tab={tab.id}
-                    style={{ scrollSnapAlign: "start" }}
-                    aria-current={active ? "page" : undefined}
-                    className={`relative flex items-center gap-1.5 rounded-full pl-1 pr-2.5 sm:pr-3.5 py-1 text-[12px] sm:text-[13px] font-semibold tracking-tight whitespace-nowrap flex-shrink-0 transition-colors duration-200 ${
-                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="tab-pill"
-                        transition={springLayout}
-                        className="absolute inset-0 rounded-full border border-border/70 bg-surface-3/90 shadow-soft"
-                      />
-                    )}
-                    {/* Skeuomorphic tinted SF-Symbol tile — like Settings.app */}
-                    <span
-                      className={`relative z-10 inline-flex h-5 w-5 items-center justify-center rounded-[6px] bg-gradient-to-b ${tab.tint} text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.35)] ring-1 ring-black/20`}
-                    >
-                      {tab.icon}
-                    </span>
-                    <span className="relative z-10 ml-0.5">{tab.label}</span>
-                  </button>
-                );
-              })}
-              </div>
-              <div className="ml-auto flex items-center gap-2 pl-3 flex-shrink-0 border-l border-border/60">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-50" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gain" />
-                </span>
-                <span className="hidden sm:inline text-[11px] font-medium text-muted-foreground">Live</span>
-                <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-border/70 bg-surface-2/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80">
-                  ⌘K
-                </span>
-              </div>
-            </div>
-          </nav>
-
           {/* Global Ticker Strip */}
           <TickerStrip />
+
+          {/* Workspace — module rail (desktop) / module strip (mobile) + content */}
+          <div className="flex flex-1 min-h-0">
+            {!isMobile && (
+              <ModuleRail
+                modules={tabs}
+                activeId={activeTab}
+                onSelect={(id) => handleTabSwitch(id as Tab)}
+              />
+            )}
+            <div className="flex flex-col flex-1 min-w-0">
+              {isMobile && (
+                <ModuleStrip
+                  modules={tabs}
+                  activeId={activeTab}
+                  onSelect={(id) => handleTabSwitch(id as Tab)}
+                />
+              )}
 
           {/* Main Content, fills all remaining space, above the status bar */}
           <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
@@ -654,16 +621,17 @@ const IndexContent = () => {
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
                             {!effectiveLoading && !analysis && (
-                              <div className="flex flex-col items-center justify-center rounded-2xl border border-border/70 bg-card py-16 shadow-soft animate-scale-in">
-                                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2 shadow-soft">
-                                  <Activity className="h-7 w-7 text-muted-foreground animate-breathe" />
+                              <div className="flex flex-col items-center justify-center rounded-xl border border-border/70 bg-card py-20 shadow-soft animate-scale-in">
+                                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-border/70 bg-surface-2">
+                                  <Activity className="h-6 w-6 text-muted-foreground animate-breathe" strokeWidth={1.5} />
                                 </div>
-                                <h2 className="mb-1.5 text-title-3 text-foreground">Ready when you are</h2>
+                                <p className="data-label mb-2.5">No instrument selected</p>
+                                <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
                                 <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
-                                  Add any global asset — stocks, crypto, forex, or commodities — and Entropy will run a
-                                  full analysis with live pricing.
+                                  Add any global asset — equities, crypto, FX or commodities — and twelve
+                                  engines will run a full pass with live pricing.
                                 </p>
-                                <p className="mt-4 text-caption-1 text-muted-foreground/60">
+                                <p className="mt-5 text-caption-1 text-muted-foreground/60">
                                   Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere
                                 </p>
                               </div>
@@ -812,6 +780,8 @@ const IndexContent = () => {
               )}
             </PageTransition>
           </main>
+            </div>
+          </div>
 
           {showMobileDashboardDock && (
             <motion.div

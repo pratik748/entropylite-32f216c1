@@ -19,15 +19,14 @@ export default {
     extend: {
       fontFamily: {
         sans: [
+          "IBM Plex Sans",
           "-apple-system",
           "BlinkMacSystemFont",
-          "SF Pro Text",
-          "SF Pro Display",
-          "Inter",
           "system-ui",
           "sans-serif",
         ],
-        mono: ["SF Mono", "ui-monospace", "JetBrains Mono", "monospace"],
+        mono: ["IBM Plex Mono", "ui-monospace", "SF Mono", "monospace"],
+        display: ["Source Serif 4", "Georgia", "Times New Roman", "serif"],
       },
       letterSpacing: {
         tightest: "-0.04em",
@@ -46,6 +45,23 @@ export default {
         spring: "cubic-bezier(0.34, 1.3, 0.64, 1)",
       },
       colors: {
+        /* Fixed institutional palette for the public site (theme-independent).
+           Pure monochrome: ink blacks, paper white — no accent hue. */
+        ink: {
+          DEFAULT: "#0A0A0B",
+          950: "#050506",
+          900: "#0A0A0B",
+          800: "#131315",
+          700: "#1C1C1F",
+          600: "#27272B",
+          500: "#3A3A40",
+        },
+        paper: "#FFFFFF",
+        capital: {
+          DEFAULT: "#3A3A40",
+          bright: "#D9D9DE",
+          soft: "#A3A3AB",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

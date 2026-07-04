@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { EntropyGlyph } from "@/components/marketing/Wordmark";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -33,24 +31,27 @@ export default function ResetPasswordPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <p className="text-muted-foreground">Invalid or expired reset link.</p>
+      <div className="min-h-screen bg-white text-ink flex items-center justify-center p-4">
+        <p className="text-[14px] text-ink/50">Invalid or expired reset link.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground font-mono">
-            RESET PASSWORD
-          </h1>
-        </div>
-        <form onSubmit={handleReset} className="space-y-4 border border-border rounded-lg p-6 bg-card">
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-foreground">New Password</Label>
-            <Input
+    <div className="relative min-h-screen bg-white text-ink flex items-center justify-center p-5">
+      <div className="absolute inset-0 paper-grid grid-vignette" aria-hidden="true" />
+      <div className="relative w-full max-w-sm">
+        <EntropyGlyph className="h-10 w-auto mb-6" />
+        <h1 className="text-[24px] font-bold tracking-tight mb-2">Reset credentials</h1>
+        <p className="text-[13.5px] text-ink/50 leading-relaxed mb-8">
+          Choose a new password for your account. You will be signed in immediately.
+        </p>
+        <form onSubmit={handleReset} className="space-y-4">
+          <div>
+            <label htmlFor="password" className="mkt-label text-[9px] text-ink/45 block mb-2">
+              New password
+            </label>
+            <input
               id="password"
               type="password"
               value={password}
@@ -58,13 +59,17 @@ export default function ResetPasswordPage() {
               required
               minLength={6}
               placeholder="••••••••"
-              className="bg-input border-border text-foreground"
+              className="w-full h-12 rounded-lg border border-ink/12 bg-white px-4 text-[14px] tracking-tight text-ink placeholder:text-ink/25 focus:outline-none focus:border-ink/45 transition-colors"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Update Password
-          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full h-12 items-center justify-center gap-2 rounded-lg bg-ink text-[13.5px] font-semibold tracking-tight text-white hover:bg-ink-700 transition-colors disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Update password
+          </button>
         </form>
       </div>
     </div>

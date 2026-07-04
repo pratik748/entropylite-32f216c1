@@ -13,6 +13,11 @@ interface PanelWrapperProps {
   defaultCollapsed?: boolean;
 }
 
+/**
+ * Terminal panel chassis. Every workspace panel shares this construction:
+ * a hairline frame, an uppercase micro-label header with a capital-blue
+ * index tick, and full-screen / collapse controls.
+ */
 const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsible, defaultCollapsed }: PanelWrapperProps) => {
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
@@ -23,30 +28,32 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
       animate={{ opacity: 1, y: 0 }}
       transition={springGentle}
       data-density="compact"
-      className={`flex flex-col h-full border border-border/70 bg-card rounded-2xl overflow-hidden shadow-soft transition-shadow duration-300 hover:shadow-soft-lg ${expanded ? "fixed inset-0 z-50 rounded-none" : ""} ${className}`}
+      className={`flex flex-col h-full border border-border/70 bg-card rounded-xl overflow-hidden shadow-soft transition-shadow duration-300 hover:shadow-soft-lg ${expanded ? "fixed inset-0 z-50 rounded-none" : ""} ${className}`}
     >
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/50 bg-surface-2/40 shrink-0">
+      <div className="flex items-center justify-between pl-3 pr-2 h-9 border-b border-border/60 bg-surface-2/50 shrink-0">
         <div
-          className={`flex items-center gap-1.5 ${collapsible ? "cursor-pointer select-none" : ""}`}
+          className={`flex items-center gap-2 min-w-0 ${collapsible ? "cursor-pointer select-none" : ""}`}
           onClick={collapsible ? () => setCollapsed(!collapsed) : undefined}
         >
           {collapsible && (
             <motion.span
               animate={{ rotate: collapsed ? 0 : 90 }}
               transition={springGentle}
+              className="shrink-0"
             >
               <ChevronRight className="h-3 w-3 text-muted-foreground" />
             </motion.span>
           )}
-          {icon && <span className="text-muted-foreground">{icon}</span>}
-          <span className="text-[12px] font-semibold tracking-tight text-foreground/85">{title}</span>
+          <span className="h-3 w-[2px] rounded-full bg-foreground/60 shrink-0" aria-hidden="true" />
+          {icon && <span className="text-muted-foreground shrink-0">{icon}</span>}
+          <span className="data-label !text-foreground/80 truncate">{title}</span>
         </div>
         {!collapsed && (
           <motion.button
             {...pressableIcon}
             onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Exit full screen" : "Enter full screen"}
-            className="text-muted-foreground/70 hover:text-foreground transition-colors p-1.5 -m-1 rounded-full hover:bg-accent"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-accent shrink-0"
           >
             {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </motion.button>

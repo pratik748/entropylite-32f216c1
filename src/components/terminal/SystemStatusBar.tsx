@@ -55,12 +55,15 @@ const SystemStatusBar = ({ stockCount = 0, priceLatency }: SystemStatusBarProps)
   return (
     <div data-tour="status-bar" className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/60 glass-subtle px-3 sm:px-4 flex items-center justify-between text-[10px] font-medium tracking-tight" style={{ height: '26px' }}>
       <div className="flex items-center gap-2.5 sm:gap-4 relative z-10">
+        <span className="hidden md:inline font-semibold uppercase tracking-[0.18em] text-[8.5px] text-muted-foreground/70">
+          Entropy OS
+        </span>
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gain opacity-40" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gain" />
           </span>
-          <span className="text-gain">Live</span>
+          <span className="text-gain font-semibold uppercase tracking-[0.14em] text-[8.5px]">Live</span>
         </div>
         <div className="flex items-center gap-1">
           <Zap className="h-2.5 w-2.5 text-muted-foreground" />
