@@ -1161,12 +1161,13 @@ QUALITY MANDATE:
 - Build a diversified recommendation slate, not a popularity contest.
 - Avoid clustered lookalikes: do not emit multiple names expressing the same crowded trade, same business model, or same mega-cap factor exposure.
 - Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
-- Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
+- FORBIDDEN: penny stocks, OTC/pink-sheet, sub-$100M float, illiquid names (<$5M ADV), pump-and-dump meme plays. Everything else is fair game.
+- HUNT ASYMMETRY, NOT FAMILIARITY: the user wants **one-in-a-thousand** ideas, not the same mega-cap consensus trade every desk already owns. Favour uncrowded names with a specific, dateable catalyst over crowded FAANG/Nifty50 lookalikes.
 - Use exact tickers supported by Yahoo Finance.
 - NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
 - Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - WHEN A "LIVE WEB CONTEXT" BLOCK IS PROVIDED: anchor at least 50% of your picks to facts in that block (recent earnings, breaking news, sector flows). Cite the catalyst from the live block in the catalyst field. Do NOT ignore fresh real-world events.
-- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Mix frontline liquidity with high-conviction mid-caps that have real catalysts. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Actively mix sectors AND market caps — at least half the slate should sit outside the top-10 mega-cap consensus trade when a liquid alternative exists. Liquid mid-caps ($1B–$20B) with a hard catalyst are strongly preferred over generic large-cap filler. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -1186,11 +1187,11 @@ ${preferredHorizon ? `\n## TIME HORIZON LOCK — HARD CONSTRAINT\nUser is tradin
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
-    - ABSOLUTELY NO obscure, unheard-of, microcap, small-cap, penny, meme, or low-liquidity names unless the user explicitly asked for small caps
+    - Liquidity floor: >$5M average daily dollar volume (>₹2Cr for India). Below that = reject. Above that, ALL market caps welcome if the catalyst is real.
     - ABSOLUTELY NO loss-making businesses, deteriorating fundamentals, or broken charts
 - Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
 - Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
-- Prefer names with >$3B market cap and strong liquidity; allow liquid mid-caps when they materially improve diversification
+- Reward asymmetry: at least 2 of the slate should be non-consensus names (mid-cap, under-covered, or a sector nobody is talking about this week) with defendable edge — not more MSFT/AAPL/RELIANCE clones
 - Provide strategy diversity across at least 3 strategy types
 - Each idea must be defendable with evidence, not narrative fluff
 
@@ -1232,7 +1233,7 @@ Return via the tool call only.`,
         try {
           const retryOpts = {
             ...aiOpts,
-            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return at least 8 high-quality, deeply liquid large/mega-cap names that any institutional desk would hold today. Favour familiar blue-chip leaders over obscure picks.`,
+            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Keep the asymmetry mandate — do NOT collapse into a generic FAANG/blue-chip list. Mix sectors and caps.`,
             temperature: 0.5,
           };
           const retryResults = await callAIParallel(retryOpts);
@@ -1728,6 +1729,34 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
       const tierBonus = filterTier === "strict" ? 0.1 : 0.04;
 
+      // ── RARITY BONUS: inline CUSUM changepoint on log returns ──
+      // Surfaces names in an actual regime break (not just drifting) —
+      // this is what makes an idea "one in a thousand" rather than generic.
+      let rarityBonus = 0;
+      const cs = td.closes;
+      if (cs && cs.length >= 30) {
+        const rets: number[] = [];
+        for (let i = 1; i < cs.length; i++) {
+          if (cs[i - 1] > 0 && cs[i] > 0) rets.push(Math.log(cs[i] / cs[i - 1]));
+        }
+        if (rets.length >= 25) {
+          const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+          const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length;
+          const sd = Math.sqrt(variance) || 1e-9;
+          const k = 0.5 * sd;
+          const h = 5 * sd;
+          let sHi = 0, sLo = 0, alarmIdx = -1;
+          for (let i = 0; i < rets.length; i++) {
+            sHi = Math.max(0, sHi + rets[i] - mean - k);
+            sLo = Math.min(0, sLo + rets[i] - mean + k);
+            if (sHi > h || sLo < -h) { alarmIdx = i; sHi = 0; sLo = 0; }
+          }
+          // Fresh alarm in last 10 bars = active regime break
+          if (alarmIdx >= rets.length - 10) rarityBonus = 0.10;
+          else if (alarmIdx >= 0) rarityBonus = 0.04;
+        }
+      }
+
       const quantScore = Math.round(
         (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
          0.15 * diversification +            // Portfolio diversification
@@ -1738,7 +1767,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
          0.10 * trendScore +                 // Trend strength (NEW)
          0.15 * winRateScore +               // Monte Carlo win rate (NEW)
          hedgeBonus +
-         tierBonus) * 100
+         tierBonus +
+         rarityBonus) * 100
       );
 
       scored.push({
@@ -1988,20 +2018,40 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       (s.rec as any).expectedR = cons.expectedR;
       (s.rec as any).costHaircutPct = Number((haircut * 100).toFixed(2));
       (s.rec as any).liquidityTier = tickerClass(s.rec.ticker);
+      // Agreement gate: flag candidates where the quant ensemble said
+      // STAND_ASIDE AND the AI wasn't highly convicted either. These are
+      // the mediocre picks that make the slate feel generic.
+      const aiConf = (s.rec.confidence ?? 50) as number;
+      (s as any).lowConviction =
+        cons.decision === "STAND_ASIDE" && aiConf < 70 && s.filterTier !== "strict";
     }
     console.log(`[desirable-assets] ensemble consensus applied to ${scored.length} candidates`);
 
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
-    const strictPool = scored.filter((s) => s.filterTier === "strict");
-    const balancedPool = scored.filter((s) => s.filterTier === "strict" || s.filterTier === "balanced");
+    // Selectivity floor — no picks below 55 quantScore in the strict/balanced
+    // pool, and never surface a candidate the AI+quant BOTH disagreed on.
+    const CONVICTION_FLOOR = 55;
+    const highConviction = scored.filter((s) => !(s as any).lowConviction);
+    const strictPool = highConviction.filter(
+      (s) => s.filterTier === "strict" && s.quantScore >= CONVICTION_FLOOR
+    );
+    const balancedPool = highConviction.filter(
+      (s) => (s.filterTier === "strict" || s.filterTier === "balanced") && s.quantScore >= CONVICTION_FLOOR
+    );
+    const droppedByGate = scored.length - highConviction.length;
+    if (droppedByGate > 0) {
+      console.log(`[desirable-assets] agreement gate dropped ${droppedByGate} low-conviction candidates (STAND_ASIDE + AI conf < 70)`);
+    }
 
     let selectionPool: ScoredRec[];
-    if (strictPool.length >= 8) {
+    if (strictPool.length >= 4) {
       selectionPool = strictPool;
-    } else if (balancedPool.length >= 8) {
+    } else if (balancedPool.length >= 4) {
       selectionPool = balancedPool;
+    } else if (highConviction.length > 0) {
+      selectionPool = highConviction;
     } else {
       selectionPool = scored;
     }
