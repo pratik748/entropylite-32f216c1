@@ -2018,20 +2018,40 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       (s.rec as any).expectedR = cons.expectedR;
       (s.rec as any).costHaircutPct = Number((haircut * 100).toFixed(2));
       (s.rec as any).liquidityTier = tickerClass(s.rec.ticker);
+      // Agreement gate: flag candidates where the quant ensemble said
+      // STAND_ASIDE AND the AI wasn't highly convicted either. These are
+      // the mediocre picks that make the slate feel generic.
+      const aiConf = (s.rec.confidence ?? 50) as number;
+      (s as any).lowConviction =
+        cons.decision === "STAND_ASIDE" && aiConf < 70 && s.filterTier !== "strict";
     }
     console.log(`[desirable-assets] ensemble consensus applied to ${scored.length} candidates`);
 
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
-    const strictPool = scored.filter((s) => s.filterTier === "strict");
-    const balancedPool = scored.filter((s) => s.filterTier === "strict" || s.filterTier === "balanced");
+    // Selectivity floor — no picks below 55 quantScore in the strict/balanced
+    // pool, and never surface a candidate the AI+quant BOTH disagreed on.
+    const CONVICTION_FLOOR = 55;
+    const highConviction = scored.filter((s) => !(s as any).lowConviction);
+    const strictPool = highConviction.filter(
+      (s) => s.filterTier === "strict" && s.quantScore >= CONVICTION_FLOOR
+    );
+    const balancedPool = highConviction.filter(
+      (s) => (s.filterTier === "strict" || s.filterTier === "balanced") && s.quantScore >= CONVICTION_FLOOR
+    );
+    const droppedByGate = scored.length - highConviction.length;
+    if (droppedByGate > 0) {
+      console.log(`[desirable-assets] agreement gate dropped ${droppedByGate} low-conviction candidates (STAND_ASIDE + AI conf < 70)`);
+    }
 
     let selectionPool: ScoredRec[];
-    if (strictPool.length >= 8) {
+    if (strictPool.length >= 4) {
       selectionPool = strictPool;
-    } else if (balancedPool.length >= 8) {
+    } else if (balancedPool.length >= 4) {
       selectionPool = balancedPool;
+    } else if (highConviction.length > 0) {
+      selectionPool = highConviction;
     } else {
       selectionPool = scored;
     }
