@@ -1161,12 +1161,13 @@ QUALITY MANDATE:
 - Build a diversified recommendation slate, not a popularity contest.
 - Avoid clustered lookalikes: do not emit multiple names expressing the same crowded trade, same business model, or same mega-cap factor exposure.
 - Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
-- Obscure, low-coverage, microcap, low-float, meme, and low-liquidity names are forbidden.
+- FORBIDDEN: penny stocks, OTC/pink-sheet, sub-$100M float, illiquid names (<$5M ADV), pump-and-dump meme plays. Everything else is fair game.
+- HUNT ASYMMETRY, NOT FAMILIARITY: the user wants **one-in-a-thousand** ideas, not the same mega-cap consensus trade every desk already owns. Favour uncrowded names with a specific, dateable catalyst over crowded FAANG/Nifty50 lookalikes.
 - Use exact tickers supported by Yahoo Finance.
 - NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
 - Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - WHEN A "LIVE WEB CONTEXT" BLOCK IS PROVIDED: anchor at least 50% of your picks to facts in that block (recent earnings, breaking news, sector flows). Cite the catalyst from the live block in the catalyst field. Do NOT ignore fresh real-world events.
-- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Prefer liquid frontline names plus select high-liquidity mid-caps when they diversify the slate. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Mix sectors and market caps when liquidity allows. At least one recommendation should come from outside the dominant mega-cap trade when a liquid alternative exists. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Mix frontline liquidity with high-conviction mid-caps that have real catalysts. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Actively mix sectors AND market caps — at least half the slate should sit outside the top-10 mega-cap consensus trade when a liquid alternative exists. Liquid mid-caps ($1B–$20B) with a hard catalyst are strongly preferred over generic large-cap filler. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -1186,11 +1187,11 @@ ${preferredHorizon ? `\n## TIME HORIZON LOCK — HARD CONSTRAINT\nUser is tradin
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
-    - ABSOLUTELY NO obscure, unheard-of, microcap, small-cap, penny, meme, or low-liquidity names unless the user explicitly asked for small caps
+    - Liquidity floor: >$5M average daily dollar volume (>₹2Cr for India). Below that = reject. Above that, ALL market caps welcome if the catalyst is real.
     - ABSOLUTELY NO loss-making businesses, deteriorating fundamentals, or broken charts
 - Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
 - Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
-- Prefer names with >$3B market cap and strong liquidity; allow liquid mid-caps when they materially improve diversification
+- Reward asymmetry: at least 2 of the slate should be non-consensus names (mid-cap, under-covered, or a sector nobody is talking about this week) with defendable edge — not more MSFT/AAPL/RELIANCE clones
 - Provide strategy diversity across at least 3 strategy types
 - Each idea must be defendable with evidence, not narrative fluff
 
@@ -1232,7 +1233,7 @@ Return via the tool call only.`,
         try {
           const retryOpts = {
             ...aiOpts,
-            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return at least 8 high-quality, deeply liquid large/mega-cap names that any institutional desk would hold today. Favour familiar blue-chip leaders over obscure picks.`,
+            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Keep the asymmetry mandate — do NOT collapse into a generic FAANG/blue-chip list. Mix sectors and caps.`,
             temperature: 0.5,
           };
           const retryResults = await callAIParallel(retryOpts);
