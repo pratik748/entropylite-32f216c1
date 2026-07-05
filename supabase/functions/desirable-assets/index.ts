@@ -1729,6 +1729,34 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const hedgeBonus = isHedge && portCorr < -0.1 ? 0.1 : 0;
       const tierBonus = filterTier === "strict" ? 0.1 : 0.04;
 
+      // ── RARITY BONUS: inline CUSUM changepoint on log returns ──
+      // Surfaces names in an actual regime break (not just drifting) —
+      // this is what makes an idea "one in a thousand" rather than generic.
+      let rarityBonus = 0;
+      const cs = td.closes;
+      if (cs && cs.length >= 30) {
+        const rets: number[] = [];
+        for (let i = 1; i < cs.length; i++) {
+          if (cs[i - 1] > 0 && cs[i] > 0) rets.push(Math.log(cs[i] / cs[i - 1]));
+        }
+        if (rets.length >= 25) {
+          const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+          const variance = rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length;
+          const sd = Math.sqrt(variance) || 1e-9;
+          const k = 0.5 * sd;
+          const h = 5 * sd;
+          let sHi = 0, sLo = 0, alarmIdx = -1;
+          for (let i = 0; i < rets.length; i++) {
+            sHi = Math.max(0, sHi + rets[i] - mean - k);
+            sLo = Math.min(0, sLo + rets[i] - mean + k);
+            if (sHi > h || sLo < -h) { alarmIdx = i; sHi = 0; sLo = 0; }
+          }
+          // Fresh alarm in last 10 bars = active regime break
+          if (alarmIdx >= rets.length - 10) rarityBonus = 0.10;
+          else if (alarmIdx >= 0) rarityBonus = 0.04;
+        }
+      }
+
       const quantScore = Math.round(
         (0.20 * (normSharpe + 1) / 2 +    // Sharpe quality
          0.15 * diversification +            // Portfolio diversification
@@ -1739,7 +1767,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
          0.10 * trendScore +                 // Trend strength (NEW)
          0.15 * winRateScore +               // Monte Carlo win rate (NEW)
          hedgeBonus +
-         tierBonus) * 100
+         tierBonus +
+         rarityBonus) * 100
       );
 
       scored.push({
