@@ -124,7 +124,24 @@ function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 }
 function stripHtml(s: string): string {
-  return s.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+  let out = s;
+  // Decode entities FIRST (Google News RSS wraps its <description> as &lt;a href=...&gt;),
+  // otherwise the tag-strip runs on already-escaped markup and does nothing.
+  const decode = (t: string) => t
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+  // Two passes handle double-encoded entities safely.
+  out = decode(decode(out));
+  // Drop tags and any residual href="..." fragments.
+  out = out.replace(/<[^>]+>/g, " ").replace(/https?:\/\/\S+/g, " ");
+  return out.replace(/\s+/g, " ").trim();
 }
 
 interface Article {

@@ -48,6 +48,28 @@ function useTimeAgo(date: Date | null) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
+// Defense-in-depth: some upstream feeds (Google News RSS) return descriptions
+// pre-escaped as &lt;a href=...&gt;. Sanitize on render so the UI never shows raw HTML/URLs.
+function cleanPreview(raw: string | null | undefined, maxLen = 220): string {
+  if (!raw) return "";
+  let out = String(raw);
+  const decode = (t: string) => t
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+  out = decode(decode(out));
+  out = out.replace(/<[^>]+>/g, " ").replace(/https?:\/\/\S+/g, " ");
+  out = out.replace(/\s+/g, " ").trim();
+  if (out.length > maxLen) out = out.slice(0, maxLen).trimEnd() + "…";
+  return out;
+}
+
 const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFeedProps) => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -199,9 +221,12 @@ const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFee
                   <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 group-hover:underline">
                     {article.title}
                   </p>
-                  {article.description && (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
-                  )}
+                  {(() => {
+                    const preview = cleanPreview(article.description);
+                    return preview ? (
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">{preview}</p>
+                    ) : null;
+                  })()}
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                     {tier && <Badge className={`${tier.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{tier.label}</Badge>}
                     <span className="font-medium">{article.source}</span>
