@@ -1208,11 +1208,17 @@ Deno.serve(async (req) => {
     let mertonEngine: EngineSignal | null = null;
     let wfEngine: EngineSignal | null = null;
     let momentSkew = 0, momentKurt = 0;
+    // Raw analytics captured so the Renaissance-style edge engines can be
+    // surfaced explicitly in the response (not just folded into consensus).
+    let cointRaw: ReturnType<typeof engleGrangerLite> | null = null;
+    let mertonRaw: ReturnType<typeof mertonProxy> | null = null;
+    let wfRaw: ReturnType<typeof walkForwardEdge> | null = null;
     try {
       const benchCloses = await fetchBenchmarkCloses(isIndian);
       // Cointegration (L1)
       if (benchCloses.length >= 60 && snap.closes.length >= 60) {
         const eg = engleGrangerLite(snap.closes, benchCloses);
+        cointRaw = eg;
         if (eg.cointegrated && Math.abs(eg.residZ) >= 1.5 && Number.isFinite(eg.halfLife) && eg.halfLife > 1 && eg.halfLife < 60) {
           // spread far from equilibrium AND mean-reverting ⇒ trade towards the mean
           const dir: -1 | 0 | 1 = eg.residZ > 0 ? -1 : 1;
@@ -1235,6 +1241,7 @@ Deno.serve(async (req) => {
       const sigmaAnnual = tech.annualizedVol / 100;
       const trendSlope = tech.sma5 > tech.sma20 ? 1 : tech.sma5 < tech.sma20 ? -1 : 0;
       const mp = mertonProxy({ sigmaAnnual, drawdownPct: ddPct, trendSlope });
+      mertonRaw = mp;
       if (mp.signal !== 0 || mp.severity !== "OK") {
         mertonEngine = {
           id: "structural_credit",
@@ -1247,6 +1254,7 @@ Deno.serve(async (req) => {
       }
       // Walk-forward edge (L4) — vetoes signals against the asset's own history
       const wf = walkForwardEdge(snap.closes, 5);
+      wfRaw = wf;
       if (wf.n >= 40) {
         const dominantSide: -1 | 0 | 1 = String(output.action) === "BUY" ? 1 : String(output.action) === "SELL" ? -1 : 0;
         // For BUY: hitRate > 0.52 supports, < 0.48 vetoes. Symmetric for SELL.
@@ -1325,6 +1333,110 @@ Deno.serve(async (req) => {
     output.consensus = consensus.consensusLabel;
     (output as any).providersUsed = consensus.engineCount;
     (output as any).ensemble = consensus;
+
+    // ── QUANT EDGE — surface every institutional technique explicitly ──
+    // The Renaissance-style edge engines (statistical-arbitrage mean
+    // reversion, walk-forward evidence, structural credit) already vote
+    // inside the ensemble, but they were invisible to the user. Emit them
+    // as a first-class block alongside an EXPECTED-PROFIT calculation in
+    // real currency so Direct Profit shows the full quant stack, not just
+    // the final BUY/SELL.
+    {
+      const act = String(output.action);
+      const cp = snap.currentPrice;
+      const entryMid = (Number(output.entryLow) + Number(output.entryHigh)) / 2 || cp;
+      const tgt = Number(output.targetPrice) || cp;
+      const stp = Number(output.stopLoss) || cp;
+      const p = consensus.calibratedProb;                 // calibrated win-prob
+      const tailMult = consensus.tailMultiplier ?? 1;     // Cornish-Fisher fat-tail scaler
+
+      // Per-share upside / downside in native currency.
+      const grossUp = act === "SELL" ? entryMid - tgt : tgt - entryMid;
+      const grossDown = act === "SELL" ? stp - entryMid : entryMid - stp;
+      const rawUp = Math.max(0, grossUp);
+      const rawDown = Math.max(0, grossDown);
+      // Fat-tail-aware expected value: the loss leg is scaled by the
+      // Cornish-Fisher tail multiplier (heavier left tail ⇒ bigger penalty),
+      // and the round-trip cost haircut is charged on notional.
+      const costPerShare = entryMid * haircut;
+      const expectedProfitPerShare = act === "WAIT"
+        ? 0
+        : p * rawUp - (1 - p) * rawDown * tailMult - costPerShare;
+      const expectedProfitPct = entryMid > 0 ? (expectedProfitPerShare / entryMid) * 100 : 0;
+
+      const dirLabelOf = (d: number) => (d === 1 ? "BUY" : d === -1 ? "SELL" : "NEUTRAL");
+
+      (output as any).quantEdge = {
+        // Expected profit — the headline number the user asked for.
+        expectedProfit: {
+          perShare: roundPrice(expectedProfitPerShare),
+          pct: Number(expectedProfitPct.toFixed(2)),
+          currency,
+          winProb: Number((p * 100).toFixed(1)),
+          expectedR: consensus.expectedR,
+          upsidePerShare: roundPrice(rawUp),
+          downsidePerShare: roundPrice(rawDown),
+          costPerShare: roundPrice(costPerShare),
+        },
+        // Renaissance statistical-arbitrage mean reversion (Engle-Granger
+        // cointegration of the asset vs its benchmark).
+        meanReversion: cointRaw
+          ? {
+              benchmark: isIndian ? "NIFTY" : "SPY",
+              cointegrated: cointRaw.cointegrated,
+              residZ: Number(cointRaw.residZ.toFixed(2)),
+              halfLifeDays: Number.isFinite(cointRaw.halfLife) ? Number(cointRaw.halfLife.toFixed(0)) : null,
+              beta: Number(cointRaw.beta.toFixed(2)),
+              signal: cointEngine ? dirLabelOf(cointEngine.direction) : "NEUTRAL",
+              note: cointRaw.cointegrated
+                ? `Spread ${cointRaw.residZ > 0 ? "stretched high" : "stretched low"} vs ${isIndian ? "NIFTY" : "SPY"} — reverts toward fair value`
+                : `No stable cointegration with ${isIndian ? "NIFTY" : "SPY"} — pure mean-reversion edge absent`,
+            }
+          : null,
+        // Walk-forward forward-return edge — the asset's own history in this
+        // direction. Vetoes trades with no realised edge.
+        walkForward: wfRaw && wfRaw.n >= 20
+          ? {
+              hitRate: Number((wfRaw.hitRate * 100).toFixed(0)),
+              meanFwdPct: Number((wfRaw.meanFwd * 100).toFixed(2)),
+              fwdSharpe: Number(wfRaw.fwdSharpe.toFixed(2)),
+              sample: wfRaw.n,
+              horizonDays: 5,
+              signal: wfEngine ? dirLabelOf(wfEngine.direction) : "NEUTRAL",
+            }
+          : null,
+        // Merton-proxy structural credit / distance-to-default regime veto.
+        structuralCredit: mertonRaw
+          ? {
+              distanceToDefault: mertonRaw.dd,
+              impliedPD: Number((mertonRaw.pd * 100).toFixed(1)),
+              severity: mertonRaw.severity,
+              signal: dirLabelOf(mertonRaw.signal),
+            }
+          : null,
+        // Fat-tail geometry driving the Cornish-Fisher downside adjustment.
+        fatTails: {
+          skew: Number(momentSkew.toFixed(2)),
+          excessKurtosis: Number(momentKurt.toFixed(2)),
+          tailMultiplier: Number(tailMult.toFixed(2)),
+          note: tailMult > 1.2
+            ? "Left tail heavier than normal — downside penalised in expected value"
+            : "Tail risk near-normal",
+        },
+        // Risk hedge — structured from the protection logic + risk metrics.
+        hedge: act === "WAIT"
+          ? { needed: false, instruction: "No position — no hedge required." }
+          : {
+              needed: true,
+              instruction: String(output.protection),
+              riskPerShare: roundPrice(rawDown),
+              var95PerShare: riskMetrics.var95,
+              cvar95PerShare: riskMetrics.cvar95,
+              suggestedStopLoss: roundPrice(stp),
+              kellyFraction: riskMetrics.kellyFraction,
+            },
+      };
+    }
 
     // Fire-and-forget: log every directional signal for the nightly
     // walk-forward calibration job to mark to market T+5 days later.
