@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { cleanAll } from "../_shared/twrd/cleaners/index.ts";
+import { admitClaims } from "../_shared/twrd/admission.ts";
 import { scoreAndStore } from "../_shared/twrd/store.ts";
 import { extractFromNews, extractFromFlows, extractFromSentiment } from "../_shared/twrd/extract.ts";
 import type { RawClaim } from "../_shared/twrd/types.ts";
@@ -28,13 +29,23 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const cleaned = cleanAll(raw);
+    // Simulation-grounded admission (TRUTH §5.3): hard gates + sybil dedup
+    // BEFORE probabilistic scoring. Rejections are reported, never silent.
+    const { admitted, rejected, evidenceDeduped } = admitClaims(cleaned);
     const results = [];
-    for (const c of cleaned) {
+    for (const c of admitted) {
       try { results.push(await scoreAndStore(c)); }
       catch (e) { console.warn("scoreAndStore failed:", (e as Error).message); }
     }
-    return new Response(JSON.stringify({ scored: results.length, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      scored: results.length,
+      results,
+      rejected: rejected.length,
+      rejectionReasons: rejected.map((r) => ({
+        subject: r.claim.subject, relation: r.claim.relation, reasons: r.reasons,
+      })),
+      evidenceDeduped,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
