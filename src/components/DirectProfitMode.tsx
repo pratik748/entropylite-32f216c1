@@ -115,6 +115,58 @@ interface TradeResult {
     costHaircut?: number;
     tailMultiplier?: number;
   };
+  quantEdge?: QuantEdge;
+}
+
+interface QuantEdge {
+  expectedProfit: {
+    perShare: number;
+    pct: number;
+    currency: string;
+    winProb: number;
+    expectedR: number;
+    upsidePerShare: number;
+    downsidePerShare: number;
+    costPerShare: number;
+  };
+  meanReversion?: {
+    benchmark: string;
+    cointegrated: boolean;
+    residZ: number;
+    halfLifeDays: number | null;
+    beta: number;
+    signal: "BUY" | "SELL" | "NEUTRAL";
+    note: string;
+  } | null;
+  walkForward?: {
+    hitRate: number;
+    meanFwdPct: number;
+    fwdSharpe: number;
+    sample: number;
+    horizonDays: number;
+    signal: "BUY" | "SELL" | "NEUTRAL";
+  } | null;
+  structuralCredit?: {
+    distanceToDefault: number;
+    impliedPD: number;
+    severity: "OK" | "STRESS" | "DISTRESS";
+    signal: "BUY" | "SELL" | "NEUTRAL";
+  } | null;
+  fatTails?: {
+    skew: number;
+    excessKurtosis: number;
+    tailMultiplier: number;
+    note: string;
+  };
+  hedge?: {
+    needed: boolean;
+    instruction: string;
+    riskPerShare?: number;
+    var95PerShare?: number;
+    cvar95PerShare?: number;
+    suggestedStopLoss?: number;
+    kellyFraction?: number;
+  };
 }
 
 interface PortfolioItem {
@@ -250,6 +302,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     bearSignals: Array.isArray(value.bearSignals) ? value.bearSignals.map((s: any) => String(s)) : undefined,
     intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
     ensemble: value.ensemble && typeof value.ensemble === "object" ? value.ensemble : undefined,
+    quantEdge: value.quantEdge && typeof value.quantEdge === "object" && value.quantEdge.expectedProfit ? value.quantEdge : undefined,
   };
 }
 
@@ -621,6 +674,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const rm = result?.riskMetrics;
   const clank = result?.clankSignals?.filter(s => s.active) || [];
   const news = result?.newsHeadlines || [];
+  const qe = result?.quantEdge;
 
   return (
     <div className="h-full overflow-auto p-4">
@@ -874,6 +928,32 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   <div className="text-base font-bold font-mono text-loss mt-0.5">{cs}{result.stopLoss.toLocaleString()}</div>
                 </div>
               </div>
+
+              {/* ── EXPECTED PROFIT (probability-weighted, fat-tail adjusted) ── */}
+              {qe && result.action !== "WAIT" && (
+                <div className={`rounded-lg p-3 border ${qe.expectedProfit.perShare >= 0 ? "bg-gain/5 border-gain/25" : "bg-loss/5 border-loss/25"}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Profit / share</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground">{qe.expectedProfit.winProb}% win-prob · R≈{qe.expectedProfit.expectedR.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className={`text-2xl font-black font-mono ${qe.expectedProfit.perShare >= 0 ? "text-gain" : "text-loss"}`}>
+                      {qe.expectedProfit.perShare >= 0 ? "+" : "−"}{cs}{Math.abs(qe.expectedProfit.perShare).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                    <span className={`text-xs font-mono ${qe.expectedProfit.pct >= 0 ? "text-gain" : "text-loss"}`}>
+                      ({qe.expectedProfit.pct >= 0 ? "+" : ""}{qe.expectedProfit.pct}%)
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
+                    <span className="text-gain/80">▲ {cs}{qe.expectedProfit.upsidePerShare.toLocaleString()}</span>
+                    <span className="text-loss/80">▼ {cs}{qe.expectedProfit.downsidePerShare.toLocaleString()}</span>
+                    {qe.expectedProfit.costPerShare > 0 && <span>cost {cs}{qe.expectedProfit.costPerShare.toLocaleString()}</span>}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── COLLAPSIBLE: more details ── */}
@@ -969,6 +1049,92 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                       <div className="text-center"><div className="text-sm font-bold font-mono text-loss">{cs}{rm.var99}</div><div className="text-[9px] text-muted-foreground">VaR 99%</div></div>
                       <div className="text-center"><div className={`text-sm font-bold font-mono ${rm.kellyFraction > 0 ? "text-gain" : "text-muted-foreground"}`}>{(rm.kellyFraction * 100).toFixed(0)}%</div><div className="text-[9px] text-muted-foreground">Kelly</div></div>
                     </div>
+                  </div>
+                )}
+
+                {/* Renaissance Quant Edge — mean reversion, walk-forward, structural credit, fat tails */}
+                {qe && (
+                  <div className="border-b border-border p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                      <Activity className="h-3.5 w-3.5 text-primary" /> Quant Edge — Renaissance Techniques
+                    </div>
+
+                    {/* Mean reversion (statistical arbitrage / cointegration) */}
+                    {qe.meanReversion && (
+                      <div className="rounded-lg bg-surface-2/40 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground">Mean Reversion · Cointegration vs {qe.meanReversion.benchmark}</span>
+                          <SignalBadge signal={qe.meanReversion.signal} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                          <div><div className={`text-sm font-bold font-mono ${Math.abs(qe.meanReversion.residZ) >= 1.5 ? "text-primary" : "text-foreground"}`}>{qe.meanReversion.residZ}</div><div className="text-muted-foreground">Spread Z</div></div>
+                          <div><div className="text-sm font-bold font-mono text-foreground">{qe.meanReversion.halfLifeDays ?? "—"}{qe.meanReversion.halfLifeDays ? "d" : ""}</div><div className="text-muted-foreground">Half-life</div></div>
+                          <div><div className={`text-sm font-bold font-mono ${qe.meanReversion.cointegrated ? "text-gain" : "text-muted-foreground"}`}>{qe.meanReversion.cointegrated ? "YES" : "NO"}</div><div className="text-muted-foreground">Cointegr.</div></div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">{qe.meanReversion.note}</p>
+                      </div>
+                    )}
+
+                    {/* Walk-forward forward-return edge */}
+                    {qe.walkForward && (
+                      <div className="rounded-lg bg-surface-2/40 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground">Walk-Forward Edge · T+{qe.walkForward.horizonDays}d ({qe.walkForward.sample} samples)</span>
+                          <SignalBadge signal={qe.walkForward.signal} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                          <div><div className={`text-sm font-bold font-mono ${qe.walkForward.hitRate >= 52 ? "text-gain" : qe.walkForward.hitRate <= 48 ? "text-loss" : "text-foreground"}`}>{qe.walkForward.hitRate}%</div><div className="text-muted-foreground">Hit rate</div></div>
+                          <div><div className={`text-sm font-bold font-mono ${qe.walkForward.meanFwdPct >= 0 ? "text-gain" : "text-loss"}`}>{qe.walkForward.meanFwdPct}%</div><div className="text-muted-foreground">Mean fwd</div></div>
+                          <div><div className={`text-sm font-bold font-mono ${qe.walkForward.fwdSharpe >= 0 ? "text-gain" : "text-loss"}`}>{qe.walkForward.fwdSharpe}</div><div className="text-muted-foreground">Fwd Sharpe</div></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Structural credit (Merton-proxy distance-to-default) */}
+                    {qe.structuralCredit && (
+                      <div className="rounded-lg bg-surface-2/40 p-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground">Structural Credit · Distance-to-Default</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                            qe.structuralCredit.severity === "DISTRESS" ? "bg-loss/20 text-loss" :
+                            qe.structuralCredit.severity === "STRESS" ? "bg-warning/20 text-warning" : "bg-gain/15 text-gain"
+                          }`}>{qe.structuralCredit.severity}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
+                          <div><div className="text-sm font-bold font-mono text-foreground">{qe.structuralCredit.distanceToDefault}σ</div><div className="text-muted-foreground">Distance</div></div>
+                          <div><div className="text-sm font-bold font-mono text-foreground">{qe.structuralCredit.impliedPD}%</div><div className="text-muted-foreground">Implied PD</div></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fat tails (Cornish-Fisher) */}
+                    {qe.fatTails && (
+                      <div className="rounded-lg bg-surface-2/40 p-3 space-y-1">
+                        <div className="text-[11px] font-semibold text-foreground">Fat-Tail Geometry · Cornish-Fisher</div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                          <div><div className={`text-sm font-bold font-mono ${qe.fatTails.skew < 0 ? "text-loss" : "text-foreground"}`}>{qe.fatTails.skew}</div><div className="text-muted-foreground">Skew</div></div>
+                          <div><div className={`text-sm font-bold font-mono ${qe.fatTails.excessKurtosis > 1 ? "text-loss" : "text-foreground"}`}>{qe.fatTails.excessKurtosis}</div><div className="text-muted-foreground">Ex. Kurt</div></div>
+                          <div><div className={`text-sm font-bold font-mono ${qe.fatTails.tailMultiplier > 1.2 ? "text-loss" : "text-foreground"}`}>{qe.fatTails.tailMultiplier}×</div><div className="text-muted-foreground">Tail mult</div></div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">{qe.fatTails.note}</p>
+                      </div>
+                    )}
+
+                    {/* Risk hedge */}
+                    {qe.hedge?.needed && (
+                      <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                          <Shield className="h-3.5 w-3.5 text-primary" /> Risk Hedge
+                        </div>
+                        <p className="text-[11px] text-foreground">{qe.hedge.instruction}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono text-muted-foreground pt-0.5">
+                          {qe.hedge.riskPerShare !== undefined && <span>Risk/sh {cs}{qe.hedge.riskPerShare.toLocaleString()}</span>}
+                          {qe.hedge.var95PerShare !== undefined && <span>VaR95 {cs}{qe.hedge.var95PerShare.toLocaleString()}</span>}
+                          {qe.hedge.cvar95PerShare !== undefined && <span>CVaR95 {cs}{qe.hedge.cvar95PerShare.toLocaleString()}</span>}
+                          {qe.hedge.kellyFraction !== undefined && <span>Kelly {(qe.hedge.kellyFraction * 100).toFixed(0)}%</span>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1182,6 +1348,16 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 };
 
 export default DirectProfitMode;
+
+// Small directional badge for quant-edge engine signals.
+const SignalBadge = ({ signal }: { signal: "BUY" | "SELL" | "NEUTRAL" }) => (
+  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+    signal === "BUY" ? "bg-gain/15 text-gain" :
+    signal === "SELL" ? "bg-loss/15 text-loss" : "bg-muted/30 text-muted-foreground"
+  }`}>
+    {signal === "BUY" ? "↑ BULL" : signal === "SELL" ? "↓ BEAR" : "— FLAT"}
+  </span>
+);
 
 // Ticker input with auto-suggest + voice mic button.
 interface SuggestWrapperProps {
