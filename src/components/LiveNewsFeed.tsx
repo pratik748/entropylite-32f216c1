@@ -221,9 +221,12 @@ const LiveNewsFeed = ({ ticker, compact, region, onArticlesUpdate }: LiveNewsFee
                   <p className="text-sm font-medium text-foreground leading-snug line-clamp-2 group-hover:underline">
                     {article.title}
                   </p>
-                  {article.description && (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{article.description}</p>
-                  )}
+                  {(() => {
+                    const preview = cleanPreview(article.description);
+                    return preview ? (
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">{preview}</p>
+                    ) : null;
+                  })()}
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
                     {tier && <Badge className={`${tier.className} text-[7px] px-1 py-0 h-3.5 rounded`}>{tier.label}</Badge>}
                     <span className="font-medium">{article.source}</span>
