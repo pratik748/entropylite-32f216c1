@@ -8,16 +8,16 @@ import {
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
-import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
-import {
-  minVarianceWeights, meanVarianceWeights, riskParityWeights,
-  fractionalKellyWeights, pc1Concentration, jacobiEigen, marchenkoPastur,
-} from "@/lib/portfolio-math";
+import { useInstitutionalAnalytics } from "@/hooks/useInstitutionalAnalytics";
+import { meanVarianceWeights, jacobiEigen, marchenkoPastur } from "@/lib/portfolio-math";
+import type { OptimizerId, OptimizerConstraints } from "@/lib/analytics/types";
 import { MethodologyTooltip } from "@/components/quant/MethodologyTooltip";
-import { TrendingUp, ShieldAlert, Scale, Zap, AlertTriangle, ArrowRightLeft, Target, Brain } from "lucide-react";
+import {
+  TrendingUp, ShieldAlert, Scale, Zap, AlertTriangle, ArrowRightLeft,
+  Target, Brain, GitBranch, Layers, Sigma, Gauge, CheckCircle2, XCircle,
+} from "lucide-react";
 
 interface Props { stocks: PortfolioStock[]; }
-type Strategy = "equal_weight" | "risk_parity" | "mean_variance" | "min_variance";
 
 const PALETTE = [
   "hsl(0, 0%, 95%)", "hsl(152, 90%, 45%)", "hsl(210, 60%, 55%)", "hsl(38, 92%, 55%)",
@@ -28,67 +28,78 @@ const GRID = "hsl(220,12%,13%)";
 const MUTED = "hsl(210,8%,45%)";
 const CARD_BG = "hsl(0,0%,5%)";
 const BG = "hsl(0,0%,3%)";
-
-const strategies: { id: Strategy; label: string; icon: typeof Scale; desc: string }[] = [
-  { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "Uniform allocation across all positions" },
-  { id: "risk_parity", label: "Risk Parity (ERC)", icon: ShieldAlert, desc: "Equal Risk Contribution solved on Σ (Maillard 2010)" },
-  { id: "mean_variance", label: "Mean-Variance", icon: TrendingUp, desc: "Markowitz utility max μᵀw − λwᵀΣw (Markowitz 1952)" },
-  { id: "min_variance", label: "Min Variance", icon: Target, desc: "w* = Σ⁻¹·1 / (1ᵀΣ⁻¹1), active-set long-only" },
-];
-
 const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 8, fontSize: 11 };
 
+const strategies: { id: OptimizerId; label: string; icon: typeof Scale; desc: string }[] = [
+  { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "wᵢ = 1/N — no estimation risk" },
+  { id: "min_variance", label: "Min Variance", icon: Target, desc: "Σ⁻¹·1 active-set long-only (Markowitz)" },
+  { id: "mean_variance", label: "Mean–Variance", icon: TrendingUp, desc: "max μᵀw − λwᵀΣw (Markowitz 1952)" },
+  { id: "robust_mean_variance", label: "Robust MVO", icon: Sigma, desc: "Ledoit–Wolf Σ + μ shrunk to grand mean" },
+  { id: "risk_parity", label: "Risk Parity", icon: ShieldAlert, desc: "Equal risk contribution (Maillard 2010)" },
+  { id: "risk_budget", label: "Risk Budget", icon: Gauge, desc: "RCᵢ ∝ current conviction (Bruder–Roncalli)" },
+  { id: "hrp", label: "HRP", icon: GitBranch, desc: "Hierarchical clustering, no inversion (LdP 2016)" },
+  { id: "black_litterman", label: "Black–Litterman", icon: Brain, desc: "Equilibrium prior Π = δΣw (BL 1992)" },
+  { id: "min_cvar", label: "Min CVaR", icon: Layers, desc: "Minimize empirical 95% ES (Rockafellar–Uryasev)" },
+];
+
+const VOL_TARGETS = [
+  { label: "Off", value: undefined },
+  { label: "10%", value: 0.10 },
+  { label: "15%", value: 0.15 },
+  { label: "20%", value: 0.20 },
+] as const;
+
+const WEIGHT_CAPS = [
+  { label: "Off", value: undefined },
+  { label: "25%", value: 0.25 },
+  { label: "40%", value: 0.40 },
+] as const;
+
+const TURNOVER_CAPS = [
+  { label: "Off", value: undefined },
+  { label: "20%", value: 0.20 },
+  { label: "50%", value: 0.50 },
+] as const;
+
 const PortfolioConstructionModule = ({ stocks }: Props) => {
-  const { totalValue, holdings, fmt, totalPnl, totalInvested } = useNormalizedPortfolio(stocks);
+  const { totalValue, holdings, fmt } = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(60000);
-  const snap = useQuantSnapshot(stocks);
-  const [activeStrategy, setActiveStrategy] = useState<Strategy>("risk_parity");
+  const [activeStrategy, setActiveStrategy] = useState<OptimizerId>("hrp");
+  const [volTargetIdx, setVolTargetIdx] = useState(0);
+  const [capIdx, setCapIdx] = useState(0);
+  const [turnoverIdx, setTurnoverIdx] = useState(0);
+
+  const constraints = useMemo<OptimizerConstraints>(() => ({
+    targetVolAnnual: VOL_TARGETS[volTargetIdx].value,
+    maxWeight: WEIGHT_CAPS[capIdx].value,
+    maxTurnover: TURNOVER_CAPS[turnoverIdx].value,
+  }), [volTargetIdx, capIdx, turnoverIdx]);
+
+  const ia = useInstitutionalAnalytics(stocks, { constraints, recommendedId: activeStrategy });
+  const snap = ia.snapshot;
 
   const analytics = useMemo(() => {
     if (holdings.length === 0) return null;
 
     const currentWeights = holdings.map((h, i) => ({
       name: h.ticker, weight: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
-      value: h.value, color: PALETTE[i % PALETTE.length],
-      risk: h.risk, beta: h.beta, pnlPct: h.pnlPct, sector: h.sector,
+      value: h.value, color: PALETTE[i % PALETTE.length], sector: h.sector,
     }));
 
-    // Real Σ-based weights — no inverse-vol heuristics, no fallbacks.
-    const cov = snap.covariance;
-    const covTickers = cov.tickers;
-    const Sigma = cov.matrix;
-    const haveRealCov = snap.ready && covTickers.length >= 2 && Sigma.length === covTickers.length;
-    const muVec = haveRealCov
-      ? covTickers.map(t => snap.assetStats[t]?.mu ?? 0)
-      : [];
+    const active = ia.optimizers.find(o => o.id === activeStrategy) ?? null;
+    const strategyError = !snap.ready
+      ? "Needs ≥30d real history for every holding"
+      : active && !active.diagnostics.converged
+        ? (active.diagnostics.notes.join("; ") || "Solver did not converge on real Σ")
+        : null;
 
-    const n = holdings.length;
-    let strategyWeights: number[] | null = null;
-    let strategyError: string | null = null;
-    if (activeStrategy === "equal_weight") {
-      strategyWeights = holdings.map(() => 1 / n);
-    } else if (!haveRealCov) {
-      strategyError = "Needs ≥30d real history for every holding";
-    } else {
-      let solved: number[] | null = null;
-      if (activeStrategy === "risk_parity") solved = riskParityWeights(Sigma);
-      else if (activeStrategy === "min_variance") solved = minVarianceWeights(Sigma);
-      else if (activeStrategy === "mean_variance") solved = meanVarianceWeights(muVec, Sigma, 2);
-      if (!solved) {
-        strategyError = "Solver did not converge on real Σ";
-      } else {
-        // Map cov-ticker order → holdings order
-        const byTicker: Record<string, number> = {};
-        covTickers.forEach((t, i) => { byTicker[t] = solved![i]; });
-        strategyWeights = holdings.map(h => byTicker[h.ticker] ?? 0);
-        const s = strategyWeights.reduce((a, v) => a + v, 0);
-        if (s > 0) strategyWeights = strategyWeights.map(v => v / s);
-      }
+    let targets = holdings.map(() => 0);
+    if (active && active.diagnostics.converged && active.weights.length > 0) {
+      const byTicker: Record<string, number> = {};
+      active.tickers.forEach((t, i) => { byTicker[t] = active.weights[i]; });
+      targets = holdings.map(h => (byTicker[h.ticker] ?? 0) * 100);
     }
 
-    const targets = strategyWeights
-      ? strategyWeights.map(w => w * 100)
-      : holdings.map(() => 0);
     const driftData = currentWeights.map((cw, i) => ({
       name: cw.name, current: +cw.weight.toFixed(1), target: +targets[i].toFixed(1),
       drift: +(cw.weight - targets[i]).toFixed(1),
@@ -97,102 +108,91 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       tradeValue: Math.abs(cw.weight - targets[i]) / 100 * totalValue,
     }));
 
-    const returns = holdings.map(h => h.pnlPct / 100);
-    const avgReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
-    const variance = returns.reduce((s, r) => s + (r - avgReturn) ** 2, 0) / returns.length;
-    const stdDev = Math.sqrt(variance);
-    const riskFreeRate = 0.05;
-    const annReturn = avgReturn * 252;
-    const annVol = stdDev * Math.sqrt(252);
-    const sharpe = annVol > 0 ? (annReturn - riskFreeRate) / annVol : 0;
-    const sortino = (() => {
-      const down = returns.filter(r => r < 0);
-      if (down.length === 0) return sharpe * 1.5;
-      const dd = Math.sqrt(down.reduce((s, r) => s + r ** 2, 0) / down.length) * Math.sqrt(252);
-      return dd > 0 ? (annReturn - riskFreeRate) / dd : 0;
-    })();
-    const maxDrawdown = Math.min(...holdings.map(h => h.pnlPct), 0);
-    const hhi = currentWeights.reduce((s, w) => s + (w.weight / 100) ** 2, 0);
-    const concentrationScore = Math.round(hhi * 100);
+    // Real time-series performance (fixes prior cross-sectional Sharpe bug)
+    const perf = ia.performance;
+    const sharpe = perf?.sharpe.value ?? 0;
+    const sortino = perf?.sortino.value ?? 0;
+    const maxDrawdown = -(perf?.maxDrawdown.value ?? 0) * 100;
+    const annReturn = perf?.annualReturn.value ?? 0;
+    const annVol = perf?.annualVol.value ?? 0;
 
-    // Real efficient frontier: sweep λ across Markowitz utility on Σ.
-    // No synthetic curve — drop entirely if Σ unavailable.
-    let frontier: { risk: number; return: number }[] = [];
+    const hhi = ia.risk?.concentration.hhi.value ?? currentWeights.reduce((s, w) => s + (w.weight / 100) ** 2, 0);
+    const concentrationScore = Math.round(hhi * 100);
+    const effectiveN = ia.risk?.concentration.effectiveN.value ?? (hhi > 0 ? 1 / hhi : 0);
+
+    // Efficient frontier: λ-sweep of Markowitz utility on real Σ
+    const covTickers = snap.covariance.tickers;
+    const Sigma = snap.covariance.matrix;
+    const haveRealCov = snap.ready && covTickers.length >= 2 && Sigma.length === covTickers.length;
+    const frontier: { risk: number; return: number }[] = [];
     if (haveRealCov) {
+      const muVec = covTickers.map(t => snap.assetStats[t]?.mu ?? 0);
       const lambdas = [0.25, 0.5, 1, 1.5, 2, 3, 5, 8, 12, 20, 35, 60];
       for (const lam of lambdas) {
         const w = meanVarianceWeights(muVec, Sigma, lam);
         if (!w) continue;
-        let muP = 0;
+        let muP = 0, varP = 0;
         for (let i = 0; i < w.length; i++) muP += w[i] * muVec[i];
-        let varP = 0;
         for (let i = 0; i < w.length; i++)
           for (let j = 0; j < w.length; j++) varP += w[i] * w[j] * Sigma[i][j];
-        const sigP = Math.sqrt(Math.max(varP, 0));
         frontier.push({
-          risk: +(sigP * Math.sqrt(252) * 100).toFixed(2),
+          risk: +(Math.sqrt(Math.max(varP, 0)) * Math.sqrt(252) * 100).toFixed(2),
           return: +(muP * 252 * 100).toFixed(2),
         });
       }
-      // Deduplicate & sort by risk for a clean monotone trace
       frontier.sort((a, b) => a.risk - b.risk);
+      // Overlay every converged optimizer as a candidate point
     }
+    const optimizerPoints = ia.optimizers
+      .filter(o => o.diagnostics.converged && o.weights.length > 0)
+      .map(o => ({
+        risk: +(o.volAnnual * 100).toFixed(2),
+        return: o.expectedReturnAnnual != null ? +(o.expectedReturnAnnual * 100).toFixed(2) : 0,
+        name: o.label,
+      }))
+      .filter(p => p.return !== 0 || p.risk !== 0);
     const portfolioPoint = { risk: +(annVol * 100).toFixed(1), return: +(annReturn * 100).toFixed(1) };
 
     const sectorMap: Record<string, { weight: number; count: number }> = {};
-    currentWeights.forEach((cw, i) => {
-      const sec = holdings[i].sector;
-      if (!sectorMap[sec]) sectorMap[sec] = { weight: 0, count: 0 };
-      sectorMap[sec].weight += cw.weight; sectorMap[sec].count += 1;
+    currentWeights.forEach((cw) => {
+      if (!sectorMap[cw.sector]) sectorMap[cw.sector] = { weight: 0, count: 0 };
+      sectorMap[cw.sector].weight += cw.weight; sectorMap[cw.sector].count += 1;
     });
     const sectorData = Object.entries(sectorMap).map(([name, d]) => ({
       name: name.length > 12 ? name.slice(0, 12) + "…" : name, weight: +d.weight.toFixed(1), count: d.count,
     })).sort((a, b) => b.weight - a.weight);
 
-    const riskContrib = holdings.map((h, i) => {
-      const w = currentWeights[i].weight / 100;
-      const marginalRisk = h.beta * h.risk * w;
-      return { name: h.ticker, contribution: +marginalRisk.toFixed(1), beta: h.beta, risk: h.risk };
-    });
-    const totalRC = riskContrib.reduce((s, r) => s + r.contribution, 0);
-    const riskContribData = riskContrib.map(r => ({ ...r, pct: totalRC > 0 ? +((r.contribution / totalRC) * 100).toFixed(1) : 0 }));
+    // Euler risk contributions from Σ (replaces β×risk-score heuristic)
+    const riskContribData = (ia.attribution?.positions ?? [])
+      .filter(p => p.riskContributionPct != null)
+      .map(p => ({ name: p.ticker, pct: +((p.riskContributionPct as number) * 100).toFixed(1) }));
 
     const radarData = [
-      { factor: "Diversification", value: Math.round(100 - concentrationScore) },
+      { factor: "Diversification", value: Math.round(Math.min(100, (effectiveN / Math.max(holdings.length, 1)) * 100)) },
       { factor: "Risk-Adjusted", value: Math.round(Math.min(100, Math.max(0, sharpe * 30 + 50))) },
-      { factor: "Momentum", value: Math.round(Math.min(100, Math.max(0, avgReturn * 500 + 50))) },
+      { factor: "Momentum", value: Math.round(Math.min(100, Math.max(0, annReturn * 200 + 50))) },
       { factor: "Stability", value: Math.round(Math.min(100, Math.max(0, 100 + maxDrawdown * 2))) },
       { factor: "Efficiency", value: Math.round(Math.min(100, Math.max(0, sortino * 25 + 50))) },
     ];
 
-    // ── Noise vs Signal (RMT) ──────────────────────────────────────
-    // Build correlation from Σ → eigen-decompose → MP edge & PC1 share.
-    let rmt: {
-      lambdaPlus: number | null;
-      signalCount: number | null;
-      pc1Share: number | null;
-      eigCount: number;
-      T: number;
-    } = { lambdaPlus: null, signalCount: null, pc1Share: null, eigCount: 0, T: snap.lookbackDays };
-    if (haveRealCov && Sigma.length >= 2) {
+    // Noise vs signal (RMT / Marchenko–Pastur) on the realized correlation
+    let rmt: { lambdaPlus: number | null; signalCount: number | null; pc1Share: number | null; eigCount: number; T: number } =
+      { lambdaPlus: null, signalCount: null, pc1Share: null, eigCount: 0, T: snap.lookbackDays };
+    if (haveRealCov) {
       const N = Sigma.length;
-      // Correlation = D⁻¹ Σ D⁻¹  with D = diag(√Σᵢᵢ)
       const stds = Sigma.map((r, i) => Math.sqrt(Math.max(r[i], 0)));
       if (stds.every(s => s > 0)) {
-        const corr: number[][] = Sigma.map((row, i) =>
-          row.map((v, j) => v / (stds[i] * stds[j]))
-        );
+        const corr = Sigma.map((row, i) => row.map((v, j) => v / (stds[i] * stds[j])));
         const eig = jacobiEigen(corr);
         if (eig) {
-          const T = snap.lookbackDays;
-          const mp = marchenkoPastur(eig.values, T, N, 1);
+          const mp = marchenkoPastur(eig.values, snap.lookbackDays, N, 1);
           const total = eig.values.reduce((a, v) => a + v, 0);
           rmt = {
             lambdaPlus: mp ? +mp.lambdaPlus.toFixed(3) : null,
             signalCount: mp ? mp.signalCount : null,
             pc1Share: total > 0 ? Math.max(...eig.values) / total : null,
             eigCount: N,
-            T,
+            T: snap.lookbackDays,
           };
         }
       }
@@ -201,17 +201,21 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     const regimeName = regime?.regime || "Range-Bound";
     const regimeAdvice = (() => {
       switch (regimeName) {
-        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt — overweight high-μ names within Σ risk budget", recommended: "mean_variance" as Strategy };
-        case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as Strategy };
-        case "Crisis": return { color: "text-loss", suggestion: "Emergency risk parity, equalize risk and raise cash allocation", recommended: "risk_parity" as Strategy };
-        case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as Strategy };
-        case "Rotation": return { color: "text-info", suggestion: "Equal weight rebalance, capture sector rotation evenly", recommended: "equal_weight" as Strategy };
-        default: return { color: "text-muted-foreground", suggestion: "Maintain current allocation, no regime trigger detected", recommended: "equal_weight" as Strategy };
+        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt — overweight high-μ names within the Σ risk budget", recommended: "mean_variance" as OptimizerId };
+        case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as OptimizerId };
+        case "Crisis": return { color: "text-loss", suggestion: "HRP — clustering stays stable exactly where Σ⁻¹ breaks in stress", recommended: "hrp" as OptimizerId };
+        case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as OptimizerId };
+        case "Rotation": return { color: "text-info", suggestion: "Equal weight rebalance, capture sector rotation evenly", recommended: "equal_weight" as OptimizerId };
+        default: return { color: "text-muted-foreground", suggestion: "Maintain current allocation, no regime trigger detected", recommended: "hrp" as OptimizerId };
       }
     })();
 
-    return { currentWeights, targets, driftData, sharpe, sortino, maxDrawdown, concentrationScore, hhi, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol, rmt, strategyError, haveRealCov };
-  }, [holdings, totalValue, activeStrategy, regime, snap]);
+    return {
+      currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, effectiveN,
+      frontier, optimizerPoints, portfolioPoint, sectorData, riskContribData, radarData,
+      regimeName, regimeAdvice, annReturn, annVol, strategyError, active, rmt,
+    };
+  }, [holdings, totalValue, activeStrategy, regime, snap, ia]);
 
   if (!analytics || holdings.length === 0) {
     return (
@@ -221,9 +225,13 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     );
   }
 
-  const { currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, frontier, portfolioPoint, sectorData, riskContribData, radarData, regimeName, regimeAdvice, annReturn, annVol, rmt, strategyError } = analytics;
+  const {
+    currentWeights, driftData, sharpe, sortino, maxDrawdown, concentrationScore, effectiveN,
+    frontier, optimizerPoints, portfolioPoint, sectorData, riskContribData, radarData,
+    regimeName, regimeAdvice, annReturn, annVol, strategyError, active, rmt,
+  } = analytics;
 
-  const regimeRecommended = regimeAdvice.recommended;
+  const diag = active?.diagnostics ?? null;
 
   return (
     <div className="space-y-5">
@@ -247,18 +255,19 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* KPI Strip */}
+      {/* KPI Strip — real time-series metrics */}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {[
-          { label: "Portfolio Value", value: fmt(totalValue), color: "text-foreground" },
-          { label: "Sharpe", value: sharpe.toFixed(2), color: sharpe >= 1 ? "text-gain" : sharpe >= 0 ? "text-foreground" : "text-loss" },
-          { label: "Sortino", value: sortino.toFixed(2), color: sortino >= 1 ? "text-gain" : sortino >= 0 ? "text-foreground" : "text-loss" },
-          { label: "Max Drawdown", value: `${maxDrawdown.toFixed(1)}%`, color: maxDrawdown < -10 ? "text-loss" : maxDrawdown < -5 ? "text-warning" : "text-gain" },
-          { label: "Concentration", value: `${concentrationScore}`, color: concentrationScore > 40 ? "text-loss" : concentrationScore > 25 ? "text-warning" : "text-gain" },
+          { label: "Portfolio Value", value: fmt(totalValue), color: "text-foreground", sub: `${holdings.length} positions` },
+          { label: "Sharpe (realized)", value: sharpe.toFixed(2), color: sharpe >= 1 ? "text-gain" : sharpe >= 0 ? "text-foreground" : "text-loss", sub: `${snap.lookbackDays}d series` },
+          { label: "Sortino (realized)", value: sortino.toFixed(2), color: sortino >= 1 ? "text-gain" : sortino >= 0 ? "text-foreground" : "text-loss", sub: `${snap.lookbackDays}d series` },
+          { label: "Max Drawdown", value: `${maxDrawdown.toFixed(1)}%`, color: maxDrawdown < -10 ? "text-loss" : maxDrawdown < -5 ? "text-warning" : "text-gain", sub: "equity curve" },
+          { label: "Effective N", value: effectiveN.toFixed(1), color: concentrationScore > 40 ? "text-loss" : concentrationScore > 25 ? "text-warning" : "text-gain", sub: `HHI ${concentrationScore}` },
         ].map(kpi => (
           <div key={kpi.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
             <p className={`mt-1 font-mono text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+            <p className="text-[9px] text-muted-foreground/60 mt-0.5">{kpi.sub}</p>
           </div>
         ))}
       </div>
@@ -266,39 +275,113 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       {/* Strategy Selector */}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Rebalancing Strategy</h3>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Allocation Engine</h3>
           <MethodologyTooltip
-            title="Strategy Math"
+            title="Optimizer Suite"
             methods={[
-              { label: "Equal Weight", formula: "wᵢ = 1/N", source: "Naïve baseline" },
-              { label: "Risk Parity (ERC)", formula: "wᵢ·(Σw)ᵢ = const", source: "Maillard, Roncalli, Teiletche (2010)", notes: "Newton iteration on Σ; null on non-convergence." },
-              { label: "Mean-Variance", formula: "max μᵀw − λ·wᵀΣw, λ=2", source: "Markowitz (1952)", notes: "Closed-form Σ⁻¹μ + Lagrangian, simplex projected." },
-              { label: "Min Variance", formula: "w* = Σ⁻¹·1 / (1ᵀΣ⁻¹1)", source: "Markowitz (1952)", notes: "Active-set long-only; null if Σ singular." },
+              { label: "Robust MVO", formula: "max μ̃ᵀw − 4wᵀΣ̃w · Σ̃ = Ledoit–Wolf, μ̃ = ½μ + ½μ̄", source: "Ledoit & Wolf (2004); James–Stein", notes: "Kills MVO's error-maximizing corners." },
+              { label: "HRP", formula: "cluster on √(½(1−ρ)) → recursive bisection", source: "López de Prado (2016)", notes: "No matrix inversion; stable on singular Σ." },
+              { label: "Risk Budget", formula: "wᵢ(Σw)ᵢ = bᵢσ²_p", source: "Bruder & Roncalli (2012)", notes: "Budgets ∝ current capital weights." },
+              { label: "Black–Litterman", formula: "μ_BL = [(τΣ)⁻¹+PᵀΩ⁻¹P]⁻¹[(τΣ)⁻¹Π+PᵀΩ⁻¹Q]", source: "Black & Litterman (1992)", notes: "Prior = current portfolio equilibrium." },
+              { label: "Min CVaR", formula: "min ES₉₅ over historical scenarios", source: "Rockafellar & Uryasev (2000)", notes: "Projected subgradient, deterministic." },
+              { label: "Constraints", formula: "weight cap · turnover cap · σ targeting", source: "Capped-simplex projection; blend; cash padding" },
             ]}
           />
         </div>
         {strategyError && (
           <p className="mb-2 text-[10px] text-warning flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> {strategyError} — strategy targets unavailable
+            <AlertTriangle className="h-3 w-3" /> {strategyError} — no fallback allocation is shown
           </p>
         )}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
           {strategies.map(s => {
             const Icon = s.icon;
-            const active = activeStrategy === s.id;
-            const isRecommended = regimeRecommended === s.id;
+            const isActive = activeStrategy === s.id;
+            const isRecommended = regimeAdvice.recommended === s.id;
+            const result = ia.optimizers.find(o => o.id === s.id);
+            const ok = result?.diagnostics.converged ?? false;
             return (
               <button key={s.id} onClick={() => setActiveStrategy(s.id)}
-                className={`relative rounded-lg p-3 text-left transition-all border ${active ? "border-foreground bg-foreground/5" : "border-border hover:border-muted-foreground/30"}`}>
+                className={`relative rounded-lg p-3 text-left transition-all border ${isActive ? "border-foreground bg-foreground/5" : "border-border hover:border-muted-foreground/30"}`}>
                 {isRecommended && <span className="absolute -top-1.5 right-2 rounded bg-primary px-1.5 py-0.5 text-[8px] font-bold text-primary-foreground uppercase">Regime Pick</span>}
-                <Icon className={`h-4 w-4 mb-1.5 ${active ? "text-foreground" : "text-muted-foreground"}`} />
-                <p className={`text-xs font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
+                <div className="flex items-center justify-between">
+                  <Icon className={`h-4 w-4 mb-1.5 ${isActive ? "text-foreground" : "text-muted-foreground"}`} />
+                  {snap.ready && (ok
+                    ? <CheckCircle2 className="h-3 w-3 text-gain/70" />
+                    : <XCircle className="h-3 w-3 text-loss/70" />)}
+                </div>
+                <p className={`text-xs font-semibold ${isActive ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
                 <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight">{s.desc}</p>
               </button>
             );
           })}
         </div>
+
+        {/* Constraint controls */}
+        <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-border/50 pt-3">
+          {[
+            { title: "Vol Target (σₐ)", options: VOL_TARGETS, idx: volTargetIdx, set: setVolTargetIdx },
+            { title: "Position Cap", options: WEIGHT_CAPS, idx: capIdx, set: setCapIdx },
+            { title: "Turnover Cap", options: TURNOVER_CAPS, idx: turnoverIdx, set: setTurnoverIdx },
+          ].map(ctl => (
+            <div key={ctl.title} className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{ctl.title}</span>
+              <div className="flex gap-1">
+                {ctl.options.map((o, i) => (
+                  <button key={o.label} onClick={() => ctl.set(i)}
+                    className={`rounded px-2 py-0.5 text-[10px] font-mono transition-colors ${ctl.idx === i ? "bg-foreground text-background" : "bg-surface-2 text-muted-foreground hover:text-foreground"}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Optimizer diagnostics */}
+      {diag && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Solver Diagnostics — {active?.label}
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p>
+              <p className={`font-mono text-sm font-bold ${diag.converged ? "text-gain" : "text-loss"}`}>
+                {diag.converged ? "CONVERGED" : "FAILED"}{diag.iterations != null ? ` · ${diag.iterations} it` : ""}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">κ(Σ) Condition</p>
+              <p className={`font-mono text-sm font-bold ${diag.conditionNumber != null && diag.conditionNumber > 1000 ? "text-warning" : "text-foreground"}`}>
+                {diag.conditionNumber == null ? "—" : diag.conditionNumber === Infinity ? "singular" : diag.conditionNumber.toFixed(0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">LW Shrinkage δ</p>
+              <p className="font-mono text-sm font-bold text-foreground">{diag.shrinkageDelta != null ? diag.shrinkageDelta.toFixed(3) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</p>
+              <p className={`font-mono text-sm font-bold uppercase ${diag.confidence === "high" ? "text-gain" : diag.confidence === "medium" ? "text-warning" : "text-loss"}`}>{diag.confidence}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Target σₐ / Cash</p>
+              <p className="font-mono text-sm font-bold text-foreground">
+                {active ? `${(active.volAnnual * 100).toFixed(1)}%` : "—"}
+                {active && active.cashWeight > 0.005 ? ` · ${(active.cashWeight * 100).toFixed(0)}% cash` : ""}
+              </p>
+            </div>
+          </div>
+          {(diag.assumptions.length > 0 || diag.notes.length > 0) && (
+            <div className="mt-2 space-y-0.5">
+              {diag.assumptions.map((a, i) => <p key={`a${i}`} className="text-[10px] text-muted-foreground/70">• {a}</p>)}
+              {diag.notes.map((nt, i) => <p key={`n${i}`} className="text-[10px] text-warning/80">• {nt}</p>)}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Noise vs Signal (RMT / Marchenko-Pastur) */}
       <div className="rounded-xl border border-border bg-card p-4">
@@ -381,7 +464,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Efficient Frontier</h3>
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Efficient Frontier & Optimizer Map</h3>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 10, right: 10, bottom: 5, left: 5 }}>
@@ -391,6 +474,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
                 <ZAxis range={[30, 30]} />
                 <Tooltip contentStyle={tipStyle} />
                 <Scatter name="Frontier" data={frontier} fill="hsl(0,0%,30%)" line={{ stroke: "hsl(0,0%,40%)", strokeWidth: 2 }} />
+                <Scatter name="Optimizers" data={optimizerPoints} fill="hsl(210,60%,55%)" />
                 <Scatter name="Your Portfolio" data={[portfolioPoint]} fill="hsl(152,90%,45%)" shape="star">
                   <Cell fill="hsl(152,90%,45%)" />
                 </Scatter>
@@ -399,8 +483,8 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
           </div>
           <div className="mt-2 flex items-center gap-4 text-[10px] text-muted-foreground">
             <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gain" /> Your Portfolio</span>
-            <span>Ann. Return: {(annReturn * 100).toFixed(1)}%</span>
-            <span>Ann. Vol: {(annVol * 100).toFixed(1)}%</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: "hsl(210,60%,55%)" }} /> Optimizer Candidates</span>
+            <span>Realized: {(annReturn * 100).toFixed(1)}% / {(annVol * 100).toFixed(1)}% σₐ</span>
           </div>
         </div>
       </div>
@@ -427,21 +511,30 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Risk Contribution</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Risk Contribution</h3>
+            <span className="text-[9px] font-mono text-muted-foreground/60">Euler: RCᵢ = wᵢ(Σw)ᵢ / σ²_p</span>
+          </div>
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={riskContribData} margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} tickFormatter={v => `${v}%`} />
-                <Tooltip contentStyle={tipStyle} formatter={(v: number, name: string) => [name === "pct" ? `${v}%` : v, name === "pct" ? "Risk Share" : "Marginal Risk"]} />
-                <Bar dataKey="pct" fill="hsl(0,0%,50%)" radius={[4, 4, 0, 0]}>
-                  {riskContribData.map((r, i) => (
-                    <Cell key={i} fill={r.pct > 30 ? "hsl(0,90%,55%)" : r.pct > 20 ? "hsl(38,92%,55%)" : "hsl(0,0%,45%)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {riskContribData.length === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-xs text-muted-foreground">Needs real Σ (≥30d history per holding)</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={riskContribData} margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+                  <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} tickFormatter={v => `${v}%`} />
+                  <Tooltip contentStyle={tipStyle} formatter={(v: number) => [`${v}%`, "Risk Share"]} />
+                  <Bar dataKey="pct" fill="hsl(0,0%,50%)" radius={[4, 4, 0, 0]}>
+                    {riskContribData.map((r, i) => (
+                      <Cell key={i} fill={r.pct > 30 ? "hsl(0,90%,55%)" : r.pct > 20 ? "hsl(38,92%,55%)" : "hsl(0,0%,45%)"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -464,7 +557,10 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Portfolio Quality</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Portfolio Quality</h3>
+            <span className="text-[9px] font-mono text-muted-foreground/60">scaled from realized metrics</span>
+          </div>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData}>
@@ -480,9 +576,16 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
 
       {/* Rebalance Trade Sheet */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-          <ArrowRightLeft className="h-4 w-4" /> Rebalance Trade Sheet
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+            <ArrowRightLeft className="h-4 w-4" /> Rebalance Trade Sheet
+          </h3>
+          {active && active.turnoverFromCurrent > 0 && (
+            <span className="text-[10px] font-mono text-muted-foreground">
+              one-way turnover: {(active.turnoverFromCurrent * 100).toFixed(1)}%
+            </span>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -507,13 +610,25 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
                   <td className="py-2.5 px-2 text-center">
                     <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${d.action === "TRIM" ? "bg-loss/10 text-loss" : d.action === "ADD" ? "bg-gain/10 text-gain" : "bg-surface-3 text-muted-foreground"}`}>{d.action}</span>
                   </td>
-                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : ","}</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : "—"}</td>
                 </tr>
               ))}
+              {active && active.cashWeight > 0.005 && (
+                <tr className="border-b border-border/50">
+                  <td className="py-2.5 px-2 font-mono font-semibold text-muted-foreground">CASH</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">0.0%</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-foreground">{(active.cashWeight * 100).toFixed(1)}%</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-gain">−{(active.cashWeight * 100).toFixed(1)}%</td>
+                  <td className="py-2.5 px-2 text-center">
+                    <span className="rounded px-2 py-0.5 text-[10px] font-bold bg-gain/10 text-gain">RAISE</span>
+                  </td>
+                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{fmt(active.cashWeight * totalValue)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-        {driftData.every(d => d.action === "HOLD") && (
+        {driftData.every(d => d.action === "HOLD") && !strategyError && (
           <p className="mt-3 text-sm text-gain flex items-center gap-2"><Zap className="h-3.5 w-3.5" /> Portfolio within tolerance, no rebalancing needed.</p>
         )}
         {driftData.some(d => d.action !== "HOLD") && (
