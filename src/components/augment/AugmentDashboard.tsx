@@ -58,7 +58,7 @@ const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
       case "riskmodel": return <RiskModelingModule stocks={stocks} />;
       case "stress": return <StressTestModule stocks={stocks} />;
       case "oms": return <OrderManagementModule stocks={stocks} />;
-      case "trade": return <TradeLifecycleModule stocks={stocks} />;
+      case "trade": return <TradeLifecycleModule />;
       case "data": return <DataAggregationModule />;
       case "compliance": return <ComplianceModule stocks={stocks} />;
       case "multiasset": return <MultiAssetModule stocks={stocks} />;
