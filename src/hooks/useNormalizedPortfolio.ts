@@ -11,7 +11,6 @@ export function useNormalizedPortfolio(stocks: PortfolioStock[]) {
   // (risk, beta, sector, suggestion) but must NEVER cause a position to vanish
   // from portfolio value. Un-analyzed positions fall back to buyPrice.
   const analyzed = stocks;
-  const analyzedOnly = stocks.filter(s => s.analysis);
 
   const { totalValue, totalInvested, totalPnl, holdings } = useMemo(() => {
     let tv = 0, ti = 0;
