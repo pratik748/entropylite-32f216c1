@@ -7,7 +7,10 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 export function useNormalizedPortfolio(stocks: PortfolioStock[]) {
   const { baseCurrency, convertToBase } = useFX();
   const sym = getCurrencySymbol(baseCurrency);
-  const analyzed = stocks.filter(s => s.analysis);
+  // Include ALL holdings in aggregate totals — analysis is used for enrichment
+  // (risk, beta, sector, suggestion) but must NEVER cause a position to vanish
+  // from portfolio value. Un-analyzed positions fall back to buyPrice.
+  const analyzed = stocks;
 
   const { totalValue, totalInvested, totalPnl, holdings } = useMemo(() => {
     let tv = 0, ti = 0;
