@@ -36,20 +36,64 @@ const ValuationModule = ({ stocks }: Props) => {
       name: v.ticker, "Fair Value": +v.fairNum.toFixed(0), "Current": +v.currentNum.toFixed(0),
     }));
 
-    const months = ["Mar 2026", "Apr 2026", "May 2026", "Jun 2026"];
-    const cf = months.map((m, i) => {
-      const inflow = holdings.reduce((s, h) => {
-        const dy = (h.analysis?.dividendYield || 1.5) / 100;
-        return s + h.value * dy / 4;
-      }, 0) * (i === 0 || i === 3 ? 1.5 : 0.5);
-      return { month: m, inflow: +inflow.toFixed(0), outflow: +(inflow * 0.3).toFixed(0), net: +(inflow * 0.7).toFixed(0), type: i === 0 || i === 3 ? "Dividend Period" : "Coupon / Interest" };
+    // Next 6 calendar months, generated from the actual current date.
+    // Inflow = quarterly dividend accrual per holding, allocated to the
+    // holding's actual ex-div month when known (analysis.exDivMonth 1-12),
+    // otherwise spread evenly across the quarter. No random multipliers.
+    const now = new Date();
+    const nextMonths = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      return { key: d.getMonth() + 1, label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }) };
     });
 
+    const cf = nextMonths.map(({ key, label }) => {
+      let inflow = 0;
+      holdings.forEach(h => {
+        const dy = (h.analysis?.dividendYield || 0) / 100;
+        if (dy <= 0) return;
+        const annual = h.value * dy;
+        const exMonth = typeof h.analysis?.exDivMonth === "number" ? h.analysis.exDivMonth : null;
+        if (exMonth != null) {
+          // Quarterly payer: pays on ex-month and every 3rd month after.
+          if (((key - exMonth + 12) % 3) === 0) inflow += annual / 4;
+        } else {
+          // Unknown schedule → smear evenly over 12 months.
+          inflow += annual / 12;
+        }
+      });
+      const outflow = 0; // No fees modelled — never fabricate cash-out numbers.
+      return {
+        month: label,
+        inflow: +inflow.toFixed(0),
+        outflow,
+        net: +(inflow - outflow).toFixed(0),
+        type: inflow > 0 ? "Dividend accrual" : "No cash event",
+      };
+    });
+
+    // Collateral tiering derived from each holding's own risk score, not
+    // from a fixed 60/37/3 split. Basel-style haircuts by liquidity tier.
+    const buckets = { cash: 0, large: 0, mid: 0, small: 0 };
+    holdings.forEach(h => {
+      const isCashLike = /CASH|MMKT|TBILL|GOLD|BOND|TLT|IEF/i.test(h.rawTicker);
+      if (isCashLike) buckets.cash += h.value;
+      else if (h.risk <= 40) buckets.large += h.value;
+      else if (h.risk <= 65) buckets.mid += h.value;
+      else buckets.small += h.value;
+    });
     const coll = [
-      { type: "Cash Equivalent", value: fmt(totalValue * 0.03), haircut: "0%", usable: fmt(totalValue * 0.03) },
-      { type: "Large Cap Equity", value: fmt(totalValue * 0.6), haircut: "25%", usable: fmt(totalValue * 0.45) },
-      { type: "Mid/Small Cap", value: fmt(totalValue * 0.37), haircut: "40%", usable: fmt(totalValue * 0.222) },
-    ];
+      { type: "Cash / Sovereign", raw: buckets.cash, haircutPct: 0 },
+      { type: "Large-cap equity",  raw: buckets.large, haircutPct: 25 },
+      { type: "Mid-cap equity",    raw: buckets.mid,   haircutPct: 40 },
+      { type: "High-vol / small",  raw: buckets.small, haircutPct: 55 },
+    ]
+      .filter(b => b.raw > 0)
+      .map(b => ({
+        type: b.type,
+        value: fmt(b.raw),
+        haircut: `${b.haircutPct}%`,
+        usable: fmt(b.raw * (1 - b.haircutPct / 100)),
+      }));
 
     return { valuations: h, cashflows: cf.map(c => ({ month: c.month, inflow: fmt(c.inflow), outflow: fmt(c.outflow), net: `+${fmt(c.net)}`, type: c.type })), collateral: coll, fairVsCurrentData: fvc, cfAreaData: cf };
   }, [holdings, totalValue, fmt]);
