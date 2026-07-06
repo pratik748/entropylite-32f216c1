@@ -36,6 +36,8 @@ export interface QuantSnapshot {
   };
   correlation: { tickers: string[]; matrix: number[][] };
   covariance: { tickers: string[]; matrix: number[][]; sigmas: number[] };
+  /** Per-asset daily log-return series (full history per ticker). */
+  returnsByTicker: Record<string, number[]>;
 }
 
 const EMPTY: QuantSnapshot = {
@@ -47,6 +49,7 @@ const EMPTY: QuantSnapshot = {
   },
   correlation: { tickers: [], matrix: [] },
   covariance: { tickers: [], matrix: [], sigmas: [] },
+  returnsByTicker: {},
 };
 
 /**
@@ -138,6 +141,7 @@ export function useQuantSnapshot(stocks: PortfolioStock[]): QuantSnapshot {
       },
       correlation,
       covariance,
+      returnsByTicker: retsByT,
     };
   }, [holdings, prices, totalValue, loading]);
 }
