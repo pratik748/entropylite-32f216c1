@@ -208,7 +208,36 @@ export function ThreatFeed({ data, selectedConflict, onSelectConflict }: Props) 
   );
 }
 
-export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTickers: string[] }) {
+export function ThreatsView({
+  data,
+  exposedTickers,
+  loading,
+  onRefresh,
+}: {
+  data: GeoData;
+  exposedTickers: string[];
+  loading?: boolean;
+  onRefresh?: () => void;
+}) {
+  const empty =
+    data.keyThreats.length === 0 &&
+    data.highEntropyZones.length === 0 &&
+    exposedTickers.length === 0;
+  if (empty) {
+    return (
+      <div className="glass-panel rounded-xl p-6 text-center text-xs text-muted-foreground">
+        {loading ? "Scanning global threat wire…" : "No active threats detected."}
+        {!loading && onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="ml-2 text-primary underline underline-offset-2"
+          >
+            Refresh
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       {data.keyThreats.length > 0 && (
@@ -271,7 +300,30 @@ export function ThreatsView({ data, exposedTickers }: { data: GeoData; exposedTi
   );
 }
 
-export function ForexView({ data }: { data: GeoData }) {
+export function ForexView({
+  data,
+  loading,
+  onRefresh,
+}: {
+  data: GeoData;
+  loading?: boolean;
+  onRefresh?: () => void;
+}) {
+  if (!data.forexVolatility || data.forexVolatility.length === 0) {
+    return (
+      <div className="glass-panel rounded-xl p-6 text-center text-xs text-muted-foreground">
+        {loading ? "Pulling FX volatility feed…" : "FX feed unavailable right now."}
+        {!loading && onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="ml-2 text-primary underline underline-offset-2"
+          >
+            Refresh
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       <div className="glass-panel rounded-xl p-3 relative">
