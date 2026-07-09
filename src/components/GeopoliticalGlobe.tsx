@@ -253,13 +253,16 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
         </div>
       )}
 
-      {viewMode === "threats" && <ThreatsView data={safeData} exposedTickers={exposedTickers} />}
-      {viewMode === "forex" && <ForexView data={safeData} />}
-      {viewMode !== "map" && !data && (
-        <div className="text-center py-12 text-xs text-muted-foreground">
-          Legacy intel summary paused (rate-limited). Live wire still active —
-          <Button variant="ghost" size="sm" onClick={() => onRefresh()} className="ml-1 h-6 text-xs">Retry</Button>
-        </div>
+      {viewMode === "threats" && (
+        <ThreatsView
+          data={safeData}
+          exposedTickers={exposedTickers}
+          loading={loading && !data}
+          onRefresh={() => onRefresh()}
+        />
+      )}
+      {viewMode === "forex" && (
+        <ForexView data={safeData} loading={loading && !data} onRefresh={() => onRefresh()} />
       )}
     </div>
   );
