@@ -6,7 +6,7 @@ import { fetchMacroCalendar, fetchYahooSummary } from "../_shared/liveData.ts";
 import { runConsensus, type EngineSignal, type ConsensusResult } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
 import { loadCalibration } from "../_shared/calibration.ts";
-import { returnMoments, walkForwardEdge, mertonProxy } from "../_shared/mathEdge.ts";
+import { returnMoments, walkForwardEdge, mertonProxy, cfExpectedR } from "../_shared/mathEdge.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -2026,6 +2026,105 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         cons.decision === "STAND_ASIDE" && aiConf < 70 && s.filterTier !== "strict";
     }
     console.log(`[desirable-assets] ensemble consensus applied to ${scored.length} candidates`);
+
+    // ── STAGE 3.7: Direct-Profit style qualification (SOFT, non-blocking) ──
+    // Mirrors the way direct-profit weighs a single trade: market-regime
+    // stress (VIX), fat-tail risk (Cornish-Fisher), historical forward-return
+    // edge (walk-forward), news impact, and structural distress. Every effect
+    // is bounded ±10 pts on quantScore — we NEVER drop a candidate here.
+    let vixNow = 0;
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 3000);
+      const r = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d&_t=${Date.now()}`,
+        { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0" } },
+      );
+      clearTimeout(to);
+      if (r.ok) {
+        const j = await r.json();
+        const px = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (Number.isFinite(px)) vixNow = Number(px);
+      }
+    } catch { /* best-effort */ }
+    const regimeStress = vixNow >= 30 ? 1 : vixNow >= 22 ? 0.6 : vixNow >= 17 ? 0.25 : 0;
+
+    for (const s of scored) {
+      const isHedge = HEDGE_STRATEGIES.has(String(s.rec.strategy || ""));
+      const closes = Array.isArray(s.closes) ? s.closes : [];
+      const moments = returnMoments(closes);
+      const wf = walkForwardEdge(closes, 5);
+      const mp = mertonProxy({
+        sigmaAnnual: (s.volatility || 0) / 100,
+        drawdownPct: (s.maxDrawdown || 0) / 100,
+        trendSlope: s.momentum20d > 0 ? 1 : s.momentum20d < 0 ? -1 : 0,
+      });
+
+      // (a) Market-stress dampener — high VIX + high-vol NON-hedge is riskier
+      let stressTilt = 0;
+      if (!isHedge && regimeStress > 0) {
+        const volFactor = Math.min(1, (s.volatility || 0) / 60);
+        stressTilt = -Math.round(regimeStress * volFactor * 8); // 0..-8
+      } else if (isHedge && regimeStress >= 0.6) {
+        stressTilt = +Math.round(regimeStress * 4); // hedges get a nudge
+      }
+
+      // (b) Fat-tail penalty — negatively skewed, kurtotic tape crushes edge
+      let tailTilt = 0;
+      if (!isHedge && moments.n >= 40) {
+        const cf = cfExpectedR({
+          p: 0.55, rUp: 2.2, rDown: 1.0,
+          skew: moments.skew, excessKurt: moments.excessKurt,
+        });
+        // tailMultiplier >1.15 = meaningfully worse than normal
+        if (cf.tailMultiplier > 1.15) {
+          tailTilt = -Math.round(Math.min(6, (cf.tailMultiplier - 1) * 20));
+        } else if (cf.tailMultiplier < 0.9) {
+          tailTilt = +2; // positively skewed
+        }
+      }
+
+      // (c) Walk-forward edge reward — historical T+5 evidence for direction
+      let wfTilt = 0;
+      if (wf.n >= 30) {
+        // fwdSharpe positive & meaningful ⇒ reward; negative ⇒ penalize
+        const w = Math.max(-1, Math.min(1, wf.fwdSharpe / 1.5));
+        wfTilt = Math.round(w * 6);
+      }
+
+      // (d) News impact — reuse sentiment we already fetched (top candidates)
+      let newsTilt = 0;
+      if (s.sentimentArticleCount > 0) {
+        // small extra nudge beyond the sentimentImpact already applied,
+        // scaled by article count (more coverage = more confidence)
+        const coverage = Math.min(1, s.sentimentArticleCount / 8);
+        newsTilt = Math.round((s.sentimentScore / 100) * coverage * 4);
+      }
+
+      // (e) Structural distress — bounded, non-blocking (Merton already fed
+      // consensus; here we ensure it also bites the score directly)
+      let distressTilt = 0;
+      if (!isHedge && mp.severity === "DISTRESS") distressTilt = -6;
+      else if (!isHedge && mp.severity === "STRESS") distressTilt = -2;
+
+      const dpTilt = clamp(stressTilt + tailTilt + wfTilt + newsTilt + distressTilt, -12, +10);
+      s.quantScore = clamp(s.quantScore + dpTilt, 1, 99);
+
+      (s.rec as any).directProfitQual = {
+        vix: vixNow ? Number(vixNow.toFixed(1)) : null,
+        regime: vixNow >= 30 ? "crisis" : vixNow >= 22 ? "elevated" : vixNow >= 15 ? "normal" : vixNow > 0 ? "calm" : "unknown",
+        stressTilt, tailTilt, wfTilt, newsTilt, distressTilt,
+        tiltApplied: dpTilt,
+        tailMultiplier: moments.n >= 40 ? Number(cfExpectedR({
+          p: 0.55, rUp: 2.2, rDown: 1.0,
+          skew: moments.skew, excessKurt: moments.excessKurt,
+        }).tailMultiplier.toFixed(2)) : null,
+        wfHitRate: wf.n >= 30 ? Number((wf.hitRate * 100).toFixed(0)) : null,
+        wfSharpe: wf.n >= 30 ? Number(wf.fwdSharpe.toFixed(2)) : null,
+        mertonSeverity: mp.severity,
+      };
+    }
+    console.log(`[desirable-assets] direct-profit qualification applied (VIX=${vixNow.toFixed(1)}, regimeStress=${regimeStress})`);
 
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
