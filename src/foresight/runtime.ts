@@ -44,7 +44,21 @@ interface PlanServiceRequest {
 
 async function callPlanService<T>(req: PlanServiceRequest): Promise<T> {
   const { data, error } = await supabase.functions.invoke("foresight-plan", { body: req });
-  if (error) throw new Error(error.message || "foresight-plan unreachable");
+  if (error) {
+    // supabase-js reports an undeployed function (404) and network/CORS
+    // failures with the same opaque "Failed to send a request" message —
+    // translate it into something an operator can act on.
+    const raw = error.message || "";
+    if (/failed to send a request/i.test(raw) || error.name === "FunctionsFetchError") {
+      throw new Error(
+        "Foresight's reasoning service is unreachable — the foresight-plan edge function is not deployed on this Supabase project (deploy it, then retry).",
+      );
+    }
+    if (error.name === "FunctionsHttpError" && typeof error.context?.status === "number" && error.context.status === 401) {
+      throw new Error("Foresight requires a signed-in session — please sign in and retry.");
+    }
+    throw new Error(raw || "foresight-plan unreachable");
+  }
   if (data?.error) throw new Error(String(data.error));
   return data as T;
 }
