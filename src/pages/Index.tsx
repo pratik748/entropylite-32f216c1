@@ -56,6 +56,11 @@ import { FXProvider, useFX } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
 import { useSellNotifications } from "@/hooks/useSellNotifications";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { ForesightProvider } from "@/foresight/ForesightProvider";
+import ForesightSurface from "@/foresight/ui/ForesightSurface";
+import Spotlight from "@/foresight/ui/Spotlight";
+import { onUIEvent } from "@/foresight/uiBus";
+import type { HostAdapter } from "@/foresight/types";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
 
@@ -150,6 +155,16 @@ const IndexContent = () => {
     },
     [],
   );
+  // ── Foresight operating layer — bus subscriptions + host adapter ──
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+  useEffect(() => {
+    const offNav = onUIEvent("navigate", ({ tab }) => handleTabSwitch(tab as Tab));
+    const offStock = onUIEvent("set_active_stock", ({ positionId }) => setActiveStockId(positionId));
+    return () => { offNav(); offStock(); };
+  }, [handleTabSwitch]);
+
   const {
     data: geoData,
     loading: geoLoading,
@@ -412,6 +427,44 @@ const IndexContent = () => {
     if (activeStockId === id) setActiveStockId(stocks.find((s) => s.id !== id)?.id ?? null);
     if (stock) unregisterWatch(stock.ticker);
   };
+  // Live application handles for Foresight's tools. Reads go through refs so
+  // the runtime (constructed once) always sees current state; mutations reuse
+  // the exact same paths as manual interaction (analysis, journaling, sentinel).
+  const foresightHost: HostAdapter = {
+    getPositions: () =>
+      stocksRef.current.map((s) => ({
+        id: s.id,
+        ticker: s.ticker,
+        buyPrice: s.buyPrice,
+        quantity: s.quantity,
+        currentPrice: s.analysis?.currentPrice,
+        currency: s.analysis?.currency,
+        analysis: s.analysis ?? null,
+      })),
+    getActiveTab: () => activeTabRef.current,
+    navigate: (tab) => handleTabSwitch(tab as Tab),
+    openAugmentModule: () => handleTabSwitch("augment"),
+    setActiveStock: (id) => setActiveStockId(id),
+    addPosition: (ticker, buyPrice, quantity) => handleAnalyze(ticker, buyPrice, quantity),
+    removePosition: (id) => handleRemoveStock(id),
+    updatePosition: (id, changes) =>
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, buyPrice: changes.buyPrice ?? s.buyPrice, quantity: changes.quantity ?? s.quantity }
+            : s,
+        ),
+      ),
+    getHistoryEntries: () =>
+      history.map((h) => ({
+        ticker: h.ticker,
+        timestamp: h.timestamp,
+        suggestion: h.suggestion,
+        currentPrice: h.currentPrice,
+        confidence: h.confidence,
+      })),
+  };
+
   if (!loaded) {
     return (
       <div className="h-screen bg-background flex items-center justify-center">
@@ -421,6 +474,7 @@ const IndexContent = () => {
   }
 
   return (
+    <ForesightProvider host={foresightHost}>
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header
         directProfitMode={directProfitMode}
@@ -781,6 +835,9 @@ const IndexContent = () => {
             </PageTransition>
           </main>
             </div>
+
+            {/* Foresight — docked operating surface (⌘J) */}
+            <ForesightSurface />
           </div>
 
           {showMobileDashboardDock && (
@@ -850,6 +907,8 @@ const IndexContent = () => {
         </>
       )}
     </div>
+    <Spotlight />
+    </ForesightProvider>
   );
 };
 

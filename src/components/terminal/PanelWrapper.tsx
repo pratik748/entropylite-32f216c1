@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Maximize2, Minimize2, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { springGentle, pressableIcon } from "@/lib/motion";
+import { useForesightTarget } from "@/foresight/uiBus";
 
 interface PanelWrapperProps {
   title: string;
@@ -22,12 +23,21 @@ const PanelWrapper = ({ title, icon, children, className = "", noPad, collapsibl
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
 
+  // Every panel is addressable by Foresight's ui.highlight through a stable
+  // id derived from its title (e.g. "Monte Carlo" → panel.monte-carlo).
+  const targetId = useMemo(
+    () => `panel.${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+    [title],
+  );
+  const targetProps = useForesightTarget(targetId, title);
+
   const content = (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springGentle}
       data-density="compact"
+      {...targetProps}
       className={`flex flex-col h-full border border-border/70 bg-card rounded-xl overflow-hidden shadow-soft transition-shadow duration-300 hover:shadow-soft-lg ${expanded ? "fixed inset-0 z-50 rounded-none" : ""} ${className}`}
     >
       <div className="flex items-center justify-between pl-3 pr-2 h-9 border-b border-border/60 bg-surface-2/50 shrink-0">

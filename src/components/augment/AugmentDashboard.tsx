@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useUIEvent } from "@/foresight/uiBus";
 import {
   Briefcase, BarChart3, Shield, Zap, FileCheck, Database,
   Scale, Layers, DollarSign, Umbrella, LayoutDashboard, Users,
@@ -49,6 +50,14 @@ type ModuleId = typeof modules[number]["id"];
 
 const AugmentDashboard = ({ stocks }: AugmentDashboardProps) => {
   const [activeModule, setActiveModule] = useState<ModuleId>("portfolio");
+
+  // Foresight can open a specific module ("open the stress testing module").
+  useUIEvent(
+    "open_module",
+    useCallback(({ moduleId }) => {
+      if (modules.some((m) => m.id === moduleId)) setActiveModule(moduleId as ModuleId);
+    }, []),
+  );
 
   const renderModule = () => {
     switch (activeModule) {

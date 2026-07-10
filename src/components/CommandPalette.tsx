@@ -10,7 +10,8 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Zap } from "lucide-react";
+import { emitUIEvent } from "@/foresight/uiBus";
+import { Command, LogOut, Zap } from "lucide-react";
 
 export interface PaletteTab {
   id: string;
@@ -63,6 +64,11 @@ const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit }
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Actions">
+          <CommandItem value="Ask Foresight" onSelect={() => run(() => emitUIEvent("open_surface", {}))}>
+            <Command className="mr-2 h-4 w-4 text-muted-foreground" />
+            Ask Foresight
+            <CommandShortcut>⌘J</CommandShortcut>
+          </CommandItem>
           <CommandItem value="Direct Profit Mode" onSelect={() => run(onToggleDirectProfit)}>
             <Zap className="mr-2 h-4 w-4 text-muted-foreground" />
             Toggle Direct Profit mode
