@@ -11,6 +11,7 @@ import {
 } from "react";
 import "./tools";
 import { ForesightRuntime } from "./runtime";
+import { speak } from "./voice";
 import { onUIEvent, type WorkbenchCard } from "./uiBus";
 import type {
   ExecutionStep, FactRecord, HostAdapter, PendingAction, RuntimeEvent, VerificationReport,
@@ -68,6 +69,13 @@ export function ForesightProvider({ host, children }: { host: HostAdapter; child
   const [prefill, setPrefill] = useState("");
 
   const applyEvent = useCallback((event: RuntimeEvent) => {
+    // Voice channel — speaks conversational beats only (never the raw ledger).
+    // speak() is a no-op unless the user has toggled voice on.
+    if (event.type === "ack") speak(event.text);
+    else if (event.type === "answer") speak(event.text);
+    else if (event.type === "clarify") speak(event.question);
+    else if (event.type === "error") speak("That run hit a problem — details are on screen.");
+
     setTranscript((prev) => {
       const next = [...prev];
       const last = next[next.length - 1];

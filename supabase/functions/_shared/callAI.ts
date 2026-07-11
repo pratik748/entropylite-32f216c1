@@ -7,6 +7,11 @@
  *   - MISTRAL_API_KEY      (primary)
  *   - MISTRAL_API_KEY_2    (fallback, used if primary fails / 429 / 401 / 5xx)
  *
+ * A third key (MISTRAL_API_KEY_3) acts as a priority reserve: it is not part
+ * of the round-robin load split, and is tried FIRST when both rotating keys
+ * hit limits — before any Gemini/1min fallback — so rate-limit bursts land on
+ * the reserve Mistral lane rather than a different provider.
+ *
  * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
  * support OpenAI-style function declarations natively), and the JSON response
  * is wrapped into a synthetic toolCall so callers don't have to branch.
@@ -216,7 +221,7 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const { primary, fallback } = buildLanes(reported);
   if (primary.length === 0 && fallback.length === 0) {
-    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
+    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
   }
 
   // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
@@ -349,12 +354,16 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const fallback: Lane[] = [];
   const m1 = Deno.env.get("MISTRAL_API_KEY");
   const m2 = Deno.env.get("MISTRAL_API_KEY_2");
+  const m3 = Deno.env.get("MISTRAL_API_KEY_3");
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
   const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
 
   if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
+  // Reserve Mistral key — kept out of the round-robin so it stays under its
+  // rate limits, and tried before Gemini when the rotating keys are exhausted.
+  if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
   // Gemini lanes — sequential fallback after every Mistral key fails.
   // Ensures analytics never go dark when Mistral is rate-limited or down.
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });

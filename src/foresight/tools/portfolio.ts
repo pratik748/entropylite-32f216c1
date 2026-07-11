@@ -6,9 +6,9 @@
  */
 
 import { computePerformanceMetrics } from "@/lib/analytics/performance";
-import { computeRiskMetrics, runStressScenario, STRESS_SCENARIOS, type StressScenario } from "@/lib/analytics/risk";
+import { computeRiskMetrics, runStressScenario, STRESS_SCENARIOS } from "@/lib/analytics/risk";
 import { runOptimizer, OPTIMIZER_LABELS } from "@/lib/analytics/optimizers";
-import type { OptimizerId } from "@/lib/analytics/types";
+import type { OptimizerId, StressScenario } from "@/lib/analytics/types";
 import { ledoitWolfShrinkage, covToCorr } from "@/lib/quant/covariance";
 import { registerTool } from "../registry";
 import type { PortfolioPosition } from "../types";
@@ -251,7 +251,12 @@ registerTool({
     const views = ((params.views as Array<{ ticker: string; expectedReturnAnnual: number; confidence: number }>) || [])
       .map((v) => {
         const idx = h.tickers.findIndex((t) => t.toUpperCase().startsWith(v.ticker.toUpperCase().split(".")[0]));
-        return idx >= 0 ? { assetIndex: idx, expectedReturnAnnual: v.expectedReturnAnnual, confidence: v.confidence ?? 0.5 } : null;
+        if (idx < 0) return null;
+        // Absolute view on one asset: one-hot view portfolio, with the stated
+        // annual return de-annualized to the daily units of Σ and μ.
+        const viewPortfolio = new Array(h.tickers.length).fill(0);
+        viewPortfolio[idx] = 1;
+        return { portfolio: viewPortfolio, expectedReturn: v.expectedReturnAnnual / 252, confidence: v.confidence ?? 0.5 };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);
 
