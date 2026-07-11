@@ -26,7 +26,7 @@ import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
-import Discover from "@/components/Discover";
+import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 
@@ -837,10 +837,10 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <ModuleErrorBoundary
-                    title="Discover module recovered"
-                    description="The opportunity board hit a render error. Retry will remount just this module."
+                    title="Desirable Assets module recovered"
+                    description="The recommendations board hit a render error. Retry will remount just this module."
                   >
-                    <Discover key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                    <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                   </ModuleErrorBoundary>
                 </div>
               )}

@@ -255,6 +255,7 @@ serve(async (req) => {
 
     const response: EngineResponse = {
       asOf: new Date().toISOString(),
+      executionVenue: "edge",
       regime: { label: regime.label, evidence: regime.evidence },
       macro: {
         rates: macro.rates,

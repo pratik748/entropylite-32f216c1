@@ -318,7 +318,8 @@ const INDIA_COVERAGE: CoverageRow[] = [
   { symbol: "SILVERBEES.NS", name: "Nippon India Silver ETF", assetClass: "commodity" },
 ];
 
-function coverageCandidates(indiaMode: boolean): Candidate[] {
+/** Pure coverage-grid universe — also used by the browser fallback venue. */
+export function coverageCandidates(indiaMode: boolean): Candidate[] {
   const rows = indiaMode ? [...INDIA_COVERAGE, ...US_COVERAGE] : US_COVERAGE;
   return rows.map((r) => ({
     symbol: r.symbol,

@@ -24,7 +24,7 @@ import { cornishFisherZ, walkForwardEdge } from "../mathEdge.ts";
 import type { MarketRegime } from "./models.ts";
 import type { ChartSeries } from "./evidence.ts";
 import { computePriceFeatures } from "./evidence.ts";
-import type { ReputationBook } from "./reputation.ts";
+import type { ReputationBook } from "./reputationCore.ts";
 import type {
   EvidenceBundle,
   ModelScore,
@@ -412,6 +412,22 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     .filter((m) => m.hasSignal && m.direction === -dominantDir)
     .flatMap((m) => m.rationale.slice(0, 2).map((r) => `${m.label}: ${r}`));
 
+  // Display trade levels, all in horizon-sigma units of the measured vol:
+  // entry band ±0.25σ, objective = the 1σ favorable prior, invalidation =
+  // the 1.25σ adverse level already quoted in the invalidation conditions.
+  const dirSign = direction === "long" ? 1 : -1;
+  const tradePlan = {
+    entryLow: Number((p.lastClose * (1 - 0.25 * sigmaH)).toFixed(4)),
+    entryHigh: Number((p.lastClose * (1 + 0.25 * sigmaH)).toFixed(4)),
+    objective: Number((p.lastClose * (1 + dirSign * sigmaH)).toFixed(4)),
+    invalidationLevel: Number((p.lastClose * (1 - dirSign * 1.25 * sigmaH)).toFixed(4)),
+  };
+
+  // Sparkline: decimate trailing closes to ≤60 points for the UI.
+  const tail = p.closes.slice(-120);
+  const step = Math.max(1, Math.ceil(tail.length / 60));
+  const sparkline = tail.filter((_, i) => i % step === 0 || i === tail.length - 1).map((v) => Number(v.toFixed(4)));
+
   const opportunity: ValidatedOpportunity = {
     symbol,
     name: candidate.name,
@@ -421,6 +437,9 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     price: p.lastClose,
     direction,
     horizonDays,
+    ...(bundle.fundamentals?.sector ? { sector: bundle.fundamentals.sector } : {}),
+    sparkline,
+    tradePlan,
     confidence: Number(confidence.toFixed(3)),
     confidenceDrivers,
     expectedEdgePct: Number(expectedEdgePct.toFixed(4)),

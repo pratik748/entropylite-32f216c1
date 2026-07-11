@@ -77,25 +77,31 @@ const SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
   { symbol: "XLC", sector: "Communication Services" },
 ];
 
-export async function collectMacroContext(benchmark: ChartSeries | null): Promise<MacroContext> {
-  const symbols = ["^TNX", "^IRX", "UUP", "^VIX", "HYG", "LQD", ...SECTOR_ETFS.map((s) => s.symbol)];
-  const charts = new Map<string, ChartSeries | null>();
-  await Promise.all(symbols.map(async (s) => charts.set(s, await fetchDailyChart(s).catch(() => null))));
+/** Every instrument the macro layer measures — both execution venues fetch this list. */
+export const MACRO_SYMBOLS: string[] = ["^TNX", "^IRX", "UUP", "^VIX", "HYG", "LQD", ...SECTOR_ETFS.map((s) => s.symbol)];
 
-  const missing: string[] = symbols.filter((s) => !charts.get(s));
+/**
+ * Pure builder: derive the macro context from already-fetched chart
+ * series. The edge function feeds it via `collectMacroContext`; the
+ * browser fallback feeds it from the deployed `historical-prices`
+ * function. Same math either way.
+ */
+export function buildMacroContext(charts: Map<string, ChartSeries | null>, benchmark: ChartSeries | null): MacroContext {
+  const missing: string[] = MACRO_SYMBOLS.filter((s) => !charts.get(s));
   const evidence: string[] = [];
 
-  // ── Rates & curve (^TNX/^IRX quote yield × 10) ────────────────
+  // ── Rates & curve (Yahoo's ^TNX/^IRX chart closes are the yield in %,
+  //    e.g. 4.28 — verified against live data) ───────────────────
   const tnx = charts.get("^TNX") ?? null;
   const irx = charts.get("^IRX") ?? null;
-  const tenYearPct = last(tnx) != null ? Number((last(tnx)! / 10).toFixed(2)) : null;
-  const threeMonthPct = last(irx) != null ? Number((last(irx)! / 10).toFixed(2)) : null;
+  const tenYearPct = last(tnx) != null ? Number(last(tnx)!.toFixed(2)) : null;
+  const threeMonthPct = last(irx) != null ? Number(last(irx)!.toFixed(2)) : null;
   const curveSlopePct = tenYearPct != null && threeMonthPct != null
     ? Number((tenYearPct - threeMonthPct).toFixed(2))
     : null;
   let tenYearChange63dPct: number | null = null;
   if (tnx && tnx.closes.length > 63) {
-    tenYearChange63dPct = Number(((tnx.closes[tnx.closes.length - 1] - tnx.closes[tnx.closes.length - 64]) / 10).toFixed(2));
+    tenYearChange63dPct = Number((tnx.closes[tnx.closes.length - 1] - tnx.closes[tnx.closes.length - 64]).toFixed(2));
   }
   if (tenYearPct != null) {
     evidence.push(
@@ -162,6 +168,13 @@ export async function collectMacroContext(benchmark: ChartSeries | null): Promis
     evidence,
     missing,
   };
+}
+
+/** Edge-venue collector: fetch every macro instrument, then build. */
+export async function collectMacroContext(benchmark: ChartSeries | null): Promise<MacroContext> {
+  const charts = new Map<string, ChartSeries | null>();
+  await Promise.all(MACRO_SYMBOLS.map(async (s) => charts.set(s, await fetchDailyChart(s).catch(() => null))));
+  return buildMacroContext(charts, benchmark);
 }
 
 /**
