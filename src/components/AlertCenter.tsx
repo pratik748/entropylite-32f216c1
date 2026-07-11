@@ -104,7 +104,7 @@ export default function AlertCenter() {
                     {o.direction.toUpperCase()}
                   </span>
                   <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-                    {(o.confidence * 100).toFixed(0)}% conf · E/R {o.riskAdjustedScore.toFixed(2)}
+                    {(o.confidence * 100).toFixed(0)}% conf · E/R {(o.portfolioAdjustedScore ?? o.riskAdjustedScore).toFixed(2)}
                   </span>
                 </div>
               ))}

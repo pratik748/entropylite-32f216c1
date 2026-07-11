@@ -1,9 +1,15 @@
 // Pure view helpers over validated opportunities. Kept free of any
 // network/client imports so every consumer (and the test suite) can use
 // them directly. The canonical ordering everywhere is expected
-// risk-adjusted edge (riskAdjustedScore, descending).
+// risk-adjusted edge — diversification-adjusted when the engine had
+// portfolio context — descending.
 
 import type { OpportunityFilters, ValidatedOpportunity } from "./types";
+
+/** The single ranking key every consumer sorts by. */
+export function rankingScore(o: ValidatedOpportunity): number {
+  return o.portfolioAdjustedScore ?? o.riskAdjustedScore;
+}
 
 export function filterOpportunities(
   opportunities: ValidatedOpportunity[],
@@ -20,7 +26,7 @@ export function filterOpportunities(
   }
   // The repository order IS the canonical ranking; re-sort defensively in
   // case a caller passed an unsorted list.
-  out = [...out].sort((a, b) => b.riskAdjustedScore - a.riskAdjustedScore);
+  out = [...out].sort((a, b) => rankingScore(b) - rankingScore(a));
   if (typeof filters.maxResults === "number") out = out.slice(0, filters.maxResults);
   return out;
 }

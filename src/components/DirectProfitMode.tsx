@@ -1447,7 +1447,7 @@ const OpportunityQueue = ({ onSelect }: { onSelect: (symbol: string) => void }) 
                 {(o.confidence * 100).toFixed(0)}% conf
               </span>
               <span className="text-[10px] font-mono text-primary">
-                E/R {o.riskAdjustedScore.toFixed(2)}
+                E/R {(o.portfolioAdjustedScore ?? o.riskAdjustedScore).toFixed(2)}
               </span>
             </button>
           ))}

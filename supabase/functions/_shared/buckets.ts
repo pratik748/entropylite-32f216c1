@@ -46,6 +46,7 @@ export const BUCKET_ASSIGNMENT: Record<string, Bucket> = {
   regime: "C",
   structural_credit: "C",
   tail_risk: "C",
+  causal: "C",
 };
 
 export function bucketOf(engineId: string): Bucket {

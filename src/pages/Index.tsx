@@ -46,6 +46,7 @@ import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { registerWatch, unregisterWatch } from "@/lib/sentinel";
+import { setPortfolioContext } from "@/lib/opportunities/repository";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
@@ -139,6 +140,27 @@ const IndexContent = () => {
       return sum + convertToBase(s.analysis.currentPrice * s.quantity, ccy);
     }, 0);
   }, [stocks, convertToBase]);
+
+  // Register holdings with the shared Opportunity Engine repository so its
+  // ranking is diversification-aware (correlation vs current exposure) and
+  // sizing can quote whole units. One registration, every consumer benefits.
+  useEffect(() => {
+    const weighted = stocks
+      .map((s) => {
+        const px = s.analysis?.currentPrice || s.buyPrice;
+        return { symbol: s.ticker, value: px * s.quantity };
+      })
+      .filter((p) => p.value > 0);
+    const total = weighted.reduce((sum, p) => sum + p.value, 0);
+    setPortfolioContext(
+      total > 0
+        ? {
+            positions: weighted.map((p) => ({ symbol: p.symbol, weight: p.value / total })),
+            value: portfolioValueBase > 0 ? portfolioValueBase : undefined,
+          }
+        : null,
+    );
+  }, [stocks, portfolioValueBase]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(

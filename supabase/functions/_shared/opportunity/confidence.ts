@@ -4,21 +4,34 @@
 // ensemble (`runConsensus`) which groups them into orthogonal information
 // buckets and *requires agreement across buckets*. Conflicting evidence
 // mechanically lowers agreement → lowers calibrated probability → fails the
-// gate. Nothing here manufactures confidence: the calibration constants are
-// refit nightly from realized outcomes (`calibration_params` table).
+// gate. Nothing here manufactures confidence:
+//
+//   • Platt constants are refit nightly from realized outcomes
+//     (`calibration_params`).
+//   • Per-model reliabilities come from settled T+5 outcomes
+//     (`engine_reliability`), keyed by (model, ticker-class, regime) — a
+//     model that stops working loses influence automatically.
+//   • Missing evidence collectors shrink confidence toward 0.50 — an
+//     opinion built on partial data is worth less, and says so.
 //
 // Ranking objective:  |expectedEdge| × confidence / downsideRisk
-// — expected risk-adjusted edge, not popularity.
+// (× a diversification multiplier when the caller supplied a portfolio) —
+// expected risk-adjusted portfolio contribution, not popularity.
 
-import { runConsensus, type CalibrationParams, type EngineSignal } from "../ensemble.ts";
+import { runConsensus, CONSENSUS_GATES, type CalibrationParams, type EngineSignal } from "../ensemble.ts";
 import { costHaircut, tickerClass } from "../costs.ts";
-import { cornishFisherZ } from "../mathEdge.ts";
+import { cornishFisherZ, walkForwardEdge } from "../mathEdge.ts";
 import type { MarketRegime } from "./models.ts";
 import type { ChartSeries } from "./evidence.ts";
 import { computePriceFeatures } from "./evidence.ts";
+import type { ReputationBook } from "./reputation.ts";
 import type {
   EvidenceBundle,
   ModelScore,
+  NearMiss,
+  OpportunitySizing,
+  PortfolioFit,
+  RejectionCode,
   RejectionRecord,
   ValidatedOpportunity,
 } from "./types.ts";
@@ -43,6 +56,17 @@ const LIQUIDITY_FLOOR_BY_CCY: Record<string, number> = {
   GBP: 1_500_000,
 };
 const DEFAULT_LIQUIDITY_FLOOR = 2_000_000;
+
+// Sizing constants:
+//   KELLY_FRACTION    — 0.25× Kelly, the standard survivability discount.
+//   KELLY_CAP         — no single idea exceeds 10% of capital on Kelly math.
+//   VOL_BUDGET_ANNUAL — each position is budgeted ~2% annualized portfolio
+//                       vol contribution (weight = budget / asset vol).
+//   VOL_WEIGHT_CAP    — vol-target weight ceiling, 15%.
+const KELLY_FRACTION = 0.25;
+const KELLY_CAP = 0.10;
+const VOL_BUDGET_ANNUAL = 0.02;
+const VOL_WEIGHT_CAP = 0.15;
 
 // ── Regime detection (from benchmark evidence, not opinion) ────────
 
@@ -79,16 +103,30 @@ export function detectRegime(benchmark: ChartSeries | null): MarketRegime {
   return { label, benchmarkRet21d: f.ret21d, benchmarkVolAnnual: f.volAnnual, benchmarkAboveSma200: aboveSma200, evidence };
 }
 
-// ── Model → ensemble signal adapter ─────────────────────────────────
+// ── Model → ensemble signal adapter (reputation-weighted) ───────────
 
-function toEngineSignals(models: ModelScore[]): EngineSignal[] {
-  return models.map((m) => ({
-    id: m.id,
-    label: m.label,
-    direction: m.direction,
-    confidence: m.confidence,
-    hasSignal: m.hasSignal,
-  }));
+function toEngineSignals(
+  models: ModelScore[],
+  reputation: ReputationBook,
+  cls: string,
+  regimeLabel: string,
+): { signals: EngineSignal[]; reputationNotes: string[] } {
+  const notes: string[] = [];
+  const signals = models.map((m) => {
+    const rel = reputation.lookup(m.id, cls, regimeLabel);
+    if (rel != null && m.direction !== 0 && m.hasSignal && Math.abs(rel - 0.55) >= 0.03) {
+      notes.push(`${m.label}: settled-outcome reliability ${(rel * 100).toFixed(0)}% in this context (default 55%).`);
+    }
+    return {
+      id: m.id,
+      label: m.label,
+      direction: m.direction,
+      confidence: m.confidence,
+      hasSignal: m.hasSignal,
+      ...(rel != null ? { reliability: rel } : {}),
+    };
+  });
+  return { signals, reputationNotes: notes.slice(0, 4) };
 }
 
 // ── Explainability ──────────────────────────────────────────────────
@@ -123,6 +161,51 @@ function buildInvalidation(b: EvidenceBundle, direction: "long" | "short", horiz
   return out;
 }
 
+// ── Portfolio interaction ───────────────────────────────────────────
+
+function correlation(a: number[], b: number[]): number | null {
+  const n = Math.min(a.length, b.length);
+  if (n < 40) return null;
+  const xa = a.slice(-n), xb = b.slice(-n);
+  const ma = xa.reduce((s, v) => s + v, 0) / n;
+  const mb = xb.reduce((s, v) => s + v, 0) / n;
+  let cov = 0, va = 0, vb = 0;
+  for (let i = 0; i < n; i++) {
+    cov += (xa[i] - ma) * (xb[i] - mb);
+    va += (xa[i] - ma) ** 2;
+    vb += (xb[i] - mb) ** 2;
+  }
+  const denom = Math.sqrt(va * vb);
+  return denom > 0 ? cov / denom : null;
+}
+
+function logReturns(closes: number[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0 && closes[i] > 0) out.push(Math.log(closes[i] / closes[i - 1]));
+  }
+  return out;
+}
+
+/**
+ * Weighted composite daily-return series for the caller's holdings —
+ * the reference stream candidates are correlated against.
+ */
+export function buildPortfolioReturns(holdings: Array<{ series: ChartSeries; weight: number }>): number[] | null {
+  const usable = holdings.filter((h) => h.series.closes.length >= 60 && h.weight > 0);
+  if (usable.length === 0) return null;
+  const rets = usable.map((h) => ({ r: logReturns(h.series.closes), w: h.weight }));
+  const len = Math.min(...rets.map((x) => x.r.length));
+  if (len < 40) return null;
+  const totalW = rets.reduce((s, x) => s + x.w, 0);
+  const out: number[] = new Array(len).fill(0);
+  for (const { r, w } of rets) {
+    const tail = r.slice(-len);
+    for (let i = 0; i < len; i++) out[i] += (w / totalW) * tail[i];
+  }
+  return out;
+}
+
 // ── ConfidenceEngine + Validator ────────────────────────────────────
 
 export interface EvaluationInput {
@@ -131,46 +214,71 @@ export interface EvaluationInput {
   regime: MarketRegime;
   horizonDays: number;
   calibration: CalibrationParams;
+  reputation: ReputationBook;
+  /** Weighted daily-return composite of the caller's holdings, if provided. */
+  portfolioReturns?: number[] | null;
+  /** Caller's portfolio value in the candidate's display terms, for qty sizing. */
+  portfolioValue?: number | null;
 }
 
 export type EvaluationResult =
   | { ok: true; opportunity: ValidatedOpportunity }
-  | { ok: false; rejection: RejectionRecord };
+  | { ok: false; rejection: RejectionRecord; nearMiss?: NearMiss };
+
+function reject(
+  symbol: string,
+  stage: RejectionRecord["stage"],
+  code: RejectionCode,
+  reason: string,
+  details?: Record<string, number>,
+): EvaluationResult {
+  return { ok: false, rejection: { symbol, stage, code, reason, details } };
+}
+
+/** Classify a STAND_ASIDE with the exact gate constants the ensemble used. */
+function standAsideCode(c: ReturnType<typeof runConsensus>): RejectionCode {
+  if (c.engineCount < CONSENSUS_GATES.minEngines) return "too_few_models";
+  if (c.bucketDecision.votingBuckets < CONSENSUS_GATES.minVotingBuckets) return "insufficient_bucket_coverage";
+  if (c.bucketDecision.agreeingBuckets < CONSENSUS_GATES.minAgreeingBuckets) return "bucket_disagreement";
+  if (c.calibratedProb < CONSENSUS_GATES.minCalibratedProb) return "confidence_below_threshold";
+  if (c.agreement < CONSENSUS_GATES.minAgreement) return "agreement_below_threshold";
+  return "insufficient_expected_r";
+}
 
 /**
  * Turn a scored candidate into a validated opportunity — or an explicit,
  * reasoned rejection. This is the only place opportunities are minted.
  */
 export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
-  const { bundle, models, regime, horizonDays, calibration } = input;
+  const { bundle, models, horizonDays, calibration, reputation, regime } = input;
   const { candidate } = bundle;
   const symbol = candidate.symbol;
   const p = bundle.price;
 
   // Gate 0: data sufficiency. We refuse to score what we can't measure.
-  if (!p) {
-    return { ok: false, rejection: { symbol, stage: "evidence", reason: "no_price_history" } };
-  }
+  if (!p) return reject(symbol, "evidence", "no_price_history", "No usable daily price history.");
   if (p.bars < MIN_PRICE_BARS) {
-    return { ok: false, rejection: { symbol, stage: "evidence", reason: "insufficient_history" } };
+    return reject(symbol, "evidence", "insufficient_history", `Only ${p.bars} daily bars (need ${MIN_PRICE_BARS}+).`, { bars: p.bars, required: MIN_PRICE_BARS });
   }
   if (!Number.isFinite(p.lastClose) || p.lastClose <= 0) {
-    return { ok: false, rejection: { symbol, stage: "evidence", reason: "invalid_price" } };
+    return reject(symbol, "evidence", "invalid_price", "Last close is not a valid positive price.");
   }
 
   // Gate 1: liquidity floor (economic viability).
   const ccy = p.currency ?? candidate.currency ?? "USD";
   const floor = LIQUIDITY_FLOOR_BY_CCY[ccy] ?? DEFAULT_LIQUIDITY_FLOOR;
   if (p.avgDollarVolume20d < floor) {
-    return { ok: false, rejection: { symbol, stage: "validation", reason: "below_liquidity_floor" } };
+    return reject(symbol, "validation", "below_liquidity_floor",
+      `20-day average traded value ${Math.round(p.avgDollarVolume20d).toLocaleString()} ${ccy} is below the ${floor.toLocaleString()} ${ccy} floor.`,
+      { avgDollarVolume20d: Math.round(p.avgDollarVolume20d), floor });
   }
 
-  // Cross-validation: orthogonal-bucket consensus over independent models.
-  // rUp/rDown are expressed in horizon-sigma units (symmetric prior; the
-  // fat-tail Cornish-Fisher adjustment inside runConsensus then inflates
-  // the adverse leg for negatively-skewed names).
+  // Cross-validation: orthogonal-bucket consensus over independent models,
+  // with per-model reliabilities loaded from settled outcomes.
+  const cls = tickerClass(symbol);
   const haircut = costHaircut(symbol);
-  const consensus = runConsensus(toEngineSignals(models), {
+  const { signals, reputationNotes } = toEngineSignals(models, reputation, cls, regime.label);
+  const consensus = runConsensus(signals, {
     rUp: 1.0,
     rDown: 1.0,
     costHaircut: haircut,
@@ -180,36 +288,120 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   });
 
   if (consensus.decision === "STAND_ASIDE") {
+    const code = standAsideCode(consensus);
+    const dominant = consensus.ensembleScore > 0 ? "long" : consensus.ensembleScore < 0 ? "short" : "none";
     return {
       ok: false,
       rejection: {
         symbol,
         stage: "validation",
-        reason: consensus.standAsideReason ?? "consensus_stand_aside",
+        code,
+        reason: consensus.standAsideReason ?? "Consensus gate failed.",
+        details: {
+          calibratedProb: consensus.calibratedProb,
+          agreement: consensus.agreement,
+          expectedR: consensus.expectedR,
+          engineCount: consensus.engineCount,
+          agreeingBuckets: consensus.bucketDecision.agreeingBuckets,
+        },
+      },
+      nearMiss: {
+        symbol,
+        name: candidate.name,
+        direction: dominant,
+        code,
+        calibratedProb: consensus.calibratedProb,
+        agreement: consensus.agreement,
+        bucketDirs: consensus.bucketDirs,
       },
     };
   }
 
   const direction: "long" | "short" = consensus.decision === "BUY" ? "long" : "short";
 
-  // Confidence / edge / risk — all from measured quantities:
+  // ── Dynamic confidence ───────────────────────────────────────────
+  // Start from the calibrated bucket-consensus probability, then shrink
+  // toward 0.50 by the square root of evidence completeness: an opinion
+  // formed on 3 of 4 collectors is explicitly worth less than one formed
+  // on all 4, and the drivers record why.
+  const collectors = Array.from(new Set(bundle.items.map((i) => i.collector)));
+  const completeness = collectors.length / Math.max(1, collectors.length + bundle.missing.length);
+  const confidence = clamp(0.5 + (consensus.calibratedProb - 0.5) * Math.sqrt(completeness), 0.5, 0.95);
+  const confidenceDrivers: string[] = [
+    `Bucket-consensus calibrated probability ${(consensus.calibratedProb * 100).toFixed(0)}% (${consensus.bucketDecision.agreeingBuckets}/${consensus.bucketDecision.votingBuckets} buckets agree, engine agreement ${(consensus.agreement * 100).toFixed(0)}%).`,
+    completeness < 1
+      ? `Evidence completeness ${(completeness * 100).toFixed(0)}% (missing: ${bundle.missing.join(", ")}) shrinks confidence to ${(confidence * 100).toFixed(0)}%.`
+      : "All evidence collectors returned data — no completeness discount.",
+    ...reputationNotes,
+  ];
+
+  // Edge / risk — all from measured quantities:
   //   sigmaH        = realized vol scaled to the horizon
   //   expectedEdge  = expectedR (σ-units, post cost + fat-tail) × sigmaH
   //   downsideRisk  = 95% Cornish-Fisher VaR over the horizon
   const sigmaH = p.volAnnual * Math.sqrt(horizonDays / 252);
-  const confidence = consensus.calibratedProb;
   const expectedEdgePct = consensus.expectedR * sigmaH * (direction === "long" ? 1 : -1);
   const zCF = Math.abs(cornishFisherZ(0.95, direction === "long" ? p.skew : -p.skew, p.excessKurt));
   const downsideRiskPct = Math.max(sigmaH * zCF, 0.005);
 
   if (Math.abs(expectedEdgePct) <= 0) {
-    return { ok: false, rejection: { symbol, stage: "validation", reason: "non_positive_expected_edge" } };
+    return reject(symbol, "validation", "non_positive_expected_edge", "Expected edge after costs is not positive.");
   }
 
   const riskAdjustedScore = (Math.abs(expectedEdgePct) * confidence) / downsideRiskPct;
   if (!Number.isFinite(riskAdjustedScore) || riskAdjustedScore <= 0) {
-    return { ok: false, rejection: { symbol, stage: "validation", reason: "non_positive_risk_adjusted_edge" } };
+    return reject(symbol, "validation", "non_positive_risk_adjusted_edge", "Risk-adjusted edge is not positive.");
   }
+
+  // ── Capital allocation (fractional Kelly ∧ vol budget) ──────────
+  const tailMult = consensus.tailMultiplier && consensus.tailMultiplier > 0 ? consensus.tailMultiplier : 1;
+  const payoffRatio = 1 / tailMult; // rUp=1σ vs fat-tail-adjusted rDown=tailMult σ
+  const rawKelly = confidence - (1 - confidence) / Math.max(payoffRatio, 0.01);
+  const fractionalKelly = clamp(rawKelly * KELLY_FRACTION, 0, KELLY_CAP);
+  const volTargetWeight = clamp(VOL_BUDGET_ANNUAL / Math.max(p.volAnnual, 0.05), 0, VOL_WEIGHT_CAP);
+  const suggestedWeight = Math.min(fractionalKelly, volTargetWeight);
+  const sizing: OpportunitySizing = {
+    kellyFraction: Number(rawKelly.toFixed(4)),
+    fractionalKellyPct: Number((fractionalKelly * 100).toFixed(2)),
+    volTargetWeightPct: Number((volTargetWeight * 100).toFixed(2)),
+    suggestedWeightPct: Number((suggestedWeight * 100).toFixed(2)),
+    basis: fractionalKelly <= volTargetWeight ? "fractional_kelly" : "vol_target",
+    estMaxLossPct: Number((suggestedWeight * downsideRiskPct * 100).toFixed(3)),
+    ...(input.portfolioValue && input.portfolioValue > 0
+      ? { suggestedQty: Math.max(0, Math.floor((input.portfolioValue * suggestedWeight) / p.lastClose)) }
+      : {}),
+  };
+
+  // ── Portfolio interaction ────────────────────────────────────────
+  let portfolioFit: PortfolioFit | undefined;
+  let portfolioAdjustedScore: number | undefined;
+  if (input.portfolioReturns && input.portfolioReturns.length >= 40) {
+    const corr = correlation(logReturns(p.closes), input.portfolioReturns);
+    if (corr != null) {
+      const mult = 1 - 0.3 * Math.max(0, corr);
+      portfolioFit = {
+        correlation: Number(corr.toFixed(3)),
+        diversificationMultiplier: Number(mult.toFixed(3)),
+        note: corr > 0.5
+          ? `Highly correlated (ρ=${corr.toFixed(2)}) with existing holdings — adds concentration, ranking penalized.`
+          : corr < 0
+            ? `Negatively correlated (ρ=${corr.toFixed(2)}) with existing holdings — genuine diversification.`
+            : `Moderate correlation (ρ=${corr.toFixed(2)}) with existing holdings.`,
+      };
+      portfolioAdjustedScore = Number((riskAdjustedScore * mult).toFixed(3));
+    }
+  }
+
+  // ── Historical base rates for this setup ─────────────────────────
+  const wf = walkForwardEdge(p.closes, horizonDays);
+  const historicalStats = wf.n >= 40
+    ? {
+      sampleSize: wf.n,
+      hitRatePct: Number(((direction === "long" ? wf.hitRate : 1 - wf.hitRate) * 100).toFixed(1)),
+      meanReturnPct: Number(((direction === "long" ? wf.meanFwd : -wf.meanFwd) * 100).toFixed(2)),
+      horizonDays,
+    }
+    : undefined;
 
   // Explainability: evidence for, against, what changed, what kills it.
   const dominantDir = direction === "long" ? 1 : -1;
@@ -219,8 +411,6 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   const contradicting = models
     .filter((m) => m.hasSignal && m.direction === -dominantDir)
     .flatMap((m) => m.rationale.slice(0, 2).map((r) => `${m.label}: ${r}`));
-
-  const collectors = Array.from(new Set(bundle.items.map((i) => i.collector)));
 
   const opportunity: ValidatedOpportunity = {
     symbol,
@@ -232,9 +422,14 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     direction,
     horizonDays,
     confidence: Number(confidence.toFixed(3)),
+    confidenceDrivers,
     expectedEdgePct: Number(expectedEdgePct.toFixed(4)),
     downsideRiskPct: Number(downsideRiskPct.toFixed(4)),
     riskAdjustedScore: Number(riskAdjustedScore.toFixed(3)),
+    ...(portfolioAdjustedScore != null ? { portfolioAdjustedScore } : {}),
+    sizing,
+    ...(portfolioFit ? { portfolioFit } : {}),
+    ...(historicalStats ? { historicalStats } : {}),
     models,
     consensus: {
       decision: consensus.decision,
@@ -251,7 +446,7 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     recentChange: buildRecentChange(bundle),
     invalidation: buildInvalidation(bundle, direction, horizonDays),
     origin: candidate.origin,
-    liquidityTier: tickerClass(symbol),
+    liquidityTier: cls,
     costHaircutPct: Number((haircut * 100).toFixed(2)),
     avgDollarVolume20d: Math.round(p.avgDollarVolume20d),
     dataQuality: {
@@ -265,7 +460,13 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   return { ok: true, opportunity };
 }
 
-/** Rank by expected risk-adjusted edge — the single ranking used everywhere. */
+/**
+ * Rank by expected risk-adjusted edge — the single ranking used everywhere.
+ * When portfolio context was supplied, the portfolio-adjusted score (edge ×
+ * confidence / risk × diversification) is the sort key: a mediocre but
+ * uncorrelated idea can legitimately outrank a brilliant redundant one.
+ */
 export function rankOpportunities(opps: ValidatedOpportunity[]): ValidatedOpportunity[] {
-  return [...opps].sort((a, b) => b.riskAdjustedScore - a.riskAdjustedScore);
+  const key = (o: ValidatedOpportunity) => o.portfolioAdjustedScore ?? o.riskAdjustedScore;
+  return [...opps].sort((a, b) => key(b) - key(a));
 }

@@ -12,6 +12,8 @@
 
 import { mertonProxy, walkForwardEdge } from "../mathEdge.ts";
 import type { EvidenceBundle, ModelScore } from "./types.ts";
+import { causalModel } from "./causal.ts";
+import type { MacroContext } from "./macro.ts";
 
 export interface MarketRegime {
   label: "risk-on" | "neutral" | "risk-off";
@@ -322,7 +324,12 @@ export function tailRiskModel(b: EvidenceBundle): ModelScore {
 // ── Runner ──────────────────────────────────────────────────────────
 
 /** Run every independent model against a bundle. Order is stable for the UI. */
-export function runAllModels(bundle: EvidenceBundle, regime: MarketRegime, horizonDays: number): ModelScore[] {
+export function runAllModels(
+  bundle: EvidenceBundle,
+  regime: MarketRegime,
+  horizonDays: number,
+  macro: MacroContext,
+): ModelScore[] {
   return [
     momentumModel(bundle),
     meanReversionModel(bundle),
@@ -336,5 +343,6 @@ export function runAllModels(bundle: EvidenceBundle, regime: MarketRegime, horiz
     sentimentModel(bundle),
     regimeModel(bundle, regime),
     tailRiskModel(bundle),
+    causalModel(bundle, macro),
   ];
 }

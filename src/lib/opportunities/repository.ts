@@ -6,10 +6,34 @@
 // object, with the same score, everywhere else.
 
 import { governedInvoke } from "@/lib/apiGovernor";
+import { updateLifecycle } from "./lifecycle";
 import type { EngineResponse } from "./types";
 
-const CACHE_KEY = "opportunity-engine-snapshot-v1";
+const CACHE_KEY = "opportunity-engine-snapshot-v2";
 const CACHE_TTL_MS = 30 * 60 * 1000; // engine output is slow-moving evidence, not a ticker
+
+// ── Portfolio context ───────────────────────────────────────────────
+// Registered once by the host app (Index) so EVERY consumer's slate is
+// ranked with the same portfolio-aware diversification adjustment.
+
+export interface PortfolioContext {
+  positions: Array<{ symbol: string; weight: number }>;
+  value?: number;
+}
+
+let portfolioContext: PortfolioContext | null = null;
+
+export function setPortfolioContext(ctx: PortfolioContext | null) {
+  portfolioContext = ctx && ctx.positions.length > 0 ? ctx : null;
+}
+
+function portfolioHash(): string {
+  if (!portfolioContext) return "np";
+  return portfolioContext.positions
+    .map((p) => `${p.symbol}:${p.weight.toFixed(2)}`)
+    .sort()
+    .join(",");
+}
 
 interface Snapshot {
   response: EngineResponse;
@@ -79,8 +103,12 @@ export async function fetchOpportunities(opts: {
 
   inflight = (async () => {
     const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
-      body: { mode: "discover", horizonDays: 21 },
-      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h21`,
+      body: {
+        mode: "discover",
+        horizonDays: 21,
+        ...(portfolioContext ? { portfolio: portfolioContext } : {}),
+      },
+      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h21|${portfolioHash()}`,
       force: opts.force,
     });
     if (error || !data || !Array.isArray(data.opportunities)) {
@@ -91,6 +119,9 @@ export async function fetchOpportunities(opts: {
     const snapshot: Snapshot = { response: data, fetchedAt: Date.now(), indiaMode: opts.indiaMode };
     current = snapshot;
     persist(snapshot);
+    // Fold this run into the conviction lifecycle before notifying
+    // subscribers, so views render state transitions consistently.
+    try { updateLifecycle(data); } catch { /* lifecycle is derived, never blocking */ }
     notify();
     return snapshot;
   })();

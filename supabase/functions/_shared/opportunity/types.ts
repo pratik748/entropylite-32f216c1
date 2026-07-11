@@ -156,6 +156,41 @@ export interface OpportunityConsensus {
   bucketConsensus: BucketDecision["consensus"];
 }
 
+/** Position-sizing guidance derived from the same measured quantities. */
+export interface OpportunitySizing {
+  /** Raw Kelly fraction from calibrated probability and payoff asymmetry. */
+  kellyFraction: number;
+  /** 0.25× fractional Kelly, percent of capital. */
+  fractionalKellyPct: number;
+  /** Weight that budgets ~2% annual portfolio vol to this position, percent. */
+  volTargetWeightPct: number;
+  /** min(fractional Kelly, vol target) — the conservative binding constraint. */
+  suggestedWeightPct: number;
+  /** Which constraint bound the size. */
+  basis: "fractional_kelly" | "vol_target";
+  /** Estimated loss at the 95% horizon VaR for the suggested weight, percent of capital. */
+  estMaxLossPct: number;
+  /** Whole units at suggested weight — only when the caller supplied portfolio value. */
+  suggestedQty?: number;
+}
+
+/** How the candidate interacts with the caller's existing portfolio. */
+export interface PortfolioFit {
+  /** Daily-return correlation vs the weighted portfolio composite. */
+  correlation: number;
+  /** Multiplier applied to the ranking score: 1 − 0.3 × max(0, correlation). */
+  diversificationMultiplier: number;
+  note: string;
+}
+
+/** Walk-forward base rates for this setup's horizon on this symbol. */
+export interface HistoricalStats {
+  sampleSize: number;      // overlapping horizon windows evaluated
+  hitRatePct: number;      // % of windows that ended favorably for this direction
+  meanReturnPct: number;   // mean forward return per window, direction-adjusted
+  horizonDays: number;
+}
+
 export interface ValidatedOpportunity {
   symbol: string;
   name: string;
@@ -168,12 +203,20 @@ export interface ValidatedOpportunity {
 
   /** 0..1 — calibrated probability the thesis is right, capped at 0.95 (never certainty). */
   confidence: number;
+  /** What produced this confidence (agreement, reputation, completeness) — auditable. */
+  confidenceDrivers: string[];
   /** Expected move over the horizon, decimal (0.04 = +4%). Sign follows direction. */
   expectedEdgePct: number;
   /** 95% CF-VaR style adverse move over the horizon, decimal, positive. */
   downsideRiskPct: number;
   /** Ranking objective: |expectedEdgePct| × confidence / downsideRiskPct. */
   riskAdjustedScore: number;
+  /** riskAdjustedScore × diversificationMultiplier; present when a portfolio was supplied. */
+  portfolioAdjustedScore?: number;
+
+  sizing: OpportunitySizing;
+  portfolioFit?: PortfolioFit;
+  historicalStats?: HistoricalStats;
 
   models: ModelScore[];
   consensus: OpportunityConsensus;
@@ -201,10 +244,39 @@ export interface ValidatedOpportunity {
 
 // ── Pipeline diagnostics ────────────────────────────────────────────
 
+/** Machine-readable rejection codes — the audit vocabulary. */
+export type RejectionCode =
+  | "no_price_history"
+  | "insufficient_history"
+  | "invalid_price"
+  | "below_liquidity_floor"
+  | "preliminary_signal_too_weak"
+  | "too_few_models"
+  | "insufficient_bucket_coverage"
+  | "bucket_disagreement"
+  | "confidence_below_threshold"
+  | "agreement_below_threshold"
+  | "insufficient_expected_r"
+  | "non_positive_expected_edge"
+  | "non_positive_risk_adjusted_edge";
+
 export interface RejectionRecord {
   symbol: string;
   stage: "evidence" | "validation";
-  reason: string;
+  code: RejectionCode;
+  reason: string;                       // human-readable expansion
+  details?: Record<string, number>;     // the numbers behind the decision
+}
+
+/** A finalist that failed validation — kept visible so the funnel is auditable. */
+export interface NearMiss {
+  symbol: string;
+  name: string;
+  direction: "long" | "short" | "none";
+  code: RejectionCode;
+  calibratedProb: number;
+  agreement: number;
+  bucketDirs: { A: -1 | 0 | 1; B: -1 | 0 | 1; C: -1 | 0 | 1 };
 }
 
 export interface PipelineDiagnostics {
@@ -214,12 +286,29 @@ export interface PipelineDiagnostics {
   scored: number;                            // candidates that reached consensus stage
   validated: number;
   rejections: RejectionRecord[];
-  rejectionSummary: Record<string, number>;  // reason → count
+  rejectionSummary: Record<string, number>;  // code → count
+  nearMisses: NearMiss[];
 }
 
 export interface EngineResponse {
   asOf: string;
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
+  /** Measured macro environment (rates, curve, dollar, vol, credit, sectors). */
+  macro: {
+    rates: { tenYearPct: number | null; threeMonthPct: number | null; curveSlopePct: number | null; tenYearChange63dPct: number | null };
+    dollar: { ret63d: number | null };
+    volatility: { vix: number | null; vixPercentile1y: number | null };
+    credit: { highYieldRelStrength63d: number | null };
+    sectors: { ranked: Array<{ symbol: string; sector: string; relStrength63d: number }> };
+    evidence: string[];
+    missing: string[];
+  };
+  /** Online-learning health: calibration fit quality and reputation coverage. */
+  learning: {
+    calibration: { alpha: number; beta: number; gamma: number; nSamples: number; brierScore: number; fitAt: string | null };
+    reputationCells: number;
+    drift: "healthy" | "degrading" | "unfit";
+  };
   opportunities: ValidatedOpportunity[];
   diagnostics: PipelineDiagnostics;
 }
