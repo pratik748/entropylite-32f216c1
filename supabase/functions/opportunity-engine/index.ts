@@ -39,6 +39,7 @@ import {
   pMap,
 } from "../_shared/opportunity/evidence.ts";
 import { collectMacroContext } from "../_shared/opportunity/macro.ts";
+import { classifyMarketContext } from "../_shared/opportunity/marketContext.ts";
 import { runAllModels } from "../_shared/opportunity/models.ts";
 import { loadLearningHealth, loadReputation } from "../_shared/opportunity/reputation.ts";
 import {
@@ -113,6 +114,8 @@ serve(async (req) => {
       loadLearningHealth(reputation.cells),
     ]);
     const regime = detectRegime(benchmark);
+    // Classify the environment ONCE for the whole run (trend / vol / risk).
+    const marketContext = classifyMarketContext(macro, regime);
 
     // ── Portfolio context (optional) ────────────────────────────────
     const positions = (body.portfolio?.positions ?? [])
@@ -206,6 +209,8 @@ serve(async (req) => {
         horizonDays,
         calibration,
         reputation,
+        macro,
+        marketContext,
         portfolioReturns,
         portfolioValue,
         portfolioCurrency,
@@ -261,6 +266,7 @@ serve(async (req) => {
       asOf: new Date().toISOString(),
       executionVenue: "edge",
       regime: { label: regime.label, evidence: regime.evidence },
+      marketContext,
       macro: {
         rates: macro.rates,
         dollar: macro.dollar,

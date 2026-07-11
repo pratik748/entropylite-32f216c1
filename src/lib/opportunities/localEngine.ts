@@ -36,6 +36,7 @@ import {
   buildMacroContext,
   macroSymbols,
 } from "../../../supabase/functions/_shared/opportunity/macro.ts";
+import { classifyMarketContext } from "../../../supabase/functions/_shared/opportunity/marketContext.ts";
 import { runAllModels } from "../../../supabase/functions/_shared/opportunity/models.ts";
 import {
   buildPortfolioReturns,
@@ -136,6 +137,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
   const benchmark = charts.get(bench) ?? null;
   const macro = buildMacroContext(charts, benchmark, indiaMode);
   const regime = detectRegime(benchmark);
+  const marketContext = classifyMarketContext(macro, regime);
   const learning = buildLearningHealth(calibrationRow, reputation.cells);
   const calibration = {
     alpha: learning.calibration.alpha,
@@ -192,6 +194,8 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
       horizonDays,
       calibration,
       reputation,
+      macro,
+      marketContext,
       portfolioReturns,
       portfolioValue,
       portfolioCurrency,
@@ -216,6 +220,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
     asOf,
     executionVenue: "local_fallback",
     regime: { label: regime.label, evidence: regime.evidence },
+    marketContext,
     macro: {
       rates: macro.rates,
       dollar: macro.dollar,

@@ -24,11 +24,16 @@ import { cornishFisherZ, walkForwardEdge } from "../mathEdge.ts";
 import type { MarketRegime } from "./models.ts";
 import type { ChartSeries } from "./evidence.ts";
 import { computePriceFeatures } from "./evidence.ts";
+import { deriveEvidence, summarizeEvidence } from "./evidenceLayer.ts";
+import { contextConfidenceMultiplier, type MarketContext } from "./marketContext.ts";
+import type { MacroContext } from "./macro.ts";
 import type { ReputationBook } from "./reputationCore.ts";
 import type {
+  AcceptanceReasonCode,
   EvidenceBundle,
   ModelScore,
   NearMiss,
+  OpportunityDiagnostics,
   OpportunitySizing,
   PortfolioFit,
   RejectionCode,
@@ -49,6 +54,13 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 //                      Set per currency at roughly the same economic level
 //                      (~$1–2M/day equivalent).
 const MIN_PRICE_BARS = 120;
+//   MAX_DOWNSIDE_RISK — a horizon 95% CF-VaR above this is uninvestable tail
+//                       risk regardless of edge; the position can lose an
+//                       outsized fraction of itself over the holding period.
+//                       Set high (75%) so it only ever bites genuinely
+//                       extreme names (deep-vol crypto / small-caps at long
+//                       horizons) — normal equities sit far below it.
+const MAX_DOWNSIDE_RISK = 0.75;
 const LIQUIDITY_FLOOR_BY_CCY: Record<string, number> = {
   USD: 2_000_000,
   INR: 150_000_000, // ≈ $1.8M
@@ -215,6 +227,10 @@ export interface EvaluationInput {
   horizonDays: number;
   calibration: CalibrationParams;
   reputation: ReputationBook;
+  /** Measured macro context — feeds the Evidence Layer's macro/regime objects. */
+  macro?: MacroContext | null;
+  /** Classified market environment — nudges confidence, never model direction. */
+  marketContext?: MarketContext | null;
   /** Weighted daily-return composite of the caller's holdings, if provided. */
   portfolioReturns?: number[] | null;
   /** Caller's portfolio value for qty sizing, denominated in portfolioCurrency. */
@@ -335,14 +351,30 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   // on all 4, and the drivers record why.
   const collectors = Array.from(new Set(bundle.items.map((i) => i.collector)));
   const completeness = collectors.length / Math.max(1, collectors.length + bundle.missing.length);
-  const confidence = clamp(0.5 + (consensus.calibratedProb - 0.5) * Math.sqrt(completeness), 0.5, 0.95);
+  const completenessConfidence = clamp(0.5 + (consensus.calibratedProb - 0.5) * Math.sqrt(completeness), 0.5, 0.95);
+  let confidence = completenessConfidence;
   const confidenceDrivers: string[] = [
     `Bucket-consensus calibrated probability ${(consensus.calibratedProb * 100).toFixed(0)}% (${consensus.bucketDecision.agreeingBuckets}/${consensus.bucketDecision.votingBuckets} buckets agree, engine agreement ${(consensus.agreement * 100).toFixed(0)}%).`,
     completeness < 1
-      ? `Evidence completeness ${(completeness * 100).toFixed(0)}% (missing: ${bundle.missing.join(", ")}) shrinks confidence to ${(confidence * 100).toFixed(0)}%.`
+      ? `Evidence completeness ${(completeness * 100).toFixed(0)}% (missing: ${bundle.missing.join(", ")}) shrinks confidence to ${(completenessConfidence * 100).toFixed(0)}%.`
       : "All evidence collectors returned data — no completeness discount.",
     ...reputationNotes,
   ];
+
+  // Market context nudges conviction WITHOUT touching model direction or the
+  // consensus decision (both already settled). The multiplier is bounded and
+  // 1.0 in a neutral/normal environment, so ranking is unchanged when the
+  // macro backdrop is uninformative.
+  const ctxMult = input.marketContext ? contextConfidenceMultiplier(input.marketContext, direction) : 1;
+  if (ctxMult !== 1) {
+    const adjusted = clamp(confidence * ctxMult, 0.5, 0.95);
+    if (adjusted !== confidence) {
+      confidenceDrivers.push(
+        `Market context (${input.marketContext!.labels.join(", ")}) ${ctxMult >= 1 ? "supports" : "tempers"} a ${direction} here — confidence ${ctxMult >= 1 ? "lifted" : "trimmed"} to ${(adjusted * 100).toFixed(0)}%.`,
+      );
+      confidence = adjusted;
+    }
+  }
 
   // Edge / risk — all from measured quantities:
   //   sigmaH        = realized vol scaled to the horizon
@@ -352,6 +384,15 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   const expectedEdgePct = consensus.expectedR * sigmaH * (direction === "long" ? 1 : -1);
   const zCF = Math.abs(cornishFisherZ(0.95, direction === "long" ? p.skew : -p.skew, p.excessKurt));
   const downsideRiskPct = Math.max(sigmaH * zCF, 0.005);
+
+  // Gate 2: tail-risk ceiling. Even a strong edge is uninvestable when the
+  // horizon 95% downside is a large fraction of the position — the honest,
+  // machine-readable reason is "excessive downside risk", not silence.
+  if (downsideRiskPct > MAX_DOWNSIDE_RISK) {
+    return reject(symbol, "validation", "excessive_downside_risk",
+      `Horizon 95% downside risk ${pct(downsideRiskPct)} exceeds the ${pct(MAX_DOWNSIDE_RISK)} ceiling — tail risk is uninvestable at this horizon.`,
+      { downsideRiskPct: Number(downsideRiskPct.toFixed(3)), ceiling: MAX_DOWNSIDE_RISK });
+  }
 
   if (Math.abs(expectedEdgePct) <= 0) {
     return reject(symbol, "validation", "non_positive_expected_edge", "Expected edge after costs is not positive.");
@@ -440,6 +481,30 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   const step = Math.max(1, Math.ceil(tail.length / 60));
   const sparkline = tail.filter((_, i) => i % step === 0 || i === tail.length - 1).map((v) => Number(v.toFixed(4)));
 
+  // ── Evidence Layer + machine-readable acceptance diagnostics ─────
+  // Derived once from the bundle we already collected; reused for the
+  // structured `evidence` surface and the diagnostics roll-up (no recompute).
+  const evidence = deriveEvidence(bundle, input.macro ?? null, regime, horizonDays);
+  const evidenceSummary = summarizeEvidence(evidence);
+  const reasonCodes: AcceptanceReasonCode[] = ["bucket_consensus_met"];
+  reasonCodes.push(consensus.bucketDecision.consensus === "ALL_3" ? "all_buckets_agree" : "majority_buckets_agree");
+  reasonCodes.push(completeness >= 1 ? "full_evidence" : "partial_evidence");
+  reasonCodes.push(historicalStats ? "historical_base_rate_available" : "insufficient_history_context");
+  if (input.marketContext) {
+    reasonCodes.push(input.marketContext.risk === "risk_on" ? "context_risk_on" : input.marketContext.risk === "risk_off" ? "context_risk_off" : "context_neutral");
+    if (ctxMult > 1) reasonCodes.push("context_supports_direction");
+    else if (ctxMult < 1) reasonCodes.push("context_tempers_direction");
+  }
+  const diagnostics: OpportunityDiagnostics = {
+    accepted: true,
+    reasonCodes,
+    marketContextLabels: input.marketContext?.labels ?? [],
+    evidenceCount: evidence.length,
+    netEvidenceStrength: evidenceSummary.netStrength,
+  };
+  // Surface the strongest evidence objects (compact — keeps the payload lean).
+  const topEvidence = [...evidence].sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength)).slice(0, 8);
+
   const opportunity: ValidatedOpportunity = {
     symbol,
     name: candidate.name,
@@ -472,6 +537,8 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
       bucketDirs: consensus.bucketDirs,
       bucketConsensus: consensus.bucketDecision.consensus,
     },
+    evidence: topEvidence,
+    diagnostics,
     supportingEvidence: supporting,
     contradictingEvidence: contradicting,
     recentChange: buildRecentChange(bundle),
