@@ -35,6 +35,8 @@ import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useSymbolSuggest } from "@/components/SymbolSuggest";
+import { useOpportunities } from "@/hooks/useOpportunities";
+import { EMPTY_STATE_MESSAGE } from "@/lib/opportunities/types";
 
 interface RiskMetrics {
   var95: number;
@@ -703,6 +705,12 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             )}
           </Button>
         </form>
+
+        {/* Validated opportunity queue — sourced from the shared Opportunity
+            Engine, so the #1 name here is the #1 name on Discover. */}
+        {!result && !loading && (
+          <OpportunityQueue onSelect={(symbol) => { setTicker(symbol); analyze(symbol); }} />
+        )}
 
         {errorMessage && !loading && (
           <Alert variant="destructive" className="border-destructive/40 bg-destructive/5">
@@ -1388,6 +1396,69 @@ const SuggestWrapper = ({ ticker, setTicker, loading, listening, toggleVoice }: 
         {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </button>
       {dropdown}
+    </div>
+  );
+};
+
+// Validated Opportunity Queue — a thin view over the shared Opportunity
+// Engine repository. No scoring or ranking happens here; the order shown
+// is the engine's canonical expected-risk-adjusted-edge ranking, identical
+// to Discover. Tapping a row runs the deep per-ticker analysis on it.
+const OpportunityQueue = ({ onSelect }: { onSelect: (symbol: string) => void }) => {
+  const { opportunities, loading, error, response } = useOpportunities({ maxResults: 6 });
+
+  if (error) return null; // the analyzer input above remains fully usable
+
+  return (
+    <div className="glass-panel rounded-xl p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold text-foreground">Validated opportunities</span>
+        </div>
+        <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
+          Shared engine · same ranking as Discover
+        </span>
+      </div>
+
+      {loading && opportunities.length === 0 && (
+        <p className="mt-3 text-xs text-muted-foreground animate-pulse">Running validation pipeline…</p>
+      )}
+
+      {!loading && opportunities.length === 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">{EMPTY_STATE_MESSAGE}</p>
+      )}
+
+      {opportunities.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {opportunities.map((o, i) => (
+            <button
+              key={o.symbol}
+              onClick={() => onSelect(o.symbol)}
+              className="flex w-full items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-left transition-colors hover:bg-surface-3"
+              title={`Confidence ${(o.confidence * 100).toFixed(0)}% · expected edge ${(o.expectedEdgePct * 100).toFixed(1)}% over ${o.horizonDays}d · 95% VaR −${(o.downsideRiskPct * 100).toFixed(1)}%`}
+            >
+              <span className="w-5 shrink-0 text-[10px] font-mono text-muted-foreground">#{i + 1}</span>
+              <span className="font-mono text-sm font-bold text-foreground">{o.symbol}</span>
+              <span className={`text-[9px] font-mono ${o.direction === "long" ? "text-gain" : "text-loss"}`}>
+                {o.direction.toUpperCase()}
+              </span>
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+                {(o.confidence * 100).toFixed(0)}% conf
+              </span>
+              <span className="text-[10px] font-mono text-primary">
+                E/R {(o.portfolioAdjustedScore ?? o.riskAdjustedScore).toFixed(2)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {response && (
+        <p className="mt-2 text-[9px] font-mono text-muted-foreground/70">
+          {response.diagnostics.universeSize} screened → {response.diagnostics.validated} validated · regime {response.regime.label}
+        </p>
+      )}
     </div>
   );
 };

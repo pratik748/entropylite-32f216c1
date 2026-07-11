@@ -55,8 +55,8 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: "desirable",
     selector: '[data-tour-tab="desirable"]',
-    title: "Desirable — what to buy next",
-    body: "Ranked picks generated from fundamentals, momentum, regime fit, and your existing exposure gaps. Each name carries an entry band, target, stop, and the reason it surfaced. One click adds it to the portfolio.",
+    title: "Discover — validated opportunities",
+    body: "The shared Opportunity Engine scans the market universe, collects evidence, scores each name with independent models, and only shows what survives cross-validation — ranked by expected risk-adjusted edge. Every card explains its supporting and contradicting evidence, and the board prefers showing nothing over showing weak ideas.",
     requiresTab: "desirable",
     side: "bottom",
     mobile: true,

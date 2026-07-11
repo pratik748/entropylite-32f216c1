@@ -26,7 +26,7 @@ import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
-import DesirableAssets from "@/components/DesirableAssets";
+import Discover from "@/components/Discover";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 
@@ -46,6 +46,7 @@ import { TOUR_FLAG_KEY } from "@/components/tour/tourSteps";
 
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { registerWatch, unregisterWatch } from "@/lib/sentinel";
+import { setPortfolioContext } from "@/lib/opportunities/repository";
 import { supabase } from "@/integrations/supabase/client";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
@@ -140,6 +141,27 @@ const IndexContent = () => {
     }, 0);
   }, [stocks, convertToBase]);
 
+  // Register holdings with the shared Opportunity Engine repository so its
+  // ranking is diversification-aware (correlation vs current exposure) and
+  // sizing can quote whole units. One registration, every consumer benefits.
+  useEffect(() => {
+    const weighted = stocks
+      .map((s) => {
+        const px = s.analysis?.currentPrice || s.buyPrice;
+        return { symbol: s.ticker, value: px * s.quantity };
+      })
+      .filter((p) => p.value > 0);
+    const total = weighted.reduce((sum, p) => sum + p.value, 0);
+    setPortfolioContext(
+      total > 0
+        ? {
+            positions: weighted.map((p) => ({ symbol: p.symbol, weight: p.value / total })),
+            value: portfolioValueBase > 0 ? portfolioValueBase : undefined,
+          }
+        : null,
+    );
+  }, [stocks, portfolioValueBase]);
+
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
     (tab: Tab) => {
@@ -147,7 +169,7 @@ const IndexContent = () => {
       tabSwitchCounter.current++;
       // Note: we intentionally do NOT flush caches or trigger a global
       // refresh on tab switches anymore. That caused every heavy module
-      // (desirable-assets, risk, deep-intel, etc.) to refire concurrently
+      // (opportunity-engine, risk, deep-intel, etc.) to refire concurrently
       // and stampede the backend, leading to "Unable to reach service"
       // errors and the app feeling crashed. The per-module caches in
       // apiGovernor already serve fresh-enough data; users can hit the
@@ -815,10 +837,10 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <ModuleErrorBoundary
-                    title="Desirable Assets module recovered"
-                    description="The recommendations board hit a render error. Retry will remount just this module."
+                    title="Discover module recovered"
+                    description="The opportunity board hit a render error. Retry will remount just this module."
                   >
-                    <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                    <Discover key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                   </ModuleErrorBoundary>
                 </div>
               )}

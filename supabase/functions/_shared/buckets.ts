@@ -35,12 +35,18 @@ export const BUCKET_ASSIGNMENT: Record<string, Bucket> = {
   desirable: "B",
   sentiment: "B",
   news: "B",
+  quality: "B",
+  value: "B",
+  growth: "B",
+  analyst: "B",
   // ── Bucket C ── risk/regime/structural
   clank: "C",
   reflexivity: "C",
   veracity: "C",
   regime: "C",
   structural_credit: "C",
+  tail_risk: "C",
+  causal: "C",
 };
 
 export function bucketOf(engineId: string): Bucket {

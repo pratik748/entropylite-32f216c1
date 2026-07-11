@@ -86,6 +86,17 @@ const MIN_VOTING_BUCKETS = 2;       // need ≥2 of 3 buckets to even speak
 const MIN_AGREEING_BUCKETS = 2;     // need ≥2 of 3 buckets to agree on direction
 const MIN_EXPECTED_R = 0.20;
 
+/** Gate thresholds, exported so callers can classify STAND_ASIDE decisions
+ *  with the exact same constants the gate itself used. */
+export const CONSENSUS_GATES = {
+  minEngines: MIN_ENGINES_FOR_TRADE,
+  minCalibratedProb: MIN_CALIBRATED_PROB,
+  minAgreement: MIN_AGREEMENT,
+  minVotingBuckets: MIN_VOTING_BUCKETS,
+  minAgreeingBuckets: MIN_AGREEING_BUCKETS,
+  minExpectedR: MIN_EXPECTED_R,
+} as const;
+
 export interface CalibrationParams {
   alpha: number;
   beta: number;

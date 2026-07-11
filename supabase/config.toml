@@ -15,7 +15,7 @@ verify_jwt = false
 [functions.tactical-movement]
 verify_jwt = false
 
-[functions.desirable-assets]
+[functions.opportunity-engine]
 verify_jwt = false
 
 [functions.causal-effects]
