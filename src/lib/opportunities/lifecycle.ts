@@ -73,7 +73,7 @@ function save(map: LifecycleMap) {
 }
 
 function scoreOf(o: ValidatedOpportunity): number {
-  return o.portfolioAdjustedScore ?? o.riskAdjustedScore;
+  return (o.portfolioAdjustedScore ?? o.riskAdjustedScore) * (o.convictionMultiplier ?? 1);
 }
 
 function stateFor(entry: LifecycleEntry, o: ValidatedOpportunity): LifecycleState {

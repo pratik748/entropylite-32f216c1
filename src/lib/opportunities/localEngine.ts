@@ -26,6 +26,7 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { supabase } from "@/integrations/supabase/client";
 import {
   coverageCandidates,
+  liquidLeaders,
   benchmarkSymbol,
 } from "../../../supabase/functions/_shared/opportunity/universe.ts";
 import {
@@ -36,6 +37,7 @@ import {
   buildMacroContext,
   macroSymbols,
 } from "../../../supabase/functions/_shared/opportunity/macro.ts";
+import { classifyMarketContext } from "../../../supabase/functions/_shared/opportunity/marketContext.ts";
 import { runAllModels } from "../../../supabase/functions/_shared/opportunity/models.ts";
 import {
   buildPortfolioReturns,
@@ -113,10 +115,17 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
   const { indiaMode, horizonDays } = params;
   const bench = benchmarkSymbol(indiaMode);
 
-  // Reduced universe: coverage grid + user's holdings.
+  // Reduced universe: coverage grid + liquid single-name leaders + holdings.
+  // The leaders are what let the browser venue surface real individual names
+  // (not only broad ETFs); they are candidates, validated like everything else.
   const holdings = (params.portfolio?.positions ?? []).slice(0, 8);
   const candidates: Candidate[] = [...coverageCandidates(indiaMode)];
   const seen = new Set(candidates.map((c) => c.symbol));
+  for (const c of liquidLeaders(indiaMode)) {
+    if (seen.has(c.symbol)) continue;
+    seen.add(c.symbol);
+    candidates.push(c);
+  }
   for (const h of holdings) {
     const symbol = h.symbol.toUpperCase();
     if (seen.has(symbol)) continue;
@@ -136,6 +145,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
   const benchmark = charts.get(bench) ?? null;
   const macro = buildMacroContext(charts, benchmark, indiaMode);
   const regime = detectRegime(benchmark);
+  const marketContext = classifyMarketContext(macro, regime);
   const learning = buildLearningHealth(calibrationRow, reputation.cells);
   const calibration = {
     alpha: learning.calibration.alpha,
@@ -192,6 +202,8 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
       horizonDays,
       calibration,
       reputation,
+      macro,
+      marketContext,
       portfolioReturns,
       portfolioValue,
       portfolioCurrency,
@@ -216,6 +228,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
     asOf,
     executionVenue: "local_fallback",
     regime: { label: regime.label, evidence: regime.evidence },
+    marketContext,
     macro: {
       rates: macro.rates,
       dollar: macro.dollar,

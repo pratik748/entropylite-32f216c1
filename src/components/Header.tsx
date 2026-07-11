@@ -11,6 +11,10 @@ interface HeaderProps {
   onToggleDirectProfit?: () => void;
 }
 
+// Foresight's top launcher is hidden for now. Flip to `true` to restore the
+// header button (⌘J and the command palette continue to open it regardless).
+const FORESIGHT_LAUNCHER_ENABLED = false;
+
 /** The brand wordmark, inverting with the terminal theme via .logo-adaptive. */
 const TerminalMark = () => (
   <img
@@ -102,16 +106,20 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
         </button>
 
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
-          {/* Foresight operating surface */}
-          <button
-            onClick={() => emitUIEvent("open_surface", {})}
-            className="pressable hidden md:flex items-center gap-1.5 rounded-lg border border-border/70 bg-surface-2/60 px-3 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
-            title="Foresight (⌘J)"
-          >
-            <Command className="h-3 w-3 text-muted-foreground" />
-            <span className="hidden lg:inline">Foresight</span>
-            <kbd className="hidden lg:inline text-[8.5px] font-mono text-muted-foreground/60 border border-border/50 rounded px-1 py-px">⌘J</kbd>
-          </button>
+          {/* Foresight operating surface — top launcher hidden for now.
+              Foresight itself is still reachable via ⌘J and the command
+              palette ("Ask Foresight"); restore this button to bring it back. */}
+          {FORESIGHT_LAUNCHER_ENABLED && (
+            <button
+              onClick={() => emitUIEvent("open_surface", {})}
+              className="pressable hidden md:flex items-center gap-1.5 rounded-lg border border-border/70 bg-surface-2/60 px-3 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
+              title="Foresight (⌘J)"
+            >
+              <Command className="h-3 w-3 text-muted-foreground" />
+              <span className="hidden lg:inline">Foresight</span>
+              <kbd className="hidden lg:inline text-[8.5px] font-mono text-muted-foreground/60 border border-border/50 rounded px-1 py-px">⌘J</kbd>
+            </button>
+          )}
 
           {/* Direct Profit Mode Toggle */}
           {onToggleDirectProfit && (

@@ -14,6 +14,76 @@ export interface CandidateOrigin {
   reason: string;
 }
 
+// ── Evidence Layer (mirrors _shared/opportunity/types.ts) ───────────
+
+export type Bucket = "A" | "B" | "C";
+
+export type EvidenceCategory =
+  | "momentum"
+  | "trend"
+  | "mean_reversion"
+  | "volume"
+  | "walkforward"
+  | "liquidity"
+  | "tail_risk"
+  | "valuation"
+  | "quality"
+  | "growth"
+  | "analyst"
+  | "sentiment"
+  | "macro";
+
+export interface Evidence {
+  id: string;
+  category: EvidenceCategory;
+  bucket: Bucket;
+  observation: string;
+  strength: number;   // signed [−1, 1]; 0 = contextual
+  freshness: number;  // 0..1
+  source: string;
+  confidence: number; // 0..1
+  metrics: Record<string, number>;
+}
+
+// ── Market Context (mirrors _shared/opportunity/marketContext.ts) ───
+
+export type TrendState = "trending" | "range_bound" | "unknown";
+export type VolState = "high_vol" | "normal_vol" | "low_vol";
+export type RiskState = "risk_on" | "neutral" | "risk_off";
+export type MarketContextLabel = TrendState | VolState | RiskState;
+
+export interface MarketContext {
+  trend: TrendState;
+  volatility: VolState;
+  risk: RiskState;
+  labels: MarketContextLabel[];
+  longConfidenceMultiplier: number;
+  shortConfidenceMultiplier: number;
+  evidence: string[];
+}
+
+export type AcceptanceReasonCode =
+  | "bucket_consensus_met"
+  | "all_buckets_agree"
+  | "majority_buckets_agree"
+  | "full_evidence"
+  | "partial_evidence"
+  | "historical_base_rate_available"
+  | "insufficient_history_context"
+  | "context_risk_on"
+  | "context_neutral"
+  | "context_risk_off"
+  | "context_supports_direction"
+  | "context_tempers_direction";
+
+export interface OpportunityDiagnostics {
+  accepted: true;
+  reasonCodes: AcceptanceReasonCode[];
+  marketContextLabels: string[];
+  evidenceCount: number;
+  netEvidenceStrength: number;
+}
+
 export interface ModelScore {
   id: string;
   label: string;
@@ -82,8 +152,9 @@ export interface ValidatedOpportunity {
   confidenceDrivers: string[];
   expectedEdgePct: number;   // decimal; sign follows direction
   downsideRiskPct: number;   // decimal, positive (95% CF-VaR over horizon)
-  riskAdjustedScore: number; // |edge| × confidence / risk — the ranking key
+  riskAdjustedScore: number; // |edge| × confidence / risk — the base ranking key
   portfolioAdjustedScore?: number; // × diversification multiplier when portfolio supplied
+  convictionMultiplier?: number;   // ≥1 multi-factor conviction scaling for ranking
 
   sizing: OpportunitySizing;
   portfolioFit?: PortfolioFit;
@@ -91,6 +162,11 @@ export interface ValidatedOpportunity {
 
   models: ModelScore[];
   consensus: OpportunityConsensus;
+
+  /** Structured Evidence Layer backing this opportunity (top items by |strength|). */
+  evidence?: Evidence[];
+  /** Machine-readable acceptance diagnostics. */
+  diagnostics?: OpportunityDiagnostics;
 
   supportingEvidence: string[];
   contradictingEvidence: string[];
@@ -124,7 +200,8 @@ export type RejectionCode =
   | "agreement_below_threshold"
   | "insufficient_expected_r"
   | "non_positive_expected_edge"
-  | "non_positive_risk_adjusted_edge";
+  | "non_positive_risk_adjusted_edge"
+  | "excessive_downside_risk";
 
 export interface RejectionRecord {
   symbol: string;
@@ -175,6 +252,9 @@ export interface EngineResponse {
   asOf: string;
   executionVenue: "edge" | "local_fallback";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
+  /** Classified market environment (trend / volatility / risk). Influences
+   *  confidence, never model direction. */
+  marketContext?: MarketContext;
   macro: MacroSnapshot;
   learning: LearningHealth;
   opportunities: ValidatedOpportunity[];

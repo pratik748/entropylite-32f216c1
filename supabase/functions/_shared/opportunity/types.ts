@@ -12,7 +12,10 @@
 // Every numeric field must be traceable to observable market data. If a
 // value cannot be computed from evidence, it is omitted — never invented.
 
-import type { BucketDecision } from "../buckets.ts";
+import type { Bucket, BucketDecision } from "../buckets.ts";
+import type { MarketContext } from "./marketContext.ts";
+
+export type { MarketContext } from "./marketContext.ts";
 
 // ── Candidate universe ──────────────────────────────────────────────
 
@@ -125,6 +128,49 @@ export interface EvidenceBundle {
   missing: string[];
 }
 
+// ── Evidence objects (the normalized Evidence Layer) ────────────────
+//
+// The uniform, self-describing representation the Confidence Engine,
+// diagnostics and explainability all consume — derived ONCE per candidate
+// from the collected bundle (see evidenceLayer.ts). Categories map onto the
+// three orthogonal consensus buckets so evidence and model votes speak the
+// same language.
+
+export type EvidenceCategory =
+  | "momentum"
+  | "trend"
+  | "mean_reversion"
+  | "volume"
+  | "walkforward"
+  | "liquidity"
+  | "tail_risk"
+  | "valuation"
+  | "quality"
+  | "growth"
+  | "analyst"
+  | "sentiment"
+  | "macro";
+
+export interface Evidence {
+  /** Stable id, unique within a bundle; also determines the bucket. */
+  id: string;
+  category: EvidenceCategory;
+  /** Consensus bucket (A price/flow, B fundamental/intel, C risk/regime). */
+  bucket: Bucket;
+  /** Self-describing statement of what was observed. */
+  observation: string;
+  /** Signed directional strength in [−1, 1]; 0 = contextual, non-directional. */
+  strength: number;
+  /** How recent the underlying datum is, 0..1. */
+  freshness: number;
+  /** Collector the observation came from, e.g. "price_history". */
+  source: string;
+  /** Reliability of THIS observation, 0..1 (before direction). */
+  confidence: number;
+  /** The measured numbers behind the observation. */
+  metrics: Record<string, number>;
+}
+
 // ── Independent scoring models ──────────────────────────────────────
 
 export interface ModelScore {
@@ -202,6 +248,34 @@ export interface TradePlan {
   invalidationLevel: number;
 }
 
+/** Machine-readable reasons an opportunity was accepted — never vague prose.
+ *  The rejection side uses `RejectionCode`; this is the acceptance vocabulary. */
+export type AcceptanceReasonCode =
+  | "bucket_consensus_met"
+  | "all_buckets_agree"
+  | "majority_buckets_agree"
+  | "full_evidence"
+  | "partial_evidence"
+  | "historical_base_rate_available"
+  | "insufficient_history_context"
+  | "context_risk_on"
+  | "context_neutral"
+  | "context_risk_off"
+  | "context_supports_direction"
+  | "context_tempers_direction";
+
+/** Per-opportunity, machine-readable acceptance diagnostics. */
+export interface OpportunityDiagnostics {
+  accepted: true;
+  reasonCodes: AcceptanceReasonCode[];
+  /** Market-context labels active for this run (trend / vol / risk). */
+  marketContextLabels: string[];
+  /** Number of Evidence objects backing this opportunity. */
+  evidenceCount: number;
+  /** Confidence-weighted net directional strength of the evidence, [−1, 1]. */
+  netEvidenceStrength: number;
+}
+
 export interface ValidatedOpportunity {
   symbol: string;
   name: string;
@@ -229,6 +303,10 @@ export interface ValidatedOpportunity {
   riskAdjustedScore: number;
   /** riskAdjustedScore × diversificationMultiplier; present when a portfolio was supplied. */
   portfolioAdjustedScore?: number;
+  /** Measured multi-factor conviction (≥1). Scales the ranking score so
+   *  setups where independent model buckets, historical base rates and the
+   *  evidence layer corroborate each other rise to the top. */
+  convictionMultiplier?: number;
 
   sizing: OpportunitySizing;
   portfolioFit?: PortfolioFit;
@@ -236,6 +314,13 @@ export interface ValidatedOpportunity {
 
   models: ModelScore[];
   consensus: OpportunityConsensus;
+
+  /** Structured Evidence Layer backing this opportunity (top items by
+   *  |strength|). Additive/optional — legacy consumers read the string
+   *  arrays below; new consumers can render the self-describing objects. */
+  evidence?: Evidence[];
+  /** Machine-readable acceptance diagnostics (never vague explanations). */
+  diagnostics?: OpportunityDiagnostics;
 
   supportingEvidence: string[];
   contradictingEvidence: string[];
@@ -274,7 +359,8 @@ export type RejectionCode =
   | "agreement_below_threshold"
   | "insufficient_expected_r"
   | "non_positive_expected_edge"
-  | "non_positive_risk_adjusted_edge";
+  | "non_positive_risk_adjusted_edge"
+  | "excessive_downside_risk";
 
 export interface RejectionRecord {
   symbol: string;
@@ -313,6 +399,9 @@ export interface EngineResponse {
    *  the opportunity-engine function isn't deployed yet. */
   executionVenue: "edge" | "local_fallback";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
+  /** Classified market environment (trend / volatility / risk axes). Influences
+   *  confidence, never model direction. Present from the Market Context module. */
+  marketContext?: MarketContext;
   /** Measured macro environment (rates, curve, dollar, vol, credit, sectors). */
   macro: {
     rates: { tenYearPct: number | null; threeMonthPct: number | null; curveSlopePct: number | null; tenYearChange63dPct: number | null };

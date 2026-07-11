@@ -39,6 +39,7 @@ import {
   pMap,
 } from "../_shared/opportunity/evidence.ts";
 import { collectMacroContext } from "../_shared/opportunity/macro.ts";
+import { classifyMarketContext } from "../_shared/opportunity/marketContext.ts";
 import { runAllModels } from "../_shared/opportunity/models.ts";
 import { loadLearningHealth, loadReputation } from "../_shared/opportunity/reputation.ts";
 import {
@@ -65,7 +66,7 @@ const corsHeaders = {
 // Pipeline size limits — bound wall-clock time, not opportunity quality:
 // stage 1 (price history) runs on the whole capped universe; only the
 // strongest preliminary signals earn the expensive stage-2 collectors.
-const MAX_UNIVERSE = 110;
+const MAX_UNIVERSE = 140;
 const FINALISTS = 20;
 const MAX_PORTFOLIO_HOLDINGS = 8;
 const DEFAULT_HORIZON_DAYS = 21;
@@ -113,6 +114,8 @@ serve(async (req) => {
       loadLearningHealth(reputation.cells),
     ]);
     const regime = detectRegime(benchmark);
+    // Classify the environment ONCE for the whole run (trend / vol / risk).
+    const marketContext = classifyMarketContext(macro, regime);
 
     // ── Portfolio context (optional) ────────────────────────────────
     const positions = (body.portfolio?.positions ?? [])
@@ -206,6 +209,8 @@ serve(async (req) => {
         horizonDays,
         calibration,
         reputation,
+        macro,
+        marketContext,
         portfolioReturns,
         portfolioValue,
         portfolioCurrency,
@@ -261,6 +266,7 @@ serve(async (req) => {
       asOf: new Date().toISOString(),
       executionVenue: "edge",
       regime: { label: regime.label, evidence: regime.evidence },
+      marketContext,
       macro: {
         rates: macro.rates,
         dollar: macro.dollar,

@@ -244,6 +244,10 @@ const SUGGESTIONS = [
   "Compare my two largest positions",
 ];
 
+// The mobile top launcher is hidden for now (matches the desktop header).
+// Foresight still opens via ⌘J / the command palette; flip to restore.
+const FORESIGHT_LAUNCHER_ENABLED = false;
+
 /** The console itself — shared by the desktop dock and the mobile sheet. */
 function PanelBody() {
   const {
@@ -452,9 +456,10 @@ export default function ForesightSurface() {
 
   return (
     <>
-      {/* Phone launcher — small button pinned top-center over the header. */}
+      {/* Phone launcher — small button pinned top-center over the header.
+          Hidden for now via FORESIGHT_LAUNCHER_ENABLED. */}
       <AnimatePresence initial={false}>
-        {!open && (
+        {FORESIGHT_LAUNCHER_ENABLED && !open && (
           <motion.button
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
