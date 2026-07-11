@@ -11,6 +11,7 @@ import { runAllModels, type MarketRegime } from "../../../supabase/functions/_sh
 import { evaluateCandidate } from "../../../supabase/functions/_shared/opportunity/confidence.ts";
 import { classifyMarketContext } from "../../../supabase/functions/_shared/opportunity/marketContext.ts";
 import { EMPTY_BOOK } from "../../../supabase/functions/_shared/opportunity/reputationCore.ts";
+import { liquidLeaders, coverageCandidates } from "../../../supabase/functions/_shared/opportunity/universe.ts";
 import type { EvidenceBundle } from "../../../supabase/functions/_shared/opportunity/types.ts";
 import type { MacroContext } from "../../../supabase/functions/_shared/opportunity/macro.ts";
 import { computePriceFeatures, type ChartSeries } from "../../../supabase/functions/_shared/opportunity/evidence.ts";
@@ -103,6 +104,13 @@ describe("evaluateCandidate — Evidence Layer + diagnostics integration", () =>
     expect(d.evidenceCount).toBeGreaterThan(0);
   });
 
+  it("carries a measured conviction multiplier (≥1) that scales ranking", () => {
+    if (!result.ok) throw new Error("expected ok");
+    const o = result.opportunity;
+    expect(o.convictionMultiplier).toBeGreaterThanOrEqual(1);
+    expect(o.convictionMultiplier).toBeLessThanOrEqual(1.4);
+  });
+
   it("preserves legacy fields consumed by the existing UI", () => {
     if (!result.ok) throw new Error("expected ok");
     const o = result.opportunity;
@@ -112,6 +120,25 @@ describe("evaluateCandidate — Evidence Layer + diagnostics integration", () =>
     expect(o.currency).toBe("USD"); // INR/base-currency handling path unchanged
     expect(o.confidence).toBeGreaterThan(0.5);
     expect(o.confidence).toBeLessThanOrEqual(0.95);
+  });
+
+  it("liquid-leaders universe adds real single names beyond broad ETFs", () => {
+    const us = liquidLeaders(false);
+    const usSymbols = new Set(us.map((c) => c.symbol));
+    // Real single names the ETF-only coverage grid never contained.
+    expect(usSymbols.has("NVDA")).toBe(true);
+    expect(usSymbols.has("AAPL")).toBe(true);
+    expect(us.length).toBeGreaterThan(20);
+    // They are candidates, not pre-baked opportunities — sourced, not hardcoded.
+    for (const c of us) expect(c.origin.source).toBe("coverage:liquid_leaders");
+    // None of the leaders duplicate the coverage grid (deduped by the venues).
+    const coverage = new Set(coverageCandidates(false).map((c) => c.symbol));
+    for (const c of us) expect(coverage.has(c.symbol)).toBe(false);
+    // India mode leads with NSE names (INR base) and keeps US leaders too.
+    const inSymbols = liquidLeaders(true).map((c) => c.symbol);
+    expect(inSymbols).toContain("RELIANCE.NS");
+    expect(inSymbols).toContain("HDFCBANK.NS");
+    expect(inSymbols).toContain("NVDA");
   });
 
   it("market context influences confidence: risk-on lifts a long vs neutral", () => {

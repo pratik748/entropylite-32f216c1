@@ -318,6 +318,105 @@ const INDIA_COVERAGE: CoverageRow[] = [
   { symbol: "SILVERBEES.NS", name: "Nippon India Silver ETF", assetClass: "commodity" },
 ];
 
+// ── Liquid market leaders (single-name breadth) ────────────────────
+// A sector-diversified set of the most liquid, institution-grade single
+// names per region. These are CANDIDATES ONLY — every one still has to earn
+// its way through evidence collection, the independent models, cross-bucket
+// consensus and the validator before it can be shown. Nothing here is a
+// recommendation; the list simply guarantees the engine always considers
+// real, tradeable leaders (not just broad ETFs), which matters most for the
+// browser fallback venue, and for India where no free full-exchange
+// directory scan is available.
+
+const US_LEADERS: CoverageRow[] = [
+  // Mega-cap technology / communication
+  { symbol: "AAPL", name: "Apple", assetClass: "equity" },
+  { symbol: "MSFT", name: "Microsoft", assetClass: "equity" },
+  { symbol: "NVDA", name: "NVIDIA", assetClass: "equity" },
+  { symbol: "GOOGL", name: "Alphabet", assetClass: "equity" },
+  { symbol: "AMZN", name: "Amazon", assetClass: "equity" },
+  { symbol: "META", name: "Meta Platforms", assetClass: "equity" },
+  { symbol: "AVGO", name: "Broadcom", assetClass: "equity" },
+  { symbol: "AMD", name: "Advanced Micro Devices", assetClass: "equity" },
+  { symbol: "CRM", name: "Salesforce", assetClass: "equity" },
+  { symbol: "ORCL", name: "Oracle", assetClass: "equity" },
+  { symbol: "NFLX", name: "Netflix", assetClass: "equity" },
+  { symbol: "TSLA", name: "Tesla", assetClass: "equity" },
+  // Financials
+  { symbol: "JPM", name: "JPMorgan Chase", assetClass: "equity" },
+  { symbol: "V", name: "Visa", assetClass: "equity" },
+  { symbol: "MA", name: "Mastercard", assetClass: "equity" },
+  { symbol: "BAC", name: "Bank of America", assetClass: "equity" },
+  { symbol: "GS", name: "Goldman Sachs", assetClass: "equity" },
+  // Healthcare
+  { symbol: "LLY", name: "Eli Lilly", assetClass: "equity" },
+  { symbol: "UNH", name: "UnitedHealth", assetClass: "equity" },
+  { symbol: "JNJ", name: "Johnson & Johnson", assetClass: "equity" },
+  { symbol: "ABBV", name: "AbbVie", assetClass: "equity" },
+  { symbol: "MRK", name: "Merck", assetClass: "equity" },
+  // Consumer
+  { symbol: "COST", name: "Costco", assetClass: "equity" },
+  { symbol: "WMT", name: "Walmart", assetClass: "equity" },
+  { symbol: "HD", name: "Home Depot", assetClass: "equity" },
+  { symbol: "MCD", name: "McDonald's", assetClass: "equity" },
+  { symbol: "PG", name: "Procter & Gamble", assetClass: "equity" },
+  { symbol: "KO", name: "Coca-Cola", assetClass: "equity" },
+  { symbol: "PEP", name: "PepsiCo", assetClass: "equity" },
+  // Industrials / energy / materials
+  { symbol: "CAT", name: "Caterpillar", assetClass: "equity" },
+  { symbol: "GE", name: "GE Aerospace", assetClass: "equity" },
+  { symbol: "HON", name: "Honeywell", assetClass: "equity" },
+  { symbol: "XOM", name: "Exxon Mobil", assetClass: "equity" },
+  { symbol: "CVX", name: "Chevron", assetClass: "equity" },
+];
+
+const INDIA_LEADERS: CoverageRow[] = [
+  { symbol: "RELIANCE.NS", name: "Reliance Industries", assetClass: "equity" },
+  { symbol: "TCS.NS", name: "Tata Consultancy Services", assetClass: "equity" },
+  { symbol: "HDFCBANK.NS", name: "HDFC Bank", assetClass: "equity" },
+  { symbol: "ICICIBANK.NS", name: "ICICI Bank", assetClass: "equity" },
+  { symbol: "INFY.NS", name: "Infosys", assetClass: "equity" },
+  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel", assetClass: "equity" },
+  { symbol: "SBIN.NS", name: "State Bank of India", assetClass: "equity" },
+  { symbol: "HINDUNILVR.NS", name: "Hindustan Unilever", assetClass: "equity" },
+  { symbol: "ITC.NS", name: "ITC", assetClass: "equity" },
+  { symbol: "LT.NS", name: "Larsen & Toubro", assetClass: "equity" },
+  { symbol: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", assetClass: "equity" },
+  { symbol: "AXISBANK.NS", name: "Axis Bank", assetClass: "equity" },
+  { symbol: "BAJFINANCE.NS", name: "Bajaj Finance", assetClass: "equity" },
+  { symbol: "MARUTI.NS", name: "Maruti Suzuki", assetClass: "equity" },
+  { symbol: "SUNPHARMA.NS", name: "Sun Pharmaceutical", assetClass: "equity" },
+  { symbol: "TITAN.NS", name: "Titan Company", assetClass: "equity" },
+  { symbol: "ASIANPAINT.NS", name: "Asian Paints", assetClass: "equity" },
+  { symbol: "ULTRACEMCO.NS", name: "UltraTech Cement", assetClass: "equity" },
+  { symbol: "HCLTECH.NS", name: "HCL Technologies", assetClass: "equity" },
+  { symbol: "WIPRO.NS", name: "Wipro", assetClass: "equity" },
+  { symbol: "NESTLEIND.NS", name: "Nestlé India", assetClass: "equity" },
+  { symbol: "TATAMOTORS.NS", name: "Tata Motors", assetClass: "equity" },
+  { symbol: "TATASTEEL.NS", name: "Tata Steel", assetClass: "equity" },
+  { symbol: "POWERGRID.NS", name: "Power Grid Corporation", assetClass: "equity" },
+  { symbol: "ADANIENT.NS", name: "Adani Enterprises", assetClass: "equity" },
+];
+
+/**
+ * Sector-diversified liquid single-name leaders for the region. India mode
+ * leads with NSE names but keeps US leaders too (global opportunity set for
+ * INR-based users). Candidates only — validated like everything else.
+ */
+export function liquidLeaders(indiaMode: boolean): Candidate[] {
+  const rows = indiaMode ? [...INDIA_LEADERS, ...US_LEADERS] : US_LEADERS;
+  return rows.map((r) => ({
+    symbol: r.symbol,
+    name: r.name,
+    assetClass: r.assetClass,
+    currency: /\.(NS|BO)$/i.test(r.symbol) ? "INR" : "USD",
+    origin: {
+      source: "coverage:liquid_leaders",
+      reason: "Liquid, institution-grade market leader — always considered so the engine evaluates real single names, not only broad ETFs.",
+    },
+  }));
+}
+
 /** Pure coverage-grid universe — also used by the browser fallback venue. */
 export function coverageCandidates(indiaMode: boolean): Candidate[] {
   const rows = indiaMode ? [...INDIA_COVERAGE, ...US_COVERAGE] : US_COVERAGE;
@@ -391,7 +490,10 @@ export async function generateUniverse(opts: {
   };
 
   // Order = survival priority under the engine's universe cap.
+  // Coverage grid (market breadth) and the liquid single-name leaders are
+  // always in the pool, then whole-market discovery fills the remainder.
   for (const c of coverageCandidates(opts.indiaMode)) push(c);
+  for (const c of liquidLeaders(opts.indiaMode)) push(c);
   if (directory.candidates.length === 0 && !opts.indiaMode) failedSources.push(directory.id);
   for (const c of directory.candidates) push(c);
   for (const r of screeners) {

@@ -66,7 +66,7 @@ const corsHeaders = {
 // Pipeline size limits — bound wall-clock time, not opportunity quality:
 // stage 1 (price history) runs on the whole capped universe; only the
 // strongest preliminary signals earn the expensive stage-2 collectors.
-const MAX_UNIVERSE = 110;
+const MAX_UNIVERSE = 140;
 const FINALISTS = 20;
 const MAX_PORTFOLIO_HOLDINGS = 8;
 const DEFAULT_HORIZON_DAYS = 21;

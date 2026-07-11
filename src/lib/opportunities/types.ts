@@ -152,8 +152,9 @@ export interface ValidatedOpportunity {
   confidenceDrivers: string[];
   expectedEdgePct: number;   // decimal; sign follows direction
   downsideRiskPct: number;   // decimal, positive (95% CF-VaR over horizon)
-  riskAdjustedScore: number; // |edge| × confidence / risk — the ranking key
+  riskAdjustedScore: number; // |edge| × confidence / risk — the base ranking key
   portfolioAdjustedScore?: number; // × diversification multiplier when portfolio supplied
+  convictionMultiplier?: number;   // ≥1 multi-factor conviction scaling for ranking
 
   sizing: OpportunitySizing;
   portfolioFit?: PortfolioFit;

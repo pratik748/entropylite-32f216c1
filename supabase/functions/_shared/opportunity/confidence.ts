@@ -505,6 +505,30 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   // Surface the strongest evidence objects (compact — keeps the payload lean).
   const topEvidence = [...evidence].sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength)).slice(0, 8);
 
+  // ── Conviction multiplier (ranking refinement) ───────────────────
+  // Beyond raw risk-adjusted edge, promote the setups where INDEPENDENT
+  // model factors genuinely corroborate each other — the "great asset"
+  // signal. Every term is measured, bounded and explained; nothing is an
+  // LLM opinion. Neutral inputs leave it at 1.0 (ranking unchanged).
+  const convDrivers: string[] = [];
+  let conviction = 1;
+  if (consensus.bucketDecision.consensus === "ALL_3") { conviction += 0.15; convDrivers.push("all three orthogonal info-buckets agree"); }
+  else if (consensus.bucketDecision.consensus === "TWO_OF_3") { conviction += 0.05; convDrivers.push("two of three info-buckets agree"); }
+  if (historicalStats && historicalStats.sampleSize >= 40 && historicalStats.hitRatePct > 52) {
+    const hb = clamp((historicalStats.hitRatePct - 52) / 100, 0, 0.12);
+    conviction += hb;
+    convDrivers.push(`historical hit-rate ${historicalStats.hitRatePct}% over ${historicalStats.sampleSize} ${horizonDays}d windows`);
+  }
+  const netAligned = evidenceSummary.netStrength * (direction === "long" ? 1 : -1);
+  if (netAligned > 0) {
+    conviction += clamp(netAligned * 0.15, 0, 0.1);
+    convDrivers.push(`evidence net strength aligned with the ${direction}`);
+  }
+  const convictionMultiplier = Number(clamp(conviction, 1, 1.4).toFixed(3));
+  if (convictionMultiplier > 1) {
+    confidenceDrivers.push(`Conviction ${((convictionMultiplier - 1) * 100).toFixed(0)}% ranking boost — ${convDrivers.join("; ")}.`);
+  }
+
   const opportunity: ValidatedOpportunity = {
     symbol,
     name: candidate.name,
@@ -523,6 +547,7 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     downsideRiskPct: Number(downsideRiskPct.toFixed(4)),
     riskAdjustedScore: Number(riskAdjustedScore.toFixed(3)),
     ...(portfolioAdjustedScore != null ? { portfolioAdjustedScore } : {}),
+    convictionMultiplier,
     sizing,
     ...(portfolioFit ? { portfolioFit } : {}),
     ...(historicalStats ? { historicalStats } : {}),
@@ -559,12 +584,18 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
 }
 
 /**
- * Rank by expected risk-adjusted edge — the single ranking used everywhere.
- * When portfolio context was supplied, the portfolio-adjusted score (edge ×
- * confidence / risk × diversification) is the sort key: a mediocre but
- * uncorrelated idea can legitimately outrank a brilliant redundant one.
+ * Rank by expected risk-adjusted edge, refined by measured conviction — the
+ * single ranking used everywhere. Base key is the portfolio-adjusted score
+ * (edge × confidence / risk × diversification) when a portfolio was supplied,
+ * else the risk-adjusted score; both are then scaled by the conviction
+ * multiplier so setups where independent model factors corroborate each
+ * other rise to the top. A mediocre but uncorrelated idea can still outrank a
+ * brilliant redundant one; a strongly-corroborated idea outranks a marginal one.
  */
+export function rankingScore(o: ValidatedOpportunity): number {
+  return (o.portfolioAdjustedScore ?? o.riskAdjustedScore) * (o.convictionMultiplier ?? 1);
+}
+
 export function rankOpportunities(opps: ValidatedOpportunity[]): ValidatedOpportunity[] {
-  const key = (o: ValidatedOpportunity) => o.portfolioAdjustedScore ?? o.riskAdjustedScore;
-  return [...opps].sort((a, b) => key(b) - key(a));
+  return [...opps].sort((a, b) => rankingScore(b) - rankingScore(a));
 }

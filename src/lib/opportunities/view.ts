@@ -6,9 +6,12 @@
 
 import type { OpportunityFilters, ValidatedOpportunity } from "./types";
 
-/** The single ranking key every consumer sorts by. */
+/** The single ranking key every consumer sorts by: expected risk-adjusted
+ *  edge (diversification-adjusted when the engine had portfolio context),
+ *  scaled by the measured multi-factor conviction multiplier so the most
+ *  strongly-corroborated setups rank highest. */
 export function rankingScore(o: ValidatedOpportunity): number {
-  return o.portfolioAdjustedScore ?? o.riskAdjustedScore;
+  return (o.portfolioAdjustedScore ?? o.riskAdjustedScore) * (o.convictionMultiplier ?? 1);
 }
 
 export function filterOpportunities(

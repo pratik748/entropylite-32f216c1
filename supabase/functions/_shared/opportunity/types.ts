@@ -303,6 +303,10 @@ export interface ValidatedOpportunity {
   riskAdjustedScore: number;
   /** riskAdjustedScore × diversificationMultiplier; present when a portfolio was supplied. */
   portfolioAdjustedScore?: number;
+  /** Measured multi-factor conviction (≥1). Scales the ranking score so
+   *  setups where independent model buckets, historical base rates and the
+   *  evidence layer corroborate each other rise to the top. */
+  convictionMultiplier?: number;
 
   sizing: OpportunitySizing;
   portfolioFit?: PortfolioFit;

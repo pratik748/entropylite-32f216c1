@@ -26,6 +26,7 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { supabase } from "@/integrations/supabase/client";
 import {
   coverageCandidates,
+  liquidLeaders,
   benchmarkSymbol,
 } from "../../../supabase/functions/_shared/opportunity/universe.ts";
 import {
@@ -114,10 +115,17 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
   const { indiaMode, horizonDays } = params;
   const bench = benchmarkSymbol(indiaMode);
 
-  // Reduced universe: coverage grid + user's holdings.
+  // Reduced universe: coverage grid + liquid single-name leaders + holdings.
+  // The leaders are what let the browser venue surface real individual names
+  // (not only broad ETFs); they are candidates, validated like everything else.
   const holdings = (params.portfolio?.positions ?? []).slice(0, 8);
   const candidates: Candidate[] = [...coverageCandidates(indiaMode)];
   const seen = new Set(candidates.map((c) => c.symbol));
+  for (const c of liquidLeaders(indiaMode)) {
+    if (seen.has(c.symbol)) continue;
+    seen.add(c.symbol);
+    candidates.push(c);
+  }
   for (const h of holdings) {
     const symbol = h.symbol.toUpperCase();
     if (seen.has(symbol)) continue;
