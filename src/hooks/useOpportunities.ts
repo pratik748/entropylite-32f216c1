@@ -27,9 +27,10 @@ export interface UseOpportunitiesResult {
 
 export function useOpportunities(
   filters: OpportunityFilters = {},
-  opts: { auto?: boolean } = {},
+  opts: { auto?: boolean; horizonDays?: number } = {},
 ): UseOpportunitiesResult {
   const auto = opts.auto !== false;
+  const horizonDays = opts.horizonDays ?? 21;
   const { indiaMode } = useFX();
   const [snapshot, setSnapshot] = useState(() => getSnapshot());
   const [loading, setLoading] = useState(false);
@@ -51,14 +52,14 @@ export function useOpportunities(
     setLoading(true);
     setError(null);
     try {
-      const s = await fetchOpportunities({ indiaMode, force });
+      const s = await fetchOpportunities({ indiaMode, force, horizonDays });
       if (mounted.current) setSnapshot(s);
     } catch (e) {
       if (mounted.current) setError(e instanceof Error ? e.message : "Opportunity engine unreachable.");
     } finally {
       if (mounted.current) setLoading(false);
     }
-  }, [indiaMode]);
+  }, [indiaMode, horizonDays]);
 
   useEffect(() => {
     if (auto) void refresh(false);

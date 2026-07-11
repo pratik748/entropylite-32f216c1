@@ -26,7 +26,7 @@ import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
-import Discover from "@/components/Discover";
+import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 
@@ -95,7 +95,7 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade, desirableZones } = useOutcomeGradient();
-  const { convertToBase } = useFX();
+  const { convertToBase, baseCurrency } = useFX();
 
   // First-time tutorial: open after portfolio loaded
   useEffect(() => {
@@ -157,10 +157,11 @@ const IndexContent = () => {
         ? {
             positions: weighted.map((p) => ({ symbol: p.symbol, weight: p.value / total })),
             value: portfolioValueBase > 0 ? portfolioValueBase : undefined,
+            currency: baseCurrency,
           }
         : null,
     );
-  }, [stocks, portfolioValueBase]);
+  }, [stocks, portfolioValueBase, baseCurrency]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
@@ -837,10 +838,10 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <ModuleErrorBoundary
-                    title="Discover module recovered"
-                    description="The opportunity board hit a render error. Retry will remount just this module."
+                    title="Desirable Assets module recovered"
+                    description="The recommendations board hit a render error. Retry will remount just this module."
                   >
-                    <Discover key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                    <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                   </ModuleErrorBoundary>
                 </div>
               )}

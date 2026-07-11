@@ -58,6 +58,13 @@ export interface HistoricalStats {
   horizonDays: number;
 }
 
+export interface TradePlan {
+  entryLow: number;
+  entryHigh: number;
+  objective: number;          // 1σ favorable move (the consensus prior)
+  invalidationLevel: number;  // 1.25σ adverse — matches the invalidation conditions
+}
+
 export interface ValidatedOpportunity {
   symbol: string;
   name: string;
@@ -67,6 +74,9 @@ export interface ValidatedOpportunity {
   price: number;
   direction: "long" | "short";
   horizonDays: number;
+  sector?: string;
+  sparkline: number[];
+  tradePlan: TradePlan;
 
   confidence: number;        // 0..1 calibrated probability, capped at 0.95 — never certainty
   confidenceDrivers: string[];
@@ -147,7 +157,7 @@ export interface PipelineDiagnostics {
 
 export interface MacroSnapshot {
   rates: { tenYearPct: number | null; threeMonthPct: number | null; curveSlopePct: number | null; tenYearChange63dPct: number | null };
-  dollar: { ret63d: number | null };
+  dollar: { ret63d: number | null; usdinrRet63d?: number | null };
   volatility: { vix: number | null; vixPercentile1y: number | null };
   credit: { highYieldRelStrength63d: number | null };
   sectors: { ranked: Array<{ symbol: string; sector: string; relStrength63d: number }> };
@@ -163,6 +173,7 @@ export interface LearningHealth {
 
 export interface EngineResponse {
   asOf: string;
+  executionVenue: "edge" | "local_fallback";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
   macro: MacroSnapshot;
   learning: LearningHealth;

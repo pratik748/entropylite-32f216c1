@@ -191,6 +191,17 @@ export interface HistoricalStats {
   horizonDays: number;
 }
 
+/** Volatility-derived trade levels for display. Not predictions: the entry
+ *  band is ±0.25× the horizon sigma, the objective is the 1-sigma favorable
+ *  move (the consensus prior), and the invalidation level is the 1.25-sigma
+ *  adverse move used in the invalidation conditions. */
+export interface TradePlan {
+  entryLow: number;
+  entryHigh: number;
+  objective: number;
+  invalidationLevel: number;
+}
+
 export interface ValidatedOpportunity {
   symbol: string;
   name: string;
@@ -200,6 +211,11 @@ export interface ValidatedOpportunity {
   price: number;
   direction: "long" | "short";
   horizonDays: number;
+  /** Yahoo sector name when fundamentals were available. */
+  sector?: string;
+  /** Trailing closes (≤60 points) for sparkline rendering. */
+  sparkline: number[];
+  tradePlan: TradePlan;
 
   /** 0..1 — calibrated probability the thesis is right, capped at 0.95 (never certainty). */
   confidence: number;
@@ -292,11 +308,15 @@ export interface PipelineDiagnostics {
 
 export interface EngineResponse {
   asOf: string;
+  /** Where the pipeline ran. "local_fallback" = same code executed in the
+   *  browser against the deployed data proxies (reduced universe) because
+   *  the opportunity-engine function isn't deployed yet. */
+  executionVenue: "edge" | "local_fallback";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
   /** Measured macro environment (rates, curve, dollar, vol, credit, sectors). */
   macro: {
     rates: { tenYearPct: number | null; threeMonthPct: number | null; curveSlopePct: number | null; tenYearChange63dPct: number | null };
-    dollar: { ret63d: number | null };
+    dollar: { ret63d: number | null; usdinrRet63d?: number | null };
     volatility: { vix: number | null; vixPercentile1y: number | null };
     credit: { highYieldRelStrength63d: number | null };
     sectors: { ranked: Array<{ symbol: string; sector: string; relStrength63d: number }> };

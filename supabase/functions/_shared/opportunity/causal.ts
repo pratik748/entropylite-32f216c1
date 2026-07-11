@@ -102,6 +102,22 @@ export function evaluateCausalChains(bundle: EvidenceBundle, macro: MacroContext
     });
   }
 
+  // ── Chain 6b: dollar → FII flows → Indian equities ─────────────
+  // Foreign institutional flows into NSE/BSE names track the dollar cycle:
+  // a strengthening dollar (or weakening rupee) pulls FII capital out of
+  // EM equities; a weakening dollar pushes it in. Applies to Indian-listed
+  // market-sensitive names.
+  const isIndianListing = /\.(NS|BO)$/i.test(candidate.symbol);
+  const fxSignal = macro.dollar.usdinrRet63d ?? dxy;
+  const fxLabel = macro.dollar.usdinrRet63d != null ? "USD/INR" : "Dollar (UUP)";
+  if (isIndianListing && candidate.assetClass === "equity" && fxSignal != null && Math.abs(fxSignal) >= DOLLAR_MOVE && beta != null && beta >= 0.8) {
+    const dollarUp = fxSignal > 0;
+    hits.push({
+      contribution: dollarUp ? -0.3 : 0.3,
+      narrative: `${fxLabel} ${fxSignal >= 0 ? "+" : ""}${pct(fxSignal)} over 63d → ${dollarUp ? "rupee pressure → FII capital rotates out of" : "rupee support → FII capital rotates into"} Indian equities → market-sensitive names (β ${beta.toFixed(2)}) ${dollarUp ? "lose" : "gain"} marginal flows.`,
+    });
+  }
+
   // ── Chain 6: yield curve → net interest margins → financials ───
   const slope = macro.rates.curveSlopePct;
   if (slope != null && sector === "Financial Services") {

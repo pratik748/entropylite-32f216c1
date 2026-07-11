@@ -50,7 +50,10 @@ export interface MacroContext {
     curveSlopePct: number | null;     // 10y − 3m, percentage points
     tenYearChange63dPct: number | null; // change in yield, percentage points
   };
-  dollar: { ret63d: number | null };  // UUP 63-day return
+  dollar: {
+    ret63d: number | null;                 // UUP 63-day return
+    usdinrRet63d?: number | null;          // USD/INR 63-day change (India mode only)
+  };
   volatility: { vix: number | null; vixPercentile1y: number | null };
   credit: { highYieldRelStrength63d: number | null }; // HYG 63d − LQD 63d; negative = spreads widening
   sectors: {
@@ -62,8 +65,10 @@ export interface MacroContext {
   missing: string[];
 }
 
-// Sector ETF grid ↔ Yahoo `assetProfile.sector` names.
-const SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
+// Sector ETF grids ↔ Yahoo `assetProfile.sector` names, per region.
+// US: S&P sector SPDRs vs SPY. India: NSE BeES sector ETFs vs NIFTYBEES —
+// the liquid on-exchange proxies for institutional sector rotation there.
+const US_SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
   { symbol: "XLK", sector: "Technology" },
   { symbol: "XLF", sector: "Financial Services" },
   { symbol: "XLE", sector: "Energy" },
@@ -77,25 +82,59 @@ const SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
   { symbol: "XLC", sector: "Communication Services" },
 ];
 
-export async function collectMacroContext(benchmark: ChartSeries | null): Promise<MacroContext> {
-  const symbols = ["^TNX", "^IRX", "UUP", "^VIX", "HYG", "LQD", ...SECTOR_ETFS.map((s) => s.symbol)];
-  const charts = new Map<string, ChartSeries | null>();
-  await Promise.all(symbols.map(async (s) => charts.set(s, await fetchDailyChart(s).catch(() => null))));
+const INDIA_SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
+  { symbol: "BANKBEES.NS", sector: "Financial Services" },
+  { symbol: "ITBEES.NS", sector: "Technology" },
+  { symbol: "PHARMABEES.NS", sector: "Healthcare" },
+  { symbol: "AUTOBEES.NS", sector: "Consumer Cyclical" },
+];
 
+function sectorGrid(indiaMode: boolean): Array<{ symbol: string; sector: string }> {
+  return indiaMode ? INDIA_SECTOR_ETFS : US_SECTOR_ETFS;
+}
+
+/**
+ * Every instrument the macro layer measures for a region — both execution
+ * venues fetch this list. US rates / dollar / credit are kept in India mode
+ * too: they are the global drivers of FII flows into Indian equities. India
+ * adds its own vol index (^INDIAVIX), the USD/INR rate, and NSE sector ETFs.
+ */
+export function macroSymbols(indiaMode: boolean): string[] {
+  const base = ["^TNX", "^IRX", "UUP", "^VIX", "HYG", "LQD"];
+  const india = indiaMode ? ["^INDIAVIX", "USDINR=X"] : [];
+  return [...base, ...india, ...sectorGrid(indiaMode).map((s) => s.symbol)];
+}
+
+/** Backwards-compatible US list. */
+export const MACRO_SYMBOLS: string[] = macroSymbols(false);
+
+/**
+ * Pure builder: derive the macro context from already-fetched chart
+ * series. The edge function feeds it via `collectMacroContext`; the
+ * browser fallback feeds it from the deployed `historical-prices`
+ * function. Same math either way.
+ */
+export function buildMacroContext(
+  charts: Map<string, ChartSeries | null>,
+  benchmark: ChartSeries | null,
+  indiaMode = false,
+): MacroContext {
+  const symbols = macroSymbols(indiaMode);
   const missing: string[] = symbols.filter((s) => !charts.get(s));
   const evidence: string[] = [];
 
-  // ── Rates & curve (^TNX/^IRX quote yield × 10) ────────────────
+  // ── Rates & curve (Yahoo's ^TNX/^IRX chart closes are the yield in %,
+  //    e.g. 4.28 — verified against live data) ───────────────────
   const tnx = charts.get("^TNX") ?? null;
   const irx = charts.get("^IRX") ?? null;
-  const tenYearPct = last(tnx) != null ? Number((last(tnx)! / 10).toFixed(2)) : null;
-  const threeMonthPct = last(irx) != null ? Number((last(irx)! / 10).toFixed(2)) : null;
+  const tenYearPct = last(tnx) != null ? Number(last(tnx)!.toFixed(2)) : null;
+  const threeMonthPct = last(irx) != null ? Number(last(irx)!.toFixed(2)) : null;
   const curveSlopePct = tenYearPct != null && threeMonthPct != null
     ? Number((tenYearPct - threeMonthPct).toFixed(2))
     : null;
   let tenYearChange63dPct: number | null = null;
   if (tnx && tnx.closes.length > 63) {
-    tenYearChange63dPct = Number(((tnx.closes[tnx.closes.length - 1] - tnx.closes[tnx.closes.length - 64]) / 10).toFixed(2));
+    tenYearChange63dPct = Number((tnx.closes[tnx.closes.length - 1] - tnx.closes[tnx.closes.length - 64]).toFixed(2));
   }
   if (tenYearPct != null) {
     evidence.push(
@@ -104,20 +143,30 @@ export async function collectMacroContext(benchmark: ChartSeries | null): Promis
     );
   }
 
-  // ── Dollar ────────────────────────────────────────────────────
+  // ── Dollar (plus USD/INR in India mode — the FII-flow channel) ─
   const uup = charts.get("UUP") ?? null;
   const dollarRet63d = uup ? ret(uup.closes, 63) : null;
   if (dollarRet63d != null) {
     evidence.push(`Dollar (UUP) ${dollarRet63d >= 0 ? "+" : ""}${pct(dollarRet63d)} over 63 days — ${dollarRet63d > 0.02 ? "strengthening" : dollarRet63d < -0.02 ? "weakening" : "stable"}.`);
   }
+  const usdinr = indiaMode ? charts.get("USDINR=X") ?? null : null;
+  const usdinrRet63d = usdinr ? ret(usdinr.closes, 63) : null;
+  if (usdinrRet63d != null) {
+    evidence.push(
+      `USD/INR ${usdinrRet63d >= 0 ? "+" : ""}${pct(usdinrRet63d)} over 63 days — rupee ${usdinrRet63d > 0.01 ? "weakening (FII outflow pressure)" : usdinrRet63d < -0.01 ? "strengthening (FII inflow support)" : "stable"}.`,
+    );
+  }
 
-  // ── Volatility regime ─────────────────────────────────────────
-  const vixSeries = charts.get("^VIX") ?? null;
+  // ── Volatility regime (India VIX preferred in India mode) ─────
+  const usVix = charts.get("^VIX") ?? null;
+  const indiaVix = indiaMode ? charts.get("^INDIAVIX") ?? null : null;
+  const vixSeries = indiaVix ?? usVix;
+  const vixName = indiaVix ? "India VIX" : "VIX";
   const vix = last(vixSeries);
   const vixPercentile1y = vixSeries ? percentileOfLast(vixSeries.closes) : null;
   if (vix != null) {
     evidence.push(
-      `VIX ${vix.toFixed(1)}${vixPercentile1y != null ? ` — ${Math.round(vixPercentile1y * 100)}th percentile of its 1-year range` : ""} (${vixPercentile1y != null && vixPercentile1y > 0.7 ? "stressed" : vixPercentile1y != null && vixPercentile1y < 0.3 ? "calm" : "mid-range"}).`,
+      `${vixName} ${vix.toFixed(1)}${vixPercentile1y != null ? ` — ${Math.round(vixPercentile1y * 100)}th percentile of its 1-year range` : ""} (${vixPercentile1y != null && vixPercentile1y > 0.7 ? "stressed" : vixPercentile1y != null && vixPercentile1y < 0.3 ? "calm" : "mid-range"}).`,
     );
   }
 
@@ -133,10 +182,11 @@ export async function collectMacroContext(benchmark: ChartSeries | null): Promis
     );
   }
 
-  // ── Sector leadership ─────────────────────────────────────────
+  // ── Sector leadership (region-appropriate grid vs its benchmark) ─
+  const benchName = indiaMode ? "NIFTYBEES" : "SPY";
   const benchRet63 = benchmark ? ret(benchmark.closes, 63) : null;
   const ranked: SectorLeadership[] = [];
-  for (const { symbol, sector } of SECTOR_ETFS) {
+  for (const { symbol, sector } of sectorGrid(indiaMode)) {
     const series = charts.get(symbol);
     const r = series ? ret(series.closes, 63) : null;
     if (r != null && benchRet63 != null) {
@@ -146,22 +196,29 @@ export async function collectMacroContext(benchmark: ChartSeries | null): Promis
   ranked.sort((a, b) => b.relStrength63d - a.relStrength63d);
   const bySector: Record<string, number> = {};
   for (const s of ranked) bySector[s.sector] = s.relStrength63d;
-  if (ranked.length >= 4) {
+  if (ranked.length >= 3) {
     evidence.push(
-      `Sector leadership (63d vs SPY): ${ranked.slice(0, 3).map((s) => `${s.sector} ${s.relStrength63d >= 0 ? "+" : ""}${pct(s.relStrength63d)}`).join(", ")}; ` +
+      `Sector leadership (63d vs ${benchName}): ${ranked.slice(0, 3).map((s) => `${s.sector} ${s.relStrength63d >= 0 ? "+" : ""}${pct(s.relStrength63d)}`).join(", ")}; ` +
       `lagging: ${ranked.slice(-2).map((s) => `${s.sector} ${pct(s.relStrength63d)}`).join(", ")}.`,
     );
   }
 
   return {
     rates: { tenYearPct, threeMonthPct, curveSlopePct, tenYearChange63dPct },
-    dollar: { ret63d: dollarRet63d },
+    dollar: { ret63d: dollarRet63d, usdinrRet63d },
     volatility: { vix, vixPercentile1y },
     credit: { highYieldRelStrength63d },
     sectors: { ranked, bySector },
     evidence,
     missing,
   };
+}
+
+/** Edge-venue collector: fetch every macro instrument, then build. */
+export async function collectMacroContext(benchmark: ChartSeries | null, indiaMode = false): Promise<MacroContext> {
+  const charts = new Map<string, ChartSeries | null>();
+  await Promise.all(macroSymbols(indiaMode).map(async (s) => charts.set(s, await fetchDailyChart(s).catch(() => null))));
+  return buildMacroContext(charts, benchmark, indiaMode);
 }
 
 /**

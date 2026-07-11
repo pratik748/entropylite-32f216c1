@@ -24,7 +24,7 @@ import { cornishFisherZ, walkForwardEdge } from "../mathEdge.ts";
 import type { MarketRegime } from "./models.ts";
 import type { ChartSeries } from "./evidence.ts";
 import { computePriceFeatures } from "./evidence.ts";
-import type { ReputationBook } from "./reputation.ts";
+import type { ReputationBook } from "./reputationCore.ts";
 import type {
   EvidenceBundle,
   ModelScore,
@@ -217,8 +217,12 @@ export interface EvaluationInput {
   reputation: ReputationBook;
   /** Weighted daily-return composite of the caller's holdings, if provided. */
   portfolioReturns?: number[] | null;
-  /** Caller's portfolio value in the candidate's display terms, for qty sizing. */
+  /** Caller's portfolio value for qty sizing, denominated in portfolioCurrency. */
   portfolioValue?: number | null;
+  /** Currency of portfolioValue (e.g. "INR" for India-mode users). Whole-unit
+   *  qty is only quoted when it matches the candidate's trading currency —
+   *  never by dividing rupees by a dollar price. */
+  portfolioCurrency?: string | null;
 }
 
 export type EvaluationResult =
@@ -265,7 +269,12 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   }
 
   // Gate 1: liquidity floor (economic viability).
-  const ccy = p.currency ?? candidate.currency ?? "USD";
+  // Currency resolution: chart metadata → candidate → listing suffix
+  // (.NS/.BO trade in INR) → USD. The suffix fallback matters for the
+  // local venue, whose data proxy doesn't return chart currency.
+  const ccy = p.currency
+    ?? candidate.currency
+    ?? (/\.(NS|BO)$/i.test(symbol) ? "INR" : "USD");
   const floor = LIQUIDITY_FLOOR_BY_CCY[ccy] ?? DEFAULT_LIQUIDITY_FLOOR;
   if (p.avgDollarVolume20d < floor) {
     return reject(symbol, "validation", "below_liquidity_floor",
@@ -367,7 +376,10 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     suggestedWeightPct: Number((suggestedWeight * 100).toFixed(2)),
     basis: fractionalKelly <= volTargetWeight ? "fractional_kelly" : "vol_target",
     estMaxLossPct: Number((suggestedWeight * downsideRiskPct * 100).toFixed(3)),
-    ...(input.portfolioValue && input.portfolioValue > 0
+    // Whole-unit qty only when the portfolio value's currency matches the
+    // candidate's trading currency (INR budget ÷ USD price is meaningless;
+    // the % weight remains valid either way and the client converts).
+    ...(input.portfolioValue && input.portfolioValue > 0 && (input.portfolioCurrency ?? "USD") === ccy
       ? { suggestedQty: Math.max(0, Math.floor((input.portfolioValue * suggestedWeight) / p.lastClose)) }
       : {}),
   };
@@ -412,6 +424,22 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     .filter((m) => m.hasSignal && m.direction === -dominantDir)
     .flatMap((m) => m.rationale.slice(0, 2).map((r) => `${m.label}: ${r}`));
 
+  // Display trade levels, all in horizon-sigma units of the measured vol:
+  // entry band ±0.25σ, objective = the 1σ favorable prior, invalidation =
+  // the 1.25σ adverse level already quoted in the invalidation conditions.
+  const dirSign = direction === "long" ? 1 : -1;
+  const tradePlan = {
+    entryLow: Number((p.lastClose * (1 - 0.25 * sigmaH)).toFixed(4)),
+    entryHigh: Number((p.lastClose * (1 + 0.25 * sigmaH)).toFixed(4)),
+    objective: Number((p.lastClose * (1 + dirSign * sigmaH)).toFixed(4)),
+    invalidationLevel: Number((p.lastClose * (1 - dirSign * 1.25 * sigmaH)).toFixed(4)),
+  };
+
+  // Sparkline: decimate trailing closes to ≤60 points for the UI.
+  const tail = p.closes.slice(-120);
+  const step = Math.max(1, Math.ceil(tail.length / 60));
+  const sparkline = tail.filter((_, i) => i % step === 0 || i === tail.length - 1).map((v) => Number(v.toFixed(4)));
+
   const opportunity: ValidatedOpportunity = {
     symbol,
     name: candidate.name,
@@ -421,6 +449,9 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     price: p.lastClose,
     direction,
     horizonDays,
+    ...(bundle.fundamentals?.sector ? { sector: bundle.fundamentals.sector } : {}),
+    sparkline,
+    tradePlan,
     confidence: Number(confidence.toFixed(3)),
     confidenceDrivers,
     expectedEdgePct: Number(expectedEdgePct.toFixed(4)),

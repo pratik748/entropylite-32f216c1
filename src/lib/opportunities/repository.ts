@@ -6,10 +6,11 @@
 // object, with the same score, everywhere else.
 
 import { governedInvoke } from "@/lib/apiGovernor";
+import { runLocalEngine } from "./localEngine";
 import { updateLifecycle } from "./lifecycle";
 import type { EngineResponse } from "./types";
 
-const CACHE_KEY = "opportunity-engine-snapshot-v2";
+const CACHE_KEY = "opportunity-engine-snapshot-v3";
 const CACHE_TTL_MS = 30 * 60 * 1000; // engine output is slow-moving evidence, not a ticker
 
 // ── Portfolio context ───────────────────────────────────────────────
@@ -19,6 +20,8 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // engine output is slow-moving evidence, n
 export interface PortfolioContext {
   positions: Array<{ symbol: string; weight: number }>;
   value?: number;
+  /** Currency `value` is denominated in (the user's base currency, e.g. INR). */
+  currency?: string;
 }
 
 let portfolioContext: PortfolioContext | null = null;
@@ -39,6 +42,7 @@ interface Snapshot {
   response: EngineResponse;
   fetchedAt: number;
   indiaMode: boolean;
+  horizonDays: number;
 }
 
 type Listener = (snapshot: Snapshot | null) => void;
@@ -79,10 +83,11 @@ export function getSnapshot(): Snapshot | null {
   return current;
 }
 
-function isFresh(snapshot: Snapshot | null, indiaMode: boolean): snapshot is Snapshot {
+function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: number): snapshot is Snapshot {
   return Boolean(
     snapshot &&
     snapshot.indiaMode === indiaMode &&
+    (snapshot.horizonDays ?? 21) === horizonDays &&
     Date.now() - snapshot.fetchedAt < CACHE_TTL_MS,
   );
 }
@@ -92,36 +97,62 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean): snapshot is Sna
  * share one inflight request and one cache entry — server-side filters are
  * intentionally NOT passed here so every module sees the identical slate;
  * use `filterOpportunities` for per-module views.
+ *
+ * Execution venues, tried in order:
+ *   1. The `opportunity-engine` edge function (full universe).
+ *   2. The SAME pipeline executed locally against the deployed
+ *      `historical-prices` proxy (reduced universe) — used automatically
+ *      while the edge function isn't deployed. Marked in the response as
+ *      executionVenue: "local_fallback".
  */
 export async function fetchOpportunities(opts: {
   indiaMode: boolean;
   force?: boolean;
+  horizonDays?: number;
 }): Promise<Snapshot> {
+  const horizonDays = opts.horizonDays ?? 21;
   const cached = getSnapshot();
-  if (!opts.force && isFresh(cached, opts.indiaMode)) return cached;
+  if (!opts.force && isFresh(cached, opts.indiaMode, horizonDays)) return cached;
   if (inflight) return inflight;
 
   inflight = (async () => {
+    let response: EngineResponse | null = null;
+    let edgeError: Error | null = null;
+
     const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
       body: {
         mode: "discover",
-        horizonDays: 21,
+        horizonDays,
         ...(portfolioContext ? { portfolio: portfolioContext } : {}),
       },
-      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h21|${portfolioHash()}`,
+      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h${horizonDays}|${portfolioHash()}`,
       force: opts.force,
     });
-    if (error || !data || !Array.isArray(data.opportunities)) {
-      throw new Error(
-        (error as Error | null)?.message || "Opportunity engine unreachable.",
-      );
+    if (!error && data && Array.isArray(data.opportunities)) {
+      response = data;
+    } else {
+      edgeError = new Error((error as Error | null)?.message || "Opportunity engine unreachable.");
+      // Edge venue unavailable (typically: function not deployed yet) —
+      // run the same pipeline locally against the deployed data proxies.
+      try {
+        response = await runLocalEngine({
+          indiaMode: opts.indiaMode,
+          horizonDays,
+          portfolio: portfolioContext,
+        });
+      } catch {
+        response = null;
+      }
     }
-    const snapshot: Snapshot = { response: data, fetchedAt: Date.now(), indiaMode: opts.indiaMode };
+
+    if (!response) throw edgeError ?? new Error("Opportunity engine unreachable.");
+
+    const snapshot: Snapshot = { response, fetchedAt: Date.now(), indiaMode: opts.indiaMode, horizonDays };
     current = snapshot;
     persist(snapshot);
     // Fold this run into the conviction lifecycle before notifying
     // subscribers, so views render state transitions consistently.
-    try { updateLifecycle(data); } catch { /* lifecycle is derived, never blocking */ }
+    try { updateLifecycle(response); } catch { /* lifecycle is derived, never blocking */ }
     notify();
     return snapshot;
   })();

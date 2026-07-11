@@ -12,6 +12,8 @@ function opp(overrides: Partial<ValidatedOpportunity>): ValidatedOpportunity {
     price: 100,
     direction: "long",
     horizonDays: 21,
+    sparkline: [98, 99, 100],
+    tradePlan: { entryLow: 98.5, entryHigh: 101.5, objective: 106, invalidationLevel: 92.5 },
     confidence: 0.65,
     confidenceDrivers: [],
     expectedEdgePct: 0.03,
@@ -92,6 +94,7 @@ describe("opportunity lifecycle", () => {
 
   const response = (opps: ValidatedOpportunity[], asOf = new Date().toISOString()): EngineResponse => ({
     asOf,
+    executionVenue: "edge",
     regime: { label: "neutral", evidence: [] },
     macro: {
       rates: { tenYearPct: null, threeMonthPct: null, curveSlopePct: null, tenYearChange63dPct: null },
