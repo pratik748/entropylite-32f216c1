@@ -20,6 +20,8 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // engine output is slow-moving evidence, n
 export interface PortfolioContext {
   positions: Array<{ symbol: string; weight: number }>;
   value?: number;
+  /** Currency `value` is denominated in (the user's base currency, e.g. INR). */
+  currency?: string;
 }
 
 let portfolioContext: PortfolioContext | null = null;

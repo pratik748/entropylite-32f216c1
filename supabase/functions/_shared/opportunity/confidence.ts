@@ -217,8 +217,12 @@ export interface EvaluationInput {
   reputation: ReputationBook;
   /** Weighted daily-return composite of the caller's holdings, if provided. */
   portfolioReturns?: number[] | null;
-  /** Caller's portfolio value in the candidate's display terms, for qty sizing. */
+  /** Caller's portfolio value for qty sizing, denominated in portfolioCurrency. */
   portfolioValue?: number | null;
+  /** Currency of portfolioValue (e.g. "INR" for India-mode users). Whole-unit
+   *  qty is only quoted when it matches the candidate's trading currency —
+   *  never by dividing rupees by a dollar price. */
+  portfolioCurrency?: string | null;
 }
 
 export type EvaluationResult =
@@ -265,7 +269,12 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   }
 
   // Gate 1: liquidity floor (economic viability).
-  const ccy = p.currency ?? candidate.currency ?? "USD";
+  // Currency resolution: chart metadata → candidate → listing suffix
+  // (.NS/.BO trade in INR) → USD. The suffix fallback matters for the
+  // local venue, whose data proxy doesn't return chart currency.
+  const ccy = p.currency
+    ?? candidate.currency
+    ?? (/\.(NS|BO)$/i.test(symbol) ? "INR" : "USD");
   const floor = LIQUIDITY_FLOOR_BY_CCY[ccy] ?? DEFAULT_LIQUIDITY_FLOOR;
   if (p.avgDollarVolume20d < floor) {
     return reject(symbol, "validation", "below_liquidity_floor",
@@ -367,7 +376,10 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     suggestedWeightPct: Number((suggestedWeight * 100).toFixed(2)),
     basis: fractionalKelly <= volTargetWeight ? "fractional_kelly" : "vol_target",
     estMaxLossPct: Number((suggestedWeight * downsideRiskPct * 100).toFixed(3)),
-    ...(input.portfolioValue && input.portfolioValue > 0
+    // Whole-unit qty only when the portfolio value's currency matches the
+    // candidate's trading currency (INR budget ÷ USD price is meaningless;
+    // the % weight remains valid either way and the client converts).
+    ...(input.portfolioValue && input.portfolioValue > 0 && (input.portfolioCurrency ?? "USD") === ccy
       ? { suggestedQty: Math.max(0, Math.floor((input.portfolioValue * suggestedWeight) / p.lastClose)) }
       : {}),
   };

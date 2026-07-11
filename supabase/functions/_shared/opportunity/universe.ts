@@ -325,6 +325,7 @@ export function coverageCandidates(indiaMode: boolean): Candidate[] {
     symbol: r.symbol,
     name: r.name,
     assetClass: r.assetClass,
+    currency: /\.(NS|BO)$/i.test(r.symbol) ? "INR" : "USD",
     origin: {
       source: "coverage:asset_class_grid",
       reason: "Asset-class coverage instrument — part of the engine's defined market universe.",

@@ -34,7 +34,7 @@ import {
 } from "../../../supabase/functions/_shared/opportunity/evidence.ts";
 import {
   buildMacroContext,
-  MACRO_SYMBOLS,
+  macroSymbols,
 } from "../../../supabase/functions/_shared/opportunity/macro.ts";
 import { runAllModels } from "../../../supabase/functions/_shared/opportunity/models.ts";
 import {
@@ -78,7 +78,9 @@ async function fetchCharts(symbols: string[]): Promise<Map<string, ChartSeries |
     out.set(
       s,
       bars && Array.isArray(bars.closes) && bars.closes.length >= 2
-        ? { closes: bars.closes, volumes: bars.volumes ?? [], currency: undefined }
+        // The proxy doesn't return chart currency; infer INR from the
+        // listing suffix so liquidity floors use the right denomination.
+        ? { closes: bars.closes, volumes: bars.volumes ?? [], currency: /\.(NS|BO)$/i.test(s) ? "INR" : undefined }
         : null,
     );
   }
@@ -103,7 +105,7 @@ async function loadLearningTables(): Promise<{ reputation: ReputationBook; calib
 export interface LocalEngineParams {
   indiaMode: boolean;
   horizonDays: number;
-  portfolio?: { positions: Array<{ symbol: string; weight: number }>; value?: number } | null;
+  portfolio?: { positions: Array<{ symbol: string; weight: number }>; value?: number; currency?: string } | null;
 }
 
 /** Run the shared pipeline in the browser. Same models, same gates, same ranking. */
@@ -127,12 +129,12 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
     });
   }
 
-  const allSymbols = Array.from(new Set([bench, ...MACRO_SYMBOLS, ...candidates.map((c) => c.symbol)]));
+  const allSymbols = Array.from(new Set([bench, ...macroSymbols(indiaMode), ...candidates.map((c) => c.symbol)]));
   const [charts, learningTables] = await Promise.all([fetchCharts(allSymbols), loadLearningTables()]);
   const { reputation, calibrationRow } = learningTables;
 
   const benchmark = charts.get(bench) ?? null;
-  const macro = buildMacroContext(charts, benchmark);
+  const macro = buildMacroContext(charts, benchmark, indiaMode);
   const regime = detectRegime(benchmark);
   const learning = buildLearningHealth(calibrationRow, reputation.cells);
   const calibration = {
@@ -150,6 +152,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
     )
     : null;
   const portfolioValue = params.portfolio?.value && params.portfolio.value > 0 ? params.portfolio.value : null;
+  const portfolioCurrency = params.portfolio?.currency ? params.portfolio.currency.toUpperCase() : null;
 
   const asOf = new Date().toISOString();
   const rejections: RejectionRecord[] = [];
@@ -191,6 +194,7 @@ export async function runLocalEngine(params: LocalEngineParams): Promise<EngineR
       reputation,
       portfolioReturns,
       portfolioValue,
+      portfolioCurrency,
     });
     if (result.ok) {
       opportunities.push(result.opportunity);

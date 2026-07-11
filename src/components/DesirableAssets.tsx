@@ -140,7 +140,7 @@ function matchesSectorChips(o: ValidatedOpportunity, selected: Set<string>): boo
 }
 
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
-  const { baseCurrency } = useFX();
+  const { baseCurrency, convertToBase } = useFX();
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
   const [showConstraints, setShowConstraints] = useState(true);
   const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
@@ -234,11 +234,16 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
   };
 
   // Quantity: engine sizing first; explicit budget applies the engine's
-  // suggested weight to the user's stated capital instead.
+  // suggested weight to the user's stated capital instead. The budget is
+  // in the user's base currency (e.g. INR), so convert the asset's price
+  // into base terms before dividing — never rupees ÷ dollars.
   const qtyFor = (o: ValidatedOpportunity): number => {
     const budgetNum = budget ? parseFloat(budget.replace(/,/g, "")) : 0;
     if (budgetNum > 0 && o.price > 0) {
-      return Math.max(1, Math.floor((budgetNum * o.sizing.suggestedWeightPct / 100) / o.price));
+      const priceInBase = convertToBase(o.price, o.currency);
+      if (priceInBase > 0) {
+        return Math.max(1, Math.floor((budgetNum * o.sizing.suggestedWeightPct / 100) / priceInBase));
+      }
     }
     return Math.max(1, o.sizing.suggestedQty ?? 1);
   };

@@ -85,6 +85,8 @@ interface EngineRequest {
   portfolio?: {
     positions?: Array<{ symbol: string; weight: number }>;
     value?: number;
+    /** Currency `value` is denominated in (e.g. "INR" for India-mode users). */
+    currency?: string;
   };
 }
 
@@ -107,7 +109,7 @@ serve(async (req) => {
       loadReputation(),
     ]);
     const [macro, learning] = await Promise.all([
-      collectMacroContext(benchmark),
+      collectMacroContext(benchmark, indiaMode),
       loadLearningHealth(reputation.cells),
     ]);
     const regime = detectRegime(benchmark);
@@ -127,6 +129,7 @@ serve(async (req) => {
       portfolioReturns = buildPortfolioReturns(holdings.filter((h): h is NonNullable<typeof h> => h != null));
     }
     const portfolioValue = Number(body.portfolio?.value) > 0 ? Number(body.portfolio!.value) : null;
+    const portfolioCurrency = body.portfolio?.currency ? String(body.portfolio.currency).toUpperCase() : null;
 
     // ── CandidateGenerator ──────────────────────────────────────────
     let candidates: Candidate[];
@@ -205,6 +208,7 @@ serve(async (req) => {
         reputation,
         portfolioReturns,
         portfolioValue,
+        portfolioCurrency,
       });
       if (result.ok) opportunities.push(result.opportunity);
       else {

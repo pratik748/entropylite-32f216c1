@@ -157,7 +157,7 @@ export interface PipelineDiagnostics {
 
 export interface MacroSnapshot {
   rates: { tenYearPct: number | null; threeMonthPct: number | null; curveSlopePct: number | null; tenYearChange63dPct: number | null };
-  dollar: { ret63d: number | null };
+  dollar: { ret63d: number | null; usdinrRet63d?: number | null };
   volatility: { vix: number | null; vixPercentile1y: number | null };
   credit: { highYieldRelStrength63d: number | null };
   sectors: { ranked: Array<{ symbol: string; sector: string; relStrength63d: number }> };

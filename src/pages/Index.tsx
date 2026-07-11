@@ -95,7 +95,7 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade, desirableZones } = useOutcomeGradient();
-  const { convertToBase } = useFX();
+  const { convertToBase, baseCurrency } = useFX();
 
   // First-time tutorial: open after portfolio loaded
   useEffect(() => {
@@ -157,10 +157,11 @@ const IndexContent = () => {
         ? {
             positions: weighted.map((p) => ({ symbol: p.symbol, weight: p.value / total })),
             value: portfolioValueBase > 0 ? portfolioValueBase : undefined,
+            currency: baseCurrency,
           }
         : null,
     );
-  }, [stocks, portfolioValueBase]);
+  }, [stocks, portfolioValueBase, baseCurrency]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(
