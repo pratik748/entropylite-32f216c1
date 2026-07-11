@@ -1,0 +1,127 @@
+// OpportunityRepository — the single client-side gateway to the shared
+// Opportunity Engine. Every module (Discover, Direct Profit, Desirable
+// Assets, alerts, future portfolio modules) queries THIS repository; none
+// of them call the backend directly or maintain their own opportunity
+// state. That guarantees a #1-ranked asset in one module is the same
+// object, with the same score, everywhere else.
+
+import { governedInvoke } from "@/lib/apiGovernor";
+import type { EngineResponse } from "./types";
+
+const CACHE_KEY = "opportunity-engine-snapshot-v1";
+const CACHE_TTL_MS = 30 * 60 * 1000; // engine output is slow-moving evidence, not a ticker
+
+interface Snapshot {
+  response: EngineResponse;
+  fetchedAt: number;
+  indiaMode: boolean;
+}
+
+type Listener = (snapshot: Snapshot | null) => void;
+
+let current: Snapshot | null = null;
+let inflight: Promise<Snapshot> | null = null;
+const listeners = new Set<Listener>();
+
+function loadPersisted(): Snapshot | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Snapshot;
+    if (!parsed?.response || !Array.isArray(parsed.response.opportunities)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persist(snapshot: Snapshot) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(snapshot));
+  } catch { /* storage full — in-memory cache still works */ }
+}
+
+function notify() {
+  for (const l of listeners) l(current);
+}
+
+export function subscribeOpportunities(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getSnapshot(): Snapshot | null {
+  if (!current) current = loadPersisted();
+  return current;
+}
+
+function isFresh(snapshot: Snapshot | null, indiaMode: boolean): snapshot is Snapshot {
+  return Boolean(
+    snapshot &&
+    snapshot.indiaMode === indiaMode &&
+    Date.now() - snapshot.fetchedAt < CACHE_TTL_MS,
+  );
+}
+
+/**
+ * Fetch (or reuse) the engine's validated opportunity set. All consumers
+ * share one inflight request and one cache entry — server-side filters are
+ * intentionally NOT passed here so every module sees the identical slate;
+ * use `filterOpportunities` for per-module views.
+ */
+export async function fetchOpportunities(opts: {
+  indiaMode: boolean;
+  force?: boolean;
+}): Promise<Snapshot> {
+  const cached = getSnapshot();
+  if (!opts.force && isFresh(cached, opts.indiaMode)) return cached;
+  if (inflight) return inflight;
+
+  inflight = (async () => {
+    const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
+      body: { mode: "discover", horizonDays: 21 },
+      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h21`,
+      force: opts.force,
+    });
+    if (error || !data || !Array.isArray(data.opportunities)) {
+      throw new Error(
+        (error as Error | null)?.message || "Opportunity engine unreachable.",
+      );
+    }
+    const snapshot: Snapshot = { response: data, fetchedAt: Date.now(), indiaMode: opts.indiaMode };
+    current = snapshot;
+    persist(snapshot);
+    notify();
+    return snapshot;
+  })();
+
+  try {
+    return await inflight;
+  } finally {
+    inflight = null;
+  }
+}
+
+/**
+ * Evaluate specific tickers through the exact same pipeline (used by
+ * Direct Profit for on-demand names). Same models, same validator, same
+ * ranking math — mode:"single" only changes the candidate source.
+ */
+export async function evaluateTickers(opts: {
+  tickers: string[];
+  indiaMode: boolean;
+}): Promise<EngineResponse> {
+  const tickers = opts.tickers.map((t) => t.trim().toUpperCase()).filter(Boolean);
+  const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
+    body: { mode: "single", tickers, horizonDays: 21 },
+    cacheKey: `single|${opts.indiaMode ? "in" : "gl"}|${tickers.slice().sort().join(",")}`,
+  });
+  if (error || !data) {
+    throw new Error((error as Error | null)?.message || "Opportunity engine unreachable.");
+  }
+  return data;
+}
+
+// Pure view helpers live in ./view (import-safe for tests); re-exported
+// here so consumers have a single import surface.
+export { filterOpportunities, newOpportunities } from "./view";

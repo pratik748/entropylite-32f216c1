@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAlerts, fetchPrefs, upsertPrefs, dismissAlert, scanNow, type RiskAlert, type AlertPrefs } from "@/lib/sentinel";
+import { useOpportunityAlerts } from "@/lib/opportunities/alerts";
 
 const icons: Record<string, any> = {
   drawdown_entry: TrendingDown,
@@ -38,7 +39,11 @@ export default function AlertCenter() {
     return () => { (supabase as any).removeChannel(ch); };
   }, []);
 
-  const unread = alerts.filter(a => !a.dismissed).length;
+  // New validated opportunities from the shared Opportunity Engine — the
+  // same objects Discover and Direct Profit render, surfaced as alerts.
+  const { fresh: freshOpportunities, acknowledge: acknowledgeOpportunities } = useOpportunityAlerts();
+
+  const unread = alerts.filter(a => !a.dismissed).length + freshOpportunities.length;
   const critical = alerts.some(a => !a.dismissed && a.severity === "critical");
 
   const savePrefs = async (partial: Partial<AlertPrefs>) => {
@@ -78,6 +83,33 @@ export default function AlertCenter() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {freshOpportunities.length > 0 && (
+            <div className="border-b border-border/60 bg-primary/5">
+              <div className="flex items-center justify-between px-3 pt-2">
+                <span className="text-[9px] font-mono uppercase tracking-wider text-primary">
+                  New validated opportunities · shared engine
+                </span>
+                <button
+                  onClick={acknowledgeOpportunities}
+                  className="text-[9px] font-mono text-muted-foreground hover:text-foreground"
+                >
+                  Mark seen
+                </button>
+              </div>
+              {freshOpportunities.slice(0, 5).map((o) => (
+                <div key={o.symbol} className="px-3 py-2 flex items-center gap-2">
+                  <TargetIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="font-mono text-[11px] font-semibold">{o.symbol}</span>
+                  <span className={`text-[9px] font-mono ${o.direction === "long" ? "text-gain" : "text-loss"}`}>
+                    {o.direction.toUpperCase()}
+                  </span>
+                  <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+                    {(o.confidence * 100).toFixed(0)}% conf · E/R {o.riskAdjustedScore.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           {alerts.length === 0 ? (
             <div className="p-6 text-center text-xs text-muted-foreground">
               <AlertTriangle className="h-6 w-6 mx-auto mb-2 opacity-40" />

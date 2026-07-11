@@ -188,15 +188,17 @@ registerTool({
 
 registerTool({
   name: "discover.assets",
-  description: "Desirable Assets discovery engine: screened, multi-gate opportunity zones with edge statistics.",
+  description: "Shared Opportunity Engine: quantitatively validated opportunities (universe scan → evidence → independent models → cross-bucket consensus → validation), ranked by expected risk-adjusted edge. Same objects Discover and Direct Profit consume.",
   category: "discovery",
   permission: "read",
-  keywords: ["discover", "opportunities", "ideas", "screen", "desirable"],
+  keywords: ["discover", "opportunities", "ideas", "screen", "desirable", "validated"],
   parameters: {},
   execute: async () => {
-    const { data, error, cached } = await governedInvoke("desirable-assets", { body: {} });
-    if (error) throw new Error(`desirable-assets failed: ${error.message || error}`);
-    return { data, cached, source: "desirable-assets" };
+    const { data, error, cached } = await governedInvoke("opportunity-engine", {
+      body: { mode: "discover", horizonDays: 21 },
+    });
+    if (error) throw new Error(`opportunity-engine failed: ${error.message || error}`);
+    return { data, cached, source: "opportunity-engine" };
   },
 });
 

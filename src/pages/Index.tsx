@@ -26,7 +26,7 @@ import EntropySandbox from "@/components/sandbox/EntropySandbox";
 import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
-import DesirableAssets from "@/components/DesirableAssets";
+import Discover from "@/components/Discover";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 
@@ -147,7 +147,7 @@ const IndexContent = () => {
       tabSwitchCounter.current++;
       // Note: we intentionally do NOT flush caches or trigger a global
       // refresh on tab switches anymore. That caused every heavy module
-      // (desirable-assets, risk, deep-intel, etc.) to refire concurrently
+      // (opportunity-engine, risk, deep-intel, etc.) to refire concurrently
       // and stampede the backend, leading to "Unable to reach service"
       // errors and the app feeling crashed. The per-module caches in
       // apiGovernor already serve fresh-enough data; users can hit the
@@ -815,10 +815,10 @@ const IndexContent = () => {
               {activeTab === "desirable" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-16">
                   <ModuleErrorBoundary
-                    title="Desirable Assets module recovered"
-                    description="The recommendations board hit a render error. Retry will remount just this module."
+                    title="Discover module recovered"
+                    description="The opportunity board hit a render error. Retry will remount just this module."
                   >
-                    <DesirableAssets key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
+                    <Discover key={refreshKey} stocks={stocks} onAddToPortfolio={handleAnalyze} />
                   </ModuleErrorBoundary>
                 </div>
               )}
