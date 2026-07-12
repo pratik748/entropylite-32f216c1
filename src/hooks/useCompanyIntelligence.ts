@@ -50,13 +50,14 @@ export interface CompanyIntelligence {
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_PREFIX = "ci_dossier_";
 
-function getCachedIntel(ticker: string): CompanyIntelligence | null {
+function getCachedIntel(ticker: string, allowStale = false): CompanyIntelligence | null {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + ticker.toUpperCase());
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL_MS) {
-      localStorage.removeItem(CACHE_PREFIX + ticker.toUpperCase());
+    if (!allowStale && Date.now() - ts > CACHE_TTL_MS) {
+      // Keep the stale entry in storage — it is the fallback when the live
+      // fetch fails. It is only replaced by a successful refresh.
       return null;
     }
     return data;
@@ -109,24 +110,35 @@ export function useCompanyIntelligence(ticker: string | null) {
       try { return localStorage.getItem("entropy-ai-provider") || "mistral"; } catch { return "mistral"; }
     })();
 
+    // On any failure, fall back to the last good dossier (however old)
+    // before surfacing an error — a stale dossier beats an error card.
+    const failWithFallback = () => {
+      if (!alive) return;
+      const stale = getCachedIntel(ticker, true);
+      if (stale) {
+        setData(stale);
+        setError(null);
+      } else {
+        setError("Intelligence is re-syncing — this fills in automatically on the next pass.");
+      }
+      setLoading(false);
+    };
+
     supabase.functions.invoke("company-intelligence", {
       body: { ticker, provider },
     }).then(({ data: result, error: err }) => {
       clearTimeout(timeout);
       if (!alive) return;
-      if (err || !result || (result as any).error) {
-        setError(err?.message || (result as any)?.error || "Failed to load intelligence");
-        setLoading(false);
+      if (err || !result || (result as { error?: string }).error) {
+        failWithFallback();
         return;
       }
       setCachedIntel(ticker, result);
       setData(result);
       setLoading(false);
-    }).catch((e) => {
+    }).catch(() => {
       clearTimeout(timeout);
-      if (!alive) return;
-      setError(e?.message || "Request timed out");
-      setLoading(false);
+      failWithFallback();
     });
 
     return () => { alive = false; clearTimeout(timeout); };

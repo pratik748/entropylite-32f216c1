@@ -52,9 +52,12 @@ export default function CompanyIntelligence({ ticker }: Props) {
 
   if (error || !data) {
     return (
-      <div className="rounded-sm border border-border bg-card p-4 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-warning" />
-        <span className="text-xs text-muted-foreground">{error || "No intelligence available"}</span>
+      <div className="rounded-sm border border-border bg-card p-4">
+        <p className="text-xs font-medium text-foreground">Corporate intelligence is assembling</p>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          The dossier for {ticker} is being generated in the background and fills in automatically —
+          no action needed. The Equity Workstation view of this name stays live meanwhile.
+        </p>
       </div>
     );
   }

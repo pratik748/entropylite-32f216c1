@@ -119,14 +119,6 @@ export const TOUR_STEPS: TourStep[] = [
     side: "bottom",
     mobile: true,
   },
-  {
-    id: "status",
-    selector: '[data-tour="status-bar"]',
-    title: "System status — engine pulse",
-    body: "Live data health: price-feed latency, engine queue depth, market-hours flags (NYSE/LSE/NSE/TSE), refresh state. If something is stale, you'll see it here before it costs you.",
-    side: "top",
-    mobile: true,
-  },
 ];
 
 export const TOUR_FLAG_KEY = "entropy_tour_done_v2";

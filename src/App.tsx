@@ -19,6 +19,7 @@ import DisclaimerPage from "./pages/DisclaimerPage";
 import BackbonePage from "./pages/BackbonePage";
 import CadencePage from "./pages/CadencePage";
 import CadenceEntryPage from "./pages/CadenceEntryPage";
+import CompanyWorkstationPage from "./pages/CompanyWorkstationPage";
 
 const queryClient = new QueryClient();
 
@@ -107,6 +108,14 @@ const App = () => (
             element={
               <AuthGate>
                 <Index />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/company/:ticker/:workspaceId?/:sectionId?"
+            element={
+              <AuthGate>
+                <CompanyWorkstationPage />
               </AuthGate>
             }
           />
