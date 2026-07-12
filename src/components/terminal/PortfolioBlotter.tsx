@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { X, AlertTriangle, FileSearch } from "lucide-react";
+import { workstationPath } from "@/components/workstation/registry";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { type PriceStatusMap } from "@/pages/Index";
 import { type TickerThreat } from "@/hooks/useGeoIntelligence";
@@ -26,6 +28,7 @@ const THREAT_COLORS: Record<string, string> = {
 };
 
 const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus, tickerThreats }: PortfolioBlotterProps) => {
+  const navigate = useNavigate();
   const { baseCurrency, convertToBase } = useFX();
   const [flashMap, setFlashMap] = useState<Record<string, "gain" | "loss">>({});
   const prevPrices = useRef<Record<string, number>>({});
@@ -116,8 +119,15 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                       </span>
                     )}
                     <button
+                      onClick={(e) => { e.stopPropagation(); navigate(workstationPath(s.ticker)); }}
+                      className="ml-auto opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-surface-3 hover:text-foreground text-muted-foreground"
+                      title="Open Equity Workstation"
+                    >
+                      <FileSearch className="w-3 h-3" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); onRemoveStock(s.id); }}
-                      className="ml-auto opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-loss/10 hover:text-loss text-muted-foreground"
+                      className="opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-loss/10 hover:text-loss text-muted-foreground"
                       title="Remove"
                     >
                       <X className="w-3 h-3" />

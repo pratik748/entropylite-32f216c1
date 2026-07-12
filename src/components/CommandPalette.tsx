@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
 import { emitUIEvent } from "@/foresight/uiBus";
-import { Command, LogOut, Zap } from "lucide-react";
+import { Command, FileSearch, LogOut, Zap } from "lucide-react";
 
 export interface PaletteTab {
   id: string;
@@ -24,13 +24,16 @@ interface CommandPaletteProps {
   onSelectTab: (id: string) => void;
   onOpenBrief?: () => void;
   onToggleDirectProfit: () => void;
+  /** Tickers with analysis — each gets an "open workstation" command. */
+  workstationTickers?: string[];
+  onOpenWorkstation?: (ticker: string) => void;
 }
 
 /**
  * ⌘K command palette — Spotlight for the terminal. Every screen and key
  * action, one keystroke away. Also opens with Ctrl+K.
  */
-const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit }: CommandPaletteProps) => {
+const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit, workstationTickers, onOpenWorkstation }: CommandPaletteProps) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -62,6 +65,23 @@ const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit }
             </CommandItem>
           ))}
         </CommandGroup>
+        {onOpenWorkstation && (workstationTickers?.length ?? 0) > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Equity Workstation">
+              {workstationTickers!.map((ticker) => (
+                <CommandItem
+                  key={ticker}
+                  value={`Workstation ${ticker}`}
+                  onSelect={() => run(() => onOpenWorkstation(ticker))}
+                >
+                  <FileSearch className="mr-2 h-4 w-4 text-muted-foreground" />
+                  Open workstation — {ticker}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
         <CommandSeparator />
         <CommandGroup heading="Actions">
           <CommandItem value="Ask Foresight" onSelect={() => run(() => emitUIEvent("open_surface", {}))}>

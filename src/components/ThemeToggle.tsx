@@ -41,7 +41,7 @@ const ThemeToggle = () => {
       onClick={cycle}
       whileTap={{ scale: 0.92 }}
       whileHover={{ scale: 1.05 }}
-      className="hidden sm:flex fixed bottom-9 right-3 z-50 items-center gap-1.5 rounded-full glass-thick px-3 py-1.5 shadow-soft-lg text-[11px] font-medium tracking-tight text-muted-foreground hover:text-foreground transition-colors"
+      className="hidden sm:flex fixed bottom-3 right-3 z-50 items-center gap-1.5 rounded-full glass-thick px-3 py-1.5 shadow-soft-lg text-[11px] font-medium tracking-tight text-muted-foreground hover:text-foreground transition-colors"
       title={`Theme: ${labels[theme]}`}
     >
       <AnimatePresence mode="wait">

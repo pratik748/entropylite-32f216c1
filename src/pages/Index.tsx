@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
@@ -8,22 +9,13 @@ import DirectProfitMode from "@/components/DirectProfitMode";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
-import StockSummary from "@/components/StockSummary";
-import NewsImpactTable from "@/components/NewsImpactTable";
-import RiskIndicator from "@/components/RiskIndicator";
-import SimulationTable from "@/components/SimulationTable";
-import MonteCarloChart from "@/components/MonteCarloChart";
-import ProfitTaskbar from "@/components/ProfitTaskbar";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
 
-import Recommendation from "@/components/Recommendation";
 import LoadingState from "@/components/LoadingState";
-import PortfolioChart from "@/components/PortfolioChart";
-import PnLWaterfall from "@/components/charts/PnLWaterfall";
+import DeskAnalysisStack from "@/components/DeskAnalysisStack";
 import type { HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
-import CompanyIntelligence from "@/components/CompanyIntelligence";
 import StatArbEngine from "@/components/sandbox/StatArbEngine";
 import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
@@ -34,7 +26,6 @@ import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import TickerStrip from "@/components/terminal/TickerStrip";
-import SystemStatusBar from "@/components/terminal/SystemStatusBar";
 import ThemeToggle from "@/components/ThemeToggle";
 import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
@@ -83,6 +74,7 @@ const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const IndexContent = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
@@ -507,6 +499,8 @@ const IndexContent = () => {
         tabs={tabs}
         onSelectTab={(id) => handleTabSwitch(id as Tab)}
         onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
+        workstationTickers={stocks.filter((s) => s.analysis).map((s) => s.ticker)}
+        onOpenWorkstation={(ticker) => navigate(`/company/${encodeURIComponent(ticker)}`)}
       />
       <TerminalTour
         open={tourOpen}
@@ -605,70 +599,25 @@ const IndexContent = () => {
               )}
 
           {/* Main Content, fills all remaining space, above the status bar */}
-          <main className="flex-1 min-h-0 pb-7 overflow-auto no-touch-bounce">
+          <main className="flex-1 min-h-0 overflow-auto no-touch-bounce">
             <PageTransition tabKey={activeTab}>
               {activeTab === "dashboard" &&
                 (isMobile ? (
                   /* Mobile: stacked layout */
-                  <div className="p-1.5 space-y-1.5 pb-24">
+                  <div className="p-1.5 space-y-1.5 pb-20">
                     <div data-tour="stock-input">
                       <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
                     </div>
                     {effectiveLoading && <LoadingState />}
-                    {analysis && !effectiveLoading && (
-                      <>
-                        <StockSummary
-                          ticker={analysis.ticker}
-                          currentPrice={analysis.currentPrice}
-                          buyPrice={analysis.buyPrice}
-                          quantity={analysis.quantity}
-                          currency={analysis.currency}
-                        />
-                        <MonteCarloChart
-                          currentPrice={analysis.currentPrice}
-                          bullRange={analysis.bullRange}
-                          bearRange={analysis.bearRange}
-                          ticker={analysis.ticker}
-                        />
-                        <NewsImpactTable
-                          news={analysis.news || []}
-                          overallSentiment={analysis.overallSentiment}
-                          totalPressure={analysis.totalPressure}
-                        />
-                        <SimulationTable
-                          currentPrice={analysis.currentPrice}
-                          bullRange={analysis.bullRange}
-                          neutralRange={analysis.neutralRange}
-                          bearRange={analysis.bearRange}
-                          currency={analysis.currency}
-                        />
-                        <Recommendation
-                          summary={analysis.summary}
-                          suggestion={analysis.suggestion}
-                          confidence={analysis.confidence}
-                          confidenceReasoning={analysis.confidenceReasoning}
-                          macroFactors={analysis.macroFactors}
-                          verdict={analysis.verdict}
-                          hedgeStrategy={analysis.hedgeStrategy}
-                          liveWebContext={(analysis as any).liveWebContext}
-                        />
-                        <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />
-                        <CompanyIntelligence ticker={analysis.ticker} />
-                      </>
-                    )}
-                    {stocks.filter((s) => s.analysis).length > 1 && (
-                      <>
-                        <PortfolioChart stocks={stocks} onAssetTap={(ticker) => {
-                          const stock = stocks.find(s => s.ticker === ticker || s.ticker.replace(".NS", "").replace(".BO", "") === ticker);
-                          if (stock) {
-                            setActiveStockId(stock.id);
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                          }
-                        }} />
-                        <PnLWaterfall stocks={stocks} />
-                      </>
-                    )}
-
+                    <DeskAnalysisStack
+                      analysis={effectiveLoading ? null : analysis}
+                      stocks={stocks}
+                      isMobile
+                      onSelectTicker={(ticker) => {
+                        const stock = stocks.find(s => s.ticker === ticker || s.ticker.replace(".NS", "").replace(".BO", "") === ticker);
+                        if (stock) setActiveStockId(stock.id);
+                      }}
+                    />
                   </div>
                 ) : (
                   /* Desktop: Bloomberg-style resizable 3-column layout */
@@ -714,69 +663,11 @@ const IndexContent = () => {
                               </div>
                             )}
                             {effectiveLoading && <LoadingState />}
-                            {analysis && !effectiveLoading && (
-                              <>
-                                <StockSummary
-                                  ticker={analysis.ticker}
-                                  currentPrice={analysis.currentPrice}
-                                  buyPrice={analysis.buyPrice}
-                                  quantity={analysis.quantity}
-                                  currency={analysis.currency}
-                                />
-                                <MonteCarloChart
-                                  currentPrice={analysis.currentPrice}
-                                  bullRange={analysis.bullRange}
-                                  bearRange={analysis.bearRange}
-                                  ticker={analysis.ticker}
-                                />
-                                <NewsImpactTable
-                                  news={analysis.news || []}
-                                  overallSentiment={analysis.overallSentiment}
-                                  totalPressure={analysis.totalPressure}
-                                />
-                                <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
-                                  <SimulationTable
-                                    currentPrice={analysis.currentPrice}
-                                    bullRange={analysis.bullRange}
-                                    neutralRange={analysis.neutralRange}
-                                    bearRange={analysis.bearRange}
-                                    currency={analysis.currency}
-                                  />
-                                  <Recommendation
-                                    summary={analysis.summary}
-                                    suggestion={analysis.suggestion}
-                                    confidence={analysis.confidence}
-                                    confidenceReasoning={analysis.confidenceReasoning}
-                                    macroFactors={analysis.macroFactors}
-                                    verdict={analysis.verdict}
-                                    hedgeStrategy={analysis.hedgeStrategy}
-                          liveWebContext={(analysis as any).liveWebContext}
-                                  />
-                                </div>
-                              </>
-                            )}
-                            {stocks.filter((s) => s.analysis).length > 1 && (
-                              <div className="grid gap-3 grid-cols-1 lg:grid-cols-2">
-                                <PortfolioChart stocks={stocks} />
-                                <PnLWaterfall stocks={stocks} />
-                              </div>
-                            )}
-                            {analysis && <RiskIndicator level={analysis.riskLevel} keyRisks={analysis.keyRisks} />}
-                            {analysis && <CompanyIntelligence ticker={analysis.ticker} />}
-                            {analysis && (
-                              <ProfitTaskbar
-                                ticker={analysis.ticker}
-                                currentPrice={analysis.currentPrice}
-                                buyPrice={analysis.buyPrice}
-                                quantity={analysis.quantity}
-                                suggestion={analysis.suggestion}
-                                confidence={analysis.confidence}
-                                bullRange={analysis.bullRange}
-                                bearRange={analysis.bearRange}
-                                riskLevel={analysis.riskLevel}
-                                currency={(analysis as any).currency}
-                              />
-                            )}
+                            <DeskAnalysisStack
+                              analysis={effectiveLoading ? null : analysis}
+                              stocks={stocks}
+                              isMobile={false}
+                            />
                           </div>
                         </ResizablePanel>
                       </ResizablePanelGroup>
@@ -798,27 +689,27 @@ const IndexContent = () => {
                 ))}
 
               {activeTab === "market" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <MarketOverview key={refreshKey} />
                 </div>
               )}
               {activeTab === "augment" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <AugmentDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "sandbox" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <EntropySandbox key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "statarb" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <StatArbEngine key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "geopolitical" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <ModuleErrorBoundary
                     title="Geopolitical module recovered"
                     description="The live geopolitics panel hit a render error. Retry keeps the rest of the terminal running."
@@ -836,7 +727,7 @@ const IndexContent = () => {
                 </div>
               )}
               {activeTab === "desirable" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <ModuleErrorBoundary
                     title="Desirable Assets module recovered"
                     description="The recommendations board hit a render error. Retry will remount just this module."
@@ -846,12 +737,12 @@ const IndexContent = () => {
                 </div>
               )}
               {activeTab === "risk" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <RiskDashboard key={refreshKey} stocks={stocks} />
                 </div>
               )}
               {activeTab === "fortress" && (
-                <div className="px-3 sm:container py-3 sm:py-5 pb-16">
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
                 </div>
               )}
@@ -867,7 +758,7 @@ const IndexContent = () => {
             <motion.div
               initial={{ y: 32, opacity: 0 }}
               animate={{ y: 0, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 30 } }}
-              className="fixed inset-x-0 bottom-9 z-30 flex justify-center px-6 pointer-events-none"
+              className="fixed inset-x-0 bottom-4 z-30 flex justify-center px-6 pointer-events-none"
             >
               <div className="pointer-events-auto flex items-center gap-1 rounded-full glass-thick p-1.5 shadow-soft-xl">
                 <Sheet>
@@ -924,8 +815,6 @@ const IndexContent = () => {
             </motion.div>
           )}
 
-          {/* System Status Bar */}
-          <SystemStatusBar stockCount={stocks.filter((s) => s.analysis).length} />
           <ThemeToggle />
         </>
       )}

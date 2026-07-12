@@ -1,8 +1,10 @@
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getCurrencySymbol, formatCurrency, resolveAssetCurrency } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
 import { springGentle } from "@/lib/motion";
+import { workstationPath } from "@/components/workstation/registry";
 
 interface StockSummaryProps {
   ticker: string;
@@ -37,7 +39,14 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
       {/* Ticker + live price, Apple Stocks hierarchy */}
       <div className="mb-4 sm:mb-5 flex items-start justify-between">
         <div className="min-w-0">
-          <p className="text-headline text-foreground">{ticker}</p>
+          <Link
+            to={workstationPath(ticker)}
+            title={`Open Equity Workstation — ${ticker}`}
+            className="group inline-flex items-center gap-1 text-headline text-foreground transition-colors hover:text-muted-foreground"
+          >
+            {ticker}
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" strokeWidth={2} />
+          </Link>
           <p className="mt-1.5 text-title-1 text-foreground tabular">{formatCurrency(currentPrice, assetCurrency)}</p>
           <p className="mt-0.5 text-caption-1 text-muted-foreground">
             {assetCurrency}
