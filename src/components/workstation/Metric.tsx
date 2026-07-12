@@ -27,7 +27,7 @@ export const GradeDot = ({ grade }: { grade: Grade }) => (
 
 export const ProvenanceChip = ({ provenance }: { provenance: EvidenceMetric["provenance"] }) => (
   <span
-    className={`rounded border px-1.5 py-px text-[9.5px] font-medium uppercase tracking-[0.08em] ${
+    className={`rounded-sm border px-1.5 py-px font-mono text-[9px] font-medium uppercase tracking-[0.1em] ${
       provenance === "reported" || provenance === "computed"
         ? "border-border text-muted-foreground"
         : "border-warning/40 text-warning"
@@ -46,7 +46,23 @@ export const ProvenanceChip = ({ provenance }: { provenance: EvidenceMetric["pro
   </span>
 );
 
-/** Stat tile — the primary evidence card. */
+/**
+ * Data matrix — stat cells separated by hairline rules, the terminal grid.
+ * Wrap MetricStat cells (or any cell) in this instead of a gap grid.
+ */
+export const MetricGrid = ({
+  children,
+  cols = "grid-cols-2 sm:grid-cols-3",
+}: {
+  children: React.ReactNode;
+  cols?: string;
+}) => (
+  <div className={`grid ${cols} gap-px overflow-hidden rounded-sm border border-border/80 bg-border/70`}>
+    {children}
+  </div>
+);
+
+/** Stat cell — the primary evidence unit, designed to sit inside MetricGrid. */
 export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
   const { graph, select, selectedId } = useEvidence();
   const active = selectedId === metric.id;
@@ -54,19 +70,17 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
     <button
       onClick={() => select(metric.id)}
       aria-pressed={active}
-      className={`group flex min-w-0 flex-col rounded-lg border px-3 py-2.5 text-left transition-colors ${
-        active
-          ? "border-foreground/25 bg-surface-3"
-          : "border-border/70 bg-card hover:border-border hover:bg-surface-2"
+      className={`group flex min-w-0 flex-col px-3 py-2.5 text-left transition-colors ${
+        active ? "bg-surface-3" : "bg-card hover:bg-surface-2"
       }`}
     >
       <span className="flex items-center gap-1.5">
         <GradeDot grade={metric.assessment.grade} />
-        <span className="truncate text-[11px] font-medium tracking-tight text-muted-foreground">
+        <span className="truncate font-mono text-[9.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {metric.label}
         </span>
       </span>
-      <span className="mt-1 text-[17px] font-semibold tabular-nums tracking-tight text-foreground">
+      <span className="mt-1 font-mono text-[16px] font-semibold tabular-nums tracking-tight text-foreground">
         {formatMetricValue(metric, graph.currency)}
       </span>
       <span className={`mt-0.5 line-clamp-2 text-[11px] leading-snug ${gradeText[metric.assessment.grade]}`}>
@@ -92,10 +106,10 @@ export const MetricRow = ({ metric, trailing }: { metric: EvidenceMetric; traili
       <span className="min-w-0 flex-1 truncate text-[12.5px] tracking-tight text-foreground">
         {metric.label}
       </span>
-      <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-foreground">
+      <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums text-foreground">
         {formatMetricValue(metric, graph.currency)}
       </span>
-      <span className={`w-16 shrink-0 text-right text-[11px] tabular-nums ${trailingColor(metric, trailing)}`}>
+      <span className={`w-16 shrink-0 text-right font-mono text-[10.5px] tabular-nums ${trailingColor(metric, trailing)}`}>
         {trailing ?? weightLabel(metric.thesisWeight)}
       </span>
     </button>

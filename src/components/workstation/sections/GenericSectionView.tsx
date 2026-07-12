@@ -1,6 +1,6 @@
 import type { SectionDef, WorkspaceDef } from "../registry";
 import { useEvidence } from "../EvidenceContext";
-import { MetricRow, MetricStat } from "../Metric";
+import { MetricGrid, MetricRow, MetricStat } from "../Metric";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 
@@ -18,11 +18,11 @@ const GenericSectionView = ({ workspace, section }: { workspace: WorkspaceDef; s
   if (data.bootstrapping) {
     return (
       <SectionShell workspace={workspace} section={section}>
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <MetricGrid>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[86px] animate-pulse rounded-lg border border-border/50 bg-surface-2" />
+            <div key={i} className="h-[86px] animate-pulse bg-surface-2" />
           ))}
-        </div>
+        </MetricGrid>
         <p className="text-center text-[11px] text-muted-foreground/70 animate-breathe">
           Running the evidence engines for {data.status.analysis.state === "loading" ? "fundamentals, " : ""}
           price structure and the dossier…
@@ -34,11 +34,11 @@ const GenericSectionView = ({ workspace, section }: { workspace: WorkspaceDef; s
   return (
     <SectionShell workspace={workspace} section={section}>
       {tiles.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <MetricGrid>
           {tiles.map((m) => (
             <MetricStat key={m.id} metric={m} />
           ))}
-        </div>
+        </MetricGrid>
       )}
       {rest.length > 0 && (
         <Block title="Further evidence">

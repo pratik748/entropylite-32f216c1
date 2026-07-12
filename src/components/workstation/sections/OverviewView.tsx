@@ -25,10 +25,10 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
     return (
       <SectionShell workspace={workspace} section={section} wide>
         <div className="space-y-3">
-          <div className="h-24 animate-pulse rounded-xl border border-border/50 bg-surface-2" />
-          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+          <div className="h-24 animate-pulse rounded-sm border border-border/50 bg-surface-2" />
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border/50 bg-border/50 sm:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-20 animate-pulse rounded-lg border border-border/50 bg-surface-2" />
+              <div key={i} className="h-20 animate-pulse bg-surface-2" />
             ))}
           </div>
           <p className="text-center text-[11px] text-muted-foreground/70 animate-breathe">
@@ -63,11 +63,11 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
       <Block>
         <div className="flex flex-wrap items-center gap-2.5">
           <span
-            className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${ACTION_TONE[synthesis.action]}`}
+            className={`rounded-sm border px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.1em] ${ACTION_TONE[synthesis.action]}`}
           >
             {synthesis.action}
           </span>
-          <span className="text-[11.5px] tabular-nums text-muted-foreground">
+          <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
             confidence {synthesis.confidence}% · {graph.coverage.total} evidence nodes ·{" "}
             {graph.coverage.estimated} estimated
           </span>
@@ -82,8 +82,8 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
         </div>
       </Block>
 
-      {/* Pillars */}
-      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+      {/* Pillars — hairline matrix */}
+      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border/80 bg-border/70 sm:grid-cols-6">
         {synthesis.pillars.map((p) => {
           const top = p.nodeIds
             .map((id) => graph.metrics[id])
@@ -93,13 +93,13 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
               key={p.pillar}
               onClick={() => top && select(top.id)}
               title={top ? `Strongest evidence: ${top.label}` : "No evidence yet"}
-              className="flex flex-col rounded-lg border border-border/70 bg-card px-3 py-2.5 text-left transition-colors hover:border-border hover:bg-surface-2"
+              className="flex flex-col bg-card px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
             >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
                 {p.label}
               </span>
               <span
-                className={`mt-1 text-[19px] font-semibold tabular-nums ${
+                className={`mt-1 font-mono text-[18px] font-semibold tabular-nums ${
                   p.score >= 70 ? "text-gain" : p.score <= 38 ? "text-loss" : "text-foreground"
                 }`}
               >
@@ -164,7 +164,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
             <span
               key={b.id}
               title={b.detail}
-              className={`rounded-md border px-2 py-1 text-[10.5px] tracking-tight ${
+              className={`rounded-sm border px-2 py-1 font-mono text-[10px] tracking-tight ${
                 b.state === "tripped"
                   ? "border-loss/50 text-loss"
                   : b.state === "watch"

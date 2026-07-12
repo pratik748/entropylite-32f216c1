@@ -59,7 +59,7 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
       <div className="flex items-baseline gap-2">
         {quote ? (
           <>
-            <span className="text-[14px] font-semibold tabular-nums text-foreground">
+            <span className="font-mono text-[13.5px] font-semibold tabular-nums text-foreground">
               {formatCurrency(quote.price, quote.currency)}
             </span>
             <span className="text-[11px] text-muted-foreground">{quote.currency}</span>
@@ -75,7 +75,7 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
 
       {hasEvidence && (
         <span
-          className={`hidden rounded-md border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] sm:inline ${ACTION_STYLE[synthesis.action]}`}
+          className={`hidden rounded-sm border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] sm:inline ${ACTION_STYLE[synthesis.action]}`}
           title={synthesis.headline}
         >
           {synthesis.action} · {synthesis.confidence}%
@@ -85,13 +85,13 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
       <div className="ml-auto flex items-center gap-3 sm:gap-4">
         {hasEvidence && (
           <span
-            className="hidden text-[11px] tabular-nums text-muted-foreground md:inline"
+            className="hidden font-mono text-[10px] tabular-nums text-muted-foreground md:inline"
             title="Evidence nodes in the graph; estimated/model nodes carry amber provenance chips"
           >
             {graph.coverage.total} nodes · {graph.coverage.estimated} est.
           </span>
         )}
-        <span className="hidden text-[11px] tabular-nums text-muted-foreground lg:inline" title="Last successful price update (UTC)">
+        <span className="hidden font-mono text-[10px] tabular-nums text-muted-foreground lg:inline" title="Last successful price update (UTC)">
           {priceFreshness ? `prices ${priceFreshness} UTC` : status.quote.state === "cached" ? "prices · last known" : "prices —"}
         </span>
         <button

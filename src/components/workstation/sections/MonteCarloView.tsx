@@ -1,6 +1,6 @@
 import type { SectionDef, WorkspaceDef } from "../registry";
 import { useEvidence } from "../EvidenceContext";
-import { MetricStat } from "../Metric";
+import { MetricGrid, MetricStat } from "../Metric";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import { formatCurrency } from "@/lib/currency";
 import SectionShell from "./SectionShell";
@@ -38,7 +38,7 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
           </Block>
         </>
       ) : data.status.analysis.state === "loading" ? (
-        <div className="h-56 animate-pulse rounded-xl border border-border/50 bg-surface-2" />
+        <div className="h-56 animate-pulse rounded-sm border border-border/50 bg-surface-2" />
       ) : (
         <Block title="Simulation">
           <p className="text-[12.5px] leading-relaxed text-muted-foreground">
@@ -49,11 +49,11 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
       )}
 
       {metrics.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <MetricGrid>
           {metrics.map((m) => (
             <MetricStat key={m.id} metric={m} />
           ))}
-        </div>
+        </MetricGrid>
       ) : (
         !hasRanges && <PendingEvidence section={section} />
       )}
@@ -62,9 +62,9 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
 };
 
 const BandTile = ({ label, lo, hi, currency, tone }: { label: string; lo: number; hi: number; currency: string; tone: "gain" | "loss" | "muted" }) => (
-  <div className="rounded-lg border border-border/60 px-3 py-2">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">{label}</p>
-    <p className={`mt-1 text-[12.5px] font-semibold tabular-nums ${tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-foreground"}`}>
+  <div className="rounded-sm border border-border/60 px-3 py-2">
+    <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">{label}</p>
+    <p className={`mt-1 font-mono text-[12px] font-semibold tabular-nums ${tone === "gain" ? "text-gain" : tone === "loss" ? "text-loss" : "text-foreground"}`}>
       {formatCurrency(lo, currency)} – {formatCurrency(hi, currency)}
     </p>
   </div>
