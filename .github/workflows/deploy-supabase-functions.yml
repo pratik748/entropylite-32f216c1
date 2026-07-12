@@ -1,0 +1,48 @@
+# Deploys Supabase Edge Functions on every merge to main.
+#
+# Why this exists: this repo's frontend auto-deploys via Netlify/Vercel on
+# push, but NOTHING deployed `supabase/functions` — so new functions (e.g.
+# opportunity-engine) 404'd in production even after merging.
+#
+# One-time setup (repo owner, ~1 minute, no Lovable needed):
+#   1. Create a personal access token at
+#      https://supabase.com/dashboard/account/tokens
+#   2. Add it as a repository secret named SUPABASE_ACCESS_TOKEN at
+#      https://github.com/pratik748/entropylite-32f216c1/settings/secrets/actions
+#   3. Re-run this workflow from the Actions tab (or merge any change).
+
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: reprphurmjtveejeqejn
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require SUPABASE_ACCESS_TOKEN secret
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN repository secret is not set."
+            echo "::error::Create a token at https://supabase.com/dashboard/account/tokens and add it under Settings → Secrets and variables → Actions, then re-run this workflow."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Deploys every function under supabase/functions, honoring
+      # config.toml verify_jwt settings. The repo is the source of truth.
+      - name: Deploy all edge functions
+        run: supabase functions deploy --project-ref "$PROJECT_REF"

@@ -394,10 +394,9 @@ export interface PipelineDiagnostics {
 
 export interface EngineResponse {
   asOf: string;
-  /** Where the pipeline ran. "local_fallback" = same code executed in the
-   *  browser against the deployed data proxies (reduced universe) because
-   *  the opportunity-engine function isn't deployed yet. */
-  executionVenue: "edge" | "local_fallback";
+  /** Where the pipeline ran. Always the edge function — there is no
+   *  client-side fallback venue. */
+  executionVenue: "edge";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
   /** Classified market environment (trend / volatility / risk axes). Influences
    *  confidence, never model direction. Present from the Market Context module. */

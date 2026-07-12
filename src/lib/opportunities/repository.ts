@@ -6,7 +6,6 @@
 // object, with the same score, everywhere else.
 
 import { governedInvoke } from "@/lib/apiGovernor";
-import { runLocalEngine } from "./localEngine";
 import { updateLifecycle } from "./lifecycle";
 import type { EngineResponse } from "./types";
 
@@ -92,18 +91,25 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: num
   );
 }
 
+/** Translate transport errors into something the user can act on. */
+function engineError(error: unknown): Error {
+  const status = (error as { context?: { status?: number } } | null)?.context?.status;
+  const message = (error as Error | null)?.message || "";
+  if (status === 404 || /not.?found/i.test(message)) {
+    return new Error(
+      "The opportunity-engine function is not deployed on this Supabase project. " +
+      "Merge to main with the SUPABASE_ACCESS_TOKEN repo secret configured (see .github/workflows/deploy-supabase-functions.yml) " +
+      "or run: supabase functions deploy opportunity-engine",
+    );
+  }
+  return new Error(message || "Opportunity engine unreachable.");
+}
+
 /**
  * Fetch (or reuse) the engine's validated opportunity set. All consumers
  * share one inflight request and one cache entry — server-side filters are
  * intentionally NOT passed here so every module sees the identical slate;
  * use `filterOpportunities` for per-module views.
- *
- * Execution venues, tried in order:
- *   1. The `opportunity-engine` edge function (full universe).
- *   2. The SAME pipeline executed locally against the deployed
- *      `historical-prices` proxy (reduced universe) — used automatically
- *      while the edge function isn't deployed. Marked in the response as
- *      executionVenue: "local_fallback".
  */
 export async function fetchOpportunities(opts: {
   indiaMode: boolean;
@@ -116,9 +122,6 @@ export async function fetchOpportunities(opts: {
   if (inflight) return inflight;
 
   inflight = (async () => {
-    let response: EngineResponse | null = null;
-    let edgeError: Error | null = null;
-
     const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
       body: {
         mode: "discover",
@@ -128,24 +131,10 @@ export async function fetchOpportunities(opts: {
       cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h${horizonDays}|${portfolioHash()}`,
       force: opts.force,
     });
-    if (!error && data && Array.isArray(data.opportunities)) {
-      response = data;
-    } else {
-      edgeError = new Error((error as Error | null)?.message || "Opportunity engine unreachable.");
-      // Edge venue unavailable (typically: function not deployed yet) —
-      // run the same pipeline locally against the deployed data proxies.
-      try {
-        response = await runLocalEngine({
-          indiaMode: opts.indiaMode,
-          horizonDays,
-          portfolio: portfolioContext,
-        });
-      } catch {
-        response = null;
-      }
+    if (error || !data || !Array.isArray(data.opportunities)) {
+      throw engineError(error);
     }
-
-    if (!response) throw edgeError ?? new Error("Opportunity engine unreachable.");
+    const response = data;
 
     const snapshot: Snapshot = { response, fetchedAt: Date.now(), indiaMode: opts.indiaMode, horizonDays };
     current = snapshot;
