@@ -487,6 +487,18 @@
     animation: breathe 2.4s var(--ease-out-quart) infinite;
   }
 
+  /* Workstation indeterminate load bar — thin sweep under the context bar */
+  @keyframes ws-loadbar-kf {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(420%); }
+  }
+  .ws-loadbar {
+    animation: ws-loadbar-kf 1.4s var(--ease-out-quart) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ws-loadbar { animation: breathe 2.4s var(--ease-out-quart) infinite; transform: none; width: 100%; }
+  }
+
   /* Terminal flash animations */
   @keyframes flash-green-kf {
     0% { background-color: hsl(var(--gain) / 0.22); }
