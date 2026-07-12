@@ -1,61 +1,37 @@
-import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, PanelRight } from "lucide-react";
-import { governedInvoke } from "@/lib/apiGovernor";
 import { formatCurrency } from "@/lib/currency";
+import type { Action } from "@/lib/evidence/types";
+import { useEvidence } from "./EvidenceContext";
 
 interface ContextBarProps {
-  ticker: string;
   inspectorOpen: boolean;
   onToggleInspector: () => void;
 }
 
-interface LivePrice {
-  price: number;
-  currency: string;
-  asOf: number;
-}
+const ACTION_STYLE: Record<Action, string> = {
+  ACCUMULATE: "border-gain/50 text-gain",
+  HOLD: "border-border text-muted-foreground",
+  REDUCE: "border-warning/50 text-warning",
+  AVOID: "border-loss/50 text-loss",
+};
 
 /**
- * Workstation context bar — company identity, live price and data freshness.
- * Always visible; carries the decision-relevant status that used to be
- * scattered in the bottom status strip (feed freshness, provenance counts).
+ * Workstation context bar — identity, live price, the evidence-weighted
+ * verdict, and the decision-relevant status that replaced the old bottom
+ * strip: per-feed freshness and evidence provenance counts.
  */
-const ContextBar = ({ ticker, inspectorOpen, onToggleInspector }: ContextBarProps) => {
-  const [live, setLive] = useState<LivePrice | null>(null);
-  const [stale, setStale] = useState(false);
-  const aliveRef = useRef(true);
+const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
+  const { ticker, data, graph, synthesis } = useEvidence();
+  const { quote, status } = data;
 
-  useEffect(() => {
-    aliveRef.current = true;
-    setLive(null);
-    setStale(false);
+  const companyName: string | null = data.dossier?.companyName ?? null;
+  const hasEvidence = graph.coverage.total > 0;
 
-    const refresh = async () => {
-      try {
-        const { data, error } = await governedInvoke("price-feed", { body: { tickers: [ticker] } });
-        if (!aliveRef.current) return;
-        const quote = data?.prices?.[ticker];
-        if (!error && quote?.price > 0) {
-          setLive({ price: quote.price, currency: quote.currency || "USD", asOf: Date.now() });
-          setStale(false);
-        } else {
-          setStale(true);
-        }
-      } catch {
-        if (aliveRef.current) setStale(true);
-      }
-    };
-
-    refresh();
-    const interval = setInterval(refresh, 15000);
-    return () => {
-      aliveRef.current = false;
-      clearInterval(interval);
-    };
-  }, [ticker]);
-
-  const freshness = live ? new Date(live.asOf).toISOString().slice(11, 19) : null;
+  const priceFreshness =
+    status.quote.state === "live" && status.quote.fetchedAt
+      ? new Date(status.quote.fetchedAt).toISOString().slice(11, 19)
+      : null;
 
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-border/70 bg-surface-1/60 px-3 py-2 sm:gap-4 sm:px-4">
@@ -69,28 +45,50 @@ const ContextBar = ({ ticker, inspectorOpen, onToggleInspector }: ContextBarProp
 
       <div className="flex min-w-0 items-baseline gap-2.5">
         <span className="text-[15px] font-semibold tracking-tight text-foreground">{ticker}</span>
-        <span className="hidden text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70 sm:inline">
-          Equity Workstation
-        </span>
-      </div>
-
-      <div className="flex items-baseline gap-2">
-        {live ? (
-          <>
-            <span className="text-[14px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(live.price, live.currency)}
-            </span>
-            <span className="text-[11px] text-muted-foreground">{live.currency}</span>
-          </>
-        ) : (
-          <span className="text-[12px] text-muted-foreground">{stale ? "price unavailable" : "loading price…"}</span>
+        {companyName && (
+          <span className="hidden max-w-[180px] truncate text-[12px] text-muted-foreground lg:inline">
+            {companyName}
+          </span>
         )}
       </div>
 
+      <div className="flex items-baseline gap-2">
+        {quote ? (
+          <>
+            <span className="text-[14px] font-semibold tabular-nums text-foreground">
+              {formatCurrency(quote.price, quote.currency)}
+            </span>
+            <span className="text-[11px] text-muted-foreground">{quote.currency}</span>
+          </>
+        ) : status.quote.state === "loading" ? (
+          <span className="text-[12px] text-muted-foreground animate-breathe">syncing price…</span>
+        ) : (
+          <span className="text-[12px] text-muted-foreground" title="Live feed will resume automatically">
+            price syncing
+          </span>
+        )}
+      </div>
+
+      {hasEvidence && (
+        <span
+          className={`hidden rounded-md border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] sm:inline ${ACTION_STYLE[synthesis.action]}`}
+          title={synthesis.headline}
+        >
+          {synthesis.action} · {synthesis.confidence}%
+        </span>
+      )}
+
       <div className="ml-auto flex items-center gap-3 sm:gap-4">
-        <span className="hidden text-[11px] tabular-nums text-muted-foreground md:inline" title="Last successful price update (UTC)">
-          {freshness ? `prices ${freshness} UTC` : "prices —"}
-          {stale && live && <span className="text-warning"> · stale</span>}
+        {hasEvidence && (
+          <span
+            className="hidden text-[11px] tabular-nums text-muted-foreground md:inline"
+            title="Evidence nodes in the graph; estimated/model nodes carry amber provenance chips"
+          >
+            {graph.coverage.total} nodes · {graph.coverage.estimated} est.
+          </span>
+        )}
+        <span className="hidden text-[11px] tabular-nums text-muted-foreground lg:inline" title="Last successful price update (UTC)">
+          {priceFreshness ? `prices ${priceFreshness} UTC` : status.quote.state === "cached" ? "prices · last known" : "prices —"}
         </span>
         <button
           onClick={onToggleInspector}

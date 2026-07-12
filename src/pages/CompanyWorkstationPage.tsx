@@ -3,7 +3,8 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import ContextBar from "@/components/workstation/ContextBar";
 import SectionRail from "@/components/workstation/SectionRail";
 import InspectorPanel from "@/components/workstation/InspectorPanel";
-import SectionScaffold from "@/components/workstation/SectionScaffold";
+import SectionContent from "@/components/workstation/sections/SectionContent";
+import { EvidenceProvider } from "@/components/workstation/EvidenceContext";
 import {
   findSection,
   findWorkspace,
@@ -15,9 +16,9 @@ import { normalizeUserTicker } from "@/lib/ticker";
 /**
  * Equity Workstation — /company/:ticker/:workspaceId?/:sectionId?
  *
- * The dedicated surface for deep company analysis. Phase 0 ships the shell:
- * context bar (identity, live price, freshness), grouped section rail,
- * inspector slot, URL-addressable sections and [ / ] keyboard navigation.
+ * The dedicated surface for deep company analysis: evidence graph, grouped
+ * workspaces, cross-linking Inspector, live synthesis in the context bar,
+ * and [ / ] keyboard navigation across every section.
  */
 const CompanyWorkstationPage = () => {
   const { ticker: rawTicker, workspaceId, sectionId } = useParams();
@@ -57,20 +58,21 @@ const CompanyWorkstationPage = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <ContextBar
-        ticker={ticker}
-        inspectorOpen={inspectorOpen}
-        onToggleInspector={() => setInspectorOpen((open) => !open)}
-      />
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <SectionRail ticker={ticker} activeWorkspaceId={workspace.id} activeSectionId={section.id} />
-        <main className="no-touch-bounce min-w-0 flex-1 overflow-auto">
-          <SectionScaffold ticker={ticker} workspace={workspace} section={section} />
-        </main>
-        {inspectorOpen && <InspectorPanel />}
+    <EvidenceProvider ticker={ticker}>
+      <div className="flex h-screen flex-col overflow-hidden bg-background">
+        <ContextBar
+          inspectorOpen={inspectorOpen}
+          onToggleInspector={() => setInspectorOpen((open) => !open)}
+        />
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <SectionRail ticker={ticker} activeWorkspaceId={workspace.id} activeSectionId={section.id} />
+          <main className="no-touch-bounce min-w-0 flex-1 overflow-auto">
+            <SectionContent workspace={workspace} section={section} />
+          </main>
+          {inspectorOpen && <InspectorPanel />}
+        </div>
       </div>
-    </div>
+    </EvidenceProvider>
   );
 };
 
