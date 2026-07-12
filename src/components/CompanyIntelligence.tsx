@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { Building2, Link2, Users, Briefcase, Handshake, Swords, Package, Scale, TrendingUp, MessageCircle, Loader2, AlertTriangle, BarChart3 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Building2, Link2, Users, Briefcase, Handshake, Swords, Package, Scale, TrendingUp, MessageCircle, Loader2, AlertTriangle, BarChart3, FileSearch } from "lucide-react";
+import { workstationPath } from "@/components/workstation/registry";
 import { getCurrencySymbol } from "@/lib/currency";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -53,11 +55,22 @@ export default function CompanyIntelligence({ ticker }: Props) {
   if (error || !data) {
     return (
       <div className="rounded-sm border border-border bg-card p-4">
-        <p className="text-xs font-medium text-foreground">Corporate intelligence is assembling</p>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-          The dossier for {ticker} is being generated in the background and fills in automatically —
-          no action needed. The Equity Workstation view of this name stays live meanwhile.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-foreground">Corporate intelligence is assembling</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              The dossier for {ticker} is being generated in the background and fills in automatically —
+              no action needed. The Equity Workstation view of this name stays live meanwhile.
+            </p>
+          </div>
+          <Link
+            to={workstationPath(ticker)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-2"
+          >
+            <FileSearch className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Open Workstation
+          </Link>
+        </div>
       </div>
     );
   }
@@ -138,7 +151,16 @@ export default function CompanyIntelligence({ ticker }: Props) {
             </div>
           )}
           <Badge variant="outline" className="text-[9px]">{data.marketCap}</Badge>
-          <Badge variant="outline" className="text-[9px]">{data.employees} employees</Badge>
+          <Badge variant="outline" className="text-[9px] hidden sm:inline-flex">{data.employees} employees</Badge>
+          <Link
+            to={workstationPath(ticker)}
+            title="Open the full Equity Workstation — evidence graph, thesis, risk lab"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-2"
+          >
+            <FileSearch className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span className="hidden sm:inline">Equity Workstation</span>
+            <span className="sm:hidden">Workstation</span>
+          </Link>
         </div>
       </div>
 
