@@ -12,18 +12,18 @@ export const Block = ({
   children: ReactNode;
   action?: ReactNode;
 }) => (
-  <section className="rounded-xl border border-border/70 bg-card p-3.5 sm:p-4">
+  <section className="rounded-sm border border-border/80 bg-card">
     {(title || action) && (
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+      <div className="flex items-baseline justify-between gap-3 border-b border-border/60 px-3 py-1.5 sm:px-3.5">
         {title && (
-          <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <h2 className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {title}
           </h2>
         )}
         {action}
       </div>
     )}
-    {children}
+    <div className="p-3 sm:p-3.5">{children}</div>
   </section>
 );
 
@@ -34,7 +34,7 @@ export const ShareBar = ({ label, pct, detail }: { label: string; pct: number; d
     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
       <div className="h-full rounded-full bg-muted-foreground/60" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
     </div>
-    <span className="w-11 shrink-0 text-right text-[11.5px] tabular-nums text-foreground">
+    <span className="w-11 shrink-0 text-right font-mono text-[11px] tabular-nums text-foreground">
       {Math.round(pct)}%
     </span>
     {detail && <span className="hidden w-20 shrink-0 truncate text-right text-[10.5px] text-muted-foreground sm:inline">{detail}</span>}

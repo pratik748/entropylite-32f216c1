@@ -19,6 +19,8 @@ const CASE_EDGE: Record<ScenarioCase["id"], string> = {
   bear: "border-t-2 border-t-loss/60",
 };
 
+const caseCard = "rounded-sm border border-border/80 bg-card p-3.5";
+
 /** Thesis workspace — where all evidence converges. One view per section. */
 const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { graph, synthesis, data } = useEvidence();
@@ -109,14 +111,14 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
       <>
         <div className="grid gap-3 lg:grid-cols-3">
           {synthesis.cases.map((c) => (
-            <div key={c.id} className={`rounded-xl border border-border/70 bg-card p-3.5 ${CASE_EDGE[c.id]}`}>
+            <div key={c.id} className={`${caseCard} ${CASE_EDGE[c.id]}`}>
               <div className="flex items-baseline justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   {c.label} · {c.probability}%
                 </span>
                 {c.target != null && (
                   <span
-                    className={`text-[13px] font-semibold tabular-nums ${
+                    className={`font-mono text-[12.5px] font-semibold tabular-nums ${
                       (c.returnPct ?? 0) >= 0 ? "text-gain" : "text-loss"
                     }`}
                   >
@@ -196,9 +198,9 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
       <Block title="Standing invalidation conditions — evaluated on every data refresh">
         <div className="space-y-2.5">
           {synthesis.breakers.map((b) => (
-            <div key={b.id} className="flex items-start gap-3 rounded-lg border border-border/60 px-3 py-2.5">
+            <div key={b.id} className="flex items-start gap-3 rounded-sm border border-border/60 px-3 py-2.5">
               <span
-                className={`mt-0.5 shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] ${
+                className={`mt-0.5 shrink-0 rounded-sm border px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] ${
                   b.state === "tripped"
                     ? "border-loss/50 text-loss"
                     : b.state === "watch"
@@ -225,7 +227,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
       <>
         <Block title="Confidence derivation">
           <div className="flex items-center gap-3">
-            <span className="text-[24px] font-semibold tabular-nums text-foreground">
+            <span className="font-mono text-[22px] font-semibold tabular-nums text-foreground">
               {synthesis.confidence}%
             </span>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
@@ -258,7 +260,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
         <Block>
           <div className="flex flex-wrap items-center gap-2.5">
             <span
-              className={`rounded-md border px-2.5 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] ${ACTION_TONE[synthesis.action]}`}
+              className={`rounded-sm border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] ${ACTION_TONE[synthesis.action]}`}
             >
               {synthesis.action}
             </span>

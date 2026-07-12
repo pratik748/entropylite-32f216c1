@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { SectionDef, WorkspaceDef } from "../registry";
 import { useEvidence } from "../EvidenceContext";
-import { MetricStat } from "../Metric";
+import { MetricGrid, MetricStat } from "../Metric";
 import { sma } from "@/lib/evidence/compute";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
@@ -106,7 +106,7 @@ const TechnicalView = ({ workspace, section }: { workspace: WorkspaceDef; sectio
           </p>
         </Block>
       ) : data.status.bars.state === "loading" ? (
-        <div className="h-56 animate-pulse rounded-xl border border-border/50 bg-surface-2" />
+        <div className="h-56 animate-pulse rounded-sm border border-border/50 bg-surface-2" />
       ) : (
         <Block title="Price structure">
           <p className="text-[12.5px] leading-relaxed text-muted-foreground">
@@ -117,11 +117,11 @@ const TechnicalView = ({ workspace, section }: { workspace: WorkspaceDef; sectio
       )}
 
       {metrics.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <MetricGrid>
           {metrics.map((m) => (
             <MetricStat key={m.id} metric={m} />
           ))}
-        </div>
+        </MetricGrid>
       ) : (
         <PendingEvidence section={section} />
       )}

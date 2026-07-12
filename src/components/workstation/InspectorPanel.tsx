@@ -14,7 +14,7 @@ import { GradeDot, ProvenanceChip, Sparkline, gradeText } from "./Metric";
  */
 
 const Label = ({ children }: { children: React.ReactNode }) => (
-  <p className="mb-1 mt-3.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+  <p className="mb-1 mt-3.5 font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
     {children}
   </p>
 );
@@ -29,7 +29,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
       <div className="flex items-start justify-between gap-2 pt-3">
         <div className="min-w-0">
           <p className="text-[13px] font-semibold tracking-tight text-foreground">{metric.label}</p>
-          <p className="mt-0.5 text-[19px] font-semibold tabular-nums tracking-tight text-foreground">
+          <p className="mt-0.5 font-mono text-[17px] font-semibold tabular-nums tracking-tight text-foreground">
             {formatMetricValue(metric, graph.currency)}
           </p>
         </div>
@@ -101,7 +101,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
               <button
                 key={r.id}
                 onClick={() => select(r.id)}
-                className="rounded-md border border-border/70 px-2 py-1 text-[10.5px] tracking-tight text-muted-foreground transition-colors hover:border-border hover:bg-surface-2 hover:text-foreground"
+                className="rounded-sm border border-border/70 px-2 py-1 font-mono text-[10px] tracking-tight text-muted-foreground transition-colors hover:border-border hover:bg-surface-2 hover:text-foreground"
               >
                 {r.label}
               </button>

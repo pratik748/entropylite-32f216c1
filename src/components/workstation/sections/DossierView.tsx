@@ -1,6 +1,6 @@
 import type { SectionDef, WorkspaceDef } from "../registry";
 import { useEvidence } from "../EvidenceContext";
-import { MetricStat } from "../Metric";
+import { MetricGrid, MetricStat } from "../Metric";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence, ShareBar } from "./blocks";
 import type { DeskAnalysis, Dossier, NewsItem } from "@/lib/evidence/inputs";
@@ -22,11 +22,11 @@ const DossierView = ({ workspace, section }: { workspace: WorkspaceDef; section:
   return (
     <SectionShell workspace={workspace} section={section} wide>
       {metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <MetricGrid>
           {metrics.slice(0, 6).map((m) => (
             <MetricStat key={m.id} metric={m} />
           ))}
-        </div>
+        </MetricGrid>
       )}
       {detail}
       {!detail && metrics.length === 0 && <PendingEvidence section={section} />}
@@ -101,7 +101,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
             <Block title="Key suppliers & dependence risk">
               <div className="grid gap-2 sm:grid-cols-2">
                 {suppliers.map((s, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
+                  <div key={i} className="flex items-start justify-between gap-3 rounded-sm border border-border/60 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-[12.5px] font-medium text-foreground">{s.name}</p>
                       <p className="truncate text-[11px] text-muted-foreground">{s.role}</p>
@@ -122,7 +122,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
             <Block title="Manufacturing footprint">
               <div className="grid gap-2 sm:grid-cols-2">
                 {manufacturers.map((m, i) => (
-                  <div key={i} className="rounded-lg border border-border/60 px-3 py-2">
+                  <div key={i} className="rounded-sm border border-border/60 px-3 py-2">
                     <p className="text-[12.5px] font-medium text-foreground">{m.name}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {m.location} · {m.type}
@@ -153,7 +153,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
             <Block title="Distribution channels">
               <div className="flex flex-wrap gap-1.5">
                 {distributors.map((x, i) => (
-                  <span key={i} className="rounded-md border border-border/70 px-2 py-1 text-[11px] text-muted-foreground">
+                  <span key={i} className="rounded-sm border border-border/70 px-2 py-1 text-[11px] text-muted-foreground">
                     {x.name} · {x.region}
                   </span>
                 ))}
@@ -181,7 +181,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
             <Block title="Product lines & lifecycle">
               <div className="grid gap-2 sm:grid-cols-2">
                 {products.map((p, i) => (
-                  <div key={i} className="rounded-lg border border-border/60 px-3 py-2">
+                  <div key={i} className="rounded-sm border border-border/60 px-3 py-2">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="truncate text-[12.5px] font-medium text-foreground">{p.name}</p>
                       <span
@@ -226,7 +226,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
         <Block title="Executive register">
           <div className="grid gap-2 sm:grid-cols-2">
             {leadership.map((e, i) => (
-              <div key={i} className="rounded-lg border border-border/60 px-3 py-2.5">
+              <div key={i} className="rounded-sm border border-border/60 px-3 py-2.5">
                 <p className="text-[12.5px] font-medium text-foreground">{e.name}</p>
                 <p className="text-[11px] text-muted-foreground">
                   {e.role}
@@ -418,7 +418,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
 }
 
 const ToneTile = ({ label, value, good, bad }: { label: string; value: string; good?: boolean; bad?: boolean }) => (
-  <div className="rounded-lg border border-border/60 px-3 py-2">
+  <div className="rounded-sm border border-border/60 px-3 py-2">
     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">{label}</p>
     <p className={`mt-1 text-[13px] font-semibold capitalize ${good ? "text-gain" : bad ? "text-loss" : "text-foreground"}`}>
       {value || "—"}
