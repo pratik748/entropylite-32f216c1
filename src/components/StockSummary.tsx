@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownRight, ChevronRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, ChevronRight, FileSearch } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getCurrencySymbol, formatCurrency, resolveAssetCurrency } from "@/lib/currency";
@@ -55,9 +55,19 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
             )}
           </p>
         </div>
-        <div className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-semibold tabular ${isProfit ? "bg-gain/12 text-gain" : "bg-loss/12 text-loss"}`}>
-          {isProfit ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-          {isProfit ? "+" : ""}{pnlPercent.toFixed(2)}%
+        <div className="flex flex-col items-end gap-2">
+          <div className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-semibold tabular ${isProfit ? "bg-gain/12 text-gain" : "bg-loss/12 text-loss"}`}>
+            {isProfit ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            {isProfit ? "+" : ""}{pnlPercent.toFixed(2)}%
+          </div>
+          <Link
+            to={workstationPath(ticker)}
+            title={`Open the Equity Workstation for ${ticker}`}
+            className="pressable flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-1.5 text-[12px] font-semibold tracking-tight text-background shadow-soft transition-opacity hover:opacity-85"
+          >
+            <FileSearch className="h-3.5 w-3.5" strokeWidth={2} />
+            Open Workstation
+          </Link>
         </div>
       </div>
 

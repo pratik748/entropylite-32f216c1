@@ -655,7 +655,8 @@ const IndexContent = () => {
                                 <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
                                 <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
                                   Add any global asset — equities, crypto, FX or commodities — and twelve
-                                  engines will run a full pass with live pricing.
+                                  engines will run a full pass with live pricing. Every position opens into
+                                  the Equity Workstation: evidence graph, thesis engine, and risk lab.
                                 </p>
                                 <p className="mt-5 text-caption-1 text-muted-foreground/60">
                                   Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere

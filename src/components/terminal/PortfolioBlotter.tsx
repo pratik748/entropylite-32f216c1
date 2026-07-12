@@ -120,7 +120,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(workstationPath(s.ticker)); }}
-                      className="ml-auto opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-surface-3 hover:text-foreground text-muted-foreground"
+                      className="ml-auto p-0.5 rounded text-muted-foreground/60 transition-colors hover:bg-surface-3 hover:text-foreground"
                       title="Open Equity Workstation"
                     >
                       <FileSearch className="w-3 h-3" />

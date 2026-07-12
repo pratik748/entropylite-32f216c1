@@ -33,8 +33,12 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
       ? new Date(status.quote.fetchedAt).toISOString().slice(11, 19)
       : null;
 
+  const loadingSources = Object.entries(status)
+    .filter(([, s]) => s.state === "loading")
+    .map(([k]) => k);
+
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-border/70 bg-surface-1/60 px-3 py-2 sm:gap-4 sm:px-4">
+    <div className="relative flex shrink-0 items-center gap-3 border-b border-border/70 bg-surface-1/60 px-3 py-2 sm:gap-4 sm:px-4">
       <Link
         to="/dashboard"
         title="Back to Desk"
@@ -104,6 +108,18 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
           Inspector
         </button>
       </div>
+
+      {/* Indeterminate load bar — engines still assembling evidence */}
+      {loadingSources.length > 0 && (
+        <div
+          className="absolute inset-x-0 -bottom-px h-[2px] overflow-hidden"
+          role="progressbar"
+          aria-label={`Loading ${loadingSources.join(", ")}`}
+          title={`Assembling evidence — ${loadingSources.join(", ")}`}
+        >
+          <div className="ws-loadbar h-full w-1/4 rounded-full bg-foreground/50" />
+        </div>
+      )}
     </div>
   );
 };
