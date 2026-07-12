@@ -97,16 +97,21 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: num
 //   1. The Supabase edge function (full-universe profile) — preferred.
 //   2. /api/opportunity-engine on this site's own origin (Netlify/Vercel
 //      serverless venue, deployed automatically with the frontend).
+//   3. The Netlify production origin, cross-origin (the handler serves
+//      CORS) — covers hosts that can't run serverless functions at all,
+//      e.g. the Lovable-published domain.
 // We call whichever answers, remember it, and never surface the plumbing.
 
-let preferredTransport: "supabase" | "http" | null = null;
+const HTTP_ENGINE_BASES = ["", "https://entropy-lite.netlify.app"];
 
-async function callSameOrigin(body: Record<string, unknown>): Promise<EngineResponse | null> {
+let preferredTransport: "supabase" | number | null = null;
+
+async function callHttpVenue(base: string, body: Record<string, unknown>): Promise<EngineResponse | null> {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
     if (!token) return null;
-    const res = await fetch("/api/opportunity-engine", {
+    const res = await fetch(`${base}/api/opportunity-engine`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
@@ -125,7 +130,7 @@ async function callEngine(
   force?: boolean,
 ): Promise<EngineResponse> {
   let supabaseMessage = "";
-  if (preferredTransport !== "http") {
+  if (preferredTransport === "supabase" || preferredTransport === null) {
     const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
       body,
       cacheKey,
@@ -138,13 +143,16 @@ async function callEngine(
     supabaseMessage = (error as Error | null)?.message || "";
   }
 
-  const viaOrigin = await callSameOrigin(body);
-  if (viaOrigin) {
-    preferredTransport = "http";
-    return viaOrigin;
+  const startIdx = typeof preferredTransport === "number" ? preferredTransport : 0;
+  for (let i = startIdx; i < HTTP_ENGINE_BASES.length; i++) {
+    const response = await callHttpVenue(HTTP_ENGINE_BASES[i], body);
+    if (response) {
+      preferredTransport = i;
+      return response;
+    }
   }
 
-  // Reset so the next attempt re-probes both venues.
+  // Reset so the next attempt re-probes every venue.
   preferredTransport = null;
   throw new Error(supabaseMessage || "Opportunity engine unreachable on every venue.");
 }
