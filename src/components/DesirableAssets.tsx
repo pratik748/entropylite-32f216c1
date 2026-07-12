@@ -271,11 +271,6 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               QUANT VALIDATED · {REGION_LABELS[baseCurrency] || "Global"}
               {regimeType && <span className={`ml-2 uppercase ${regimeType === "risk-off" ? "text-loss" : regimeType === "risk-on" ? "text-gain" : "text-warning"}`}>{regimeType}</span>}
               {stats.generated > 0 && <span className="ml-2 text-primary">{stats.passed}/{stats.generated} passed</span>}
-              {response?.executionVenue === "local_fallback" && (
-                <span className="ml-2 text-warning" title="The opportunity-engine edge function isn't deployed yet, so the same pipeline ran locally on a reduced universe (coverage grid + your holdings) via the deployed data proxies.">
-                  LOCAL VENUE · REDUCED UNIVERSE
-                </span>
-              )}
               {fetchedAt && <span className="ml-2">{Math.round((Date.now() - fetchedAt) / 1000)}s ago</span>}
             </p>
           </div>

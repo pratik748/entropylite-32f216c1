@@ -6,7 +6,7 @@
 // object, with the same score, everywhere else.
 
 import { governedInvoke } from "@/lib/apiGovernor";
-import { runLocalEngine } from "./localEngine";
+import { supabase } from "@/integrations/supabase/client";
 import { updateLifecycle } from "./lifecycle";
 import type { EngineResponse } from "./types";
 
@@ -92,18 +92,68 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: num
   );
 }
 
+// ── Engine transport ────────────────────────────────────────────────
+// The SAME shared handler is hosted in more than one place:
+//   1. The Supabase edge function (full-universe profile) — preferred.
+//   2. /api/opportunity-engine on this site's own origin (Netlify/Vercel
+//      serverless venue, deployed automatically with the frontend).
+// We call whichever answers, remember it, and never surface the plumbing.
+
+let preferredTransport: "supabase" | "http" | null = null;
+
+async function callSameOrigin(body: Record<string, unknown>): Promise<EngineResponse | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) return null;
+    const res = await fetch("/api/opportunity-engine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as EngineResponse;
+    return Array.isArray(data?.opportunities) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function callEngine(
+  body: Record<string, unknown>,
+  cacheKey: string,
+  force?: boolean,
+): Promise<EngineResponse> {
+  let supabaseMessage = "";
+  if (preferredTransport !== "http") {
+    const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
+      body,
+      cacheKey,
+      force,
+    });
+    if (!error && data && Array.isArray(data.opportunities)) {
+      preferredTransport = "supabase";
+      return data;
+    }
+    supabaseMessage = (error as Error | null)?.message || "";
+  }
+
+  const viaOrigin = await callSameOrigin(body);
+  if (viaOrigin) {
+    preferredTransport = "http";
+    return viaOrigin;
+  }
+
+  // Reset so the next attempt re-probes both venues.
+  preferredTransport = null;
+  throw new Error(supabaseMessage || "Opportunity engine unreachable on every venue.");
+}
+
 /**
  * Fetch (or reuse) the engine's validated opportunity set. All consumers
  * share one inflight request and one cache entry — server-side filters are
  * intentionally NOT passed here so every module sees the identical slate;
  * use `filterOpportunities` for per-module views.
- *
- * Execution venues, tried in order:
- *   1. The `opportunity-engine` edge function (full universe).
- *   2. The SAME pipeline executed locally against the deployed
- *      `historical-prices` proxy (reduced universe) — used automatically
- *      while the edge function isn't deployed. Marked in the response as
- *      executionVenue: "local_fallback".
  */
 export async function fetchOpportunities(opts: {
   indiaMode: boolean;
@@ -116,36 +166,16 @@ export async function fetchOpportunities(opts: {
   if (inflight) return inflight;
 
   inflight = (async () => {
-    let response: EngineResponse | null = null;
-    let edgeError: Error | null = null;
-
-    const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
-      body: {
+    const response = await callEngine(
+      {
         mode: "discover",
         horizonDays,
+        indiaMode: opts.indiaMode,
         ...(portfolioContext ? { portfolio: portfolioContext } : {}),
       },
-      cacheKey: `discover|${opts.indiaMode ? "in" : "gl"}|h${horizonDays}|${portfolioHash()}`,
-      force: opts.force,
-    });
-    if (!error && data && Array.isArray(data.opportunities)) {
-      response = data;
-    } else {
-      edgeError = new Error((error as Error | null)?.message || "Opportunity engine unreachable.");
-      // Edge venue unavailable (typically: function not deployed yet) —
-      // run the same pipeline locally against the deployed data proxies.
-      try {
-        response = await runLocalEngine({
-          indiaMode: opts.indiaMode,
-          horizonDays,
-          portfolio: portfolioContext,
-        });
-      } catch {
-        response = null;
-      }
-    }
-
-    if (!response) throw edgeError ?? new Error("Opportunity engine unreachable.");
+      `discover|${opts.indiaMode ? "in" : "gl"}|h${horizonDays}|${portfolioHash()}`,
+      opts.force,
+    );
 
     const snapshot: Snapshot = { response, fetchedAt: Date.now(), indiaMode: opts.indiaMode, horizonDays };
     current = snapshot;
@@ -174,14 +204,10 @@ export async function evaluateTickers(opts: {
   indiaMode: boolean;
 }): Promise<EngineResponse> {
   const tickers = opts.tickers.map((t) => t.trim().toUpperCase()).filter(Boolean);
-  const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
-    body: { mode: "single", tickers, horizonDays: 21 },
-    cacheKey: `single|${opts.indiaMode ? "in" : "gl"}|${tickers.slice().sort().join(",")}`,
-  });
-  if (error || !data) {
-    throw new Error((error as Error | null)?.message || "Opportunity engine unreachable.");
-  }
-  return data;
+  return callEngine(
+    { mode: "single", tickers, horizonDays: 21, indiaMode: opts.indiaMode },
+    `single|${opts.indiaMode ? "in" : "gl"}|${tickers.slice().sort().join(",")}`,
+  );
 }
 
 // Pure view helpers live in ./view (import-safe for tests); re-exported

@@ -250,7 +250,7 @@ export interface LearningHealth {
 
 export interface EngineResponse {
   asOf: string;
-  executionVenue: "edge" | "local_fallback";
+  executionVenue: "edge";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };
   /** Classified market environment (trend / volatility / risk). Influences
    *  confidence, never model direction. */
