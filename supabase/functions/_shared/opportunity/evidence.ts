@@ -300,19 +300,19 @@ export async function fetchFundamentals(symbol: string): Promise<FundamentalFeat
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 /**
- * Stage-1 evidence: price history only (cheap, runs for the whole universe).
- * Fundamentals + news run later for finalists via `enrichBundle`.
+ * Stage-1 evidence from an already-fetched series (pure — no I/O). The
+ * venue's chart loader decides HOW the series was obtained; this decides
+ * what it means.
  */
-export async function collectPriceEvidence(
+export function buildPriceBundle(
   candidate: Candidate,
+  series: ChartSeries | null,
   benchmark: ChartSeries | null,
-  timeoutMs = 8000,
-): Promise<EvidenceBundle> {
+): EvidenceBundle {
   const asOf = new Date().toISOString();
   const items: EvidenceItem[] = [];
   const missing: string[] = [];
 
-  const series = await fetchDailyChart(candidate.symbol, timeoutMs);
   let price: PriceFeatures | null = null;
   if (series && series.closes.length >= 2) {
     price = computePriceFeatures(series, benchmark);

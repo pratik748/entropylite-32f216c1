@@ -6,11 +6,13 @@
 //   • Netlify function              (netlify/functions/opportunity-engine.mts)
 //   • Vercel edge function          (api/opportunity-engine.ts)
 //
-// Venues differ ONLY in how they authenticate the caller and load the
-// learning tables (injected via `EngineLoaders`) and in their wall-clock
-// budget (`EnginePerfProfile`). The models, gates, ranking and response
-// schema are identical everywhere — this file uses nothing but Web APIs
-// (Request/Response/fetch), no Deno, no Node, no URL imports.
+// Venues differ ONLY in data access — how the caller is authenticated,
+// how learning tables are read, and HOW CHARTS ARE FETCHED (Yahoo blocks
+// some datacenter egress IPs, so serverless venues batch through the
+// deployed historical-prices proxy instead of hitting Yahoo directly) —
+// all injected via `EngineLoaders`, plus a wall-clock `EnginePerfProfile`.
+// The models, gates, ranking and response schema are identical everywhere;
+// this file uses nothing but Web APIs (Request/Response/fetch).
 
 import { tickerClass } from "../costs.ts";
 import type { CalibrationParams } from "../ensemble.ts";
@@ -21,12 +23,13 @@ import {
   benchmarkSymbol,
 } from "./universe.ts";
 import {
-  collectPriceEvidence,
+  buildPriceBundle,
   enrichBundle,
   fetchDailyChart,
   pMap,
+  type ChartSeries,
 } from "./evidence.ts";
-import { collectMacroContext } from "./macro.ts";
+import { buildMacroContext, macroSymbols } from "./macro.ts";
 import { classifyMarketContext } from "./marketContext.ts";
 import { runAllModels } from "./models.ts";
 import type { LearningHealth, ReputationBook } from "./reputationCore.ts";
@@ -73,15 +76,41 @@ export interface SignalLogPayload {
   userId: string | null;
 }
 
+export interface ChartLoadOptions {
+  timeoutMs: number;
+  concurrency: number;
+}
+
 /** Venue-specific capabilities, injected by each host adapter. */
 export interface EngineLoaders {
   /** Validate the caller; return the user id, or throw a Response(401). */
   requireUser(req: Request): Promise<{ id: string }>;
+  /** Fetch daily chart series for every symbol. `req` is the incoming
+   *  request so proxy-based loaders can forward the caller's own JWT. */
+  loadCharts(symbols: string[], opts: ChartLoadOptions, req: Request): Promise<Map<string, ChartSeries | null>>;
   loadCalibration(): Promise<CalibrationParams>;
   loadReputation(): Promise<ReputationBook>;
   loadLearningHealth(reputationCells: number): Promise<LearningHealth>;
   /** Best-effort outcome logging for the nightly calibration refit. */
   logSignal?: (payload: SignalLogPayload) => Promise<void>;
+}
+
+/** Default chart loader: Yahoo directly. Works from Deno Deploy egress
+ *  (the Supabase venue) and local dev; NOT from AWS-Lambda-style egress. */
+export async function directChartLoader(
+  symbols: string[],
+  opts: ChartLoadOptions,
+  _req: Request,
+): Promise<Map<string, ChartSeries | null>> {
+  const out = new Map<string, ChartSeries | null>();
+  await pMap(
+    symbols,
+    async (s) => {
+      out.set(s, await fetchDailyChart(s, opts.timeoutMs).catch(() => null));
+    },
+    opts.concurrency,
+  );
+  return out;
 }
 
 /**
@@ -118,7 +147,7 @@ export const SERVERLESS_PROFILE: EnginePerfProfile = {
   maxUniverse: 80,
   finalists: 80,              // no stage-2 cost, so no preliminary cut needed
   chartConcurrency: 16,
-  chartTimeoutMs: 4500,
+  chartTimeoutMs: 8500,       // one batched proxy call, not per-symbol Yahoo
   enrich: false,
 };
 
@@ -156,40 +185,15 @@ export function createEngineHandler(
       const horizonDays = Math.min(Math.max(Math.round(Number(body.horizonDays) || DEFAULT_HORIZON_DAYS), 5), 126);
       const maxResults = Math.min(Math.max(Math.round(Number(body.maxResults) || DEFAULT_MAX_RESULTS), 1), 30);
 
-      // ── Environment first: benchmark, macro context, learning state ─
-      const [benchmark, calibration, reputation] = await Promise.all([
-        fetchDailyChart(benchmarkSymbol(indiaMode), profile.chartTimeoutMs),
-        loaders.loadCalibration(),
-        loaders.loadReputation(),
-      ]);
-      const [macro, learning] = await Promise.all([
-        collectMacroContext(benchmark, indiaMode, profile.chartTimeoutMs),
-        loaders.loadLearningHealth(reputation.cells),
-      ]);
-      const regime = detectRegime(benchmark);
-      // Classify the environment ONCE for the whole run (trend / vol / risk).
-      const marketContext = classifyMarketContext(macro, regime);
-
-      // ── Portfolio context (optional) ────────────────────────────────
+      // ── CandidateGenerator ──────────────────────────────────────────
+      let candidates: Candidate[];
+      let universeSources: Record<string, number>;
       const positions = (body.portfolio?.positions ?? [])
         .map((x) => ({ symbol: String(x?.symbol || "").toUpperCase(), weight: Number(x?.weight) || 0 }))
         .filter((x) => x.symbol && x.weight > 0)
         .sort((a, b) => b.weight - a.weight)
         .slice(0, MAX_PORTFOLIO_HOLDINGS);
-      let portfolioReturns: number[] | null = null;
-      if (positions.length > 0) {
-        const holdings = await pMap(positions, async (pos) => {
-          const series = await fetchDailyChart(pos.symbol, profile.chartTimeoutMs).catch(() => null);
-          return series ? { series, weight: pos.weight } : null;
-        }, 4);
-        portfolioReturns = buildPortfolioReturns(holdings.filter((h): h is NonNullable<typeof h> => h != null));
-      }
-      const portfolioValue = Number(body.portfolio?.value) > 0 ? Number(body.portfolio!.value) : null;
-      const portfolioCurrency = body.portfolio?.currency ? String(body.portfolio.currency).toUpperCase() : null;
 
-      // ── CandidateGenerator ──────────────────────────────────────────
-      let candidates: Candidate[];
-      let universeSources: Record<string, number>;
       if (mode === "single") {
         const tickers = (body.tickers ?? []).map((t) => String(t).trim().toUpperCase()).filter(Boolean).slice(0, 10);
         candidates = tickers.map((symbol) => ({
@@ -234,12 +238,41 @@ export function createEngineHandler(
         candidates = candidates.slice(0, profile.maxUniverse);
       }
 
-      // ── EvidenceCollectors (price history for everyone) ─────────────
-      const bundles = await pMap(
-        candidates,
-        (c) => collectPriceEvidence(c, benchmark, profile.chartTimeoutMs),
-        profile.chartConcurrency,
-      );
+      // ── Data collection: ONE batched chart load for everything ──────
+      const bench = benchmarkSymbol(indiaMode);
+      const allSymbols = Array.from(new Set([
+        bench,
+        ...macroSymbols(indiaMode),
+        ...candidates.map((c) => c.symbol),
+        ...positions.map((p) => p.symbol),
+      ]));
+      const [charts, calibration, reputation] = await Promise.all([
+        loaders.loadCharts(allSymbols, { timeoutMs: profile.chartTimeoutMs, concurrency: profile.chartConcurrency }, req),
+        loaders.loadCalibration(),
+        loaders.loadReputation(),
+      ]);
+      const learning = await loaders.loadLearningHealth(reputation.cells);
+
+      const benchmark = charts.get(bench) ?? null;
+      const macro = buildMacroContext(charts, benchmark, indiaMode);
+      const regime = detectRegime(benchmark);
+      // Classify the environment ONCE for the whole run (trend / vol / risk).
+      const marketContext = classifyMarketContext(macro, regime);
+
+      // ── Portfolio composite (optional) ──────────────────────────────
+      let portfolioReturns: number[] | null = null;
+      if (positions.length > 0) {
+        portfolioReturns = buildPortfolioReturns(
+          positions
+            .map((pos) => ({ series: charts.get(pos.symbol), weight: pos.weight }))
+            .filter((h): h is { series: ChartSeries; weight: number } => h.series != null),
+        );
+      }
+      const portfolioValue = Number(body.portfolio?.value) > 0 ? Number(body.portfolio!.value) : null;
+      const portfolioCurrency = body.portfolio?.currency ? String(body.portfolio.currency).toUpperCase() : null;
+
+      // ── Price evidence (pure, from the charts map) ──────────────────
+      const bundles = candidates.map((c) => buildPriceBundle(c, charts.get(c.symbol) ?? null, benchmark));
 
       const rejections: RejectionRecord[] = [];
       const nearMisses: NearMiss[] = [];

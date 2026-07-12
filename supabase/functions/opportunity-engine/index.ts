@@ -14,6 +14,7 @@ import { requireAuth } from "../_shared/auth.ts";
 import { logSignalOutcome } from "../_shared/calibration.ts";
 import {
   createEngineHandler,
+  directChartLoader,
   EDGE_PROFILE,
   type EngineLoaders,
 } from "../_shared/opportunity/handler.ts";
@@ -27,6 +28,8 @@ const corsHeaders = {
 
 const loaders: EngineLoaders = {
   ...restLoaders(),
+  // Deno Deploy egress reaches Yahoo directly — no proxy hop needed.
+  loadCharts: directChartLoader,
   async requireUser(req) {
     const auth = await requireAuth(req, corsHeaders);
     return { id: auth.user.id };
