@@ -1,53 +1,163 @@
-// Desirable Assets — the classic board UI, now powered ENTIRELY by the
-// shared Opportunity Engine. The presentation is the familiar one (header,
-// Needs & Constraints, staged loader, glass cards with entry/target/stop
-// and one-tap add); the architecture behind it changed completely:
-//
-//   • No AI-generated candidates, no reserve universes, no template theses.
-//   • Every card is a ValidatedOpportunity from the shared pipeline
-//     (universe → evidence → independent models → cross-bucket consensus →
-//     validation), identical objects and ranking to Direct Profit's queue
-//     and the alert feed.
-//   • Entry zone / target / stop are volatility-derived display levels
-//     (±0.25σ band, 1σ objective, 1.25σ invalidation), not predictions.
-//   • When nothing survives validation the board says so instead of
-//     inventing ideas.
-
-import { useMemo, useState, useRef, useEffect } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  Ban,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Plus,
-  RefreshCw,
-  Shield,
-  SlidersHorizontal,
-  Sparkles,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Zap,
-} from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { governedInvoke } from "@/lib/apiGovernor";
+import { runWithRepair } from "@/lib/selfRepair";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
 import { getCurrencySymbol } from "@/lib/currency";
-import { useFX } from "@/hooks/useFX";
-import { useOpportunities } from "@/hooks/useOpportunities";
-import {
-  EMPTY_STATE_MESSAGE,
-  type AssetClass,
-  type ValidatedOpportunity,
-} from "@/lib/opportunities/types";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
+import { toast } from "@/hooks/use-toast";
+import { useFX } from "@/hooks/useFX";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+
+interface Recommendation {
+  ticker: string;
+  name: string;
+  assetClass: string;
+  exchange: string;
+  currency: string;
+  realPrice: number;
+  realCurrency: string;
+  currentEstPrice: number;
+  entryZone: [number, number];
+  targetPrice: number;
+  stopLoss: number;
+  timeHorizon: string;
+  suggestedQty: number;
+  confidence: number;
+  thesis: string;
+  catalyst: string;
+  hedgingStrategy: string;
+  riskReward: string;
+  sector: string;
+  tags: string[];
+  riskProfile?: string[];
+  strategy?: string;
+  pairedInstrument?: string;
+  pairedStructure?: string;
+  capitalEfficiency?: number;
+  priceChange24h: number;
+  priceVerified: boolean;
+  sharpeRatio?: number;
+  maxDrawdown?: number;
+  portfolioCorrelation?: number;
+  volatility?: number;
+  zScore?: number;
+  quantScore?: number;
+  closes?: number[];
+  simulationTested?: boolean;
+  momentum20d?: number;
+  momentum5d?: number;
+  trendStrength?: number;
+  sentimentScore?: number;
+  sentimentLabel?: string;
+  earningsSignal?: "bullish" | "neutral" | "bearish";
+  sentimentHeadline?: string;
+  sentimentArticleCount?: number;
+  allocationPct?: number;
+  positionValue?: number;
+  riskBudgetPct?: number;
+  hedgeInstrument?: string;
+  hedgeRatioPct?: number;
+  evidenceSummary?: string[];
+  portfolioFit?: string;
+  riskVerdict?: "low" | "medium" | "high";
+  riskCompositeScore?: number;
+  horizonClass?: "intraday" | "short_term" | "medium_term" | "long_term";
+  consensus?: {
+    decision: "BUY" | "SELL" | "STAND_ASIDE";
+    calibratedProb: number;
+    agreement: number;
+    engineCount: number;
+    consensusLabel: "UNANIMOUS" | "MAJORITY" | "SPLIT";
+    expectedR: number;
+  };
+  bucketConsensus?: "ALL_3" | "TWO_OF_3" | "SPLIT" | "INSUFFICIENT";
+  bucketDirs?: { A: -1 | 0 | 1; B: -1 | 0 | 1; C: -1 | 0 | 1 };
+  costHaircutPct?: number;
+  liquidityTier?: string;
+  expectedRAfterCost?: number;
+}
 
 interface Props {
   stocks: PortfolioStock[];
   onAddToPortfolio: (ticker: string, price: number, qty: number) => void;
+}
+
+const strategyColors: Record<string, string> = {
+  equity: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  pair_trade: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  futures_leverage: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  vol_arb: "bg-red-500/10 text-red-400 border-red-500/20",
+  sector_hedge: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  correlation_hedge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  mean_reversion: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  momentum: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+};
+
+const riskProfileColors: Record<string, string> = {
+  aggressive: "bg-loss/10 text-loss",
+  conservative: "bg-gain/10 text-gain",
+  short_term: "bg-amber-500/10 text-amber-400",
+  medium_term: "bg-blue-500/10 text-blue-400",
+  long_term: "bg-purple-500/10 text-purple-400",
+  income: "bg-emerald-500/10 text-emerald-400",
+  safe_haven: "bg-cyan-500/10 text-cyan-400",
+  high_conviction: "bg-primary/10 text-primary",
+};
+
+const MAX_RETRIES = 2;
+const DA_CACHE_KEY = "da_recommendations_v7";
+const DA_PREV_TICKERS_KEY = "da_previous_tickers_v3";
+const DA_CACHE_TTL = 2 * 60 * 60 * 1000;
+
+function getPreviousTickers(): string[] {
+  try {
+    const raw = localStorage.getItem(DA_PREV_TICKERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function savePreviousTickers(tickers: string[]) {
+  try {
+    // Keep only the last slate (max 12) as a soft-avoid hint. A larger memory
+    // was starving the AI and producing the "6 already in your portfolio"
+    // collapse: the model exhausted its diverse alternatives and fell back
+    // to held names. Backend treats this as a soft hint, not a hard ban.
+    localStorage.setItem(DA_PREV_TICKERS_KEY, JSON.stringify(tickers.slice(-12)));
+  } catch { /* ignore */ }
+}
+
+function getCachedDA() {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > DA_CACHE_TTL) {
+      localStorage.removeItem(DA_CACHE_KEY);
+      return null;
+    }
+    return cached;
+  } catch { return null; }
+}
+
+/**
+ * Stale cache, ignores TTL. Used by the self-repair layer as a last resort
+ * so the panel never renders empty when the backend is hiccuping.
+ */
+function getStaleCachedDA() {
+  try {
+    const raw = localStorage.getItem(DA_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function setCachedDA(data: any) {
+  try {
+    localStorage.setItem(DA_CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
+  } catch { /* ignore */ }
 }
 
 const REGION_LABELS: Record<string, string> = {
@@ -56,64 +166,65 @@ const REGION_LABELS: Record<string, string> = {
   BRL: "Brazil + Global", HKD: "Hong Kong + Global", SGD: "Singapore + Global",
 };
 
-const ASSET_TYPES: Array<{ label: string; key: AssetClass }> = [
-  { label: "Stocks", key: "equity" },
-  { label: "ETFs", key: "etf" },
-  { label: "Indices", key: "index" },
-  { label: "Bonds", key: "bond" },
-  { label: "Commodities", key: "commodity" },
-  { label: "Crypto", key: "crypto" },
-];
+function sanitizeRecommendation(rec: any): Recommendation {
+  return {
+    ticker: typeof rec?.ticker === "string" ? rec.ticker : "—",
+    name: typeof rec?.name === "string" ? rec.name : "Unnamed asset",
+    assetClass: typeof rec?.assetClass === "string" ? rec.assetClass : "asset",
+    exchange: typeof rec?.exchange === "string" ? rec.exchange : "",
+    currency: typeof rec?.currency === "string" ? rec.currency : "USD",
+    realPrice: Number(rec?.realPrice) || 0,
+    realCurrency: typeof rec?.realCurrency === "string" ? rec.realCurrency : (typeof rec?.currency === "string" ? rec.currency : "USD"),
+    currentEstPrice: Number(rec?.currentEstPrice) || 0,
+    entryZone: Array.isArray(rec?.entryZone) ? [Number(rec.entryZone[0]) || 0, Number(rec.entryZone[1]) || 0] : [0, 0],
+    targetPrice: Number(rec?.targetPrice) || 0,
+    stopLoss: Number(rec?.stopLoss) || 0,
+    timeHorizon: typeof rec?.timeHorizon === "string" ? rec.timeHorizon : "n/a",
+    suggestedQty: Number(rec?.suggestedQty) || 1,
+    confidence: Number(rec?.confidence) || 0,
+    thesis: typeof rec?.thesis === "string" ? rec.thesis : "",
+    catalyst: typeof rec?.catalyst === "string" ? rec.catalyst : "No catalyst provided.",
+    hedgingStrategy: typeof rec?.hedgingStrategy === "string" ? rec.hedgingStrategy : "No hedge specified.",
+    riskReward: typeof rec?.riskReward === "string" ? rec.riskReward : "—",
+    sector: typeof rec?.sector === "string" ? rec.sector : "Unclassified",
+    tags: Array.isArray(rec?.tags) ? rec.tags.filter((t: unknown) => typeof t === "string") : [],
+    riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.filter((t: unknown) => typeof t === "string") : [],
+    strategy: typeof rec?.strategy === "string" ? rec.strategy : undefined,
+    pairedInstrument: typeof rec?.pairedInstrument === "string" ? rec.pairedInstrument : undefined,
+    pairedStructure: typeof rec?.pairedStructure === "string" ? rec.pairedStructure : undefined,
+    capitalEfficiency: Number.isFinite(Number(rec?.capitalEfficiency)) ? Number(rec.capitalEfficiency) : undefined,
+    priceChange24h: Number(rec?.priceChange24h) || 0,
+    priceVerified: Boolean(rec?.priceVerified),
+    sharpeRatio: Number.isFinite(Number(rec?.sharpeRatio)) ? Number(rec.sharpeRatio) : undefined,
+    maxDrawdown: Number.isFinite(Number(rec?.maxDrawdown)) ? Number(rec.maxDrawdown) : undefined,
+    portfolioCorrelation: Number.isFinite(Number(rec?.portfolioCorrelation)) ? Number(rec.portfolioCorrelation) : undefined,
+    volatility: Number.isFinite(Number(rec?.volatility)) ? Number(rec.volatility) : undefined,
+    zScore: Number.isFinite(Number(rec?.zScore)) ? Number(rec.zScore) : undefined,
+    quantScore: Number(rec?.quantScore) || 0,
+    closes: Array.isArray(rec?.closes) ? rec.closes.map((v: unknown) => Number(v)).filter((v: number) => Number.isFinite(v)) : [],
+    simulationTested: Boolean(rec?.simulationTested),
+    momentum20d: Number.isFinite(Number(rec?.momentum20d)) ? Number(rec.momentum20d) : undefined,
+    momentum5d: Number.isFinite(Number(rec?.momentum5d)) ? Number(rec.momentum5d) : undefined,
+    trendStrength: Number.isFinite(Number(rec?.trendStrength)) ? Number(rec.trendStrength) : undefined,
+    sentimentScore: Number.isFinite(Number(rec?.sentimentScore)) ? Number(rec.sentimentScore) : undefined,
+    sentimentLabel: typeof rec?.sentimentLabel === "string" ? rec.sentimentLabel : undefined,
+    earningsSignal: rec?.earningsSignal === "bullish" || rec?.earningsSignal === "neutral" || rec?.earningsSignal === "bearish" ? rec.earningsSignal : undefined,
+    sentimentHeadline: typeof rec?.sentimentHeadline === "string" ? rec.sentimentHeadline : undefined,
+    sentimentArticleCount: Number.isFinite(Number(rec?.sentimentArticleCount)) ? Number(rec.sentimentArticleCount) : undefined,
+    allocationPct: Number(rec?.allocationPct) || 0,
+    positionValue: Number.isFinite(Number(rec?.positionValue)) ? Number(rec.positionValue) : undefined,
+    riskBudgetPct: Number(rec?.riskBudgetPct) || 0,
+    hedgeInstrument: typeof rec?.hedgeInstrument === "string" ? rec.hedgeInstrument : undefined,
+    hedgeRatioPct: Number.isFinite(Number(rec?.hedgeRatioPct)) ? Number(rec.hedgeRatioPct) : undefined,
+    evidenceSummary: Array.isArray(rec?.evidenceSummary) ? rec.evidenceSummary.filter((t: unknown) => typeof t === "string") : [],
+    portfolioFit: typeof rec?.portfolioFit === "string" ? rec.portfolioFit : undefined,
+    riskVerdict: rec?.riskVerdict === "low" || rec?.riskVerdict === "medium" || rec?.riskVerdict === "high" ? rec.riskVerdict : undefined,
+    riskCompositeScore: Number.isFinite(Number(rec?.riskCompositeScore)) ? Number(rec.riskCompositeScore) : undefined,
+    horizonClass: rec?.horizonClass === "intraday" || rec?.horizonClass === "short_term" || rec?.horizonClass === "medium_term" || rec?.horizonClass === "long_term" ? rec.horizonClass : undefined,
+  };
+}
 
-// Old sector chips → Yahoo sector names the engine reports.
-const SECTORS: Array<{ label: string; matches: string[] }> = [
-  { label: "Technology", matches: ["Technology", "Communication Services"] },
-  { label: "Banking", matches: ["Financial Services"] },
-  { label: "Healthcare", matches: ["Healthcare"] },
-  { label: "Energy", matches: ["Energy"] },
-  { label: "Consumer", matches: ["Consumer Cyclical", "Consumer Defensive"] },
-  { label: "Infrastructure", matches: ["Industrials", "Utilities", "Real Estate"] },
-  { label: "Pharma", matches: ["Healthcare"] },
-  { label: "Auto", matches: ["Consumer Cyclical"] },
-  { label: "FMCG", matches: ["Consumer Defensive"] },
-  { label: "Metals", matches: ["Basic Materials"] },
-];
-
-const HORIZONS = [
-  { key: "intraday", label: "Intraday", hint: "Same-day, hours", days: 5 },
-  { key: "short_term", label: "Short-term", hint: "1d – 4 weeks", days: 10 },
-  { key: "medium_term", label: "Medium-term", hint: "1 – 6 months", days: 21 },
-  { key: "long_term", label: "Long-term", hint: "6 months+", days: 63 },
-] as const;
-
-// Real pipeline stages — labels match what the engine actually does; the
-// timer only paces the bar, it does not invent work.
-const LOADING_STAGES = [
-  { at: 10, label: "Measuring macro environment (rates, dollar, vol, credit)..." },
-  { at: 25, label: "Generating market universe..." },
-  { at: 45, label: "Collecting price evidence..." },
-  { at: 62, label: "Running independent scoring models..." },
-  { at: 78, label: "Cross-validating across info-buckets..." },
-  { at: 90, label: "Applying validation gates & ranking..." },
-];
-
-const REJECTION_LABELS: Record<string, string> = {
-  no_price_history: "lacked usable price history",
-  insufficient_history: "had too little trading history",
-  invalid_price: "had invalid prices",
-  below_liquidity_floor: "failed the liquidity bar",
-  preliminary_signal_too_weak: "had signals too weak to score deeply",
-  too_few_models: "had too few models with a view",
-  insufficient_bucket_coverage: "lacked independent evidence coverage",
-  bucket_disagreement: "had conflicting evidence across buckets",
-  confidence_below_threshold: "fell below the confidence threshold",
-  agreement_below_threshold: "had models too split to trade",
-  insufficient_expected_r: "had insufficient reward after costs and fat tails",
-  non_positive_expected_edge: "had no positive expected edge",
-  non_positive_risk_adjusted_edge: "had no positive risk-adjusted edge",
-};
-
-// Mini sparkline component (classic look)
+// Mini sparkline component
 const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
   if (!data || data.length < 2) return null;
   const min = Math.min(...data);
@@ -129,59 +240,379 @@ const Sparkline = ({ data, className = "" }: { data: number[]; className?: strin
   );
 };
 
-function matchesSectorChips(o: ValidatedOpportunity, selected: Set<string>): boolean {
-  if (selected.size === 0) return true;
-  if (!o.sector) return false;
-  for (const chip of SECTORS) {
-    if (!selected.has(chip.label)) continue;
-    if (chip.matches.some((m) => o.sector === m)) return true;
-  }
-  return false;
+// Correlation color
+function corrColor(corr: number): string {
+  if (corr < -0.2) return "text-gain";
+  if (corr < 0.3) return "text-emerald-400";
+  if (corr < 0.5) return "text-warning";
+  return "text-loss";
+}
+
+function corrLabel(corr: number): string {
+  if (corr < -0.2) return "Inverse";
+  if (corr < 0.1) return "Uncorrelated";
+  if (corr < 0.3) return "Low";
+  if (corr < 0.5) return "Medium";
+  return "High";
+}
+
+function sentimentColor(score: number): string {
+  if (score >= 15) return "text-gain";
+  if (score <= -15) return "text-loss";
+  return "text-warning";
+}
+
+function earningsSignalColor(signal?: "bullish" | "neutral" | "bearish"): string {
+  if (signal === "bullish") return "text-gain";
+  if (signal === "bearish") return "text-loss";
+  return "text-warning";
 }
 
 const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
-  const { baseCurrency, convertToBase } = useFX();
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [marketCondition, setMarketCondition] = useState("");
+  const [regimeType, setRegimeType] = useState("");
+  const [liveWebContext, setLiveWebContext] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [addedTickers, setAddedTickers] = useState<Set<string>>(new Set());
-  const [showConstraints, setShowConstraints] = useState(true);
-  const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
-
-  // Needs & Constraints state (classic controls)
-  const [budget, setBudget] = useState("");
-  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<AssetClass>>(new Set());
-  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
-  const [selectedHorizon, setSelectedHorizon] = useState<string>("");
-
-  const horizonDays = HORIZONS.find((h) => h.key === selectedHorizon)?.days ?? 21;
-  const filters = useMemo(() => ({
-    assetClasses: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
-  }), [selectedAssetTypes]);
-
-  const { opportunities: engineSlate, response, loading, error, fetchedAt, refresh } =
-    useOpportunities(filters, { horizonDays });
-
-  // Sector chips filter client-side (the engine reports Yahoo sector names).
-  const recommendations = useMemo(
-    () => engineSlate.filter((o) => matchesSectorChips(o, selectedSectors)),
-    [engineSlate, selectedSectors],
-  );
-
-  // Staged loading bar — visual pacing over the single real request.
+  const [lastFetch, setLastFetch] = useState<number | null>(null);
+  const [stats, setStats] = useState({ generated: 0, passed: 0 });
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState("");
+  const [autoRepaired, setAutoRepaired] = useState(false);
+  const [repairNote, setRepairNote] = useState<string | null>(null);
+  const retryCount = useRef(0);
+  const bootstrapFetchDone = useRef(false);
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (loading) {
-      setLoadingProgress(LOADING_STAGES[0].at);
-      setLoadingStage(LOADING_STAGES[0].label);
-      let idx = 1;
+  const { baseCurrency, indiaMode } = useFX();
+  const {
+    getAssetBoost,
+    validateSignal,
+    gradient,
+    desirableZones,
+    combinationScores,
+    scarMemory,
+    totalTrades: odgsTotalTrades,
+  } = useOutcomeGradient();
+  const existingTickers = stocks.map(s => s.ticker);
+
+  // Needs & Constraints state
+  const [budget, setBudget] = useState("");
+  const ASSET_TYPES = ["Stocks", "ETFs", "Mutual Funds", "Bonds", "Commodities", "Crypto"] as const;
+  const SECTORS = ["Technology", "Banking", "Healthcare", "Energy", "Consumer", "Infrastructure", "Pharma", "Auto", "FMCG", "Metals"] as const;
+  const HORIZONS = [
+    { key: "intraday", label: "Intraday", hint: "Same-day, hours" },
+    { key: "short_term", label: "Short-term", hint: "1d – 4 weeks" },
+    { key: "medium_term", label: "Medium-term", hint: "1 – 6 months" },
+    { key: "long_term", label: "Long-term", hint: "6 months+" },
+  ] as const;
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
+  const [selectedSectors, setSelectedSectors] = useState<Set<string>>(new Set());
+  const [selectedHorizon, setSelectedHorizon] = useState<string>("");
+  const [showConstraints, setShowConstraints] = useState(true);
+
+  const hasActiveFilters = Boolean(
+    budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon,
+  );
+  const isHonestEmptyState = Boolean(
+    error &&
+    recommendations.length === 0 &&
+    (/none cleared the screening rules|no setups generated this cycle/i.test(error) || stats.generated > 0),
+  );
+  const errorTitle = isHonestEmptyState ? "No clean setups right now" : "Feed interrupted";
+  const errorDetail = isHonestEmptyState
+    ? "The engine ran, but today’s candidates failed risk, repeat, or horizon checks."
+    : "Live intelligence did not complete cleanly, so nothing was shown as a fake fallback.";
+
+  const toggleChip = (set: Set<string>, setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value); else next.add(value);
+    setter(next);
+  };
+
+  const fetchRecommendations = useCallback(async (showLoading = true, forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = getCachedDA();
+      if (cached) {
+        const cachedRecommendations = Array.isArray(cached.recommendations)
+          ? cached.recommendations.map(sanitizeRecommendation)
+          : [];
+        setRecommendations(cachedRecommendations);
+        setMarketCondition(cached.marketCondition || "");
+        setRegimeType(cached.regimeType || "");
+        setLiveWebContext(cached.liveWebContext || "");
+        setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
+        setLastFetch(cached.timestamp);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+    }
+
+    if (showLoading) {
+      setLoading(true);
+      setError(null);
+      // Clear stale results immediately so the loading screen is unambiguous —
+      // user explicitly asked old assets to disappear when "Find Assets" is tapped.
+      setRecommendations([]);
+      setMarketCondition("");
+      setLiveWebContext("");
+      setStats({ generated: 0, passed: 0 });
+      setAddedTickers(new Set());
+      setLoadingProgress(0);
+      setLoadingStage("Initializing quant funnel...");
+      // Simulate progress through stages
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      const stages = [
+        { at: 5, label: "Querying AI strategist..." },
+        { at: 18, label: "Generating momentum candidates..." },
+        { at: 35, label: "Fetching real-time prices..." },
+        { at: 48, label: "Running Sharpe & drawdown filters..." },
+        { at: 58, label: "Momentum & trend validation..." },
+        { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
+        { at: 78, label: "Injecting live earnings sentiment..." },
+        { at: 85, label: "Scoring & ranking assets..." },
+        { at: 90, label: "Final quality checks..." },
+      ];
+      let idx = 0;
       progressTimer.current = setInterval(() => {
-        if (idx < LOADING_STAGES.length) {
-          setLoadingProgress(LOADING_STAGES[idx].at);
-          setLoadingStage(LOADING_STAGES[idx].label);
+        if (idx < stages.length) {
+          setLoadingProgress(stages[idx].at);
+          setLoadingStage(stages[idx].label);
           idx++;
         }
-      }, 2500);
-    } else {
+      }, 3500);
+    }
+    try {
+      const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
+
+      // Cross-module conflict guard: pull tickers Direct Profit just proposed
+      // (stored in dp-portfolio) so Desirable Assets doesn't surface contradictory
+      // setups for the same names the user just acted on in Direct Profit.
+      let dpTickers: string[] = [];
+      try {
+        const raw = localStorage.getItem("dp-portfolio");
+        if (raw) {
+          const items = JSON.parse(raw);
+          if (Array.isArray(items)) {
+            dpTickers = items.map((it: any) => String(it?.ticker || "").toUpperCase()).filter(Boolean);
+          }
+        }
+      } catch { /* ignore */ }
+
+      // Build weights and sectors maps
+      const portfolioWeights: Record<string, number> = {};
+      const portfolioSectors: Record<string, string> = {};
+      for (const st of stocks) {
+        const val = (st.analysis?.currentPrice || st.buyPrice) * st.quantity;
+        portfolioWeights[st.ticker] = totalValue > 0 ? val / totalValue : 0;
+        portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
+      }
+
+      // Cross-module signals: respect what Analysis & Risk are already telling the user.
+      // Don't recommend the same sector / similar profile for stocks the AI says to Sell/Exit
+      // or that carry high risk. This stops Desirable Assets from contradicting other modules.
+      const sellTickers: string[] = [];
+      const highRiskTickers: string[] = [];
+      const avoidSectors = new Set<string>();
+      for (const st of stocks) {
+        const sug = String((st.analysis as any)?.suggestion || "").toLowerCase();
+        const risk = Number((st.analysis as any)?.riskScore || 0);
+        const sector = String((st.analysis as any)?.sector || "").trim();
+        if (sug === "sell" || sug === "exit" || sug === "downside") {
+          sellTickers.push(st.ticker);
+          if (sector) avoidSectors.add(sector);
+        }
+        if (risk >= 70) {
+          highRiskTickers.push(st.ticker);
+          if (sector) avoidSectors.add(sector);
+        }
+      }
+      const portfolioSignals = {
+        sellTickers,
+        highRiskTickers,
+        avoidSectors: Array.from(avoidSectors),
+      };
+
+      // Self-Repair Department: always attempts recovery before showing an error.
+      const result = await runWithRepair<any>({
+        label: "desirable-assets",
+        maxRetries: 2,
+        baseBackoffMs: 2000,
+        // A successful response with an empty recommendations array is a VALID outcome
+        // (no setup passed the elite quant filters this cycle), not a service failure.
+        // Treat it as usable so we surface a clear empty-state instead of looping into
+        // "Unable to reach service".
+        isUsable: (d) => d != null && Array.isArray(d?.recommendations),
+        staleCache: () => {
+          const stale = getStaleCachedDA();
+          return stale && Array.isArray(stale.recommendations) && stale.recommendations.length > 0 ? stale : null;
+        },
+        run: () => governedInvoke("desirable-assets", {
+          body: {
+            portfolioTickers: Array.from(new Set([...existingTickers, ...dpTickers])),
+            portfolioWeights,
+            portfolioSectors,
+            portfolioSignals,
+            portfolioValue: totalValue || 100000,
+            baseCurrency,
+            indiaMode,
+            // On manual force-refresh, drop the recent-slate memory entirely
+            // so the engine isn't fighting two exclusion lists at once.
+            previousTickers: forceRefresh ? [] : getPreviousTickers(),
+            userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
+            preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
+            preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
+            preferredHorizon: selectedHorizon || undefined,
+            // ODGS — Outcome Density Gradient System signals. Lets the AI
+            // pick names the user's own learned profit field already favours
+            // and avoid scarred patterns. Only sent when there's enough
+            // trade history to be meaningful.
+            odgs: odgsTotalTrades >= 5 ? {
+              generation: gradient.generation,
+              totalTrades: odgsTotalTrades,
+              hotAssets: Object.entries(gradient.assetBiases || {})
+                .filter(([, b]) => Number(b) > 1.05)
+                .sort((a, b) => Number(b[1]) - Number(a[1]))
+                .slice(0, 12)
+                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
+              coldAssets: Object.entries(gradient.assetBiases || {})
+                .filter(([, b]) => Number(b) < 0.85)
+                .sort((a, b) => Number(a[1]) - Number(b[1]))
+                .slice(0, 8)
+                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
+              synergyPairs: combinationScores.slice(0, 6).map((c) => ({
+                pair: c.pair,
+                synergy: c.synergyScore,
+                jointWinRate: c.jointWinRate,
+              })),
+              hotZones: desirableZones.slice(0, 4).map((z) => ({
+                assets: z.assets.slice(0, 5),
+                regime: z.regime,
+                avgPnlPct: z.avgPnlPct,
+                density: z.density,
+              })),
+              featureWeights: gradient.featureWeights.map((f) => ({
+                feature: f.feature,
+                weight: f.weight,
+              })),
+              scarTickers: Array.from(new Set(
+                scarMemory
+                  .filter((s) => s.realized_pnl_pct < -2)
+                  .map((s) => s.ticker)
+              )).slice(0, 10),
+            } : undefined,
+          },
+          // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
+          // every poll because currentPrice ticks). Keying on structural identity only.
+          cacheKey: [
+            "v2",
+            baseCurrency,
+            indiaMode ? "in" : "gl",
+            existingTickers.slice().sort().join(","),
+            sellTickers.slice().sort().join(",") || "ns",
+            highRiskTickers.slice().sort().join(",") || "nr",
+            budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
+            selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
+            selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
+            selectedHorizon || "any-horizon",
+          ].join("|"),
+          force: forceRefresh,
+        }),
+      });
+
+      const data = result.data;
+      setAutoRepaired(result.autoRepaired);
+      if (result.autoRepaired) {
+        setRepairNote(
+          result.servedFromStaleCache
+            ? "Served last-good intelligence while live feed recovers."
+            : "Live feed hiccupped, auto-repaired and retrying.",
+        );
+        console.log("[DesirableAssets] auto-repair trail:", result.repairTrail);
+      } else {
+        setRepairNote(null);
+      }
+
+      if (!data || !Array.isArray(data.recommendations)) {
+        throw new Error(result.error || "Service unreachable. Please retry.");
+      }
+
+        if (data.recommendations.length === 0) {
+          // Honest empty: backend ran cleanly but no candidate cleared the screening rules.
+          setMarketCondition(data.marketCondition || "");
+          setRegimeType(data.regimeType || "");
+          setLiveWebContext(data.liveWebContext || "");
+          setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+          setRecommendations([]);
+          setLastFetch(Date.now());
+          // Clear stale exclusion memory — it's almost certainly part of why
+          // we got an empty set. Next refresh starts from a clean slate.
+          try { localStorage.removeItem(DA_PREV_TICKERS_KEY); } catch { /* ignore */ }
+          const gen = data.candidatesGenerated || 0;
+          const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
+            ? ` ${data.rejectSummary.join(". ")}.`
+            : "";
+          const refillTried = Array.isArray(data.repairTrail)
+            && data.repairTrail.some((s: string) => typeof s === "string" && s.toLowerCase().includes("refill"));
+          const refillNote = refillTried
+            ? " Replacement search was attempted but didn't return enough fresh names."
+            : "";
+          setError(
+            gen > 0
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry — the next pass will start with a fresh exclusion window.`
+              : "No setups generated this cycle. Try again or adjust filters.",
+          );
+          retryCount.current = 0;
+          return;
+        }
+
+      if (data.autoRepaired && Array.isArray(data.repairTrail)) {
+        const reserveRecovered = data.repairTrail.some((s: string) => /reserve universe|reserve ranking/i.test(String(s)));
+        if (reserveRecovered) {
+          setRepairNote("Live AI slate was thin, so the engine switched to a price-verified reserve ranking to keep the board populated.");
+        }
+      }
+
+      const sanitizedRecommendations = data.recommendations.map(sanitizeRecommendation);
+
+      const payload = {
+        recommendations: sanitizedRecommendations,
+        marketCondition: data.marketCondition || "",
+        regimeType: data.regimeType || "",
+        liveWebContext: data.liveWebContext || "",
+        candidatesGenerated: data.candidatesGenerated || 0,
+        candidatesPassed: data.candidatesPassed || 0,
+      };
+      
+      // Save tickers for anti-repeat on next refresh
+      const newTickers = sanitizedRecommendations.map((r) => r.ticker);
+      // Replace, don't append — the recent-slate memory is a single window.
+      savePreviousTickers(newTickers);
+      
+      setMarketCondition(data.marketCondition || "");
+      setRegimeType(data.regimeType || "");
+      setLiveWebContext(data.liveWebContext || "");
+      setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
+      
+      setCachedDA(payload);
+      setRecommendations(sanitizedRecommendations);
+      setLastFetch(Date.now());
+      setError(null);
+      retryCount.current = 0;
+    } catch (e: any) {
+      console.error("Desirable assets error:", e);
+      setAutoRepaired(false);
+      setRepairNote(null);
+      setError(e.message || "Failed to load recommendations");
+      if (retryCount.current < MAX_RETRIES && !e.message?.includes("credits")) {
+        retryCount.current++;
+        setTimeout(() => fetchRecommendations(false), retryCount.current * 5000);
+      }
+    } finally {
+      setLoading(false);
       setLoadingProgress(100);
       setLoadingStage("Complete");
       if (progressTimer.current) {
@@ -189,77 +620,45 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         progressTimer.current = null;
       }
     }
-    return () => {
-      if (progressTimer.current) {
-        clearInterval(progressTimer.current);
-        progressTimer.current = null;
-      }
-    };
-  }, [loading]);
+  }, [stocks.length, baseCurrency, indiaMode, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
 
-  const existingTickers = useMemo(() => new Set(stocks.map((s) => s.ticker.toUpperCase())), [stocks]);
-  const diagnostics = response?.diagnostics ?? null;
-  const stats = {
-    generated: diagnostics?.universeSize ?? 0,
-    passed: diagnostics?.validated ?? 0,
-  };
-  const regimeType = response?.regime.label ?? "";
-  const marketCondition = response
-    ? [...response.regime.evidence.slice(0, 1), ...response.macro.evidence.slice(0, 2)].join(" ")
-    : "";
+  // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
-  const hasActiveFilters = Boolean(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon);
-  const isHonestEmptyState = Boolean(!error && !loading && recommendations.length === 0 && (diagnostics?.universeSize ?? 0) > 0);
-
-  const rejectSummary = useMemo(() => {
-    if (!diagnostics) return [] as string[];
-    return Object.entries(diagnostics.rejectionSummary)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([code, count]) => `${count} ${REJECTION_LABELS[code] || code.replace(/_/g, " ")}`);
-  }, [diagnostics]);
-
-  const toggleChip = <T,>(set: Set<T>, setter: React.Dispatch<React.SetStateAction<Set<T>>>, value: T) => {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value); else next.add(value);
-    setter(next);
-  };
-
-  const toggleEvidence = (symbol: string) => {
-    setExpandedEvidence((prev) => {
-      const next = new Set(prev);
-      if (next.has(symbol)) next.delete(symbol); else next.add(symbol);
-      return next;
-    });
-  };
-
-  // Quantity: engine sizing first; explicit budget applies the engine's
-  // suggested weight to the user's stated capital instead. The budget is
-  // in the user's base currency (e.g. INR), so convert the asset's price
-  // into base terms before dividing — never rupees ÷ dollars.
-  const qtyFor = (o: ValidatedOpportunity): number => {
-    const budgetNum = budget ? parseFloat(budget.replace(/,/g, "")) : 0;
-    if (budgetNum > 0 && o.price > 0) {
-      const priceInBase = convertToBase(o.price, o.currency);
-      if (priceInBase > 0) {
-        return Math.max(1, Math.floor((budgetNum * o.sizing.suggestedWeightPct / 100) / priceInBase));
-      }
+  // Hydrate from cache on mount so returning users see their last results instantly
+  // without having to re-run the funnel. Cache TTL is 2h.
+  useEffect(() => {
+    const cached = getCachedDA();
+    if (cached && Array.isArray(cached.recommendations) && cached.recommendations.length > 0) {
+      setRecommendations(cached.recommendations.map(sanitizeRecommendation));
+      setMarketCondition(cached.marketCondition || "");
+      setRegimeType(cached.regimeType || "");
+      setLiveWebContext(cached.liveWebContext || "");
+      setStats({ generated: cached.candidatesGenerated || 0, passed: cached.candidatesPassed || 0 });
+      setLastFetch(cached.timestamp);
+      setHasSearched(true);
+      return;
     }
-    return Math.max(1, o.sizing.suggestedQty ?? 1);
-  };
 
-  const handleAdd = (o: ValidatedOpportunity) => {
-    const qty = qtyFor(o);
-    onAddToPortfolio(o.symbol, o.price, qty);
-    setAddedTickers((prev) => new Set(prev).add(o.symbol));
-    toast({ title: `Added ${o.symbol}`, description: `${qty} units at ${getCurrencySymbol(o.currency)}${o.price.toLocaleString()}` });
+    if (!bootstrapFetchDone.current) {
+      bootstrapFetchDone.current = true;
+      setHasSearched(true);
+      fetchRecommendations(true, true);
+    }
+  }, [fetchRecommendations]);
+
+  const handleAdd = (rec: Recommendation) => {
+    const price = rec.realPrice || rec.currentEstPrice;
+    onAddToPortfolio(rec.ticker, price, rec.suggestedQty || 1);
+    setAddedTickers(prev => new Set(prev).add(rec.ticker));
+    toast({ title: `Added ${rec.ticker}`, description: `${rec.suggestedQty} units at ${getCurrencySymbol(rec.realCurrency || rec.currency)}${price.toLocaleString()}` });
+
   };
 
   const showInlineLoader = loading && recommendations.length === 0;
 
   return (
     <div className="space-y-5">
-      {/* Header (classic) */}
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
@@ -268,10 +667,9 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight">Desirable Assets</h2>
             <p className="text-[10px] text-muted-foreground font-mono tracking-wider">
-              QUANT VALIDATED · {REGION_LABELS[baseCurrency] || "Global"}
-              {regimeType && <span className={`ml-2 uppercase ${regimeType === "risk-off" ? "text-loss" : regimeType === "risk-on" ? "text-gain" : "text-warning"}`}>{regimeType}</span>}
+              QUANT VALIDATED · {REGION_LABELS[baseCurrency] || "Global"} · {regimeType && <span className={`uppercase ${regimeType === "crisis" ? "text-loss" : regimeType === "risk-off" ? "text-warning" : "text-gain"}`}>{regimeType}</span>}
               {stats.generated > 0 && <span className="ml-2 text-primary">{stats.passed}/{stats.generated} passed</span>}
-              {fetchedAt && <span className="ml-2">{Math.round((Date.now() - fetchedAt) / 1000)}s ago</span>}
+              {lastFetch && <span className="ml-2">{Math.round((Date.now() - lastFetch) / 1000)}s ago</span>}
             </p>
           </div>
         </div>
@@ -280,21 +678,24 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground">Cached 30m</span>
-          <Button size="sm" variant="ghost" onClick={() => refresh(true)} className="h-7 gap-1.5 text-xs">
+          <span className="text-[9px] font-mono text-muted-foreground">Cached 2h</span>
+          <Button size="sm" variant="ghost" onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, true); }} className="h-7 gap-1.5 text-xs">
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
 
-      {/* Needs & Constraints Bar (classic) */}
+      {/* Needs & Constraints Bar */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <button onClick={() => setShowConstraints(!showConstraints)} className="flex items-center gap-2 w-full text-left">
+        <button
+          onClick={() => setShowConstraints(!showConstraints)}
+          className="flex items-center gap-2 w-full text-left"
+        >
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold text-foreground">Needs & Constraints</span>
           <span className="text-[10px] text-muted-foreground ml-1">
-            {hasActiveFilters
-              ? [budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedHorizon ? (HORIZONS.find(h => h.key === selectedHorizon)?.label || selectedHorizon) : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")
+            {(budget || selectedAssetTypes.size > 0 || selectedSectors.size > 0 || selectedHorizon)
+              ? `${[budget ? `${getCurrencySymbol(baseCurrency)}${budget}` : "", selectedHorizon ? (HORIZONS.find(h => h.key === selectedHorizon)?.label || selectedHorizon) : "", selectedAssetTypes.size > 0 ? `${selectedAssetTypes.size} types` : "", selectedSectors.size > 0 ? `${selectedSectors.size} sectors` : ""].filter(Boolean).join(" · ")}`
               : "Set your preferences"}
           </span>
           <span className={`ml-auto text-muted-foreground text-xs transition-transform ${showConstraints ? "rotate-180" : ""}`}>▼</span>
@@ -323,15 +724,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               <div className="flex flex-wrap gap-1.5">
                 {ASSET_TYPES.map((type) => (
                   <button
-                    key={type.key}
-                    onClick={() => toggleChip(selectedAssetTypes, setSelectedAssetTypes, type.key)}
+                    key={type}
+                    onClick={() => toggleChip(selectedAssetTypes, setSelectedAssetTypes, type)}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                      selectedAssetTypes.has(type.key)
+                      selectedAssetTypes.has(type)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
                     }`}
                   >
-                    {type.label}
+                    {type}
                   </button>
                 ))}
               </div>
@@ -343,15 +744,15 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
               <div className="flex flex-wrap gap-1.5">
                 {SECTORS.map((sector) => (
                   <button
-                    key={sector.label}
-                    onClick={() => toggleChip(selectedSectors, setSelectedSectors, sector.label)}
+                    key={sector}
+                    onClick={() => toggleChip(selectedSectors, setSelectedSectors, sector)}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                      selectedSectors.has(sector.label)
+                      selectedSectors.has(sector)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-muted/50 text-muted-foreground border-border hover:border-primary/50"
                     }`}
                   >
-                    {sector.label}
+                    {sector}
                   </button>
                 ))}
               </div>
@@ -361,7 +762,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="h-3 w-3" /> Time Horizon
-                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">— sets the evaluation horizon for edge, risk and validation</span>
+                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">— filters picks to match how long you'll hold</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {HORIZONS.map((h) => (
@@ -382,7 +783,11 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             </div>
 
             {/* Apply */}
-            <Button size="sm" onClick={() => refresh(true)} className="w-full h-8 text-xs gap-1.5">
+            <Button
+              size="sm"
+              onClick={() => { setHasSearched(true); retryCount.current = 0; fetchRecommendations(true, false); }}
+              className="w-full h-8 text-xs gap-1.5"
+            >
               <Sparkles className="h-3 w-3" />
               Find Assets
             </Button>
@@ -390,56 +795,37 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         )}
       </div>
 
-      {/* Error banner (classic look) */}
-      {error && recommendations.length === 0 && !loading && (
-        <div className="rounded-xl border border-loss/20 bg-loss/5 p-4">
+      {/* Error Banner */}
+      {error && recommendations.length === 0 && (
+        <div className={`rounded-xl border p-4 ${isHonestEmptyState ? "border-warning/20 bg-warning/5" : "border-loss/20 bg-loss/5"}`}>
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-loss/10">
-              <AlertTriangle className="h-4 w-4 text-loss flex-shrink-0" />
+            <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${isHonestEmptyState ? "bg-warning/10" : "bg-loss/10"}`}>
+              {isHonestEmptyState ? <Ban className="h-4 w-4 text-warning flex-shrink-0" /> : <AlertTriangle className="h-4 w-4 text-loss flex-shrink-0" />}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-foreground">Feed interrupted</p>
-                <span className="rounded-full px-2 py-0.5 text-[9px] font-mono bg-loss/10 text-loss">LIVE FAILURE</span>
+                <p className="text-sm font-semibold text-foreground">{errorTitle}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-mono ${isHonestEmptyState ? "bg-warning/10 text-warning" : "bg-loss/10 text-loss"}`}>
+                  {isHonestEmptyState ? "HONEST EMPTY" : "LIVE FAILURE"}
+                </span>
+                {selectedHorizon && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-mono text-primary">
+                    {HORIZONS.find((h) => h.key === selectedHorizon)?.label || selectedHorizon}
+                  </span>
+                )}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                The engine did not complete cleanly, so nothing was shown as a fake fallback.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{errorDetail}</p>
               <p className="mt-2 text-sm text-foreground">{error}</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => refresh(true)}>Retry live</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Honest empty (classic look, engine-backed accounting) */}
-      {isHonestEmptyState && (
-        <div className="rounded-xl border border-warning/20 bg-warning/5 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning/10">
-              <Ban className="h-4 w-4 text-warning flex-shrink-0" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-foreground">No clean setups right now</p>
-                <span className="rounded-full px-2 py-0.5 text-[9px] font-mono bg-warning/10 text-warning">HONEST EMPTY</span>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{EMPTY_STATE_MESSAGE}</p>
-              {engineSlate.length > recommendations.length ? (
-                <p className="mt-2 text-sm text-foreground">
-                  {engineSlate.length - recommendations.length} validated name{engineSlate.length - recommendations.length === 1 ? " is" : "s are"} hidden by your sector filters.
-                </p>
-              ) : rejectSummary.length > 0 ? (
-                <p className="mt-2 text-sm text-foreground">{rejectSummary.join(". ")}.</p>
-              ) : null}
               <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground font-mono">
-                <span className="rounded-full bg-surface-2 px-2 py-1">Screened {stats.generated}</span>
+                <span className="rounded-full bg-surface-2 px-2 py-1">Generated {stats.generated}</span>
                 <span className="rounded-full bg-surface-2 px-2 py-1">Passed {stats.passed}</span>
                 <span className="rounded-full bg-surface-2 px-2 py-1">Filters {hasActiveFilters ? "custom" : "default"}</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <Button size="sm" variant="secondary" onClick={() => refresh(true)}>Retry live</Button>
+              <Button size="sm" variant={isHonestEmptyState ? "secondary" : "outline"} onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}>
+                Retry live
+              </Button>
               {hasActiveFilters && (
                 <Button size="sm" variant="ghost" onClick={() => { setBudget(""); setSelectedAssetTypes(new Set()); setSelectedSectors(new Set()); setSelectedHorizon(""); }}>
                   Clear filters
@@ -450,7 +836,38 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
-      {/* Staged loader (classic look, real stage names) */}
+      {error && recommendations.length > 0 && (
+        <div className="rounded-xl border border-warning/20 bg-warning/5 p-3 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground">Live refresh failed — showing last good results.</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{error}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}>
+            Retry live
+          </Button>
+        </div>
+      )}
+
+      {/* Auto-Repair Badge, shown only when backend self-healed or we served stale cache */}
+      {autoRepaired && recommendations.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+            <Wrench className="h-3.5 w-3.5 text-primary animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Auto-Repair Department</span>
+              <span className="text-[9px] font-mono text-muted-foreground">SELF-HEALED</span>
+            </div>
+            <p className="text-xs text-foreground mt-0.5">
+              {repairNote || "Live feed recovered automatically, results are valid."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Initial state, no search yet */}
       {showInlineLoader && (
         <div className="flex flex-col items-center justify-center py-12 gap-4 max-w-md mx-auto">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -463,20 +880,32 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             </div>
             <Progress value={loadingProgress} className="h-2.5 bg-surface-2" />
             <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
-              <span>Universe</span>
-              <span>Evidence</span>
-              <span>Models</span>
-              <span>Validate</span>
+              <span>AI Candidates</span>
+              <span>Price Verify</span>
+              <span>Quant Filter</span>
+              <span>Rank</span>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground/60 font-mono text-center mt-2">
-            Shared pipeline: macro context → universe → evidence → independent models → consensus → validation
+            4-stage funnel: AI generation → Price verify → Quant filter → Monte Carlo stress test
           </p>
         </div>
       )}
 
-      {/* Market Assessment (classic card, measured content) */}
-      {marketCondition && !showInlineLoader && (
+      {!hasSearched && !loading && recommendations.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Target className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-medium text-foreground">Set your preferences above</p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Configure your budget, preferred asset types, and sectors, then click <strong>Find Assets</strong> to get tailored recommendations.
+          </p>
+        </div>
+      )}
+
+      {/* Market Condition */}
+      {marketCondition && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
           <div className="flex items-center gap-2 mb-1">
             <Zap className="h-3.5 w-3.5 text-primary" />
@@ -486,156 +915,352 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
-      {/* Cards (classic layout) */}
+      {/* Live Web Pulse — Real-time Google Search grounding */}
+      {liveWebContext && liveWebContext.trim().length > 30 && (
+        <div className="rounded-xl border border-gain/20 bg-gain/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-3.5 w-3.5 text-gain animate-pulse" />
+            <span className="text-[10px] font-bold text-gain uppercase tracking-wider">Live Web Pulse</span>
+            <span className="text-[9px] text-muted-foreground">· Real-time Google Search grounding</span>
+          </div>
+          <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground font-sans">{liveWebContext.replace(/^\s*## LIVE WEB CONTEXT[^\n]*\n/, "").trim()}</pre>
+        </div>
+      )}
+
+      {/* Cards */}
       <div className="grid gap-4 md:grid-cols-2">
         {recommendations.map((rec, i) => {
-          const sym = getCurrencySymbol(rec.currency);
-          const price = rec.price;
-          const target = rec.tradePlan.objective;
-          const stop = rec.tradePlan.invalidationLevel;
-          const upside = price > 0 ? ((target - price) / price) * 100 : 0;
-          const downside = price > 0 ? ((stop - price) / price) * 100 : 0;
-          const inZone = price >= rec.tradePlan.entryLow && price <= rec.tradePlan.entryHigh;
-          const alreadyOwned = existingTickers.has(rec.symbol.toUpperCase());
-          const justAdded = addedTickers.has(rec.symbol);
-          const spark = rec.sparkline;
-          const change = spark.length >= 2 ? ((spark[spark.length - 1] - spark[spark.length - 2]) / spark[spark.length - 2]) * 100 : 0;
-          const confidencePct = Math.round(rec.confidence * 100);
-          const qty = qtyFor(rec);
-          const evidenceOpen = expandedEvidence.has(rec.symbol);
-          const conflicted = rec.contradictingEvidence.length > 0;
+          const price = rec.realPrice || rec.currentEstPrice || 0;
+          const sym = getCurrencySymbol(rec.realCurrency || rec.currency);
+          const targetPrice = rec.targetPrice || 0;
+          const stopLoss = rec.stopLoss || 0;
+          const entryZone: [number, number] = [rec.entryZone?.[0] || 0, rec.entryZone?.[1] || 0];
+          const upside = price > 0 ? ((targetPrice - price) / price * 100) : 0;
+          const downside = price > 0 ? ((stopLoss - price) / price * 100) : 0;
+          const inZone = price >= entryZone[0] && price <= entryZone[1];
+          const priceChange24h = rec.priceChange24h || 0;
+          const alreadyOwned = existingTickers.includes(rec.ticker);
+          const justAdded = addedTickers.has(rec.ticker);
+          const odgs = getAssetBoost(rec.ticker);
+          const qs = Math.round(rec.quantScore || 0);
+          const boostedAlloc = Math.max(1, Math.round((rec.suggestedQty || 1) * odgs.allocMult));
+          const disagreement = rec.riskVerdict === "high";
+
+          // ── ODG outcome-path validation: desirable asset != desirable trade ──
+          const validation = validateSignal({
+            ticker: rec.ticker,
+            signalType: "invest",
+            features: {
+              momentum: rec.momentum20d ?? 0,
+              vol: rec.volatility ?? 0,
+              sentiment: rec.sentimentScore ?? 0,
+            },
+            regime: regimeType || "unknown",
+          });
+          const tradeBlocked = !validation.executable;
 
           return (
-            <div key={rec.symbol} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
+            <div key={rec.ticker} className={`glass-panel rounded-xl p-5 transition-all hover:glass-glow-primary ${i < 2 ? "glass-glow-primary" : ""}`}>
               {/* Header row */}
               <div className="flex items-center justify-between mb-3 relative z-10">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-base font-bold text-foreground">{rec.symbol}</span>
-                  <span className={`rounded border px-1.5 py-0.5 text-[9px] font-mono ${rec.direction === "long" ? "bg-gain/10 text-gain border-gain/20" : "bg-loss/10 text-loss border-loss/20"}`}>
-                    {rec.direction.toUpperCase()}
-                  </span>
-                  <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> VALIDATED
-                  </span>
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[8px] font-mono ${rec.consensus.bucketConsensus === "ALL_3" ? "bg-gain/15 text-gain" : "bg-primary/15 text-primary"}`}
-                    title={`Independent info-buckets: price/flow ${rec.consensus.bucketDirs.A === 1 ? "↑" : rec.consensus.bucketDirs.A === -1 ? "↓" : "—"} · fundamental ${rec.consensus.bucketDirs.B === 1 ? "↑" : rec.consensus.bucketDirs.B === -1 ? "↓" : "—"} · risk/regime ${rec.consensus.bucketDirs.C === 1 ? "↑" : rec.consensus.bucketDirs.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} models · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated`}
-                  >
-                    {rec.consensus.bucketConsensus === "ALL_3" ? "3/3" : rec.consensus.bucketConsensus === "TWO_OF_3" ? "2/3" : rec.consensus.bucketConsensus} · {Math.round(rec.consensus.calibratedProb * 100)}%
-                  </span>
-                  {conflicted && (
-                    <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[8px] font-mono text-warning flex items-center gap-0.5" title={rec.contradictingEvidence[0]}>
-                      <AlertTriangle className="h-2.5 w-2.5" /> MIXED EVIDENCE
+                  <span className="font-mono text-base font-bold text-foreground">{rec.ticker}</span>
+                  {rec.strategy && (
+                    <span className={`rounded border px-1.5 py-0.5 text-[9px] font-mono ${strategyColors[rec.strategy] || "bg-surface-3 text-muted-foreground border-border"}`}>
+                      {rec.strategy.replace(/_/g, " ").toUpperCase()}
+                    </span>
+                  )}
+                  {rec.simulationTested && (
+                    <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> MC SIM
+                    </span>
+                  )}
+                  {typeof rec.sentimentScore === "number" && (
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono bg-surface-2 ${sentimentColor(rec.sentimentScore)}`}>
+                      SENT {rec.sentimentScore > 0 ? "+" : ""}{rec.sentimentScore}
+                    </span>
+                  )}
+                  {rec.earningsSignal && (
+                    <span className={`rounded px-1.5 py-0.5 text-[8px] font-mono bg-surface-2 ${earningsSignalColor(rec.earningsSignal)}`}>
+                      EARN {rec.earningsSignal.toUpperCase()}
+                    </span>
+                  )}
+                  {(rec.momentum20d || 0) > 0 && (
+                    <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain flex items-center gap-0.5">
+                      <TrendingUp className="h-2.5 w-2.5" /> +{rec.momentum20d?.toFixed(1)}%
                     </span>
                   )}
                   {i < 2 && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-mono text-primary">TOP PICK</span>}
-                </div>
-                <Sparkline data={spark} />
-              </div>
-
-              {/* Name + price row */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">{rec.name}</p>
-                  <p className="text-[9px] font-mono text-muted-foreground/70">{rec.sector || rec.assetClass.toUpperCase()}{rec.exchange ? ` · ${rec.exchange}` : ""}</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-lg font-bold text-foreground">{sym}{price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-                  <div className={`text-[10px] font-mono ${change >= 0 ? "text-gain" : "text-loss"}`}>
-                    {change >= 0 ? "+" : ""}{change.toFixed(2)}% today
-                  </div>
-                </div>
-              </div>
-
-              {/* Entry / Target / Stop (classic rows, vol-derived levels) */}
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="rounded-lg bg-surface-2 px-2 py-1.5" title="±0.25× the expected horizon volatility around the last close">
-                  <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground">Entry zone {inZone && <span className="text-gain">· IN</span>}</div>
-                  <div className="font-mono text-[11px] text-foreground">{sym}{rec.tradePlan.entryLow.toFixed(2)}–{rec.tradePlan.entryHigh.toFixed(2)}</div>
-                </div>
-                <div className="rounded-lg bg-surface-2 px-2 py-1.5" title="1σ favorable move over the horizon — the consensus prior, not a promise">
-                  <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Target className="h-2.5 w-2.5" /> Objective</div>
-                  <div className="font-mono text-[11px] text-gain">{sym}{target.toFixed(2)} <span className="text-[9px]">({upside >= 0 ? "+" : ""}{upside.toFixed(1)}%)</span></div>
-                </div>
-                <div className="rounded-lg bg-surface-2 px-2 py-1.5" title="1.25σ adverse move — the same level quoted in the invalidation conditions">
-                  <div className="text-[8px] font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Shield className="h-2.5 w-2.5" /> Invalidation</div>
-                  <div className="font-mono text-[11px] text-loss">{sym}{stop.toFixed(2)} <span className="text-[9px]">({downside.toFixed(1)}%)</span></div>
-                </div>
-              </div>
-
-              {/* Confidence bar + stats (classic) */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1">
-                  <span>Confidence {confidencePct}%</span>
-                  <span>
-                    Edge {rec.expectedEdgePct >= 0 ? "+" : ""}{(rec.expectedEdgePct * 100).toFixed(1)}% · VaR −{(rec.downsideRiskPct * 100).toFixed(1)}% · {rec.horizonDays}d
+                  {odgs.isHot && <span className="rounded bg-gain/10 px-1.5 py-0.5 text-[8px] font-mono text-gain">ODGS ↑</span>}
+                  {rec.consensus && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                        rec.bucketConsensus === "ALL_3"
+                          ? "bg-gain/15 text-gain"
+                          : rec.bucketConsensus === "TWO_OF_3"
+                            ? "bg-primary/15 text-primary"
+                            : "bg-loss/10 text-loss"
+                      }`}
+                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "—"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "—"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
+                    >
+                      {rec.bucketConsensus === "ALL_3" ? "3/3" : rec.bucketConsensus === "TWO_OF_3" ? "2/3" : rec.bucketConsensus === "SPLIT" ? "SPLIT" : "1/3"} · {Math.round(rec.consensus.calibratedProb * 100)}%
+                    </span>
+                  )}
+                  {typeof rec.costHaircutPct === "number" && rec.costHaircutPct >= 1 && (
+                    <span
+                      className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-mono text-amber-400"
+                      title={`Round-trip cost ≈ ${rec.costHaircutPct}% (${rec.liquidityTier}) — eats into edge`}
+                    >
+                      ⚠ COST {rec.costHaircutPct}%
+                    </span>
+                  )}
+                  {disagreement && (
+                    <span className="rounded bg-loss/10 px-1.5 py-0.5 text-[8px] font-mono text-loss flex items-center gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" /> RISK CONFLICT
+                    </span>
+                  )}
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[8px] font-mono flex items-center gap-0.5 ${
+                      validation.status === "EXECUTABLE"
+                        ? "bg-gain/10 text-gain"
+                        : validation.status === "ARMED"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-loss/10 text-loss"
+                    }`}
+                    title={`Adverse ${(validation.pAdverse * 100).toFixed(0)}% · DD ${validation.expectedDrawdownPct.toFixed(1)}% / budget ${validation.drawdownBudgetPct.toFixed(1)}%`}
+                  >
+                    {validation.status === "EXECUTABLE"
+                      ? "ODG OK"
+                      : validation.status === "ARMED"
+                      ? `ARMED · ${validation.confirmationsMissing[0]?.replace(/_/g, " ") || "wait"}`
+                      : `BLOCKED · ${validation.topReason}`}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden">
-                  <div className={`h-full rounded-full ${confidencePct >= 72 ? "bg-gain" : confidencePct >= 62 ? "bg-primary" : "bg-warning"}`} style={{ width: `${confidencePct}%` }} />
+                <div className="flex items-center gap-1.5">
+                  {/* Quant Score badge */}
+                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-mono font-bold ${qs >= 70 ? "bg-gain/10 text-gain" : qs >= 45 ? "bg-warning/10 text-warning" : "bg-loss/10 text-loss"}`}>
+                    Q{qs}
+                  </span>
                 </div>
               </div>
 
-              {/* Thesis + catalyst (classic slots, evidence-backed content) */}
-              {rec.supportingEvidence[0] && (
-                <p className="text-xs text-foreground/90 leading-snug mb-1.5">{rec.supportingEvidence.slice(0, 2).join(" ")}</p>
-              )}
-              <p className="text-[11px] text-muted-foreground leading-snug mb-3">
-                <span className="font-semibold text-foreground/80">What changed: </span>{rec.recentChange}
-              </p>
+              <p className="text-xs text-muted-foreground mb-1 relative z-10">{rec.name}</p>
 
-              {/* Expandable full evidence */}
-              <button onClick={() => toggleEvidence(rec.symbol)} className="flex w-full items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground mb-2">
-                <Activity className="h-3 w-3" />
-                {rec.consensus.engineCount} models · evidence for & against · what invalidates it
-                <ChevronDown className={`ml-auto h-3 w-3 transition-transform ${evidenceOpen ? "rotate-180" : ""}`} />
-              </button>
-              {evidenceOpen && (
-                <div className="mb-3 rounded-lg border border-border/60 bg-surface-1 px-3 py-2 space-y-2">
-                  {rec.supportingEvidence.length > 0 && (
-                    <div>
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-gain flex items-center gap-1"><TrendingUp className="h-2.5 w-2.5" /> For</div>
-                      <ul className="mt-0.5 space-y-0.5">
-                        {rec.supportingEvidence.slice(0, 4).map((e, j) => <li key={j} className="text-[10px] leading-snug text-foreground/90">• {e}</li>)}
-                      </ul>
-                    </div>
+              {/* Paired instrument */}
+              {rec.pairedStructure && (
+                <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 px-3 py-1.5 mb-2 text-[10px] font-mono text-purple-400 relative z-10">
+                  <span className="font-bold">STRUCTURE:</span> {rec.pairedStructure}
+                  {rec.capitalEfficiency && rec.capitalEfficiency > 1 && (
+                    <span className="ml-2 text-amber-400">{rec.capitalEfficiency}x capital efficiency</span>
                   )}
-                  {rec.contradictingEvidence.length > 0 && (
-                    <div>
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-loss flex items-center gap-1"><TrendingDown className="h-2.5 w-2.5" /> Against</div>
-                      <ul className="mt-0.5 space-y-0.5">
-                        {rec.contradictingEvidence.slice(0, 3).map((e, j) => <li key={j} className="text-[10px] leading-snug text-muted-foreground">• {e}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Shield className="h-2.5 w-2.5" /> Invalidated by</div>
-                    <ul className="mt-0.5 space-y-0.5">
-                      {rec.invalidation.slice(0, 3).map((e, j) => <li key={j} className="text-[10px] leading-snug text-muted-foreground">• {e}</li>)}
-                    </ul>
-                  </div>
-                  {rec.historicalStats && (
-                    <p className="text-[9px] font-mono text-muted-foreground">
-                      History: {rec.historicalStats.sampleSize} similar {rec.historicalStats.horizonDays}d windows · {rec.historicalStats.hitRatePct}% win rate
+                </div>
+              )}
+
+              <p className="text-[11px] text-secondary-foreground leading-relaxed mb-3 relative z-10">{(rec.thesis || "").replace(/\*{1,3}/g, "").replace(/&\(/g, "(").replace(/#{1,4}\s*/g, "").replace(/`/g, "")}</p>
+
+              {/* Quant Proof Section */}
+              {rec.sharpeRatio !== undefined && (
+                <div className="grid grid-cols-5 gap-1.5 mb-3 rounded-lg bg-surface-2 p-2.5 relative z-10">
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Sharpe</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.sharpeRatio || 0) >= 0.5 ? "text-gain" : (rec.sharpeRatio || 0) >= 0 ? "text-warning" : "text-loss"}`}>
+                      {rec.sharpeRatio?.toFixed(2)}
                     </p>
-                  )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Port Corr</p>
+                    <p className={`font-mono text-xs font-bold ${corrColor(rec.portfolioCorrelation || 0)}`}>
+                      {rec.portfolioCorrelation?.toFixed(2)}
+                    </p>
+                    <p className={`text-[7px] ${corrColor(rec.portfolioCorrelation || 0)}`}>
+                      {corrLabel(rec.portfolioCorrelation || 0)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">MaxDD</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.maxDrawdown || 0) < 15 ? "text-gain" : (rec.maxDrawdown || 0) < 25 ? "text-warning" : "text-loss"}`}>
+                      {rec.maxDrawdown?.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Vol</p>
+                    <p className="font-mono text-xs font-bold text-foreground">{rec.volatility?.toFixed(1)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[7px] text-muted-foreground uppercase">Z-Score</p>
+                    <p className={`font-mono text-xs font-bold ${(rec.zScore || 0) < -1.5 ? "text-gain" : (rec.zScore || 0) > 1.5 ? "text-loss" : "text-foreground"}`}>
+                      {rec.zScore?.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {/* Footer: qty + add (classic) */}
-              <div className="flex items-center justify-between border-t border-border/50 pt-3">
-                <div className="text-[10px] font-mono text-muted-foreground" title={`Sizing: ${rec.sizing.suggestedWeightPct}% of capital, bound by ${rec.sizing.basis === "fractional_kelly" ? "¼-Kelly" : "2% vol budget"}; est. loss at VaR ${rec.sizing.estMaxLossPct}% of capital.${rec.portfolioFit ? ` ${rec.portfolioFit.note}` : ""}`}>
-                  Qty {qty} · {rec.sizing.suggestedWeightPct}% alloc · cost {rec.costHaircutPct}%
+              {(rec.evidenceSummary?.length || rec.portfolioFit || rec.riskCompositeScore !== undefined) && (
+                <div className="mb-3 rounded-lg border border-border bg-card/60 p-3 relative z-10">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-primary">Why this passed</span>
+                    {rec.riskCompositeScore !== undefined && (
+                      <span className={`text-[9px] font-mono ${rec.riskVerdict === "high" ? "text-loss" : rec.riskVerdict === "medium" ? "text-warning" : "text-gain"}`}>
+                        Risk {rec.riskCompositeScore}/100
+                      </span>
+                    )}
+                  </div>
+                  {rec.portfolioFit && <p className="mb-2 text-[10px] text-foreground">{rec.portfolioFit}</p>}
+                  {rec.evidenceSummary?.length ? (
+                    <div className="flex flex-wrap gap-1">
+                      {rec.evidenceSummary.map((item) => (
+                        <span key={item} className="rounded-full bg-surface-2 px-2 py-0.5 text-[9px] text-muted-foreground">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-                <Button
+              )}
+
+              {/* Max Profit Target */}
+              {(rec as any).maxProfitTarget && (rec as any).maxProfitTarget > price && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 mb-3 relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Target className="h-3 w-3 text-primary" />
+                      <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Quant Max Profit</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-muted-foreground">
+                      {(rec as any).maxProfitConfidence}% confidence · {(rec as any).maxProfitMethod}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="font-mono text-sm font-bold text-primary">
+                      {sym}{(rec as any).maxProfitTarget.toLocaleString()}
+                    </span>
+                    <span className="font-mono text-[10px] text-gain">
+                      +{(((rec as any).maxProfitTarget - price) / price * 100).toFixed(1)}% from current
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Price + Sparkline */}
+              <div className="flex items-center gap-3 mb-3 relative z-10">
+                <div className="flex-1 grid grid-cols-4 gap-2">
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Current</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{sym}{price.toLocaleString()}</p>
+                    <p className={`font-mono text-[9px] ${priceChange24h >= 0 ? "text-gain" : "text-loss"}`}>
+                      {priceChange24h >= 0 ? "+" : ""}{priceChange24h.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Target</p>
+                    <p className="font-mono text-sm font-bold text-gain">{sym}{targetPrice.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-gain">+{upside.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">Stop Loss</p>
+                    <p className="font-mono text-sm font-bold text-loss">{sym}{stopLoss.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-loss">{downside.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
+                    {(() => {
+                      const hc = rec.horizonClass;
+                      const cls = hc === "intraday" ? "bg-red-500/10 text-red-400 border-red-500/20"
+                        : hc === "short_term" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        : hc === "medium_term" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        : hc === "long_term" ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        : "bg-muted/30 text-muted-foreground border-border";
+                      const label = hc === "intraday" ? "INTRADAY"
+                        : hc === "short_term" ? "SHORT-TERM"
+                        : hc === "medium_term" ? "MID-TERM"
+                        : hc === "long_term" ? "LONG-TERM"
+                        : "HORIZON";
+                      return (
+                        <span className={`inline-flex items-center gap-1 mt-0.5 px-1.5 py-[1px] rounded-full border text-[8px] font-mono font-bold ${cls}`} title={`Hold window: ${rec.timeHorizon || "n/a"}`}>
+                          <Clock className="h-2 w-2" />
+                          {label} · {rec.timeHorizon || "n/a"}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <Sparkline data={rec.closes || []} />
+              </div>
+
+              {/* Entry Zone */}
+              <div className={`rounded-lg px-3 py-2 mb-3 text-[10px] font-mono relative z-10 ${inZone ? "bg-gain/10 text-gain border border-gain/20" : "bg-surface-2 text-muted-foreground"}`}>
+                <span className="font-bold">{inZone ? "IN ENTRY ZONE" : "ENTRY ZONE"}</span>: {sym}{entryZone[0].toLocaleString()} – {sym}{entryZone[1].toLocaleString()}
+                {inZone && " · BUY SIGNAL ACTIVE"}
+              </div>
+
+              {/* Position Sizing */}
+              <div className="rounded-lg bg-surface-2 px-3 py-2 mb-3 text-[10px] font-mono relative z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Position Size</span>
+                  <span className="text-foreground font-bold">{boostedAlloc} units</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-muted-foreground">Capital</span>
+                  <span className="text-primary">{sym}{(price * boostedAlloc).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-muted-foreground">Allocation</span>
+                  <span className="text-foreground">{(rec.allocationPct || 0).toFixed(2)}% · Risk {(rec.riskBudgetPct || 0).toFixed(2)}%</span>
+                </div>
+                {rec.hedgeInstrument && (
+                  <div className="mt-1 text-warning">
+                    Hedge Overlay: {rec.hedgeInstrument} {rec.hedgeRatioPct ? `(~${rec.hedgeRatioPct}% notional)` : ""}
+                  </div>
+                )}
+              </div>
+
+              {rec.sentimentHeadline && (
+                <div className="rounded-lg border border-border bg-card/50 px-3 py-2 mb-3 text-[10px]">
+                  <p className="text-muted-foreground mb-0.5">Live sentiment trigger</p>
+                  <p className="text-foreground">{rec.sentimentHeadline}</p>
+                </div>
+              )}
+
+              {/* Catalyst & Hedge */}
+              <div className="grid grid-cols-2 gap-2 mb-3 text-[10px] relative z-10">
+                <div className="rounded-lg bg-surface-2 p-2">
+                  <p className="text-muted-foreground mb-0.5 flex items-center gap-1"><Target className="h-2.5 w-2.5" /> Catalyst</p>
+                  <p className="text-foreground">{rec.catalyst}</p>
+                </div>
+                <div className="rounded-lg bg-surface-2 p-2">
+                  <p className="text-muted-foreground mb-0.5 flex items-center gap-1"><Shield className="h-2.5 w-2.5" /> Hedge</p>
+                  <p className="text-foreground">{(rec.hedgingStrategy || "").replace(/\*{1,3}/g, "").replace(/&\(/g, "(").replace(/#{1,4}\s*/g, "").replace(/`/g, "")}</p>
+                </div>
+              </div>
+
+              {/* Tags: strategy + risk profile */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex flex-wrap gap-1">
+                  {rec.riskProfile?.map(tag => (
+                    <span key={tag} className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${riskProfileColors[tag] || "bg-surface-3 text-muted-foreground"}`}>
+                      {tag.replace(/_/g, " ")}
+                    </span>
+                  ))}
+                  <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9px] text-muted-foreground">{rec.sector}</span>
+                </div>
+                  <Button
                   size="sm"
-                  variant={alreadyOwned || justAdded ? "secondary" : "default"}
-                  disabled={alreadyOwned || justAdded}
-                  onClick={() => handleAdd(rec)}
-                  className="h-7 gap-1 text-xs"
+                  variant={justAdded ? "secondary" : "default"}
+                  disabled={alreadyOwned || justAdded || tradeBlocked}
+                  title={tradeBlocked ? `ODG gate: ${validation.topReason}` : undefined}
+                    onClick={() => handleAdd({ ...rec, suggestedQty: boostedAlloc, positionValue: price * boostedAlloc })}
+                  className="h-7 gap-1 text-[10px]"
                 >
-                  <Plus className="h-3 w-3" />
-                  {alreadyOwned ? "Owned" : justAdded ? "Added" : "Add to Portfolio"}
+                  {justAdded
+                    ? "Added"
+                    : alreadyOwned
+                    ? "Owned"
+                    : tradeBlocked
+                    ? validation.status === "ARMED"
+                      ? "Armed"
+                      : "Blocked"
+                    : <><Plus className="h-3 w-3" /> Add</>}
                 </Button>
               </div>
             </div>
