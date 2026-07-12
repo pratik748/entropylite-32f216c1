@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.opportunity-engine]
 verify_jwt = false
 
+[functions.desirable-assets]
+verify_jwt = false
+
 [functions.causal-effects]
 verify_jwt = false
 
