@@ -1,7 +1,9 @@
-// EngineLoaders backed by plain Supabase REST calls — used by the
-// Netlify/Vercel adapters, which run outside Deno and can't use the
-// Deno-specific loaders in reputation.ts/calibration.ts. Same tables,
-// same shrinkage/health rules (reputationCore.ts), fetch-only.
+// EngineLoaders backed by plain Supabase REST calls: calibration params,
+// per-model reliabilities and the own-distribution maturity gate, using
+// the shared shrinkage/health rules in reputationCore.ts — fetch-only, no
+// Deno-specific client. Charts are loaded directly from Yahoo (Supabase
+// edge egress reaches it — the deployed historical-prices function proves
+// this), so no proxy hop is needed.
 //
 // The URL and anon key are the project's PUBLIC client credentials (they
 // ship in the browser bundle and in the committed .env) — no secret is
@@ -9,7 +11,6 @@
 // against Supabase Auth, exactly like the edge function's requireAuth.
 
 import type { CalibrationParams } from "../ensemble.ts";
-import type { ChartSeries } from "./evidence.ts";
 import {
   buildLearningHealth,
   buildReputationBook,
@@ -20,7 +21,7 @@ import {
   type ReliabilityRow,
   type ReputationBook,
 } from "./reputationCore.ts";
-import type { ChartLoadOptions, EngineLoaders } from "./handler.ts";
+import { directChartLoader, type EngineLoaders } from "./handler.ts";
 
 export const SUPABASE_URL = "https://reprphurmjtveejeqejn.supabase.co";
 export const SUPABASE_ANON_KEY =
@@ -73,62 +74,9 @@ async function ownSettledCount(): Promise<number> {
   return count;
 }
 
-/**
- * Chart loader for venues whose egress Yahoo blocks (AWS-Lambda-style
- * IPs): ONE batched call to the deployed `historical-prices` Supabase
- * function, which proxies Yahoo (with an AlphaVantage fallback) from
- * egress that works. The caller's own JWT is forwarded — the proxy
- * enforces the same auth as the engine itself.
- */
-async function proxyChartLoader(
-  symbols: string[],
-  opts: ChartLoadOptions,
-  req: Request,
-): Promise<Map<string, ChartSeries | null>> {
-  const out = new Map<string, ChartSeries | null>();
-  for (const s of symbols) out.set(s, null);
-  try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), opts.timeoutMs);
-    let res: Response;
-    try {
-      res = await fetch(`${SUPABASE_URL}/functions/v1/historical-prices`, {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: req.headers.get("authorization") ?? `Bearer ${SUPABASE_ANON_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ tickers: symbols, range: "1y", interval: "1d" }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(t);
-    }
-    if (!res.ok) return out;
-    const payload = await res.json().catch(() => null);
-    const data: Record<string, { closes?: number[]; volumes?: number[] }> = payload?.data ?? {};
-    for (const s of symbols) {
-      const bars = data[s];
-      if (bars && Array.isArray(bars.closes) && bars.closes.length >= 2) {
-        out.set(s, {
-          closes: bars.closes,
-          volumes: Array.isArray(bars.volumes) ? bars.volumes : [],
-          // The proxy doesn't return chart currency; infer INR from the
-          // listing suffix so liquidity floors use the right denomination.
-          currency: /\.(NS|BO)$/i.test(s) ? "INR" : undefined,
-        });
-      }
-    }
-    return out;
-  } catch {
-    return out;
-  }
-}
-
 export function restLoaders(): EngineLoaders {
   return {
-    loadCharts: proxyChartLoader,
+    loadCharts: directChartLoader,
 
     async requireUser(req: Request): Promise<{ id: string }> {
       const authHeader = req.headers.get("authorization");

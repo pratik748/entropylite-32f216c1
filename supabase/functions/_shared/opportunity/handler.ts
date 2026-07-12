@@ -1,18 +1,11 @@
-// Opportunity Engine — runtime-agnostic HTTP handler.
+// Opportunity Engine — HTTP handler for the Supabase edge function.
 //
-// ONE implementation of the request → pipeline → response flow, executed
-// by every hosting venue:
-//   • Supabase edge function        (supabase/functions/opportunity-engine)
-//   • Netlify function              (netlify/functions/opportunity-engine.mts)
-//   • Vercel edge function          (api/opportunity-engine.ts)
-//
-// Venues differ ONLY in data access — how the caller is authenticated,
-// how learning tables are read, and HOW CHARTS ARE FETCHED (Yahoo blocks
-// some datacenter egress IPs, so serverless venues batch through the
-// deployed historical-prices proxy instead of hitting Yahoo directly) —
-// all injected via `EngineLoaders`, plus a wall-clock `EnginePerfProfile`.
-// The models, gates, ranking and response schema are identical everywhere;
-// this file uses nothing but Web APIs (Request/Response/fetch).
+// ONE implementation of the request → pipeline → response flow. Venue
+// specifics (auth, learning-table access, chart loading) are injected via
+// `EngineLoaders`, and a wall-clock `EnginePerfProfile` bounds the run;
+// the models, gates, ranking and response schema are fixed. The handler
+// uses nothing but Web APIs (Request/Response/fetch), so it is host-
+// agnostic if the engine ever needs to run somewhere other than Supabase.
 
 import { tickerClass } from "../costs.ts";
 import type { CalibrationParams } from "../ensemble.ts";
@@ -114,12 +107,16 @@ export async function directChartLoader(
 }
 
 /**
- * Wall-clock budget knobs. The serverless profile exists because Netlify
- * functions get ~10s and Vercel edge ~25s: it scans the coverage grid +
- * liquid leaders (+ holdings) instead of the whole-market shard, and skips
- * the stage-2 collectors — those bundles carry the collectors in `missing`
- * so the evidence-completeness discount lowers confidence honestly. The
- * models, consensus gates and ranking are byte-identical across profiles.
+ * Wall-clock budget knobs. Two profiles trade universe breadth for speed;
+ * the models, consensus gates and ranking are byte-identical between them.
+ *   RELIABLE  — coverage grid + liquid single-name leaders (+ holdings),
+ *               stage-2 fundamentals/news skipped and recorded as `missing`
+ *               (completeness discount applies). Empirically ~2s / 30-40
+ *               validated names against live data; the default so the board
+ *               populates on first deploy.
+ *   EDGE      — whole-market directory shard + screeners + trending, with
+ *               stage-2 enrichment. Heavier; enable once deploy timing is
+ *               confirmed on the live project.
  */
 export interface EnginePerfProfile {
   id: "edge" | "serverless";
@@ -141,13 +138,14 @@ export const EDGE_PROFILE: EnginePerfProfile = {
   enrich: true,
 };
 
+// The reliable default (see index.ts). Named SERVERLESS_PROFILE for history.
 export const SERVERLESS_PROFILE: EnginePerfProfile = {
   id: "serverless",
   fullUniverse: false,
   maxUniverse: 80,
   finalists: 80,              // no stage-2 cost, so no preliminary cut needed
   chartConcurrency: 16,
-  chartTimeoutMs: 8500,       // one batched proxy call, not per-symbol Yahoo
+  chartTimeoutMs: 8000,
   enrich: false,
 };
 
