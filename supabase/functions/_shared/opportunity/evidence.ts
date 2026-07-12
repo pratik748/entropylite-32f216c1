@@ -64,7 +64,7 @@ export interface ChartSeries {
 const chartCache = new Map<string, { data: ChartSeries | null; expires: number }>();
 const CHART_TTL_MS = 10 * 60 * 1000;
 
-export async function fetchDailyChart(symbol: string): Promise<ChartSeries | null> {
+export async function fetchDailyChart(symbol: string, timeoutMs = 8000): Promise<ChartSeries | null> {
   const key = symbol.toUpperCase();
   const hit = chartCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.data;
@@ -72,7 +72,7 @@ export async function fetchDailyChart(symbol: string): Promise<ChartSeries | nul
   const url =
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
     `?range=1y&interval=1d&includePrePost=false&events=div%2Csplit`;
-  const data = await fetchJSON(url);
+  const data = await fetchJSON(url, timeoutMs);
   const result = data?.chart?.result?.[0];
   const quote = result?.indicators?.quote?.[0];
   const rawCloses: unknown[] = quote?.close ?? [];
@@ -306,12 +306,13 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 export async function collectPriceEvidence(
   candidate: Candidate,
   benchmark: ChartSeries | null,
+  timeoutMs = 8000,
 ): Promise<EvidenceBundle> {
   const asOf = new Date().toISOString();
   const items: EvidenceItem[] = [];
   const missing: string[] = [];
 
-  const series = await fetchDailyChart(candidate.symbol);
+  const series = await fetchDailyChart(candidate.symbol, timeoutMs);
   let price: PriceFeatures | null = null;
   if (series && series.closes.length >= 2) {
     price = computePriceFeatures(series, benchmark);

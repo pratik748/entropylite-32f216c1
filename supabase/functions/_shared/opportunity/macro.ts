@@ -214,10 +214,10 @@ export function buildMacroContext(
   };
 }
 
-/** Edge-venue collector: fetch every macro instrument, then build. */
-export async function collectMacroContext(benchmark: ChartSeries | null, indiaMode = false): Promise<MacroContext> {
+/** Server-venue collector: fetch every macro instrument, then build. */
+export async function collectMacroContext(benchmark: ChartSeries | null, indiaMode = false, timeoutMs = 8000): Promise<MacroContext> {
   const charts = new Map<string, ChartSeries | null>();
-  await Promise.all(macroSymbols(indiaMode).map(async (s) => charts.set(s, await fetchDailyChart(s).catch(() => null))));
+  await Promise.all(macroSymbols(indiaMode).map(async (s) => charts.set(s, await fetchDailyChart(s, timeoutMs).catch(() => null))));
   return buildMacroContext(charts, benchmark, indiaMode);
 }
 
