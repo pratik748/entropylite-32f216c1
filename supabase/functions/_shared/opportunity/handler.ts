@@ -1,16 +1,11 @@
-// Opportunity Engine — runtime-agnostic HTTP handler.
+// Opportunity Engine — HTTP handler for the Supabase edge function.
 //
-// ONE implementation of the request → pipeline → response flow, executed
-// by every hosting venue:
-//   • Supabase edge function        (supabase/functions/opportunity-engine)
-//   • Netlify function              (netlify/functions/opportunity-engine.mts)
-//   • Vercel edge function          (api/opportunity-engine.ts)
-//
-// Venues differ ONLY in how they authenticate the caller and load the
-// learning tables (injected via `EngineLoaders`) and in their wall-clock
-// budget (`EnginePerfProfile`). The models, gates, ranking and response
-// schema are identical everywhere — this file uses nothing but Web APIs
-// (Request/Response/fetch), no Deno, no Node, no URL imports.
+// ONE implementation of the request → pipeline → response flow. Venue
+// specifics (auth, learning-table access, chart loading) are injected via
+// `EngineLoaders`, and a wall-clock `EnginePerfProfile` bounds the run;
+// the models, gates, ranking and response schema are fixed. The handler
+// uses nothing but Web APIs (Request/Response/fetch), so it is host-
+// agnostic if the engine ever needs to run somewhere other than Supabase.
 
 import { tickerClass } from "../costs.ts";
 import type { CalibrationParams } from "../ensemble.ts";
@@ -21,12 +16,13 @@ import {
   benchmarkSymbol,
 } from "./universe.ts";
 import {
-  collectPriceEvidence,
+  buildPriceBundle,
   enrichBundle,
   fetchDailyChart,
   pMap,
+  type ChartSeries,
 } from "./evidence.ts";
-import { collectMacroContext } from "./macro.ts";
+import { buildMacroContext, macroSymbols } from "./macro.ts";
 import { classifyMarketContext } from "./marketContext.ts";
 import { runAllModels } from "./models.ts";
 import type { LearningHealth, ReputationBook } from "./reputationCore.ts";
@@ -73,10 +69,18 @@ export interface SignalLogPayload {
   userId: string | null;
 }
 
+export interface ChartLoadOptions {
+  timeoutMs: number;
+  concurrency: number;
+}
+
 /** Venue-specific capabilities, injected by each host adapter. */
 export interface EngineLoaders {
   /** Validate the caller; return the user id, or throw a Response(401). */
   requireUser(req: Request): Promise<{ id: string }>;
+  /** Fetch daily chart series for every symbol. `req` is the incoming
+   *  request so proxy-based loaders can forward the caller's own JWT. */
+  loadCharts(symbols: string[], opts: ChartLoadOptions, req: Request): Promise<Map<string, ChartSeries | null>>;
   loadCalibration(): Promise<CalibrationParams>;
   loadReputation(): Promise<ReputationBook>;
   loadLearningHealth(reputationCells: number): Promise<LearningHealth>;
@@ -84,13 +88,35 @@ export interface EngineLoaders {
   logSignal?: (payload: SignalLogPayload) => Promise<void>;
 }
 
+/** Default chart loader: Yahoo directly. Works from Deno Deploy egress
+ *  (the Supabase venue) and local dev; NOT from AWS-Lambda-style egress. */
+export async function directChartLoader(
+  symbols: string[],
+  opts: ChartLoadOptions,
+  _req: Request,
+): Promise<Map<string, ChartSeries | null>> {
+  const out = new Map<string, ChartSeries | null>();
+  await pMap(
+    symbols,
+    async (s) => {
+      out.set(s, await fetchDailyChart(s, opts.timeoutMs).catch(() => null));
+    },
+    opts.concurrency,
+  );
+  return out;
+}
+
 /**
- * Wall-clock budget knobs. The serverless profile exists because Netlify
- * functions get ~10s and Vercel edge ~25s: it scans the coverage grid +
- * liquid leaders (+ holdings) instead of the whole-market shard, and skips
- * the stage-2 collectors — those bundles carry the collectors in `missing`
- * so the evidence-completeness discount lowers confidence honestly. The
- * models, consensus gates and ranking are byte-identical across profiles.
+ * Wall-clock budget knobs. Two profiles trade universe breadth for speed;
+ * the models, consensus gates and ranking are byte-identical between them.
+ *   RELIABLE  — coverage grid + liquid single-name leaders (+ holdings),
+ *               stage-2 fundamentals/news skipped and recorded as `missing`
+ *               (completeness discount applies). Empirically ~2s / 30-40
+ *               validated names against live data; the default so the board
+ *               populates on first deploy.
+ *   EDGE      — whole-market directory shard + screeners + trending, with
+ *               stage-2 enrichment. Heavier; enable once deploy timing is
+ *               confirmed on the live project.
  */
 export interface EnginePerfProfile {
   id: "edge" | "serverless";
@@ -112,13 +138,14 @@ export const EDGE_PROFILE: EnginePerfProfile = {
   enrich: true,
 };
 
+// The reliable default (see index.ts). Named SERVERLESS_PROFILE for history.
 export const SERVERLESS_PROFILE: EnginePerfProfile = {
   id: "serverless",
   fullUniverse: false,
   maxUniverse: 80,
   finalists: 80,              // no stage-2 cost, so no preliminary cut needed
   chartConcurrency: 16,
-  chartTimeoutMs: 4500,
+  chartTimeoutMs: 8000,
   enrich: false,
 };
 
@@ -156,40 +183,15 @@ export function createEngineHandler(
       const horizonDays = Math.min(Math.max(Math.round(Number(body.horizonDays) || DEFAULT_HORIZON_DAYS), 5), 126);
       const maxResults = Math.min(Math.max(Math.round(Number(body.maxResults) || DEFAULT_MAX_RESULTS), 1), 30);
 
-      // ── Environment first: benchmark, macro context, learning state ─
-      const [benchmark, calibration, reputation] = await Promise.all([
-        fetchDailyChart(benchmarkSymbol(indiaMode), profile.chartTimeoutMs),
-        loaders.loadCalibration(),
-        loaders.loadReputation(),
-      ]);
-      const [macro, learning] = await Promise.all([
-        collectMacroContext(benchmark, indiaMode, profile.chartTimeoutMs),
-        loaders.loadLearningHealth(reputation.cells),
-      ]);
-      const regime = detectRegime(benchmark);
-      // Classify the environment ONCE for the whole run (trend / vol / risk).
-      const marketContext = classifyMarketContext(macro, regime);
-
-      // ── Portfolio context (optional) ────────────────────────────────
+      // ── CandidateGenerator ──────────────────────────────────────────
+      let candidates: Candidate[];
+      let universeSources: Record<string, number>;
       const positions = (body.portfolio?.positions ?? [])
         .map((x) => ({ symbol: String(x?.symbol || "").toUpperCase(), weight: Number(x?.weight) || 0 }))
         .filter((x) => x.symbol && x.weight > 0)
         .sort((a, b) => b.weight - a.weight)
         .slice(0, MAX_PORTFOLIO_HOLDINGS);
-      let portfolioReturns: number[] | null = null;
-      if (positions.length > 0) {
-        const holdings = await pMap(positions, async (pos) => {
-          const series = await fetchDailyChart(pos.symbol, profile.chartTimeoutMs).catch(() => null);
-          return series ? { series, weight: pos.weight } : null;
-        }, 4);
-        portfolioReturns = buildPortfolioReturns(holdings.filter((h): h is NonNullable<typeof h> => h != null));
-      }
-      const portfolioValue = Number(body.portfolio?.value) > 0 ? Number(body.portfolio!.value) : null;
-      const portfolioCurrency = body.portfolio?.currency ? String(body.portfolio.currency).toUpperCase() : null;
 
-      // ── CandidateGenerator ──────────────────────────────────────────
-      let candidates: Candidate[];
-      let universeSources: Record<string, number>;
       if (mode === "single") {
         const tickers = (body.tickers ?? []).map((t) => String(t).trim().toUpperCase()).filter(Boolean).slice(0, 10);
         candidates = tickers.map((symbol) => ({
@@ -234,12 +236,41 @@ export function createEngineHandler(
         candidates = candidates.slice(0, profile.maxUniverse);
       }
 
-      // ── EvidenceCollectors (price history for everyone) ─────────────
-      const bundles = await pMap(
-        candidates,
-        (c) => collectPriceEvidence(c, benchmark, profile.chartTimeoutMs),
-        profile.chartConcurrency,
-      );
+      // ── Data collection: ONE batched chart load for everything ──────
+      const bench = benchmarkSymbol(indiaMode);
+      const allSymbols = Array.from(new Set([
+        bench,
+        ...macroSymbols(indiaMode),
+        ...candidates.map((c) => c.symbol),
+        ...positions.map((p) => p.symbol),
+      ]));
+      const [charts, calibration, reputation] = await Promise.all([
+        loaders.loadCharts(allSymbols, { timeoutMs: profile.chartTimeoutMs, concurrency: profile.chartConcurrency }, req),
+        loaders.loadCalibration(),
+        loaders.loadReputation(),
+      ]);
+      const learning = await loaders.loadLearningHealth(reputation.cells);
+
+      const benchmark = charts.get(bench) ?? null;
+      const macro = buildMacroContext(charts, benchmark, indiaMode);
+      const regime = detectRegime(benchmark);
+      // Classify the environment ONCE for the whole run (trend / vol / risk).
+      const marketContext = classifyMarketContext(macro, regime);
+
+      // ── Portfolio composite (optional) ──────────────────────────────
+      let portfolioReturns: number[] | null = null;
+      if (positions.length > 0) {
+        portfolioReturns = buildPortfolioReturns(
+          positions
+            .map((pos) => ({ series: charts.get(pos.symbol), weight: pos.weight }))
+            .filter((h): h is { series: ChartSeries; weight: number } => h.series != null),
+        );
+      }
+      const portfolioValue = Number(body.portfolio?.value) > 0 ? Number(body.portfolio!.value) : null;
+      const portfolioCurrency = body.portfolio?.currency ? String(body.portfolio.currency).toUpperCase() : null;
+
+      // ── Price evidence (pure, from the charts map) ──────────────────
+      const bundles = candidates.map((c) => buildPriceBundle(c, charts.get(c.symbol) ?? null, benchmark));
 
       const rejections: RejectionRecord[] = [];
       const nearMisses: NearMiss[] = [];

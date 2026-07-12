@@ -1,7 +1,9 @@
-// EngineLoaders backed by plain Supabase REST calls — used by the
-// Netlify/Vercel adapters, which run outside Deno and can't use the
-// Deno-specific loaders in reputation.ts/calibration.ts. Same tables,
-// same shrinkage/health rules (reputationCore.ts), fetch-only.
+// EngineLoaders backed by plain Supabase REST calls: calibration params,
+// per-model reliabilities and the own-distribution maturity gate, using
+// the shared shrinkage/health rules in reputationCore.ts — fetch-only, no
+// Deno-specific client. Charts are loaded directly from Yahoo (Supabase
+// edge egress reaches it — the deployed historical-prices function proves
+// this), so no proxy hop is needed.
 //
 // The URL and anon key are the project's PUBLIC client credentials (they
 // ship in the browser bundle and in the committed .env) — no secret is
@@ -19,7 +21,7 @@ import {
   type ReliabilityRow,
   type ReputationBook,
 } from "./reputationCore.ts";
-import type { EngineLoaders } from "./handler.ts";
+import { directChartLoader, type EngineLoaders } from "./handler.ts";
 
 export const SUPABASE_URL = "https://reprphurmjtveejeqejn.supabase.co";
 export const SUPABASE_ANON_KEY =
@@ -74,6 +76,8 @@ async function ownSettledCount(): Promise<number> {
 
 export function restLoaders(): EngineLoaders {
   return {
+    loadCharts: directChartLoader,
+
     async requireUser(req: Request): Promise<{ id: string }> {
       const authHeader = req.headers.get("authorization");
       const unauthorized = (msg: string) =>

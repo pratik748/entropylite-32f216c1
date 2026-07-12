@@ -6,7 +6,6 @@
 // object, with the same score, everywhere else.
 
 import { governedInvoke } from "@/lib/apiGovernor";
-import { supabase } from "@/integrations/supabase/client";
 import { updateLifecycle } from "./lifecycle";
 import type { EngineResponse } from "./types";
 
@@ -93,30 +92,23 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: num
 }
 
 // ── Engine transport ────────────────────────────────────────────────
-// The SAME shared handler is hosted in more than one place:
-//   1. The Supabase edge function (full-universe profile) — preferred.
-//   2. /api/opportunity-engine on this site's own origin (Netlify/Vercel
-//      serverless venue, deployed automatically with the frontend).
-// We call whichever answers, remember it, and never surface the plumbing.
+// The engine is a single Supabase edge function (opportunity-engine),
+// deployed by Lovable Cloud from this repo. The whole app reaches it
+// through the Supabase client — the same backend entropylite.in already
+// talks to for every other function. No other venue, no plumbing.
 
-let preferredTransport: "supabase" | "http" | null = null;
-
-async function callSameOrigin(body: Record<string, unknown>): Promise<EngineResponse | null> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (!token) return null;
-    const res = await fetch("/api/opportunity-engine", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as EngineResponse;
-    return Array.isArray(data?.opportunities) ? data : null;
-  } catch {
-    return null;
+/** Turn a transport error into something the user can act on. */
+function engineError(error: unknown): Error {
+  const status = (error as { context?: { status?: number } } | null)?.context?.status;
+  const message = (error as Error | null)?.message || "";
+  if (status === 404 || /not.?found|failed to send a request/i.test(message)) {
+    return new Error(
+      "The Discover engine isn't live on the backend yet. On Lovable Cloud the opportunity-engine " +
+      "function deploys automatically when the project syncs the latest changes — open the Lovable " +
+      "project once to trigger the sync if this persists.",
+    );
   }
+  return new Error(message || "Opportunity engine unreachable.");
 }
 
 async function callEngine(
@@ -124,29 +116,15 @@ async function callEngine(
   cacheKey: string,
   force?: boolean,
 ): Promise<EngineResponse> {
-  let supabaseMessage = "";
-  if (preferredTransport !== "http") {
-    const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
-      body,
-      cacheKey,
-      force,
-    });
-    if (!error && data && Array.isArray(data.opportunities)) {
-      preferredTransport = "supabase";
-      return data;
-    }
-    supabaseMessage = (error as Error | null)?.message || "";
+  const { data, error } = await governedInvoke<EngineResponse>("opportunity-engine", {
+    body,
+    cacheKey,
+    force,
+  });
+  if (error || !data || !Array.isArray(data.opportunities)) {
+    throw engineError(error);
   }
-
-  const viaOrigin = await callSameOrigin(body);
-  if (viaOrigin) {
-    preferredTransport = "http";
-    return viaOrigin;
-  }
-
-  // Reset so the next attempt re-probes both venues.
-  preferredTransport = null;
-  throw new Error(supabaseMessage || "Opportunity engine unreachable on every venue.");
+  return data;
 }
 
 /**
