@@ -3,6 +3,7 @@ import type { SectionDef, WorkspaceDef } from "../registry";
 import { sectionPath } from "../registry";
 import { useEvidence } from "../EvidenceContext";
 import { MetricRow } from "../Metric";
+import ContributionWaterfall from "../ContributionWaterfall";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 import type { Action } from "@/lib/evidence/types";
@@ -19,7 +20,7 @@ const ACTION_TONE: Record<Action, string> = {
  * scores, strongest evidence each way, and where to go deeper.
  */
 const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
-  const { ticker, graph, synthesis, select, data } = useEvidence();
+  const { ticker, graph, synthesis, select, data, changes } = useEvidence();
 
   if (data.bootstrapping) {
     return (
@@ -82,6 +83,11 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
         </div>
       </Block>
 
+      {/* How the call adds up — causal contributions around the zero axis */}
+      <Block title="How the call adds up — causal contributions">
+        <ContributionWaterfall />
+      </Block>
+
       {/* Pillars — hairline matrix */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border/80 bg-border/70 sm:grid-cols-6">
         {synthesis.pillars.map((p) => {
@@ -95,19 +101,22 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
               title={top ? `Strongest evidence: ${top.label}` : "No evidence yet"}
               className="flex flex-col bg-card px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
             >
-              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
-                {p.label}
+              <span className="flex items-baseline justify-between gap-1">
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                  {p.label}
+                </span>
+                <span className="font-mono text-[9.5px] tabular-nums text-muted-foreground/60">{p.score}</span>
               </span>
               <span
-                className={`mt-1 font-mono text-[18px] font-semibold tabular-nums ${
-                  p.score >= 70 ? "text-gain" : p.score <= 38 ? "text-loss" : "text-foreground"
+                className={`mt-1 truncate text-[13.5px] font-semibold tracking-tight ${
+                  p.score >= 68 ? "text-gain" : p.score < 45 ? "text-loss" : "text-foreground"
                 }`}
               >
-                {p.score}
+                {p.verdict}
               </span>
-              <span className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-3">
+              <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-3">
                 <span
-                  className={`block h-full rounded-full ${p.score >= 70 ? "bg-gain" : p.score <= 38 ? "bg-loss" : "bg-muted-foreground/60"}`}
+                  className={`ws-grow-x block h-full origin-left rounded-full ${p.score >= 68 ? "bg-gain" : p.score < 45 ? "bg-loss" : "bg-muted-foreground/60"}`}
                   style={{ width: `${p.score}%` }}
                 />
               </span>
@@ -116,6 +125,45 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
           );
         })}
       </div>
+
+      {/* What changed — real session-over-session evidence deltas */}
+      <Block title="What changed since your last session">
+        {changes.length > 0 ? (
+          <div className="space-y-0.5">
+            {changes.slice(0, 5).map((c) => (
+              <button
+                key={c.id}
+                onClick={() => select(c.id)}
+                className="flex w-full items-baseline gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+              >
+                <span className="min-w-0 flex-1 truncate text-[12.5px] tracking-tight text-foreground">
+                  {c.label}
+                </span>
+                {c.previous != null && c.current != null && (
+                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {c.previous} → <span className="text-foreground">{c.current}</span>
+                  </span>
+                )}
+                {c.deltaPct != null && (
+                  <span className={`w-14 shrink-0 text-right font-mono text-[10.5px] tabular-nums ${c.deltaPct >= 0 ? "text-gain" : "text-loss"}`}>
+                    {c.deltaPct >= 0 ? "+" : ""}{c.deltaPct}%
+                  </span>
+                )}
+                {c.regraded && (
+                  <span className="shrink-0 rounded-sm border border-warning/50 px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-warning">
+                    regraded
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            No material evidence moves since the last stored session — deltas of ±2% or any grade
+            change appear here automatically, each one opening its investigation.
+          </p>
+        )}
+      </Block>
 
       {/* Evidence for / against */}
       <div className="grid gap-3 lg:grid-cols-2">

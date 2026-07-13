@@ -16,7 +16,9 @@ import type {
   ThesisBreaker,
 } from "./types";
 import { clamp, round } from "./compute";
+import type { Contribution } from "./types";
 import type { DeskAnalysis } from "./inputs";
+import { EVIDENCE_RELATIONS } from "./relations";
 
 const PILLAR_LABELS: Record<Pillar, string> = {
   valuation: "Valuation",
@@ -28,6 +30,24 @@ const PILLAR_LABELS: Record<Pillar, string> = {
 };
 
 const GRADE_SCORE = { good: 90, neutral: 55, bad: 15, unknown: 50 } as const;
+
+/**
+ * Decisions, not scores: each pillar's number resolves to the word an
+ * analyst would actually write in the memo. High–mid–low per pillar.
+ */
+const PILLAR_VERDICTS: Record<Pillar, [string, string, string]> = {
+  valuation: ["Undemanding", "Full", "Rich"],
+  quality: ["Elite", "Sound", "Fragile"],
+  growth: ["Compounding", "Moderate", "Stalling"],
+  health: ["Fortress", "Stable", "Strained"],
+  momentum: ["Leading", "Neutral", "Under pressure"],
+  risk: ["Contained", "Watchful", "Elevated"],
+};
+
+export function pillarVerdict(pillar: Pillar, score: number): string {
+  const [hi, mid, lo] = PILLAR_VERDICTS[pillar];
+  return score >= 68 ? hi : score >= 45 ? mid : lo;
+}
 
 function pillarRead(pillar: Pillar, score: number, nodes: EvidenceMetric[]): string {
   const worst = [...nodes].sort((a, b) => a.thesisWeight - b.thesisWeight)[0];
@@ -46,7 +66,7 @@ function shortLabel(m: EvidenceMetric): string {
 function scorePillar(pillar: Pillar, nodes: EvidenceMetric[]): PillarScore {
   const relevant = nodes.filter((n) => n.pillar === pillar && n.assessment.grade !== "unknown");
   if (relevant.length === 0) {
-    return { pillar, label: PILLAR_LABELS[pillar], score: 50, read: "no evidence yet", nodeIds: [] };
+    return { pillar, label: PILLAR_LABELS[pillar], score: 50, verdict: "No evidence", read: "no evidence yet", nodeIds: [] };
   }
   let weighted = 0;
   let weights = 0;
@@ -60,6 +80,7 @@ function scorePillar(pillar: Pillar, nodes: EvidenceMetric[]): PillarScore {
     pillar,
     label: PILLAR_LABELS[pillar],
     score,
+    verdict: pillarVerdict(pillar, score),
     read: pillarRead(pillar, score, relevant),
     nodeIds: relevant.map((n) => n.id),
   };
@@ -237,6 +258,40 @@ function actionFrom(net: number, breakers: ThesisBreaker[], coverage: number): A
   return "HOLD";
 }
 
+/**
+ * Causal contribution scoring. A node's pull on the recommendation is its
+ * own weight, amplified when its declared drivers point the same way and
+ * damped when they conflict — corroborated evidence counts for more than a
+ * lone reading, and contested evidence counts for less. Deterministic:
+ * contribution = w × (1 + 0.25·aligned − 0.15·conflicting), clamped ±1.
+ */
+export function scoreContributions(graph: EvidenceGraph): Contribution[] {
+  return graph.order.map((id) => {
+    const node = graph.metrics[id];
+    const base = node.thesisWeight;
+    if (base === 0) return { id, base, scored: 0, via: [] };
+    let aligned = 0;
+    let conflicting = 0;
+    const via: string[] = [];
+    for (const rel of EVIDENCE_RELATIONS) {
+      if (rel.to !== id) continue;
+      const driver = graph.metrics[rel.from];
+      if (!driver || driver.thesisWeight === 0) continue;
+      // The driver's push on this node: its own pull × edge polarity.
+      const push = driver.thesisWeight * rel.polarity;
+      if (push * base > 0) {
+        aligned += Math.abs(driver.thesisWeight) * driver.confidence;
+        via.push(driver.label);
+      } else {
+        conflicting += Math.abs(driver.thesisWeight) * driver.confidence;
+        via.push(`${driver.label} (against)`);
+      }
+    }
+    const scored = round(clamp(base * (1 + 0.25 * aligned - 0.15 * conflicting), -1, 1), 2);
+    return { id, base, scored, via };
+  });
+}
+
 export function synthesize(
   graph: EvidenceGraph,
   analysis: DeskAnalysis | null,
@@ -246,14 +301,15 @@ export function synthesize(
   const pillars = (Object.keys(PILLAR_LABELS) as Pillar[]).map((p) => scorePillar(p, nodes));
   const breakers = buildBreakers(graph);
 
-  const net = round(nodes.reduce((acc, n) => acc + n.thesisWeight, 0), 2);
-  const supporting = nodes.filter((n) => n.thesisWeight > 0).length;
-  const opposing = nodes.filter((n) => n.thesisWeight < 0).length;
-  const neutral = nodes.length - supporting - opposing;
-  const movers = [...nodes]
-    .sort((a, b) => Math.abs(b.thesisWeight) - Math.abs(a.thesisWeight))
+  const contributions = scoreContributions(graph);
+  const net = round(contributions.reduce((acc, c) => acc + c.scored, 0), 2);
+  const supporting = contributions.filter((c) => c.scored > 0).length;
+  const opposing = contributions.filter((c) => c.scored < 0).length;
+  const neutral = contributions.length - supporting - opposing;
+  const movers = [...contributions]
+    .sort((a, b) => Math.abs(b.scored) - Math.abs(a.scored))
     .slice(0, 6)
-    .map((n) => ({ id: n.id, weight: n.thesisWeight }));
+    .map((c) => ({ id: c.id, weight: c.scored }));
 
   const action = actionFrom(net, breakers, nodes.length);
 
@@ -306,6 +362,7 @@ export function synthesize(
     cases,
     breakers,
     keyDrivers,
+    contributions,
     ledger: {
       supporting,
       opposing,

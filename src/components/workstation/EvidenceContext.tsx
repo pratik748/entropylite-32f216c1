@@ -1,7 +1,9 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useWorkstationData, type WorkstationData } from "@/hooks/useWorkstationData";
 import { buildEvidenceGraph, metricsForSection } from "@/lib/evidence/build";
 import { synthesize } from "@/lib/evidence/synthesis";
+import { connectedIds } from "@/lib/evidence/relations";
+import { diffAndStore, type EvidenceChange } from "@/lib/evidence/history";
 import type { EvidenceGraph, EvidenceMetric, Synthesis } from "@/lib/evidence/types";
 
 interface EvidenceContextValue {
@@ -13,6 +15,10 @@ interface EvidenceContextValue {
   selectedId: string | null;
   select: (id: string | null) => void;
   selected: EvidenceMetric | null;
+  /** Ids connected to the selection through the relationship web — for soft cross-page highlighting. */
+  relatedIds: Set<string>;
+  /** Material evidence changes since the last stored session. */
+  changes: EvidenceChange[];
   sectionMetrics: (sectionKey: string) => EvidenceMetric[];
   refresh: () => void;
 }
@@ -22,6 +28,7 @@ const EvidenceContext = createContext<EvidenceContextValue | null>(null);
 export function EvidenceProvider({ ticker, children }: { ticker: string; children: ReactNode }) {
   const { refresh, ...data } = useWorkstationData(ticker);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [changes, setChanges] = useState<EvidenceChange[]>([]);
 
   const graph = useMemo(
     () =>
@@ -31,14 +38,29 @@ export function EvidenceProvider({ ticker, children }: { ticker: string; childre
         bars: data.bars,
         dossier: data.dossier,
         quote: data.quote,
+        fetchedAt: {
+          analysis: data.status.analysis.fetchedAt,
+          bars: data.status.bars.fetchedAt,
+          dossier: data.status.dossier.fetchedAt,
+          quote: data.status.quote.fetchedAt,
+        },
       }),
-    [ticker, data.analysis, data.bars, data.dossier, data.quote],
+    [ticker, data.analysis, data.bars, data.dossier, data.quote, data.status],
   );
 
   const synthesis = useMemo(
     () => synthesize(graph, data.analysis, data.quote?.price ?? data.analysis?.currentPrice ?? null),
     [graph, data.analysis, data.quote],
   );
+
+  // Session-over-session diff: run once the graph is materially assembled.
+  useEffect(() => {
+    if (graph.coverage.total >= 10) {
+      setChanges(diffAndStore(graph));
+    }
+  }, [graph]);
+
+  const relatedIds = useMemo(() => connectedIds(graph, selectedId), [graph, selectedId]);
 
   const value = useMemo<EvidenceContextValue>(
     () => ({
@@ -49,10 +71,12 @@ export function EvidenceProvider({ ticker, children }: { ticker: string; childre
       selectedId,
       select: setSelectedId,
       selected: selectedId ? (graph.metrics[selectedId] ?? null) : null,
+      relatedIds,
+      changes,
       sectionMetrics: (sectionKey: string) => metricsForSection(graph, sectionKey),
       refresh,
     }),
-    [ticker, data, graph, synthesis, selectedId, refresh],
+    [ticker, data, graph, synthesis, selectedId, relatedIds, changes, refresh],
   );
 
   return <EvidenceContext.Provider value={value}>{children}</EvidenceContext.Provider>;

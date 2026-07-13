@@ -54,6 +54,47 @@ export interface EvidenceMetric {
   pillar: Pillar;
   /** Every "workspaceId/sectionId" view this node appears in. */
   sections: string[];
+  /** Mechanical confidence in this node's value, 0–1 (provenance + sample). */
+  confidence: number;
+  /** When the underlying data was fetched (ms epoch); null if unknown. */
+  updatedAt: number | null;
+  /** Text rendered when value is null but a qualitative read exists (e.g. "Large Cap"). */
+  displayText?: string;
+}
+
+/* ── Relationship engine ───────────────────────────────────────── */
+
+export type RelationKind = "driver" | "constraint" | "context";
+
+export interface EvidenceRelation {
+  /** The influencing node. */
+  from: string;
+  /** The influenced node. */
+  to: string;
+  kind: RelationKind;
+  /** +1: from supports/raises to · −1: from pressures/undermines to. */
+  polarity: 1 | -1;
+  /** One institutional sentence naming the mechanism. */
+  note: string;
+}
+
+/** A node's resolved neighborhood, for the constellation and highlighting. */
+export interface RelationNeighborhood {
+  drivers: { metric: EvidenceMetric; relation: EvidenceRelation }[];
+  driven: { metric: EvidenceMetric; relation: EvidenceRelation }[];
+  /** All connected ids including the center. */
+  ids: Set<string>;
+}
+
+/** Causal contribution of one node to the recommendation. */
+export interface Contribution {
+  id: string;
+  /** Raw thesis weight. */
+  base: number;
+  /** Weight after aligned/conflicting driver propagation. */
+  scored: number;
+  /** Labels of driver nodes that amplified or damped it. */
+  via: string[];
 }
 
 export interface EvidenceGraph {
@@ -79,6 +120,8 @@ export interface PillarScore {
   label: string;
   /** 0–100; 50 is neutral. */
   score: number;
+  /** Plain-language decision word for the pillar, e.g. "Rich" / "Elite" / "Contained". */
+  verdict: string;
   /** Two-or-three-word read, e.g. "rich vs history". */
   read: string;
   nodeIds: string[];
@@ -115,6 +158,8 @@ export interface Synthesis {
   cases: ScenarioCase[];
   breakers: ThesisBreaker[];
   keyDrivers: { id: string; weight: number }[];
+  /** Causal contribution per node — the recommendation's full audit trail. */
+  contributions: Contribution[];
   ledger: {
     supporting: number;
     opposing: number;
