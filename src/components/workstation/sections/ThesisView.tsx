@@ -80,7 +80,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             ))}
           </div>
         </Block>
-        <Block title="What you must believe (evidence-anchored)">
+        <Block title="What you must believe">
           <div className="space-y-0.5">
             {synthesis.keyDrivers.map((d) => (
               <MetricRow key={d.id} metric={graph.metrics[d.id]} />
@@ -97,7 +97,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
 
   function KeyDrivers() {
     return (
-      <Block title="Drivers ranked by influence on the call">
+      <Block title="Driver ranking">
         <div className="space-y-0.5">
           {synthesis.ledger.movers.map((m) => (
             <MetricRow key={m.id} metric={graph.metrics[m.id]} />
@@ -149,7 +149,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
     if (priced.length < 3) return null;
     const ev = priced.reduce((acc, c) => acc + (c.returnPct! * c.probability) / 100, 0);
     return (
-      <Block title="Probability-weighted expected return">
+      <Block title="Expected return">
         <p className="text-[13px] text-foreground">
           <span className={`font-semibold tabular-nums ${ev >= 0 ? "text-gain" : "text-loss"}`}>
             {ev >= 0 ? "+" : ""}
@@ -182,7 +182,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
           </div>
         </Block>
         {engine && (
-          <Block title="Independent engine cross-check">
+          <Block title="Engine cross-check">
             <MetricRow metric={engine} />
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/70">
               The desk's confluence engine weighs the same name with different priors. Agreement with
@@ -196,7 +196,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
 
   function Breakers() {
     return (
-      <Block title="Standing invalidation conditions — evaluated on every data refresh">
+      <Block title="Standing invalidation conditions">
         <div className="space-y-2.5">
           {synthesis.breakers.map((b) => (
             <div key={b.id} className="flex items-start gap-3 rounded-sm border border-border/60 px-3 py-2.5">
@@ -241,7 +241,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             any breaker off intact. Nothing is asserted — remove evidence and the number falls.
           </p>
         </Block>
-        <Block title="How the call adds up — causal contributions">
+        <Block title="How the call adds up">
           <ContributionWaterfall limit={12} />
         </Block>
       </>

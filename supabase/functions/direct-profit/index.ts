@@ -630,6 +630,7 @@ function buildDeterministicFallback(
 
   return {
     action,
+    bias: Number(bias.toFixed(2)),
     confidence,
     currency,
     entryLow: roundPrice(entryLow),
@@ -679,11 +680,13 @@ function hasContextualDirectionalEdge(
     : bearCount - bullCount;
 
   const criticalClank = clankSignals.some((signal) => signal.severity === "CRITICAL");
+  const strongBias = Math.abs(Number((deterministic as any).bias) || 0) >= 1.2;
   const supportiveTape =
-    Math.abs(tech.momentumScore) >= 2 ||
-    Math.abs(tech.zScore) >= 1.1 ||
-    Math.abs(tech.changePct) >= 1.2 ||
-    signalSpread >= 2;
+    strongBias ||
+    Math.abs(tech.momentumScore) >= 1 ||
+    Math.abs(tech.zScore) >= 0.8 ||
+    Math.abs(tech.changePct) >= 0.8 ||
+    signalSpread >= 1;
   const desirableSupport =
     deterministic.action === "BUY" &&
     desirableHint?.listed &&
@@ -886,8 +889,8 @@ Deno.serve(async (req) => {
         `RULES:\n` +
         `• If suggestion is "Exit" → action MUST be SELL or WAIT (never BUY).\n` +
         `• If suggestion is "Add" → action MUST be BUY or WAIT (never SELL).\n` +
-        `• If suggestion is "Hold" → prefer WAIT, but BUY/SELL is allowed when technical edge and risk-reward are clearly favorable.\n` +
-        `• If suggestion is "Skip" → prefer WAIT, but a directional trade is allowed when the asset is flagged as desirable and your own evidence is clearly stronger.\n` +
+        `• If suggestion is "Hold" → pick the direction the tape favors: BUY when structure is constructive (price above trend, positive momentum/z-pull), SELL when structure is deteriorating. Reserve WAIT for genuinely flat, contradictory tape.\n` +
+        `• If suggestion is "Skip" → same rule: read the tape and commit to the favored side; WAIT only when the tape truly shows no lean.\n` +
         `• Your verdict text must NOT contradict the intelligence verdict.`
       : "";
 

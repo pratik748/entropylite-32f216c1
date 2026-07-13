@@ -16,6 +16,8 @@ type Tab = {
   bullets: string[];
   img: string;
   alt: string;
+  /** Shown when a capture uses representative rather than live data. */
+  dataNote?: string;
 };
 
 const TABS: Tab[] = [
@@ -32,12 +34,13 @@ const TABS: Tab[] = [
     ],
     img: workstationImg,
     alt: "Entropy Equity Workstation executive summary showing the causal contribution ledger, pillar verdicts and thesis breakers",
+    dataNote: "Representative data",
   },
   {
     id: "investigation",
     label: "Investigation",
     title: "Every metric is an investigation, not a number.",
-    desc: "Select any figure — P/E, ROE, leverage, volatility — and its evidence opens: definition, actual operands, relationship constellation, corroborating and countervailing evidence, and its exact pull on the recommendation.",
+    desc: "Select any figure — P/E, ROE, leverage, volatility — and its evidence opens: definition, actual operands, the named cause-and-effect mechanisms behind it, corroborating and countervailing evidence, and its exact pull on the recommendation.",
     bullets: [
       "Relationship engine: ~35 typed mechanisms connecting the evidence web; investigations branch without dead ends",
       "Cross-highlighting: selecting a node softly illuminates its connected evidence across the whole page",
@@ -45,7 +48,8 @@ const TABS: Tab[] = [
       "Provenance on every node — reported, computed, estimated or model — with mechanical confidence and last update",
     ],
     img: workstationInspectorImg,
-    alt: "Entropy Evidence Inspector showing an ROE investigation with relationship constellation and connected metrics highlighted",
+    alt: "Entropy Evidence Inspector showing an ROE investigation with connected metrics highlighted",
+    dataNote: "Representative data",
   },
   {
     id: "markets",
@@ -197,7 +201,7 @@ export default function FeatureGallery() {
           <figure className="lg:col-span-3 border border-hairline bg-carbon-900">
             <div className="flex items-center justify-between px-4 h-8 border-b border-hairline-faint">
               <span className="mkt-label text-[9px] text-white/40">{tab.label} · Terminal capture</span>
-              <span className="mkt-num text-[9px] text-white/25">1600 × 900</span>
+              <span className="mkt-num text-[9px] text-white/25">{tab.dataNote ?? "1600 × 900"}</span>
             </div>
             <img
               key={tab.id}

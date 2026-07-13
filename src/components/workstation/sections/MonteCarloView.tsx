@@ -22,7 +22,7 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
       {hasRanges ? (
         <>
           <MonteCarloChart currentPrice={price} bullRange={a!.bullRange} bearRange={a!.bearRange} ticker={graph.ticker} />
-          <Block title="Simulated 21-day bands">
+          <Block title="Simulated bands · 21 sessions">
             <div className="grid grid-cols-3 gap-2">
               <BandTile label="Bear band" lo={a!.bearRange[0]} hi={a!.bearRange[1]} currency={graph.currency} tone="loss" />
               {Array.isArray(a?.neutralRange) && (

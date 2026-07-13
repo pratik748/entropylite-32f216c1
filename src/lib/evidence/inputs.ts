@@ -160,3 +160,65 @@ export interface Quote {
   price: number;
   currency: string;
 }
+
+/* ── company-financials payload (deterministic statement pipeline) ── */
+
+export interface IncomeRow {
+  period?: string;
+  endDate?: number | null;
+  revenue?: number | null;
+  grossProfit?: number | null;
+  operatingIncome?: number | null;
+  netIncome?: number | null;
+}
+
+export interface BalanceRow {
+  period?: string;
+  endDate?: number | null;
+  totalAssets?: number | null;
+  totalLiabilities?: number | null;
+  equity?: number | null;
+  cash?: number | null;
+  longTermDebt?: number | null;
+  currentAssets?: number | null;
+  currentLiabilities?: number | null;
+}
+
+export interface CashflowRow {
+  period?: string;
+  endDate?: number | null;
+  operatingCF?: number | null;
+  capex?: number | null;
+  freeCF?: number | null;
+  dividendsPaid?: number | null;
+  buybacks?: number | null;
+  netIncome?: number | null;
+}
+
+export interface Financials {
+  symbol?: string;
+  currency?: string;
+  marketCap?: number | null;
+  sharesOutstanding?: number | null;
+  income?: IncomeRow[];
+  balance?: BalanceRow[];
+  cashflow?: CashflowRow[];
+  ratios?: {
+    grossMargin?: number | null;
+    operatingMargin?: number | null;
+    netMargin?: number | null;
+    returnOnEquity?: number | null;
+    returnOnAssets?: number | null;
+    currentRatio?: number | null;
+    quickRatio?: number | null;
+    debtToEquity?: number | null;
+    totalCash?: number | null;
+    totalDebt?: number | null;
+    ebitda?: number | null;
+    operatingCashflow?: number | null;
+    freeCashflow?: number | null;
+    revenueGrowth?: number | null;
+    earningsGrowth?: number | null;
+  };
+  asOf?: number;
+}

@@ -7,7 +7,7 @@
  */
 
 import type { EvidenceGraph, EvidenceMetric, Grade, HistoryPoint } from "./types";
-import type { DeskAnalysis, Dossier, Quote } from "./inputs";
+import type { DeskAnalysis, Dossier, Financials, Quote } from "./inputs";
 import { EVIDENCE_RELATIONS } from "./relations";
 import {
   annualizedVol,
@@ -42,12 +42,15 @@ export interface BuildInputs {
   dossier: Dossier | null;
   /** live quote from price-feed. */
   quote: Quote | null;
+  /** company-financials statements payload (deterministic pipeline). */
+  financials?: Financials | null;
   /** Per-source fetch timestamps, for node-level last-update provenance. */
   fetchedAt?: {
     analysis?: number | null;
     bars?: number | null;
     dossier?: number | null;
     quote?: number | null;
+    financials?: number | null;
   };
 }
 
@@ -58,6 +61,7 @@ const SRC_PRICE = "price history · 2y daily";
 const SRC_ENGINE = "analysis engine · live scrape";
 const SRC_DOSSIER = "AI dossier · scrape-grounded";
 const SRC_QUOTE = "live price feed";
+const SRC_STMT = "financial statements · exchange data";
 
 interface NodeSpec {
   id: string;
@@ -131,16 +135,20 @@ const fmtNum = (v: number | null | undefined, dp = 2) =>
   v == null || !Number.isFinite(v) ? "—" : String(round(v, dp));
 
 export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
-  const { ticker, analysis: a, bars, dossier: d, quote, fetchedAt } = inputs;
+  const { ticker, analysis: a, bars, dossier: d, quote, financials: f, fetchedAt } = inputs;
   const tsEngine = fetchedAt?.analysis ?? null;
   const tsPrice = fetchedAt?.bars ?? null;
   const tsDossier = fetchedAt?.dossier ?? null;
+  const tsStmt = fetchedAt?.financials ?? null;
   const nodes: EvidenceMetric[] = [];
   const push = (spec: NodeSpec | null) => {
     if (spec) {
       if (spec.updatedAt === undefined) {
         spec.updatedAt =
-          spec.source === SRC_PRICE ? tsPrice : spec.source === SRC_DOSSIER ? tsDossier : tsEngine;
+          spec.source === SRC_PRICE ? tsPrice
+            : spec.source === SRC_DOSSIER ? tsDossier
+            : spec.source === SRC_STMT ? tsStmt
+            : tsEngine;
       }
       nodes.push(makeNode(spec));
     }
@@ -240,7 +248,7 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
   }
 
   const capText = a?.marketCap || (d as Dossier & { marketCap?: string })?.marketCap || null;
-  const mktCapValue = a?.marketCapValue ?? parseCapString(capText);
+  const mktCapValue = a?.marketCapValue ?? f?.marketCap ?? parseCapString(capText);
   if (mktCapValue != null || capText) {
     push({
       id: "market_cap",
@@ -1167,6 +1175,406 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       sections: ["risk/monte-carlo", "risk/scenarios", "risk/sensitivity"],
       relatedIds: ["support_distance", "volatility"],
     });
+  }
+
+
+  /* ── Financial statements (deterministic pipeline) ──────────── */
+
+  if (f) {
+    const r = f.ratios ?? {};
+    const income = (f.income ?? []).filter((row) => row.revenue != null);
+    const cfRows = (f.cashflow ?? []).filter((row) => row.operatingCF != null);
+    const balRows = f.balance ?? [];
+    const latestInc = income[0] ?? null;
+    const latestCf = cfRows[0] ?? null;
+    const pct = (v: number | null | undefined) => (v == null ? null : round(v * 100, 1));
+    const fyHistory = <T,>(rows: T[], value: (row: T) => number | null): HistoryPoint[] =>
+      [...rows]
+        .reverse()
+        .flatMap((row) => {
+          const v = value(row);
+          const period = (row as { period?: string }).period ?? "FY";
+          return v == null ? [] : [{ period, value: round(v, 2) }];
+        });
+
+    const revenue = latestInc?.revenue ?? null;
+    if (revenue != null) {
+      const growth = pct(r.revenueGrowth) ?? (income[1]?.revenue ? round(((revenue - income[1].revenue!) / Math.abs(income[1].revenue!)) * 100, 1) : null);
+      push({
+        id: "revenue",
+        label: "Revenue (FY)",
+        value: revenue,
+        format: "number",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Total reported revenue for the latest fiscal year.",
+        calculation: `Latest annual filing: ${fmtNum(revenue / 1e9, 1)}B ${f.currency ?? currency}${growth != null ? `; growth ${fmtNum(growth, 1)}%` : ""}.`,
+        whyItMatters: "Everything downstream — margins, cash, the multiple — is a claim on this line growing or holding.",
+        grade: growth == null ? "neutral" : growth >= 8 ? "good" : growth >= 0 ? "neutral" : "bad",
+        reason:
+          growth == null
+            ? "Reported top line — growth read pending a second fiscal year."
+            : growth >= 8
+              ? `Top line compounding at ${fmtNum(growth, 1)}% — real growth, not price effects alone.`
+              : growth >= 0
+                ? `Top line roughly flat (${fmtNum(growth, 1)}%) — the thesis must rest on margins or capital returns.`
+                : `Top line shrinking (${fmtNum(growth, 1)}%) — every other line is fighting gravity.`,
+        importance: 0.5,
+        pillar: "growth",
+        sections: ["financials/income-statement", "valuation/growth"],
+        history: fyHistory(income, (row) => (row.revenue == null ? null : row.revenue / 1e9)),
+        relatedIds: ["gross_margin", "revenue_growth", "pe"],
+      });
+      if (growth != null) {
+        push({
+          id: "revenue_growth",
+          label: "Revenue growth",
+          value: growth,
+          format: "signed",
+          provenance: "reported",
+          source: SRC_STMT,
+          definition: "Year-over-year change in reported revenue.",
+          calculation: r.revenueGrowth != null ? `Reported growth rate = ${fmtNum(growth, 1)}%.` : `(${fmtNum(revenue / 1e9, 1)}B − prior FY) ÷ prior FY = ${fmtNum(growth, 1)}%.`,
+          whyItMatters: "Growth is what the multiple is paying for; without it a premium P/E is a countdown.",
+          grade: growth >= 10 ? "good" : growth >= 2 ? "neutral" : "bad",
+          reason:
+            growth >= 10
+              ? `${fmtNum(growth, 1)}% — genuine compounding that can carry a premium multiple.`
+              : growth >= 2
+                ? `${fmtNum(growth, 1)}% — positive but unremarkable; the multiple needs other support.`
+                : `${fmtNum(growth, 1)}% — stalling top line; premium multiples de-rate on this.`,
+          importance: 0.6,
+          pillar: "growth",
+          sections: ["valuation/growth", "financials/income-statement", "competition/peer-matrix"],
+          relatedIds: ["revenue", "pe", "earnings_growth"],
+        });
+      }
+    }
+
+    const gm = pct(r.grossMargin) ?? (latestInc?.grossProfit != null && revenue ? round((latestInc.grossProfit / revenue) * 100, 1) : null);
+    if (gm != null) {
+      push({
+        id: "gross_margin",
+        label: "Gross margin",
+        value: gm,
+        format: "percent",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Gross profit as a share of revenue — pricing power and input-cost control before operating expenses.",
+        calculation: `Gross profit ÷ revenue = ${fmtNum(gm, 1)}% (latest reported).`,
+        whyItMatters: "The margin the moat defends; erosion here shows up quarters before it reaches EPS.",
+        grade: gm >= 40 ? "good" : gm >= 20 ? "neutral" : "bad",
+        reason:
+          gm >= 40
+            ? `${fmtNum(gm, 1)}% — pricing power; input costs are being passed through, not absorbed.`
+            : gm >= 20
+              ? `${fmtNum(gm, 1)}% — workable but competitive; watch the trend more than the level.`
+              : `${fmtNum(gm, 1)}% — thin unit economics; scale or mix must do the heavy lifting.`,
+        importance: 0.6,
+        pillar: "quality",
+        sections: ["financials/income-statement", "financials/ratios", "valuation/profitability"],
+        history: fyHistory(income, (row) => (row.grossProfit != null && row.revenue ? (row.grossProfit / row.revenue) * 100 : null)),
+        relatedIds: ["operating_margin", "moat", "roe"],
+      });
+    }
+
+    const om = pct(r.operatingMargin) ?? (latestInc?.operatingIncome != null && revenue ? round((latestInc.operatingIncome / revenue) * 100, 1) : null);
+    if (om != null) {
+      push({
+        id: "operating_margin",
+        label: "Operating margin",
+        value: om,
+        format: "percent",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Operating income as a share of revenue — profitability after the full cost of running the business.",
+        calculation: `Operating income ÷ revenue = ${fmtNum(om, 1)}%.`,
+        whyItMatters: "This is where operating leverage lives: small revenue moves swing this line hardest.",
+        grade: om >= 20 ? "good" : om >= 8 ? "neutral" : "bad",
+        reason:
+          om >= 20
+            ? `${fmtNum(om, 1)}% — an efficient machine; incremental revenue is highly profitable.`
+            : om >= 8
+              ? `${fmtNum(om, 1)}% — ordinary operating economics.`
+              : `${fmtNum(om, 1)}% — little cushion; any revenue softness reaches earnings immediately.`,
+        importance: 0.5,
+        pillar: "quality",
+        sections: ["financials/income-statement", "financials/ratios", "valuation/profitability"],
+        history: fyHistory(income, (row) => (row.operatingIncome != null && row.revenue ? (row.operatingIncome / row.revenue) * 100 : null)),
+        relatedIds: ["gross_margin", "net_margin"],
+      });
+    }
+
+    const nm = pct(r.netMargin) ?? (latestInc?.netIncome != null && revenue ? round((latestInc.netIncome / revenue) * 100, 1) : null);
+    if (nm != null) {
+      push({
+        id: "net_margin",
+        label: "Net margin",
+        value: nm,
+        format: "percent",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Net income as a share of revenue — what actually reaches shareholders per unit of sales.",
+        calculation: `Net income ÷ revenue = ${fmtNum(nm, 1)}%.`,
+        whyItMatters: "The bottom line the market caps; margin structure above decides whether it is durable.",
+        grade: nm >= 15 ? "good" : nm >= 5 ? "neutral" : "bad",
+        reason:
+          nm >= 15
+            ? `${fmtNum(nm, 1)}% — elite conversion of sales into profit.`
+            : nm >= 5
+              ? `${fmtNum(nm, 1)}% — ordinary profitability.`
+              : `${fmtNum(nm, 1)}% — most of the revenue never reaches owners.`,
+        importance: 0.45,
+        pillar: "quality",
+        sections: ["financials/income-statement", "financials/ratios", "valuation/profitability"],
+        history: fyHistory(income, (row) => (row.netIncome != null && row.revenue ? (row.netIncome / row.revenue) * 100 : null)),
+        relatedIds: ["operating_margin", "roe", "fcf_conversion"],
+      });
+    }
+
+    const roa = pct(r.returnOnAssets);
+    if (roa != null) {
+      push({
+        id: "roa",
+        label: "Return on assets",
+        value: roa,
+        format: "percent",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Net income against the full asset base — capital efficiency before leverage flattering.",
+        calculation: `Net income ÷ total assets = ${fmtNum(roa, 1)}%.`,
+        whyItMatters: "ROE can be manufactured with debt; ROA cannot. The gap between them is the leverage story.",
+        grade: roa >= 8 ? "good" : roa >= 3 ? "neutral" : "bad",
+        reason:
+          roa >= 8
+            ? `${fmtNum(roa, 1)}% — the asset base itself earns well; ROE is not a leverage illusion.`
+            : roa >= 3
+              ? `${fmtNum(roa, 1)}% — ordinary asset productivity.`
+              : `${fmtNum(roa, 1)}% — a heavy asset base earning little; check how much of ROE is leverage.`,
+        importance: 0.4,
+        pillar: "quality",
+        sections: ["financials/ratios", "financials/balance-sheet", "valuation/profitability"],
+        relatedIds: ["roe", "debt_equity"],
+      });
+    }
+
+    const cr = r.currentRatio ?? null;
+    if (cr != null) {
+      push({
+        id: "current_ratio",
+        label: "Current ratio",
+        value: round(cr, 2),
+        format: "ratio",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Current assets over current liabilities — can the next twelve months be paid from what's on hand.",
+        calculation: `Current assets ÷ current liabilities = ${fmtNum(cr, 2)}×.`,
+        whyItMatters: "Liquidity is the difference between a bad quarter and a forced action.",
+        grade: cr >= 1.5 ? "good" : cr >= 1 ? "neutral" : "bad",
+        reason:
+          cr >= 1.5
+            ? `${fmtNum(cr, 2)}× — comfortable near-term liquidity.`
+            : cr >= 1
+              ? `${fmtNum(cr, 2)}× — adequate but tight; working capital discipline matters.`
+              : `${fmtNum(cr, 2)}× — current liabilities exceed current assets; funding depends on cash flow staying healthy.`,
+        importance: 0.35,
+        pillar: "health",
+        sections: ["financials/balance-sheet", "financials/ratios", "financials/health"],
+        relatedIds: ["net_debt", "financial_risk"],
+      });
+    }
+
+    const totalCash = r.totalCash ?? balRows[0]?.cash ?? null;
+    const totalDebt = r.totalDebt ?? null;
+    if (totalCash != null || totalDebt != null) {
+      const netDebt = (totalDebt ?? 0) - (totalCash ?? 0);
+      const ebitda = r.ebitda ?? null;
+      const ndEbitda = ebitda && ebitda > 0 ? round(netDebt / ebitda, 2) : null;
+      push({
+        id: "net_debt",
+        label: "Net debt",
+        value: netDebt,
+        format: "number",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Total debt minus cash — the balance sheet's true net obligation.",
+        calculation: `Debt ${fmtNum((totalDebt ?? 0) / 1e9, 1)}B − cash ${fmtNum((totalCash ?? 0) / 1e9, 1)}B = ${fmtNum(netDebt / 1e9, 1)}B${ndEbitda != null ? ` (${fmtNum(ndEbitda, 1)}× EBITDA)` : ""}.`,
+        whyItMatters: "Net cash buys time and options in a downturn; net debt sells them.",
+        grade: netDebt <= 0 ? "good" : ndEbitda != null ? (ndEbitda <= 1.5 ? "neutral" : ndEbitda <= 3 ? "neutral" : "bad") : "neutral",
+        reason:
+          netDebt <= 0
+            ? `Net cash position of ${fmtNum(Math.abs(netDebt) / 1e9, 1)}B — the balance sheet is an asset, not a constraint.`
+            : ndEbitda == null
+              ? `Net debt ${fmtNum(netDebt / 1e9, 1)}B — sized against earnings power once EBITDA reports.`
+              : ndEbitda <= 3
+                ? `${fmtNum(ndEbitda, 1)}× EBITDA — serviceable leverage at current earnings.`
+                : `${fmtNum(ndEbitda, 1)}× EBITDA — leverage that owns the equity story in a downturn.`,
+        importance: 0.5,
+        pillar: "health",
+        sections: ["financials/balance-sheet", "financials/health", "financials/cash-flow"],
+        relatedIds: ["debt_equity", "current_ratio", "fcf"],
+      });
+    }
+
+    const fcf = r.freeCashflow ?? latestCf?.freeCF ?? null;
+    if (fcf != null) {
+      push({
+        id: "fcf",
+        label: "Free cash flow",
+        value: fcf,
+        format: "number",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Operating cash flow minus capital expenditure — the cash the business actually throws off.",
+        calculation: r.freeCashflow != null ? `Reported FCF = ${fmtNum(fcf / 1e9, 1)}B.` : `OCF ${fmtNum((latestCf?.operatingCF ?? 0) / 1e9, 1)}B − capex = ${fmtNum(fcf / 1e9, 1)}B.`,
+        whyItMatters: "Earnings are an opinion; this is the cash. Everything returned to holders is paid from here.",
+        grade: fcf > 0 ? "good" : "bad",
+        reason:
+          fcf > 0
+            ? `${fmtNum(fcf / 1e9, 1)}B of genuine cash generation.`
+            : `Negative free cash flow — the business consumes cash and must fund itself externally.`,
+        importance: 0.6,
+        pillar: "quality",
+        sections: ["financials/cash-flow", "financials/cash-generation", "valuation/capital-allocation"],
+        history: fyHistory(cfRows, (row) => (row.freeCF == null ? null : row.freeCF / 1e9)),
+        relatedIds: ["fcf_conversion", "net_debt", "dividend_yield"],
+      });
+
+      if (revenue) {
+        const fcfMargin = round((fcf / revenue) * 100, 1);
+        push({
+          id: "fcf_margin",
+          label: "FCF margin",
+          value: fcfMargin,
+          format: "percent",
+          provenance: "reported",
+          source: SRC_STMT,
+          definition: "Free cash flow as a share of revenue — how much of each sale becomes deployable cash.",
+          calculation: `FCF ${fmtNum(fcf / 1e9, 1)}B ÷ revenue ${fmtNum(revenue / 1e9, 1)}B = ${fmtNum(fcfMargin, 1)}%.`,
+          whyItMatters: "The cleanest single read on business model quality — hard to fake, hard to compete away quickly.",
+          grade: fcfMargin >= 15 ? "good" : fcfMargin >= 5 ? "neutral" : "bad",
+          reason:
+            fcfMargin >= 15
+              ? `${fmtNum(fcfMargin, 1)}% — a cash machine.`
+              : fcfMargin >= 5
+                ? `${fmtNum(fcfMargin, 1)}% — respectable cash economics.`
+                : `${fmtNum(fcfMargin, 1)}% — revenue is not converting to deployable cash.`,
+          importance: 0.5,
+          pillar: "quality",
+          sections: ["financials/cash-generation", "financials/ratios"],
+          relatedIds: ["fcf", "net_margin"],
+        });
+      }
+
+      const ni = latestCf?.netIncome ?? latestInc?.netIncome ?? null;
+      if (ni != null && ni !== 0) {
+        const conv = round((fcf / ni) * 100, 0);
+        push({
+          id: "fcf_conversion",
+          label: "FCF conversion",
+          value: conv,
+          format: "percent",
+          provenance: "reported",
+          source: SRC_STMT,
+          definition: "Free cash flow over net income — how much of reported profit is actual cash.",
+          calculation: `FCF ${fmtNum(fcf / 1e9, 1)}B ÷ net income ${fmtNum(ni / 1e9, 1)}B = ${fmtNum(conv, 0)}%.`,
+          whyItMatters: "The core earnings-quality test: profit that never becomes cash is accrual, not earnings.",
+          grade: conv >= 90 ? "good" : conv >= 60 ? "neutral" : "bad",
+          reason:
+            conv >= 90
+              ? `${fmtNum(conv, 0)}% — reported earnings are backed nearly one-for-one by cash. High quality.`
+              : conv >= 60
+                ? `${fmtNum(conv, 0)}% — a normal accrual gap; watch it, don't fear it.`
+                : `${fmtNum(conv, 0)}% — a wide gap between profit and cash; interrogate the accruals.`,
+          importance: 0.65,
+          pillar: "quality",
+          sections: ["financials/earnings-quality", "financials/cash-generation", "financials/cash-flow"],
+          relatedIds: ["fcf", "net_margin", "roe"],
+        });
+      }
+
+      const returned = Math.abs(latestCf?.dividendsPaid ?? 0) + Math.abs(latestCf?.buybacks ?? 0);
+      if (returned > 0) {
+        const payout = fcf > 0 ? round((returned / fcf) * 100, 0) : null;
+        push({
+          id: "capital_returned",
+          label: "Capital returned",
+          value: returned,
+          format: "number",
+          provenance: "reported",
+          source: SRC_STMT,
+          definition: "Dividends plus buybacks in the latest fiscal year — what management actually sent back.",
+          calculation: `Dividends + repurchases = ${fmtNum(returned / 1e9, 1)}B${payout != null ? ` (${fmtNum(payout, 0)}% of FCF)` : ""}.`,
+          whyItMatters: "Capital allocation is strategy made visible — the split between reinvestment and returns is the CEO's real forecast.",
+          grade: payout == null ? "neutral" : payout <= 95 ? "good" : payout <= 130 ? "neutral" : "bad",
+          reason:
+            payout == null
+              ? "Returns are running while FCF is negative — funded from the balance sheet."
+              : payout <= 95
+                ? `${fmtNum(payout, 0)}% of FCF returned — generous and fully funded.`
+                : payout <= 130
+                  ? `${fmtNum(payout, 0)}% of FCF — returns are outrunning cash generation; balance-sheet funded at the margin.`
+                  : `${fmtNum(payout, 0)}% of FCF — unsustainable pace without new debt.`,
+          importance: 0.45,
+          pillar: "quality",
+          sections: ["valuation/capital-allocation", "financials/cash-flow", "financials/cash-generation"],
+          relatedIds: ["fcf", "dividend_yield", "net_debt"],
+        });
+      }
+    }
+
+    const capex = latestCf?.capex != null ? Math.abs(latestCf.capex) : null;
+    if (capex != null && revenue) {
+      const intensity = round((capex / revenue) * 100, 1);
+      push({
+        id: "capex_intensity",
+        label: "Capex intensity",
+        value: intensity,
+        format: "percent",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Capital expenditure as a share of revenue — how much must be reinvested just to keep the machine running.",
+        calculation: `Capex ${fmtNum(capex / 1e9, 1)}B ÷ revenue ${fmtNum(revenue / 1e9, 1)}B = ${fmtNum(intensity, 1)}%.`,
+        whyItMatters: "Capital intensity is the tax on growth: it decides how much of the P&L ever becomes free cash.",
+        grade: intensity <= 5 ? "good" : intensity <= 12 ? "neutral" : "bad",
+        reason:
+          intensity <= 5
+            ? `${fmtNum(intensity, 1)}% — asset-light; growth is cheap to fund.`
+            : intensity <= 12
+              ? `${fmtNum(intensity, 1)}% — moderate reinvestment burden.`
+              : `${fmtNum(intensity, 1)}% — capital-hungry; free cash arrives only after heavy reinvestment.`,
+        importance: 0.35,
+        pillar: "health",
+        sections: ["financials/cash-flow", "valuation/capital-allocation"],
+        relatedIds: ["fcf", "fcf_margin"],
+      });
+    }
+
+    const eg = pct(r.earningsGrowth);
+    if (eg != null) {
+      push({
+        id: "earnings_growth",
+        label: "Earnings growth",
+        value: eg,
+        format: "signed",
+        provenance: "reported",
+        source: SRC_STMT,
+        definition: "Year-over-year change in reported earnings.",
+        calculation: `Reported earnings growth = ${fmtNum(eg, 1)}%.`,
+        whyItMatters: "Multiples follow earnings revisions — this is the line the re-rating machine watches.",
+        grade: eg >= 12 ? "good" : eg >= 0 ? "neutral" : "bad",
+        reason:
+          eg >= 12
+            ? `${fmtNum(eg, 1)}% — earnings compounding fast enough to grow into the multiple.`
+            : eg >= 0
+              ? `${fmtNum(eg, 1)}% — positive but not multiple-expanding.`
+              : `${fmtNum(eg, 1)}% — contracting earnings under a premium multiple is the classic de-rating setup.`,
+        importance: 0.55,
+        pillar: "growth",
+        sections: ["valuation/growth", "financials/income-statement"],
+        relatedIds: ["revenue_growth", "pe"],
+      });
+    }
   }
 
   /* ── Engine verdict as corroborating model evidence ─────────── */
