@@ -8,6 +8,7 @@
 
 import type { EvidenceGraph, EvidenceMetric, Grade, HistoryPoint } from "./types";
 import type { DeskAnalysis, Dossier, Quote } from "./inputs";
+import { EVIDENCE_RELATIONS } from "./relations";
 import {
   annualizedVol,
   clamp,
@@ -41,6 +42,13 @@ export interface BuildInputs {
   dossier: Dossier | null;
   /** live quote from price-feed. */
   quote: Quote | null;
+  /** Per-source fetch timestamps, for node-level last-update provenance. */
+  fetchedAt?: {
+    analysis?: number | null;
+    bars?: number | null;
+    dossier?: number | null;
+    quote?: number | null;
+  };
 }
 
 /** grade → contribution multiplier for thesis weight. */
@@ -70,9 +78,15 @@ interface NodeSpec {
   history?: HistoryPoint[];
   percentiles?: EvidenceMetric["percentiles"];
   relatedIds?: string[];
+  updatedAt?: number | null;
+  displayText?: string;
 }
 
+/** Mechanical confidence: provenance base plus a small sample bonus. */
+const PROVENANCE_CONFIDENCE = { reported: 0.9, computed: 0.85, estimated: 0.6, model: 0.5 } as const;
+
 function makeNode(spec: NodeSpec): EvidenceMetric {
+  const sampleBonus = Math.min(spec.history?.length ?? 0, 24) / 24 * 0.08;
   return {
     id: spec.id,
     label: spec.label,
@@ -90,18 +104,48 @@ function makeNode(spec: NodeSpec): EvidenceMetric {
     thesisWeight: round(GRADE_SIGN[spec.grade] * spec.importance, 2),
     pillar: spec.pillar,
     sections: spec.sections,
+    confidence: round(Math.min(0.95, PROVENANCE_CONFIDENCE[spec.provenance] + sampleBonus), 2),
+    updatedAt: spec.updatedAt ?? null,
+    displayText: spec.displayText,
   };
+}
+
+/** Parse "$3.4T" / "620B" / "₹1,20,000 Cr" style capitalization strings. */
+export function parseCapString(s: string | undefined | null): number | null {
+  if (!s) return null;
+  const m = String(s).replace(/,/g, "").match(/([\d.]+)\s*(t|tn|trillion|b|bn|billion|m|mn|million|cr|crore|l|lakh)/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = m[2].toLowerCase();
+  const mult = unit.startsWith("t") ? 1e12
+    : unit.startsWith("b") ? 1e9
+    : unit.startsWith("m") ? 1e6
+    : unit.startsWith("c") ? 1e7
+    : unit.startsWith("l") ? 1e5
+    : null;
+  return mult ? n * mult : null;
 }
 
 const fmtNum = (v: number | null | undefined, dp = 2) =>
   v == null || !Number.isFinite(v) ? "—" : String(round(v, dp));
 
 export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
-  const { ticker, analysis: a, bars, dossier: d, quote } = inputs;
+  const { ticker, analysis: a, bars, dossier: d, quote, fetchedAt } = inputs;
+  const tsEngine = fetchedAt?.analysis ?? null;
+  const tsPrice = fetchedAt?.bars ?? null;
+  const tsDossier = fetchedAt?.dossier ?? null;
   const nodes: EvidenceMetric[] = [];
   const push = (spec: NodeSpec | null) => {
-    if (spec) nodes.push(makeNode(spec));
+    if (spec) {
+      if (spec.updatedAt === undefined) {
+        spec.updatedAt =
+          spec.source === SRC_PRICE ? tsPrice : spec.source === SRC_DOSSIER ? tsDossier : tsEngine;
+      }
+      nodes.push(makeNode(spec));
+    }
   };
+  const isFinancialSector = /financ|bank|insur/i.test(String(a?.sector ?? d?.sector ?? ""));
 
   const currency: string = quote?.currency || a?.currency || "USD";
   const price: number | null = quote?.price ?? a?.currentPrice ?? null;
@@ -195,20 +239,22 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
     });
   }
 
-  const mktCapValue = a?.marketCapValue ?? null;
-  if (mktCapValue != null || a?.marketCap) {
+  const capText = a?.marketCap || (d as Dossier & { marketCap?: string })?.marketCap || null;
+  const mktCapValue = a?.marketCapValue ?? parseCapString(capText);
+  if (mktCapValue != null || capText) {
     push({
       id: "market_cap",
       label: "Market capitalization",
       value: mktCapValue,
       format: "number",
+      displayText: mktCapValue == null && capText ? capText : undefined,
       provenance: "reported",
       source: SRC_ENGINE,
       definition: "Total equity value at the current price — the size class of the company.",
-      calculation: a?.marketCap ? `Classified ${a.marketCap} from scraped capitalization.` : "Shares outstanding × price.",
+      calculation: capText ? `Classified ${capText} from scraped capitalization.` : "Shares outstanding × price.",
       whyItMatters: "Size sets liquidity, index membership, and how much institutional flow can move the name.",
       grade: "neutral",
-      reason: `${a?.marketCap || "Capitalization"} profile — context for liquidity and flows rather than a directional signal.`,
+      reason: `${capText || "Capitalization"} profile — context for liquidity and flows rather than a directional signal.`,
       importance: 0.1,
       pillar: "valuation",
       sections: ["overview/summary", "structure/microstructure"],
@@ -532,7 +578,9 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
 
   const de = a?.debtToEquity ?? null;
   if (de != null) {
-    const grade: Grade = de < 50 ? "good" : de <= 120 ? "neutral" : "bad";
+    const grade: Grade = isFinancialSector
+      ? "neutral"
+      : de < 50 ? "good" : de <= 120 ? "neutral" : "bad";
     push({
       id: "debt_equity",
       label: "Debt / equity",
@@ -544,8 +592,9 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       calculation: `Total debt ÷ equity = ${fmtNum(de, 0)}% (scraped fundamentals).`,
       whyItMatters: "Leverage amplifies everything: it turns margin pressure into distress and rate cycles into refinancing risk.",
       grade,
-      reason:
-        de < 50
+      reason: isFinancialSector
+        ? `${fmtNum(de, 0)}% — leverage is the business model for financials; judge it by capital ratios and funding stability, not the industrial D/E frame.`
+        : de < 50
           ? `${fmtNum(de, 0)}% is conservative — the balance sheet is a shock absorber, not a risk.`
           : de <= 120
             ? `${fmtNum(de, 0)}% is manageable but real — coverage matters if margins compress.`
@@ -1155,9 +1204,14 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
     }
   }
 
-  // Prune related ids that don't exist in this build.
+  // Prune declared related ids, then union in the relationship web so every
+  // node's neighbors reflect the live graph and navigation never dead-ends.
   for (const id of order) {
-    metrics[id].relatedIds = metrics[id].relatedIds.filter((r) => !!metrics[r]);
+    const declared = metrics[id].relatedIds.filter((r) => !!metrics[r]);
+    const fromEdges = EVIDENCE_RELATIONS.flatMap((e) =>
+      e.from === id && metrics[e.to] ? [e.to] : e.to === id && metrics[e.from] ? [e.from] : [],
+    );
+    metrics[id].relatedIds = [...new Set([...declared, ...fromEdges])];
   }
 
   const sources = new Set<string>();

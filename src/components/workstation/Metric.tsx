@@ -64,14 +64,21 @@ export const MetricGrid = ({
 
 /** Stat cell — the primary evidence unit, designed to sit inside MetricGrid. */
 export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
-  const { graph, select, selectedId } = useEvidence();
+  const { graph, select, selectedId, relatedIds } = useEvidence();
   const active = selectedId === metric.id;
+  // Connected evidence illuminates softly when a related node is selected.
+  const related = !active && relatedIds.has(metric.id);
   return (
     <button
       onClick={() => select(metric.id)}
       aria-pressed={active}
-      className={`group flex min-w-0 flex-col px-3 py-2.5 text-left transition-colors ${
-        active ? "bg-surface-3" : "bg-card hover:bg-surface-2"
+      data-evidence-related={related || undefined}
+      className={`group flex min-w-0 flex-col px-3 py-2.5 text-left transition-colors duration-300 ${
+        active
+          ? "bg-surface-3"
+          : related
+            ? "bg-surface-2 shadow-[inset_2px_0_0_hsl(var(--foreground)/0.35)]"
+            : "bg-card hover:bg-surface-2"
       }`}
     >
       <span className="flex items-center gap-1.5">
@@ -92,14 +99,20 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
 
 /** Row — compact evidence line for ledgers and lists. */
 export const MetricRow = ({ metric, trailing }: { metric: EvidenceMetric; trailing?: string }) => {
-  const { graph, select, selectedId } = useEvidence();
+  const { graph, select, selectedId, relatedIds } = useEvidence();
   const active = selectedId === metric.id;
+  const related = !active && relatedIds.has(metric.id);
   return (
     <button
       onClick={() => select(metric.id)}
       aria-pressed={active}
-      className={`flex w-full items-baseline gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors ${
-        active ? "bg-surface-3" : "hover:bg-surface-2"
+      data-evidence-related={related || undefined}
+      className={`flex w-full items-baseline gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors duration-300 ${
+        active
+          ? "bg-surface-3"
+          : related
+            ? "bg-surface-2 shadow-[inset_2px_0_0_hsl(var(--foreground)/0.35)]"
+            : "hover:bg-surface-2"
       }`}
     >
       <GradeDot grade={metric.assessment.grade} />

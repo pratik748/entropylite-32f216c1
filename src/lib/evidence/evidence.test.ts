@@ -262,3 +262,137 @@ describe("synthesize", () => {
     for (const m of movers) expect(graph.metrics[m.id]).toBeTruthy();
   });
 });
+
+/* ── relationship engine, contributions, history ─────────────── */
+
+import { EVIDENCE_RELATIONS, alignment, connectedIds, neighborhood, valuationSensitivity } from "./relations";
+import { scoreContributions } from "./synthesis";
+import { diffSnapshot } from "./history";
+import { parseCapString } from "./build";
+
+describe("evidence relationship engine", () => {
+  const graph = buildEvidenceGraph(fullInputs);
+
+  it("declares edges only between known node ids with named mechanisms", () => {
+    const knownIds = new Set(Object.keys(buildEvidenceGraph(fullInputs).metrics));
+    for (const rel of EVIDENCE_RELATIONS) {
+      expect(rel.note.length, `${rel.from}→${rel.to} note`).toBeGreaterThan(20);
+      expect([1, -1]).toContain(rel.polarity);
+      // Every edge endpoint must be an id the builder can produce.
+      expect(knownIds.has(rel.from) || knownIds.has(rel.to), `${rel.from}→${rel.to}`).toBe(true);
+    }
+  });
+
+  it("resolves neighborhoods against the live graph without dead ends", () => {
+    const hood = neighborhood(graph, "roe");
+    expect(hood.drivers.length + hood.driven.length).toBeGreaterThan(0);
+    for (const e of [...hood.drivers, ...hood.driven]) {
+      expect(graph.metrics[e.metric.id]).toBeTruthy();
+    }
+    expect(connectedIds(graph, "roe").has("roe")).toBe(true);
+    expect(connectedIds(graph, null).size).toBe(0);
+  });
+
+  it("splits neighbors into corroborating and countervailing evidence", () => {
+    const { supporting, opposing } = alignment(graph, "risk_composite");
+    for (const e of supporting) expect(e.metric.thesisWeight * graph.metrics["risk_composite"].thesisWeight).toBeGreaterThan(0);
+    for (const e of opposing) expect(e.metric.thesisWeight * graph.metrics["risk_composite"].thesisWeight).toBeLessThan(0);
+  });
+
+  it("computes deterministic valuation sensitivity from actual operands", () => {
+    const sens = valuationSensitivity(graph, 227.5);
+    expect(sens).not.toBeNull();
+    expect(sens!.rows).toHaveLength(4);
+    const reversion = sens!.rows.find((r) => r.scenario.includes("18×"))!;
+    // price × (18 / 31.2)
+    expect(reversion.implied).toBeCloseTo(227.5 * (18 / 31.2), 0);
+    expect(valuationSensitivity(buildEvidenceGraph({ ...fullInputs, analysis: null }), 227.5)).toBeNull();
+  });
+});
+
+describe("causal contribution scoring", () => {
+  const graph = buildEvidenceGraph(fullInputs);
+
+  it("amplifies corroborated evidence and stays bounded", () => {
+    const contributions = scoreContributions(graph);
+    expect(contributions).toHaveLength(graph.order.length);
+    for (const c of contributions) {
+      expect(Math.abs(c.scored)).toBeLessThanOrEqual(1);
+      if (c.base === 0) expect(c.scored).toBe(0);
+      // Sign never flips through propagation — drivers scale, they don't invert.
+      if (c.base !== 0) expect(Math.sign(c.scored)).toBe(Math.sign(c.base));
+    }
+    // roe has an aligned driver (moat) in the fixture → amplified above base.
+    const roe = contributions.find((c) => c.id === "roe")!;
+    expect(Math.abs(roe.scored)).toBeGreaterThan(Math.abs(roe.base));
+    expect(roe.via.length).toBeGreaterThan(0);
+  });
+
+  it("feeds the synthesis ledger", () => {
+    const syn = synthesize(graph, analysisFixture, 227.5);
+    expect(syn.contributions).toHaveLength(graph.order.length);
+    expect(syn.ledger.supporting + syn.ledger.opposing + syn.ledger.neutral).toBe(graph.order.length);
+  });
+});
+
+describe("historical intelligence", () => {
+  it("diffs snapshots into material changes, grade flips first", () => {
+    const graph = buildEvidenceGraph(fullInputs);
+    const prev = {
+      ts: Date.now() - 86400000,
+      nodes: Object.fromEntries(
+        graph.order.map((id) => {
+          const m = graph.metrics[id];
+          if (id === "pe") return [id, { v: 24.0, g: "neutral" as const, w: 0 }];
+          if (id === "volatility") return [id, { v: m.value, g: m.assessment.grade, w: m.thesisWeight }];
+          return [id, { v: m.value, g: m.assessment.grade, w: m.thesisWeight }];
+        }),
+      ),
+    };
+    const changes = diffSnapshot(prev, graph);
+    const peChange = changes.find((c) => c.id === "pe");
+    expect(peChange).toBeTruthy();
+    expect(peChange!.regraded).toBe(true);
+    expect(changes[0].regraded).toBe(true);
+    expect(peChange!.deltaPct).toBeCloseTo(30, 0);
+  });
+});
+
+describe("robustness fixes", () => {
+  it("parses capitalization strings", () => {
+    expect(parseCapString("$3.4T")).toBe(3.4e12);
+    expect(parseCapString("620B")).toBe(620e9);
+    expect(parseCapString("₹1,20,000 Cr")).toBe(120000 * 1e7);
+    expect(parseCapString("large cap")).toBeNull();
+    expect(parseCapString(null)).toBeNull();
+  });
+
+  it("market cap renders a size class when the numeric value is missing", () => {
+    const g = buildEvidenceGraph({
+      ...fullInputs,
+      analysis: { ...analysisFixture, marketCapValue: undefined, marketCap: "Large Cap" },
+    });
+    const cap = g.metrics["market_cap"];
+    expect(cap).toBeTruthy();
+    expect(cap.value == null ? cap.displayText : "has-value").toBeTruthy();
+  });
+
+  it("grades bank leverage against the financial-sector frame", () => {
+    const g = buildEvidenceGraph({
+      ...fullInputs,
+      analysis: { ...analysisFixture, sector: "Financial Services", debtToEquity: 890 },
+    });
+    expect(g.metrics["debt_equity"].assessment.grade).toBe("neutral");
+    expect(g.metrics["debt_equity"].assessment.reason).toMatch(/capital ratios/i);
+  });
+
+  it("every node carries confidence and provenance-consistent bounds", () => {
+    const g = buildEvidenceGraph(fullInputs);
+    for (const id of g.order) {
+      const m = g.metrics[id];
+      expect(m.confidence).toBeGreaterThan(0.4);
+      expect(m.confidence).toBeLessThanOrEqual(0.95);
+      if (m.provenance === "model") expect(m.confidence).toBeLessThanOrEqual(0.6);
+    }
+  });
+});

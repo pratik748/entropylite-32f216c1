@@ -19,7 +19,7 @@ const ACTION_TONE: Record<Action, string> = {
  * scores, strongest evidence each way, and where to go deeper.
  */
 const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
-  const { ticker, graph, synthesis, select, data } = useEvidence();
+  const { ticker, graph, synthesis, select, data, changes } = useEvidence();
 
   if (data.bootstrapping) {
     return (
@@ -116,6 +116,45 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
           );
         })}
       </div>
+
+      {/* What changed — real session-over-session evidence deltas */}
+      <Block title="What changed since your last session">
+        {changes.length > 0 ? (
+          <div className="space-y-0.5">
+            {changes.slice(0, 5).map((c) => (
+              <button
+                key={c.id}
+                onClick={() => select(c.id)}
+                className="flex w-full items-baseline gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+              >
+                <span className="min-w-0 flex-1 truncate text-[12.5px] tracking-tight text-foreground">
+                  {c.label}
+                </span>
+                {c.previous != null && c.current != null && (
+                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {c.previous} → <span className="text-foreground">{c.current}</span>
+                  </span>
+                )}
+                {c.deltaPct != null && (
+                  <span className={`w-14 shrink-0 text-right font-mono text-[10.5px] tabular-nums ${c.deltaPct >= 0 ? "text-gain" : "text-loss"}`}>
+                    {c.deltaPct >= 0 ? "+" : ""}{c.deltaPct}%
+                  </span>
+                )}
+                {c.regraded && (
+                  <span className="shrink-0 rounded-sm border border-warning/50 px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-warning">
+                    regraded
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            No material evidence moves since the last stored session — deltas of ±2% or any grade
+            change appear here automatically, each one opening its investigation.
+          </p>
+        )}
+      </Block>
 
       {/* Evidence for / against */}
       <div className="grid gap-3 lg:grid-cols-2">

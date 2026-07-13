@@ -3,7 +3,7 @@ import type { EvidenceMetric } from "./types";
 
 /** Format a metric's value for display, honoring its declared format. */
 export function formatMetricValue(m: EvidenceMetric, currency: string): string {
-  if (m.value == null || !Number.isFinite(m.value)) return "—";
+  if (m.value == null || !Number.isFinite(m.value)) return m.displayText ?? "—";
   switch (m.format) {
     case "percent":
       return `${m.value.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;

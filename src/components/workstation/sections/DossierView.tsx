@@ -28,6 +28,7 @@ const DossierView = ({ workspace, section }: { workspace: WorkspaceDef; section:
           ))}
         </MetricGrid>
       )}
+      {key === "competition/peer-matrix" && <PremiumAttribution />}
       {detail}
       {!detail && metrics.length === 0 && <PendingEvidence section={section} />}
       {d && detail && (
@@ -37,6 +38,98 @@ const DossierView = ({ workspace, section }: { workspace: WorkspaceDef; section:
         </p>
       )}
     </SectionShell>
+  );
+};
+
+/**
+ * Premium attribution — answers the peer questions directly instead of
+ * leaving ratios beside competitors: why is this name priced where it is,
+ * which evidence carries the premium, which competitors are converging,
+ * and where the register says capital is flowing. Deterministic: every
+ * sentence is derived from graph nodes and the dossier register.
+ */
+const PremiumAttribution = () => {
+  const { graph, select, data } = useEvidence();
+  const pe = graph.metrics["pe"];
+  const d = data.dossier;
+  if (!pe?.value || pe.value <= 0) return null;
+
+  const premiumPct = Math.round(((pe.value - 18) / 18) * 100);
+  const carriers = ["roe", "moat", "sharpe_1y", "narrative_momentum"]
+    .map((id) => graph.metrics[id])
+    .filter((m) => m && m.thesisWeight > 0);
+  const against = graph.order
+    .map((id) => graph.metrics[id])
+    .filter((m) => (m.pillar === "growth" || m.pillar === "valuation") && m.thesisWeight < 0 && m.id !== "pe")
+    .slice(0, 3);
+  const lead = carriers[0] ?? null;
+
+  const competitors = Array.isArray(d?.competitors) ? d!.competitors! : [];
+  const converging = competitors.filter((c) => c.threat === "emerging").map((c) => c.name).filter(Boolean);
+  const holders = d?.ownership?.topHolders ?? [];
+  const accumulating = holders.filter((h) => h.trend === "accumulating").map((h) => h.name).filter(Boolean);
+  const distributing = holders.filter((h) => h.trend === "distributing").map((h) => h.name).filter(Boolean);
+
+  return (
+    <Block title="Premium attribution — why the multiple is where it is">
+      <p className="text-[12.5px] leading-relaxed text-foreground">
+        Trades at <button onClick={() => select("pe")} className="font-mono font-semibold underline decoration-border underline-offset-2 hover:decoration-foreground">{pe.value}×</button>{" "}
+        trailing earnings — {premiumPct >= 0 ? `a ${premiumPct}% premium to` : `a ${Math.abs(premiumPct)}% discount to`} the
+        long-run broad-market norm of ~18×.
+      </p>
+      {lead && (
+        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+          The single metric doing the most to justify it:{" "}
+          <button onClick={() => select(lead.id)} className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">
+            {lead.label}
+          </button>{" "}
+          — {lead.assessment.reason.charAt(0).toLowerCase() + lead.assessment.reason.slice(1)}
+        </p>
+      )}
+      {carriers.length > 1 && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+          Also carrying it:{" "}
+          {carriers.slice(1, 3).map((m, i) => (
+            <span key={m.id}>
+              {i > 0 && " · "}
+              <button onClick={() => select(m.id)} className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">
+                {m.label}
+              </button>
+            </span>
+          ))}
+          .
+        </p>
+      )}
+      {against.length > 0 && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+          Working against the premium:{" "}
+          {against.map((m, i) => (
+            <span key={m.id}>
+              {i > 0 && " · "}
+              <button onClick={() => select(m.id)} className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">
+                {m.label}
+              </button>
+            </span>
+          ))}
+          {" — if these deteriorate faster than the carriers, the reversion rows in the P/E investigation are the price path."}
+        </p>
+      )}
+      {(converging.length > 0 || accumulating.length > 0 || distributing.length > 0) && (
+        <div className="mt-2.5 border-t border-border/60 pt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+          {converging.length > 0 && (
+            <p>Converging competitors (emerging threats): <span className="text-foreground">{converging.join(", ")}</span>.</p>
+          )}
+          {(accumulating.length > 0 || distributing.length > 0) && (
+            <p className="mt-0.5">
+              Register capital flow:{" "}
+              {accumulating.length > 0 && <span className="text-gain">{accumulating.join(", ")} accumulating</span>}
+              {accumulating.length > 0 && distributing.length > 0 && " · "}
+              {distributing.length > 0 && <span className="text-loss">{distributing.join(", ")} distributing</span>}.
+            </p>
+          )}
+        </div>
+      )}
+    </Block>
   );
 };
 
