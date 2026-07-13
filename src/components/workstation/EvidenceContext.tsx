@@ -38,14 +38,16 @@ export function EvidenceProvider({ ticker, children }: { ticker: string; childre
         bars: data.bars,
         dossier: data.dossier,
         quote: data.quote,
+        financials: data.financials,
         fetchedAt: {
           analysis: data.status.analysis.fetchedAt,
           bars: data.status.bars.fetchedAt,
           dossier: data.status.dossier.fetchedAt,
           quote: data.status.quote.fetchedAt,
+          financials: data.status.financials.fetchedAt,
         },
       }),
-    [ticker, data.analysis, data.bars, data.dossier, data.quote, data.status],
+    [ticker, data.analysis, data.bars, data.dossier, data.quote, data.financials, data.status],
   );
 
   const synthesis = useMemo(

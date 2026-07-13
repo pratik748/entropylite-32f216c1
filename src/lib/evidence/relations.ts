@@ -29,6 +29,23 @@ export const EVIDENCE_RELATIONS: EvidenceRelation[] = [
   { from: "debt_equity", to: "roe", kind: "constraint", polarity: -1, note: "Leverage mechanically inflates ROE — the same returns on more borrowed capital, not better economics." },
   { from: "sharpe_1y", to: "engine_verdict", kind: "context", polarity: 1, note: "Risk-adjusted delivery corroborates the engine's read of the setup." },
 
+  /* ── Statement chain: margins → returns → multiple ──────────── */
+  { from: "moat", to: "gross_margin", kind: "driver", polarity: 1, note: "Pricing power is the moat made visible — it is what keeps gross margin from being competed away." },
+  { from: "gross_margin", to: "operating_margin", kind: "driver", polarity: 1, note: "Everything below gross profit is cost discipline; the gross line sets the ceiling." },
+  { from: "operating_margin", to: "net_margin", kind: "driver", polarity: 1, note: "Operating economics flow through to the bottom line net of financing and tax." },
+  { from: "net_margin", to: "roe", kind: "driver", polarity: 1, note: "Margin is the first term of the DuPont identity — the profit engine inside ROE." },
+  { from: "roa", to: "roe", kind: "context", polarity: 1, note: "The ROE–ROA gap is the leverage story: ROA is the unlevered truth." },
+  { from: "revenue_growth", to: "pe", kind: "driver", polarity: 1, note: "Growth is what a premium multiple is buying; without it the multiple is a countdown." },
+  { from: "earnings_growth", to: "pe", kind: "driver", polarity: 1, note: "Earnings revisions are the re-rating machine's primary input." },
+  { from: "revenue_growth", to: "revenue", kind: "context", polarity: 1, note: "The growth rate is the derivative of the reported top line." },
+  { from: "fcf_conversion", to: "pe", kind: "driver", polarity: 1, note: "Cash-backed earnings deserve a fuller multiple than accrual-heavy ones." },
+  { from: "fcf", to: "capital_returned", kind: "driver", polarity: 1, note: "Buybacks and dividends are paid from free cash flow — or from the balance sheet when it falls short." },
+  { from: "fcf", to: "dividend_yield", kind: "driver", polarity: 1, note: "FCF coverage is what makes a yield durable rather than a trap." },
+  { from: "capex_intensity", to: "fcf", kind: "constraint", polarity: -1, note: "Every point of capital intensity is revenue that never becomes free cash." },
+  { from: "net_debt", to: "financial_risk", kind: "driver", polarity: -1, note: "The net obligation, not gross debt, is what stresses the equity in a downturn." },
+  { from: "current_ratio", to: "financial_risk", kind: "context", polarity: 1, note: "Near-term liquidity is the first buffer before balance-sheet risk becomes an event." },
+  { from: "net_margin", to: "fcf_margin", kind: "driver", polarity: 1, note: "Accounting margin sets the ceiling for cash margin; the gap is accruals and reinvestment." },
+
   /* ── Balance sheet → risk chain ─────────────────────────────── */
   { from: "debt_equity", to: "financial_risk", kind: "driver", polarity: -1, note: "Leverage is the primary input to balance-sheet risk — it converts margin pressure into distress." },
   { from: "financial_risk", to: "risk_composite", kind: "driver", polarity: -1, note: "Balance-sheet fragility feeds directly into the composite risk the desk sizes against." },

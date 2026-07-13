@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildEvidenceGraph, metricsForSection, type BuildInputs } from "./build";
-import type { DeskAnalysis, Dossier } from "./inputs";
+import type { DeskAnalysis, Dossier, Financials } from "./inputs";
 import { synthesize } from "./synthesis";
 import { annualizedVol, concentrationIndex, maxDrawdown, percentileOfLast, positionIn52w, trailingReturn } from "./compute";
 import { WORKSPACES } from "@/components/workstation/registry";
@@ -90,12 +90,41 @@ const dossierFixture: Dossier = {
   regulatoryExposure: [{ issue: "DMA", severity: "medium", region: "EU", status: "active" }],
 };
 
+const financialsFixture: Financials = {
+  symbol: "TEST",
+  currency: "USD",
+  marketCap: 3.42e12,
+  income: [
+    { period: "FY2025", revenue: 391e9, grossProfit: 180.7e9, operatingIncome: 123.2e9, netIncome: 93.7e9 },
+    { period: "FY2024", revenue: 383.3e9, grossProfit: 169.1e9, operatingIncome: 114.3e9, netIncome: 97e9 },
+    { period: "FY2023", revenue: 394.3e9, grossProfit: 170.8e9, operatingIncome: 119.4e9, netIncome: 99.8e9 },
+  ],
+  balance: [
+    { period: "FY2025", totalAssets: 365e9, totalLiabilities: 308e9, equity: 57e9, cash: 30e9, longTermDebt: 96e9, currentAssets: 153e9, currentLiabilities: 176e9 },
+    { period: "FY2024", totalAssets: 353e9, totalLiabilities: 290e9, equity: 62e9, cash: 29.9e9, longTermDebt: 106e9, currentAssets: 143e9, currentLiabilities: 145e9 },
+  ],
+  cashflow: [
+    { period: "FY2025", operatingCF: 118e9, capex: -11e9, freeCF: 107e9, dividendsPaid: -15.2e9, buybacks: -94.9e9, netIncome: 93.7e9 },
+    { period: "FY2024", operatingCF: 110.5e9, capex: -10.9e9, freeCF: 99.6e9, dividendsPaid: -15e9, buybacks: -77.5e9, netIncome: 97e9 },
+  ],
+  ratios: {
+    grossMargin: 0.462, operatingMargin: 0.315, netMargin: 0.24,
+    returnOnEquity: 1.472, returnOnAssets: 0.257,
+    currentRatio: 0.87, quickRatio: 0.83, debtToEquity: 154,
+    totalCash: 62e9, totalDebt: 110e9, ebitda: 134e9,
+    operatingCashflow: 118e9, freeCashflow: 107e9,
+    revenueGrowth: 0.02, earningsGrowth: -0.034,
+  },
+  asOf: Date.now(),
+};
+
 const fullInputs: BuildInputs = {
   ticker: "TEST",
   analysis: analysisFixture,
   bars: makeBars(),
   dossier: dossierFixture,
   quote: { price: 227.5, currency: "USD" },
+  financials: financialsFixture,
 };
 
 /* ── compute helpers ──────────────────────────────────────────── */
@@ -175,8 +204,6 @@ describe("buildEvidenceGraph", () => {
       "thesis/breakers",
       "thesis/confidence",
       "thesis/recommendation",
-      "financials/cash-flow", // derived proxies + pipeline note
-      "financials/earnings-quality",
       "competition/network", // dossier competitor table
       "intelligence/management", // dossier leadership view
       "intelligence/earnings-calls",
@@ -394,5 +421,50 @@ describe("robustness fixes", () => {
       expect(m.confidence).toBeLessThanOrEqual(0.95);
       if (m.provenance === "model") expect(m.confidence).toBeLessThanOrEqual(0.6);
     }
+  });
+});
+
+
+/* ── statement pipeline nodes ─────────────────────────────────── */
+
+describe("statement-derived evidence", () => {
+  const graph = buildEvidenceGraph(fullInputs);
+
+  it("fills the core financial sections with reported nodes", () => {
+    for (const id of ["revenue", "revenue_growth", "gross_margin", "operating_margin", "net_margin", "fcf", "fcf_conversion", "net_debt", "current_ratio", "capital_returned", "capex_intensity"]) {
+      expect(graph.metrics[id], `node ${id}`).toBeTruthy();
+      expect(graph.metrics[id].provenance).toBe("reported");
+    }
+    expect(metricsForSection(graph, "financials/income-statement").length).toBeGreaterThanOrEqual(3);
+    expect(metricsForSection(graph, "financials/cash-flow").length).toBeGreaterThanOrEqual(3);
+    expect(metricsForSection(graph, "financials/earnings-quality").length).toBeGreaterThanOrEqual(1);
+    expect(metricsForSection(graph, "financials/cash-generation").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("computes the derived figures correctly from the fixture", () => {
+    expect(graph.metrics["gross_margin"].value).toBeCloseTo(46.2, 1);
+    // FCF conversion: 107B / 93.7B ≈ 114%
+    expect(graph.metrics["fcf_conversion"].value).toBeCloseTo(114, 0);
+    expect(graph.metrics["fcf_conversion"].assessment.grade).toBe("good");
+    // Net debt 110 − 62 = 48B; 48/134 EBITDA ≈ 0.36× → serviceable
+    expect(graph.metrics["net_debt"].value).toBeCloseTo(48e9, -9);
+    // Margin history carries the three fiscal years
+    expect(graph.metrics["gross_margin"].history.length).toBe(3);
+    // Capital returned 15.2 + 94.9 = 110.1B (103% of FCF → neutral)
+    expect(graph.metrics["capital_returned"].value).toBeCloseTo(110.1e9, -9);
+  });
+
+  it("market cap uses the statement pipeline when the engine lacks it", () => {
+    const g = buildEvidenceGraph({
+      ...fullInputs,
+      analysis: { ...analysisFixture, marketCapValue: undefined, marketCap: undefined },
+    });
+    expect(g.metrics["market_cap"].value).toBe(3.42e12);
+  });
+
+  it("degrades to the pre-statement graph when financials are absent", () => {
+    const g = buildEvidenceGraph({ ...fullInputs, financials: null });
+    expect(g.metrics["revenue"]).toBeUndefined();
+    expect(g.order.length).toBeGreaterThanOrEqual(25);
   });
 });

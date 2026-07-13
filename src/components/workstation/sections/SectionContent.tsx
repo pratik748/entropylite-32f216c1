@@ -5,6 +5,13 @@ import ThesisView from "./ThesisView";
 import TechnicalView from "./TechnicalView";
 import MonteCarloView from "./MonteCarloView";
 import DossierView from "./DossierView";
+import StatementsView from "./StatementsView";
+
+const STATEMENT_SECTIONS = new Set([
+  "financials/income-statement",
+  "financials/balance-sheet",
+  "financials/cash-flow",
+]);
 
 const DOSSIER_SECTIONS = new Set([
   "competition/landscape",
@@ -29,6 +36,7 @@ const SectionContent = ({ workspace, section }: { workspace: WorkspaceDef; secti
 
   if (key === "overview/summary") return <OverviewView workspace={workspace} section={section} />;
   if (workspace.id === "thesis") return <ThesisView workspace={workspace} section={section} />;
+  if (STATEMENT_SECTIONS.has(key)) return <StatementsView workspace={workspace} section={section} />;
   if (key === "structure/technical") return <TechnicalView workspace={workspace} section={section} />;
   if (key === "risk/monte-carlo") return <MonteCarloView workspace={workspace} section={section} />;
   if (DOSSIER_SECTIONS.has(key)) return <DossierView workspace={workspace} section={section} />;

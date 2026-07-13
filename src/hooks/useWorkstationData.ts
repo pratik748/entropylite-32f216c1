@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { governedInvoke } from "@/lib/apiGovernor";
 import type { Bars } from "@/lib/evidence/build";
-import type { DeskAnalysis, Dossier, Quote } from "@/lib/evidence/inputs";
+import type { DeskAnalysis, Dossier, Financials, Quote } from "@/lib/evidence/inputs";
 
 /**
  * Workstation data layer — resilient by contract.
@@ -25,11 +25,13 @@ export interface WorkstationData {
   analysis: DeskAnalysis | null;
   bars: Bars | null;
   dossier: Dossier | null;
+  financials: Financials | null;
   status: {
     quote: SourceStatus;
     analysis: SourceStatus;
     bars: SourceStatus;
     dossier: SourceStatus;
+    financials: SourceStatus;
   };
   /** True while nothing at all is available yet (first paint skeletons). */
   bootstrapping: boolean;
@@ -40,6 +42,7 @@ const TTL = {
   analysis: 6 * 60 * 60 * 1000, // 6h
   bars: 12 * 60 * 60 * 1000, // 12h
   dossier: 24 * 60 * 60 * 1000, // 24h — shared with the desk dossier cache
+  financials: 24 * 60 * 60 * 1000, // 24h — statements move quarterly
 } as const;
 
 /* ── localStorage cache (versioned, never throws) ─────────────── */
@@ -90,11 +93,13 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
   const [analysis, setAnalysis] = useState<DeskAnalysis | null>(null);
   const [bars, setBars] = useState<Bars | null>(null);
   const [dossier, setDossier] = useState<Dossier | null>(null);
+  const [financials, setFinancials] = useState<Financials | null>(null);
   const [status, setStatus] = useState<WorkstationData["status"]>({
     quote: { state: "loading", fetchedAt: null },
     analysis: { state: "loading", fetchedAt: null },
     bars: { state: "loading", fetchedAt: null },
     dossier: { state: "loading", fetchedAt: null },
+    financials: { state: "loading", fetchedAt: null },
   });
   const [refreshTick, setRefreshTick] = useState(0);
   const aliveRef = useRef(true);
@@ -116,11 +121,13 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
     setAnalysis(null);
     setBars(null);
     setDossier(null);
+    setFinancials(null);
     setStatus({
       quote: { state: "loading", fetchedAt: null },
       analysis: { state: "loading", fetchedAt: null },
       bars: { state: "loading", fetchedAt: null },
       dossier: { state: "loading", fetchedAt: null },
+      financials: { state: "loading", fetchedAt: null },
     });
 
     /* quote — poll every 15s; keep last good value on failures */
@@ -265,11 +272,48 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       }
     };
 
+    /* financials — real statements; cached 24h, stale-on-error. Until the
+       function is deployed a 404 resolves to "unavailable" and the sections
+       keep their designed pending state — never an error. */
+    const loadFinancials = async () => {
+      const cached = cacheGet<Financials>("financials", ticker);
+      if (cached && Date.now() - cached.ts < TTL.financials) {
+        setFinancials(cached.data);
+        setSource("financials", "cached", cached.ts);
+        return;
+      }
+      try {
+        const { data, error } = await withTimeout(
+          governedInvoke("company-financials", { body: { ticker } }),
+          20_000,
+        );
+        const ok = !error && data && !data.error && (data.income?.length || data.ratios);
+        if (ok) {
+          cacheSet("financials", ticker, data);
+          if (aliveRef.current) {
+            setFinancials(data);
+            setSource("financials", "live", Date.now());
+          }
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      if (!aliveRef.current) return;
+      if (cached) {
+        setFinancials(cached.data);
+        setSource("financials", "cached", cached.ts);
+      } else {
+        setSource("financials", "unavailable", null);
+      }
+    };
+
     // Everything runs in parallel; cached sources hydrate instantly and the
     // analysis loader only awaits the quote when its own cache misses.
     const quotePromise = fetchQuote();
     void loadBars();
     void loadDossier();
+    void loadFinancials();
     void loadAnalysis(quotePromise);
     quoteInterval = setInterval(fetchQuote, 15000);
 
@@ -280,12 +324,12 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
   }, [ticker, refreshTick, setSource]);
 
   const bootstrapping = useMemo(() => {
-    const anyData = !!(quote || analysis || bars || dossier);
+    const anyData = !!(quote || analysis || bars || dossier || financials);
     const allSettled = Object.values(status).every((s) => s.state !== "loading");
     return !anyData && !allSettled;
-  }, [quote, analysis, bars, dossier, status]);
+  }, [quote, analysis, bars, dossier, financials, status]);
 
   const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
 
-  return { quote, analysis, bars, dossier, status, bootstrapping, refresh };
+  return { quote, analysis, bars, dossier, financials, status, bootstrapping, refresh };
 }

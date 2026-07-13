@@ -3,10 +3,9 @@ import { Crosshair, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { EvidenceMetric } from "@/lib/evidence/types";
 import { formatMetricValue, SCOPE_LABELS } from "@/lib/evidence/format";
-import { alignment, valuationSensitivity } from "@/lib/evidence/relations";
+import { alignment, neighborhood, valuationSensitivity } from "@/lib/evidence/relations";
 import { useEvidence } from "./EvidenceContext";
 import { GradeDot, MetricRow, ProvenanceChip, Sparkline, gradeText } from "./Metric";
-import RelationGraph from "./RelationGraph";
 
 /**
  * Evidence Inspector — an investigation workspace, not a tooltip. For any
@@ -150,8 +149,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
         </>
       )}
 
-      <Label>Relationship map</Label>
-      <RelationGraph id={metric.id} />
+      <RelationLedger id={metric.id} />
 
       {(supporting.length > 0 || opposing.length > 0) && (
         <>
@@ -241,6 +239,57 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
         )}
       </p>
     </div>
+  );
+};
+
+/**
+ * Relationship mechanisms as a ledger — the named cause-and-effect sentences
+ * behind the evidence web, each row opening the connected investigation.
+ * Prose over diagrams: this is a memo, not a mind map.
+ */
+const RelationLedger = ({ id }: { id: string }) => {
+  const { graph, select } = useEvidence();
+  const hood = neighborhood(graph, id);
+  if (hood.drivers.length === 0 && hood.driven.length === 0) return null;
+
+  const row = (m: EvidenceMetric, note: string, polarity: 1 | -1) => (
+    <button
+      key={`${m.id}-${note.slice(0, 8)}`}
+      onClick={() => select(m.id)}
+      className="block w-full rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+    >
+      <span className="flex items-baseline gap-1.5">
+        <GradeDot grade={m.assessment.grade} />
+        <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium tracking-tight text-foreground">
+          {m.label}
+        </span>
+        <span className={`shrink-0 font-mono text-[9px] uppercase tracking-[0.08em] ${polarity === 1 ? "text-muted-foreground" : "text-warning"}`}>
+          {polarity === 1 ? "supports" : "pressures"}
+        </span>
+      </span>
+      <span className="mt-0.5 block pl-3.5 text-[10.5px] leading-snug text-muted-foreground/80">{note}</span>
+    </button>
+  );
+
+  return (
+    <>
+      {hood.drivers.length > 0 && (
+        <>
+          <Label>Driven by</Label>
+          <div className="space-y-0.5">
+            {hood.drivers.slice(0, 4).map((e) => row(e.metric, e.relation.note, e.relation.polarity))}
+          </div>
+        </>
+      )}
+      {hood.driven.length > 0 && (
+        <>
+          <Label>Drives</Label>
+          <div className="space-y-0.5">
+            {hood.driven.slice(0, 4).map((e) => row(e.metric, e.relation.note, e.relation.polarity))}
+          </div>
+        </>
+      )}
+    </>
   );
 };
 

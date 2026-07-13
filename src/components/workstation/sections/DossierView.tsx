@@ -454,7 +454,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
             <ShareBar label="Retail" pct={o.retailPct ?? 0} />
           </Block>
           {holders.length > 0 && (
-            <Block title="Top holders">
+            <Block title="Top holders" action={<span className="rounded-sm border border-warning/40 px-1.5 py-px font-mono text-[8.5px] uppercase tracking-[0.1em] text-warning">estimated</span>}>
               <div className="space-y-1">
                 {holders.map((h, i) => (
                   <div key={i} className="flex items-baseline gap-2.5 text-[12px]">
@@ -481,7 +481,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
       const trades = Array.isArray(d.insiderActivity) ? d.insiderActivity : [];
       if (trades.length === 0) return null;
       return (
-        <Block title="Reported insider transactions">
+        <Block title="Insider transactions" action={<span className="rounded-sm border border-warning/40 px-1.5 py-px font-mono text-[8.5px] uppercase tracking-[0.1em] text-warning">estimated</span>}>
           <div className="space-y-1">
             {trades.map((t, i) => (
               <div key={i} className="flex items-baseline gap-2.5 text-[12px]">
