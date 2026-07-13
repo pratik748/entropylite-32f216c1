@@ -1,6 +1,7 @@
 import type { SectionDef, WorkspaceDef } from "../registry";
 import { useEvidence } from "../EvidenceContext";
 import { MetricRow } from "../Metric";
+import ContributionWaterfall from "../ContributionWaterfall";
 import { formatCurrency } from "@/lib/currency";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
@@ -222,7 +223,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
   }
 
   function Confidence() {
-    const { supporting, opposing, neutral, estimated, movers } = synthesis.ledger;
+    const { supporting, opposing, neutral, estimated } = synthesis.ledger;
     return (
       <>
         <Block title="Confidence derivation">
@@ -240,12 +241,8 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             any breaker off intact. Nothing is asserted — remove evidence and the number falls.
           </p>
         </Block>
-        <Block title="Largest movers">
-          <div className="space-y-0.5">
-            {movers.map((m) => (
-              <MetricRow key={m.id} metric={graph.metrics[m.id]} />
-            ))}
-          </div>
+        <Block title="How the call adds up — causal contributions">
+          <ContributionWaterfall limit={12} />
         </Block>
       </>
     );

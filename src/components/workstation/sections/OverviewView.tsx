@@ -3,6 +3,7 @@ import type { SectionDef, WorkspaceDef } from "../registry";
 import { sectionPath } from "../registry";
 import { useEvidence } from "../EvidenceContext";
 import { MetricRow } from "../Metric";
+import ContributionWaterfall from "../ContributionWaterfall";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 import type { Action } from "@/lib/evidence/types";
@@ -82,6 +83,11 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
         </div>
       </Block>
 
+      {/* How the call adds up — causal contributions around the zero axis */}
+      <Block title="How the call adds up — causal contributions">
+        <ContributionWaterfall />
+      </Block>
+
       {/* Pillars — hairline matrix */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border/80 bg-border/70 sm:grid-cols-6">
         {synthesis.pillars.map((p) => {
@@ -95,19 +101,22 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
               title={top ? `Strongest evidence: ${top.label}` : "No evidence yet"}
               className="flex flex-col bg-card px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
             >
-              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
-                {p.label}
+              <span className="flex items-baseline justify-between gap-1">
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                  {p.label}
+                </span>
+                <span className="font-mono text-[9.5px] tabular-nums text-muted-foreground/60">{p.score}</span>
               </span>
               <span
-                className={`mt-1 font-mono text-[18px] font-semibold tabular-nums ${
-                  p.score >= 70 ? "text-gain" : p.score <= 38 ? "text-loss" : "text-foreground"
+                className={`mt-1 truncate text-[13.5px] font-semibold tracking-tight ${
+                  p.score >= 68 ? "text-gain" : p.score < 45 ? "text-loss" : "text-foreground"
                 }`}
               >
-                {p.score}
+                {p.verdict}
               </span>
-              <span className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-3">
+              <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-3">
                 <span
-                  className={`block h-full rounded-full ${p.score >= 70 ? "bg-gain" : p.score <= 38 ? "bg-loss" : "bg-muted-foreground/60"}`}
+                  className={`ws-grow-x block h-full origin-left rounded-full ${p.score >= 68 ? "bg-gain" : p.score < 45 ? "bg-loss" : "bg-muted-foreground/60"}`}
                   style={{ width: `${p.score}%` }}
                 />
               </span>

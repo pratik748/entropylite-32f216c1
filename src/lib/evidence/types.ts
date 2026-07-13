@@ -120,6 +120,8 @@ export interface PillarScore {
   label: string;
   /** 0–100; 50 is neutral. */
   score: number;
+  /** Plain-language decision word for the pillar, e.g. "Rich" / "Elite" / "Contained". */
+  verdict: string;
   /** Two-or-three-word read, e.g. "rich vs history". */
   read: string;
   nodeIds: string[];

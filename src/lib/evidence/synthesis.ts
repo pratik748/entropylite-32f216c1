@@ -31,6 +31,24 @@ const PILLAR_LABELS: Record<Pillar, string> = {
 
 const GRADE_SCORE = { good: 90, neutral: 55, bad: 15, unknown: 50 } as const;
 
+/**
+ * Decisions, not scores: each pillar's number resolves to the word an
+ * analyst would actually write in the memo. High–mid–low per pillar.
+ */
+const PILLAR_VERDICTS: Record<Pillar, [string, string, string]> = {
+  valuation: ["Undemanding", "Full", "Rich"],
+  quality: ["Elite", "Sound", "Fragile"],
+  growth: ["Compounding", "Moderate", "Stalling"],
+  health: ["Fortress", "Stable", "Strained"],
+  momentum: ["Leading", "Neutral", "Under pressure"],
+  risk: ["Contained", "Watchful", "Elevated"],
+};
+
+export function pillarVerdict(pillar: Pillar, score: number): string {
+  const [hi, mid, lo] = PILLAR_VERDICTS[pillar];
+  return score >= 68 ? hi : score >= 45 ? mid : lo;
+}
+
 function pillarRead(pillar: Pillar, score: number, nodes: EvidenceMetric[]): string {
   const worst = [...nodes].sort((a, b) => a.thesisWeight - b.thesisWeight)[0];
   const best = [...nodes].sort((a, b) => b.thesisWeight - a.thesisWeight)[0];
@@ -48,7 +66,7 @@ function shortLabel(m: EvidenceMetric): string {
 function scorePillar(pillar: Pillar, nodes: EvidenceMetric[]): PillarScore {
   const relevant = nodes.filter((n) => n.pillar === pillar && n.assessment.grade !== "unknown");
   if (relevant.length === 0) {
-    return { pillar, label: PILLAR_LABELS[pillar], score: 50, read: "no evidence yet", nodeIds: [] };
+    return { pillar, label: PILLAR_LABELS[pillar], score: 50, verdict: "No evidence", read: "no evidence yet", nodeIds: [] };
   }
   let weighted = 0;
   let weights = 0;
@@ -62,6 +80,7 @@ function scorePillar(pillar: Pillar, nodes: EvidenceMetric[]): PillarScore {
     pillar,
     label: PILLAR_LABELS[pillar],
     score,
+    verdict: pillarVerdict(pillar, score),
     read: pillarRead(pillar, score, relevant),
     nodeIds: relevant.map((n) => n.id),
   };

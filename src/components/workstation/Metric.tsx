@@ -90,6 +90,16 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
       <span className="mt-1 font-mono text-[16px] font-semibold tabular-nums tracking-tight text-foreground">
         {formatMetricValue(metric, graph.currency)}
       </span>
+      {metric.format === "score" && metric.value != null && (
+        <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-surface-3">
+          <span
+            className={`ws-grow-x block h-full origin-left rounded-full ${
+              metric.assessment.grade === "good" ? "bg-gain/80" : metric.assessment.grade === "bad" ? "bg-loss/80" : "bg-muted-foreground/50"
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, metric.value))}%` }}
+          />
+        </span>
+      )}
       <span className={`mt-0.5 line-clamp-2 text-[11px] leading-snug ${gradeText[metric.assessment.grade]}`}>
         {metric.assessment.reason}
       </span>

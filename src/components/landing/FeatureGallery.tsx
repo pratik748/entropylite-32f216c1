@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import workstationImg from "@/assets/preview-workstation.webp";
+import workstationInspectorImg from "@/assets/preview-workstation-inspector.webp";
 import marketsImg from "@/assets/preview-markets.webp";
 import geopoliticsImg from "@/assets/preview-geopolitics.webp";
 import desirableImg from "@/assets/preview-desirable.webp";
@@ -17,6 +19,34 @@ type Tab = {
 };
 
 const TABS: Tab[] = [
+  {
+    id: "workstation",
+    label: "Workstation",
+    title: "The Equity Workstation. Decisions, not dashboards.",
+    desc: "A dedicated research operating system per ticker: nine workspaces over a connected evidence graph, synthesized into one auditable call — with every contribution named.",
+    bullets: [
+      "Causal contribution ledger: how the ACCUMULATE / HOLD / REDUCE / AVOID call adds up, node by node, around a zero axis",
+      "Six pillar verdicts in plain institutional language — Rich, Elite, Compounding, Strained, Contained — scores demoted to context",
+      "Live thesis breakers: standing invalidation conditions re-evaluated on every data refresh",
+      "Session-over-session evidence deltas: what changed, by how much, and what was regraded",
+    ],
+    img: workstationImg,
+    alt: "Entropy Equity Workstation executive summary showing the causal contribution ledger, pillar verdicts and thesis breakers",
+  },
+  {
+    id: "investigation",
+    label: "Investigation",
+    title: "Every metric is an investigation, not a number.",
+    desc: "Select any figure — P/E, ROE, leverage, volatility — and its evidence opens: definition, actual operands, relationship constellation, corroborating and countervailing evidence, and its exact pull on the recommendation.",
+    bullets: [
+      "Relationship engine: ~35 typed mechanisms connecting the evidence web; investigations branch without dead ends",
+      "Cross-highlighting: selecting a node softly illuminates its connected evidence across the whole page",
+      "Deterministic sensitivity: EPS ±10% and multiple-reversion price paths computed from the actual operands",
+      "Provenance on every node — reported, computed, estimated or model — with mechanical confidence and last update",
+    ],
+    img: workstationInspectorImg,
+    alt: "Entropy Evidence Inspector showing an ROE investigation with relationship constellation and connected metrics highlighted",
+  },
   {
     id: "markets",
     label: "Markets",
@@ -132,7 +162,7 @@ export default function FeatureGallery() {
             <span className="mkt-label text-[10px] text-white/55">Inside the terminal</span>
           </div>
           <h2 className="mkt-display-2 text-white">
-            Six core surfaces.
+            Eight core surfaces.
             <br />
             <span className="text-white/40">Real screens, real data.</span>
           </h2>

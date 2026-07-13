@@ -487,6 +487,18 @@
     animation: breathe 2.4s var(--ease-out-quart) infinite;
   }
 
+  /* Workstation bar/gauge mount animation — quiet grow, no bounce */
+  @keyframes ws-grow-x {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  .ws-grow-x {
+    animation: ws-grow-x 0.6s var(--ease-out-quart) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ws-grow-x { animation: none; }
+  }
+
   /* Workstation indeterminate load bar — thin sweep under the context bar */
   @keyframes ws-loadbar-kf {
     0% { transform: translateX(-120%); }
