@@ -43,7 +43,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
   if (graph.coverage.total === 0) {
     return (
       <SectionShell workspace={workspace} section={section} wide>
-        <Block title="Evidence engines are re-syncing">
+        <Block title="Evidence pending">
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             No feed answered on the first pass for {ticker} — the desk keeps retrying in the background
             and this page fills in the moment any engine lands. Live prices, fundamentals and the
@@ -84,7 +84,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
       </Block>
 
       {/* How the call adds up — causal contributions around the zero axis */}
-      <Block title="How the call adds up — causal contributions">
+      <Block title="How the call adds up">
         <ContributionWaterfall />
       </Block>
 
@@ -127,7 +127,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
       </div>
 
       {/* What changed — real session-over-session evidence deltas */}
-      <Block title="What changed since your last session">
+      <Block title="Since last session">
         {changes.length > 0 ? (
           <div className="space-y-0.5">
             {changes.slice(0, 5).map((c) => (
@@ -167,7 +167,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
 
       {/* Evidence for / against */}
       <div className="grid gap-3 lg:grid-cols-2">
-        <Block title="Strongest evidence — for">
+        <Block title="Supporting evidence">
           {supporting.length > 0 ? (
             <div className="space-y-0.5">
               {supporting.map((m) => (
@@ -180,7 +180,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
             </p>
           )}
         </Block>
-        <Block title="Strongest evidence — against">
+        <Block title="Opposing evidence">
           {opposing.length > 0 ? (
             <div className="space-y-0.5">
               {opposing.map((m) => (

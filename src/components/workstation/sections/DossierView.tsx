@@ -71,7 +71,7 @@ const PremiumAttribution = () => {
   const distributing = holders.filter((h) => h.trend === "distributing").map((h) => h.name).filter(Boolean);
 
   return (
-    <Block title="Premium attribution — why the multiple is where it is">
+    <Block title="Premium attribution">
       <p className="text-[12.5px] leading-relaxed text-foreground">
         Trades at <button onClick={() => select("pe")} className="font-mono font-semibold underline decoration-border underline-offset-2 hover:decoration-foreground">{pe.value}×</button>{" "}
         trailing earnings — {premiumPct >= 0 ? `a ${premiumPct}% premium to` : `a ${Math.abs(premiumPct)}% discount to`} the
@@ -191,7 +191,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
       return (
         <>
           {suppliers.length > 0 && (
-            <Block title="Key suppliers & dependence risk">
+            <Block title="Key suppliers">
               <div className="grid gap-2 sm:grid-cols-2">
                 {suppliers.map((s, i) => (
                   <div key={i} className="flex items-start justify-between gap-3 rounded-sm border border-border/60 px-3 py-2">
@@ -236,7 +236,7 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
       return (
         <>
           {segments.length > 0 && (
-            <Block title="Demand mix — where revenue comes from">
+            <Block title="Demand mix">
               {segments.map((s, i) => (
                 <ShareBar key={i} label={s.segment ?? "Segment"} pct={s.percentage ?? 0} detail={s.trend} />
               ))}

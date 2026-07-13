@@ -73,7 +73,7 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
       onClick={() => select(metric.id)}
       aria-pressed={active}
       data-evidence-related={related || undefined}
-      className={`group flex min-w-0 flex-col px-3 py-2.5 text-left transition-colors duration-300 ${
+      className={`group flex min-w-0 flex-col px-3 py-2.5 text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40 ${
         active
           ? "bg-surface-3"
           : related
@@ -100,7 +100,10 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
           />
         </span>
       )}
-      <span className={`mt-0.5 line-clamp-2 text-[11px] leading-snug ${gradeText[metric.assessment.grade]}`}>
+      <span
+        title={metric.assessment.reason}
+        className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground"
+      >
         {metric.assessment.reason}
       </span>
     </button>
@@ -117,7 +120,7 @@ export const MetricRow = ({ metric, trailing }: { metric: EvidenceMetric; traili
       onClick={() => select(metric.id)}
       aria-pressed={active}
       data-evidence-related={related || undefined}
-      className={`flex w-full items-baseline gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors duration-300 ${
+      className={`flex w-full items-baseline gap-2.5 rounded-sm px-2 py-1.5 text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/40 ${
         active
           ? "bg-surface-3"
           : related

@@ -67,7 +67,9 @@ const CompanyWorkstationPage = () => {
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <SectionRail ticker={ticker} activeWorkspaceId={workspace.id} activeSectionId={section.id} />
           <main className="no-touch-bounce min-w-0 flex-1 overflow-auto">
-            <SectionContent workspace={workspace} section={section} />
+            <div key={`${workspace.id}/${section.id}`} className="animate-fade-in">
+              <SectionContent workspace={workspace} section={section} />
+            </div>
           </main>
           {inspectorOpen && <InspectorPanel />}
         </div>
