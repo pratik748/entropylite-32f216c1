@@ -57,6 +57,8 @@ interface Props {
   ships?: TacticalShip[];
   planes?: TacticalPlane[];
   chokepoints?: TacticalChokepoint[];
+  aisLive?: boolean;
+  adsbLive?: boolean;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -85,7 +87,7 @@ const isLL = (a: unknown, b: unknown): boolean =>
 export default function GeopoliticalMap({
   data, portfolioMarkers, onSelectConflict, visibleLayers,
   geoEvents, selectedEventId, onSelectEvent,
-  ships, planes, chokepoints,
+  ships, planes, chokepoints, aisLive = false, adsbLive = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -368,12 +370,12 @@ export default function GeopoliticalMap({
         className: "geo-pulse-ring",
       })
         .bindTooltip(
-          `<b>${c.name}</b><br/>Stress ${Math.round(c.stress * 100)}<br/>${c.ships} ships (${c.stoppedShips} idle) · ${c.planes} flights<br/>Δ vs baseline ${c.delta > 0 ? "+" : ""}${Math.round(c.delta * 100)}%`,
+          `<b>${c.name}</b><br/>Stress ${Math.round(c.stress * 100)}<br/>${aisLive ? `${c.ships} AIS vessels (${c.stoppedShips} idle)` : "AIS unavailable"} · ${adsbLive ? `${c.planes} ADS-B flights` : "ADS-B unavailable"}<br/>Δ vs baseline ${c.delta > 0 ? "+" : ""}${Math.round(c.delta * 100)}%`,
           { direction: "top", className: "entropy-tooltip", offset: [0, -10] },
         )
         .addTo(layer);
     });
-  }, [chokepoints, visibleLayers.chokepoints]);
+  }, [chokepoints, visibleLayers.chokepoints, aisLive, adsbLive]);
 
   // Fly-to on conflict select
   const flyTo = useCallback((lat: number, lng: number) => {
