@@ -54,6 +54,9 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
   const [selectedEvent, setSelectedEvent] = useState<ScoredGeoEvent | null>(null);
   const { events: geoEvents, loading: eventsLoading, lastTick: eventsLastTick, error: eventsError } = useGeoEvents();
   const { data: tactical } = useTacticalMovement(true);
+  const aisLive = tactical?.sources?.ais === "live";
+  const adsbLive = tactical?.sources?.opensky === "live";
+  const hasMovementTelemetry = aisLive || adsbLive;
 
   const portfolioMarkers = useMemo(() =>
     stocks.filter(s => s.analysis).map(s => {
@@ -106,9 +109,9 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             </span>
           </div>
           <div className="min-w-0">
-            <h2 className="text-xs font-bold text-foreground tracking-tight truncate">God's Eye, Intelligence Map</h2>
+            <h2 className="text-xs font-bold text-foreground tracking-tight truncate">Geopolitical Risk Monitor</h2>
             <p className="text-[8px] text-muted-foreground font-mono tracking-widest truncate">
-              LIVE 20s · {safeData.conflictEvents.length} CONFLICTS · {geoEvents.length} WIRE
+              LIVE 20s · {safeData.conflictEvents.length} CONFLICTS · {geoEvents.length} WIRE EVENTS
               {exposedTickers.length > 0 && <span className="text-loss ml-1">{exposedTickers.length} EXPOSED</span>}
             </p>
           </div>
@@ -129,11 +132,11 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
       {data && <RiskStrip data={data} />}
 
       {/* Chokepoint Stress Strip */}
-      {tactical?.chokepoints && tactical.chokepoints.length > 0 && (
+      {hasMovementTelemetry && tactical?.chokepoints && tactical.chokepoints.length > 0 && (
         <div className="glass-panel rounded-xl px-2.5 py-1.5 overflow-x-auto">
           <div className="flex items-center gap-2 min-w-max">
             <span className="text-[8px] font-mono uppercase tracking-widest text-muted-foreground flex-shrink-0">
-              Chokepoints
+              Trade-route telemetry
             </span>
             {tactical.chokepoints.map(c => {
               const tone = c.stress > 0.6 ? "text-loss border-loss/30 bg-loss/5"
@@ -143,7 +146,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
                 <div key={c.name} className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border ${tone}`}>
                   <span className="font-mono text-[9px] font-semibold whitespace-nowrap">{c.name}</span>
                   <span className="font-mono text-[9px] tabular-nums opacity-80">
-                    {c.ships} ships · {c.planes} air
+                    {aisLive ? `${c.ships} AIS` : "AIS n/a"} · {adsbLive ? `${c.planes} ADS-B` : "ADS-B n/a"}
                   </span>
                   <span className="font-mono text-[9px] tabular-nums font-bold">
                     {Math.round(c.stress * 100)}
@@ -209,9 +212,11 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
               geoEvents={geoEvents as any}
               selectedEventId={selectedEvent?.id || null}
               onSelectEvent={(e) => setSelectedEvent(e as ScoredGeoEvent)}
-              ships={tactical?.ships}
-              planes={tactical?.planes}
-              chokepoints={tactical?.chokepoints}
+              ships={aisLive ? tactical?.ships : undefined}
+              planes={adsbLive ? tactical?.planes : undefined}
+              chokepoints={hasMovementTelemetry ? tactical?.chokepoints : undefined}
+              aisLive={aisLive}
+              adsbLive={adsbLive}
             />
           </div>
 
