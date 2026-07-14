@@ -6,12 +6,27 @@ import TechnicalView from "./TechnicalView";
 import MonteCarloView from "./MonteCarloView";
 import DossierView from "./DossierView";
 import StatementsView from "./StatementsView";
+import {
+  CapitalStructureView,
+  CashGenerationView,
+  HealthView,
+  ProfitabilityView,
+  RiskAnalysisView,
+} from "./AnalyticsViews";
 
 const STATEMENT_SECTIONS = new Set([
   "financials/income-statement",
-  "financials/balance-sheet",
   "financials/cash-flow",
 ]);
+
+/** Purpose-built analytical views — each section its own institutional module. */
+const ANALYTICS_VIEWS: Record<string, typeof ProfitabilityView> = {
+  "financials/balance-sheet": CapitalStructureView,
+  "financials/health": HealthView,
+  "financials/cash-generation": CashGenerationView,
+  "valuation/profitability": ProfitabilityView,
+  "risk/risk-analysis": RiskAnalysisView,
+};
 
 const DOSSIER_SECTIONS = new Set([
   "competition/landscape",
@@ -36,6 +51,8 @@ const SectionContent = ({ workspace, section }: { workspace: WorkspaceDef; secti
 
   if (key === "overview/summary") return <OverviewView workspace={workspace} section={section} />;
   if (workspace.id === "thesis") return <ThesisView workspace={workspace} section={section} />;
+  const Analytics = ANALYTICS_VIEWS[key];
+  if (Analytics) return <Analytics workspace={workspace} section={section} />;
   if (STATEMENT_SECTIONS.has(key)) return <StatementsView workspace={workspace} section={section} />;
   if (key === "structure/technical") return <TechnicalView workspace={workspace} section={section} />;
   if (key === "risk/monte-carlo") return <MonteCarloView workspace={workspace} section={section} />;

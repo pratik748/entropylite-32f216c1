@@ -468,3 +468,74 @@ describe("statement-derived evidence", () => {
     expect(g.order.length).toBeGreaterThanOrEqual(25);
   });
 });
+
+/* ── institutional analytics (per-section computed views) ─────── */
+
+import {
+  computeCapitalStructure,
+  computeCashCascade,
+  computeDuPont,
+  computeHealthScore,
+  computeRiskDecomposition,
+} from "./analytics";
+
+describe("institutional analytics", () => {
+  it("derives capital structure without the statement pipeline", () => {
+    const s = computeCapitalStructure(null, analysisFixture);
+    expect(s).not.toBeNull();
+    expect(s!.source).toBe("derived");
+    // book equity = market cap / P/B = 3.4e12 / 46.1
+    expect(s!.bookEquity).toBeCloseTo(3.4e12 / 46.1, -8);
+    // total debt = book equity × D/E% = bookEquity × 1.54
+    expect(s!.totalDebt).toBeCloseTo((3.4e12 / 46.1) * 1.54, -8);
+    expect(s!.debtFundingPct).toBeGreaterThan(0);
+  });
+
+  it("prefers reported statements for capital structure", () => {
+    const s = computeCapitalStructure(financialsFixture, analysisFixture);
+    expect(s!.source).toBe("reported");
+    expect(s!.totalDebt).toBe(110e9);
+    expect(s!.netDebt).toBe(110e9 - 62e9);
+  });
+
+  it("computes the three-factor DuPont identity", () => {
+    const d = computeDuPont(financialsFixture, analysisFixture);
+    expect(d).not.toBeNull();
+    expect(d!.factors).toHaveLength(3);
+    // net margin × asset turnover × equity multiplier ≈ ROE
+    const product = d!.factors.reduce((acc, f) => acc * (f.unit === "%" ? f.value / 100 : f.value), 1);
+    expect(product * 100).toBeCloseTo(d!.roe, 0);
+  });
+
+  it("falls back to a two-factor DuPont from analysis alone", () => {
+    const d = computeDuPont(null, analysisFixture);
+    expect(d!.source).toBe("derived");
+    expect(d!.factors).toHaveLength(2);
+  });
+
+  it("builds a monotonic cash conversion cascade", () => {
+    const c = computeCashCascade(financialsFixture);
+    expect(c!.length).toBeGreaterThanOrEqual(5);
+    expect(c![0].id).toBe("revenue");
+    expect(c![0].conversionPct).toBeNull();
+    for (const step of c!.slice(1)) expect(step.conversionPct).not.toBeNull();
+  });
+
+  it("scores a solvency scorecard with a band", () => {
+    const h = computeHealthScore(financialsFixture, analysisFixture);
+    expect(h).not.toBeNull();
+    expect(h!.score).toBeLessThanOrEqual(h!.max);
+    expect(["Fortress", "Sound", "Watch", "Strained"]).toContain(h!.band);
+    for (const c of h!.checks) expect(typeof c.pass).toBe("boolean");
+  });
+
+  it("decomposes composite risk into ranked factors summing to 100% share", () => {
+    const r = computeRiskDecomposition(analysisFixture);
+    expect(r).not.toBeNull();
+    const shareSum = r!.factors.reduce((s, f) => s + f.share, 0);
+    expect(shareSum).toBeGreaterThanOrEqual(97);
+    expect(shareSum).toBeLessThanOrEqual(103);
+    // ranked descending
+    for (let i = 1; i < r!.factors.length; i++) expect(r!.factors[i - 1].value).toBeGreaterThanOrEqual(r!.factors[i].value);
+  });
+});

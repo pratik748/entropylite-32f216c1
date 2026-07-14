@@ -1327,6 +1327,57 @@ Deno.serve(async (req) => {
       ];
     }
 
+    // ── SELF-SUGGESTION GUARD ──────────────────────────────────────────
+    // If this asset came from the Desirable board — i.e. Direct Profit
+    // surfaced it as an opportunity itself — resolving to WAIT is a direct
+    // self-contradiction. The board already validated a positive-edge zone,
+    // so a WAIT here is promoted to a directional ticket (default BUY, the
+    // side the desirable edge implies) UNLESS a genuine structural block
+    // exists: a critical CLANK constraint or deeply negative risk-adjusted
+    // return. The whole point of the module is to hand the user the trade
+    // it just recommended — not to shrug at its own pick.
+    const criticalBlock =
+      clankSignals.some((s) => s.severity === "CRITICAL") || riskMetrics.sharpeRatio < -0.9;
+    if (
+      output.action === "WAIT" &&
+      desirableHint?.listed &&
+      (desirableHint.avgPnlPct ?? 0) >= -1 &&
+      !criticalBlock
+    ) {
+      const dir: "BUY" | "SELL" = deterministic.action === "SELL" ? "SELL" : "BUY";
+      const cp = snap.currentPrice;
+      const entryWidth = Math.max(0.006, Math.min(0.02, tech.dailyVol / 100));
+      const targetWidth = Math.max(0.018, Math.min(0.08, entryWidth * 2.4));
+      const stopWidth = Math.max(0.012, Math.min(0.04, entryWidth * 1.2));
+      let eL = cp, eH = cp, tg = cp, sl = cp, rr = 0;
+      if (dir === "BUY") {
+        eL = cp * (1 - entryWidth); eH = cp * (1 + entryWidth * 0.35);
+        tg = Math.max(cp * (1 + targetWidth), tech.resistance || 0);
+        sl = Math.min(cp * (1 - stopWidth), tech.support || cp * (1 - stopWidth));
+        rr = (tg - (eL + eH) / 2) / Math.max((eL + eH) / 2 - sl, 0.01);
+      } else {
+        eL = cp * (1 - entryWidth * 0.35); eH = cp * (1 + entryWidth);
+        tg = Math.min(cp * (1 - targetWidth), tech.support || cp * (1 - targetWidth));
+        sl = Math.max(cp * (1 + stopWidth), tech.resistance || cp * (1 + stopWidth));
+        rr = ((eL + eH) / 2 - tg) / Math.max(sl - (eL + eH) / 2, 0.01);
+      }
+      console.log(`direct-profit self-suggestion guard: WAIT → ${dir} (desirable avgPnl=${desirableHint.avgPnlPct})`);
+      output.action = dir;
+      output.direction = dir === "BUY" ? "UP" : "DOWN";
+      output.directionReason = `Desirable-board pick — ${(desirableHint.avgPnlPct ?? 0) >= 0 ? "positive" : "neutral"} historical edge`;
+      output.entryLow = roundPrice(eL);
+      output.entryHigh = roundPrice(eH);
+      output.targetPrice = roundPrice(tg);
+      output.stopLoss = roundPrice(sl);
+      output.riskRewardRatio = Number(Math.abs(rr).toFixed(2));
+      output.protection = dir === "BUY"
+        ? `${resolvedTicker} ${roundPrice(sl)} PE as hedge. Trail stop at ${currencySymbol}${roundPrice(sl)}. Risk/share: ${currencySymbol}${roundPrice(cp - sl)}.`
+        : `Cover above ${currencySymbol}${roundPrice(sl)} with ${resolvedTicker} ${roundPrice(sl)} CE. Max loss: ${currencySymbol}${roundPrice(sl - cp)}/share.`;
+      output.confidence = Math.max(Number(output.confidence) || 50, 55);
+      (output as any).waitReasons = undefined;
+      (output as any).consensus = "DESIRABLE_CONVICTION";
+    }
+
     // Re-calibrate the displayed confidence to the calibrated probability
     // (so the number the user sees is honest about how often this should win).
     if (output.action !== "WAIT") {
