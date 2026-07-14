@@ -25,9 +25,9 @@ interface EvidenceContextValue {
 
 const EvidenceContext = createContext<EvidenceContextValue | null>(null);
 
-export function EvidenceProvider({ ticker, children }: { ticker: string; children: ReactNode }) {
+export function EvidenceProvider({ ticker, initialSelectedId, children }: { ticker: string; initialSelectedId?: string | null; children: ReactNode }) {
   const { refresh, ...data } = useWorkstationData(ticker);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const [changes, setChanges] = useState<EvidenceChange[]>([]);
 
   const graph = useMemo(
@@ -54,6 +54,10 @@ export function EvidenceProvider({ ticker, children }: { ticker: string; childre
     () => synthesize(graph, data.analysis, data.quote?.price ?? data.analysis?.currentPrice ?? null),
     [graph, data.analysis, data.quote],
   );
+
+  useEffect(() => {
+    if (initialSelectedId && graph.metrics[initialSelectedId]) setSelectedId(initialSelectedId);
+  }, [initialSelectedId, graph.metrics]);
 
   // Session-over-session diff: run once the graph is materially assembled.
   useEffect(() => {
