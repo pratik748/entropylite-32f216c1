@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ContextBar from "@/components/workstation/ContextBar";
 import SectionRail from "@/components/workstation/SectionRail";
 import InspectorPanel from "@/components/workstation/InspectorPanel";
@@ -24,6 +24,7 @@ const CompanyWorkstationPage = () => {
   const { ticker: rawTicker, workspaceId, sectionId } = useParams();
   const navigate = useNavigate();
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [searchParams] = useSearchParams();
 
   const ticker = normalizeUserTicker(rawTicker ?? "");
   const workspace = findWorkspace(workspaceId);
@@ -58,7 +59,7 @@ const CompanyWorkstationPage = () => {
   }
 
   return (
-    <EvidenceProvider ticker={ticker}>
+    <EvidenceProvider ticker={ticker} initialSelectedId={searchParams.get("evidence")}>
       <div className="flex h-screen flex-col overflow-hidden bg-background">
         <ContextBar
           inspectorOpen={inspectorOpen}

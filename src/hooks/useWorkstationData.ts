@@ -116,6 +116,24 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
     aliveRef.current = true;
     let quoteInterval: ReturnType<typeof setInterval> | null = null;
 
+    if (!ticker.trim()) {
+      setQuote(null);
+      setAnalysis(null);
+      setBars(null);
+      setDossier(null);
+      setFinancials(null);
+      setStatus({
+        quote: { state: "unavailable", fetchedAt: null },
+        analysis: { state: "unavailable", fetchedAt: null },
+        bars: { state: "unavailable", fetchedAt: null },
+        dossier: { state: "unavailable", fetchedAt: null },
+        financials: { state: "unavailable", fetchedAt: null },
+      });
+      return () => {
+        aliveRef.current = false;
+      };
+    }
+
     // Reset per ticker.
     setQuote(null);
     setAnalysis(null);

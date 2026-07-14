@@ -33,10 +33,13 @@ import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/c
 import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
-import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useSymbolSuggest } from "@/components/SymbolSuggest";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { EMPTY_STATE_MESSAGE } from "@/lib/opportunities/types";
+import { useWorkstationData } from "@/hooks/useWorkstationData";
+import { buildEvidenceGraph } from "@/lib/evidence/build";
+import { synthesize } from "@/lib/evidence/synthesis";
+import type { Synthesis } from "@/lib/evidence/types";
 
 interface RiskMetrics {
   var95: number;
@@ -58,7 +61,7 @@ interface ClankSignal {
 }
 
 interface TradeResult {
-  action: "BUY" | "SELL" | "WAIT";
+  action: "BUY" | "SELL" | "HOLD" | "REDUCE" | "EXIT";
   confidence: number;
   entryLow: number;
   entryHigh: number;
@@ -82,6 +85,14 @@ interface TradeResult {
   clankSignals?: ClankSignal[];
   newsHeadlines?: string[];
   waitReasons?: string[];
+  evidenceCount?: number;
+  expectedReturnPct?: number | null;
+  expectedDownsidePct?: number | null;
+  primaryDrivers?: { id: string; label: string; reason: string; weight: number }[];
+  primaryRisks?: { id: string; label: string; reason: string; weight: number }[];
+  probabilityDistribution?: Synthesis["cases"];
+  thesisBreakers?: Synthesis["breakers"];
+  engineSources?: string[];
   bullSignals?: string[];
   bearSignals?: string[];
   intelligence?: {
@@ -186,7 +197,6 @@ interface PortfolioItem {
 }
 
 const STORAGE_KEY = "dp-portfolio";
-const ANALYSIS_TIMEOUT_MS = 25000;
 
 function loadPortfolio(): PortfolioItem[] {
   try {
@@ -260,7 +270,7 @@ function computeOptimalQuantity(opts: {
 function isTradeResult(value: any): value is TradeResult {
   return Boolean(
     value &&
-      ["BUY", "SELL", "WAIT"].includes(value.action) &&
+      ["BUY", "SELL", "HOLD", "REDUCE", "EXIT"].includes(value.action) &&
       ["UP", "DOWN", "SIDEWAYS"].includes(value.direction) &&
       typeof value.confidence === "number" &&
       typeof value.currentPrice === "number"
@@ -300,6 +310,14 @@ function normalizeTradeResult(value: any): TradeResult | null {
     clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
     newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
     waitReasons: Array.isArray(value.waitReasons) ? value.waitReasons.map((s: any) => String(s)) : undefined,
+    evidenceCount: typeof value.evidenceCount === "number" ? value.evidenceCount : undefined,
+    expectedReturnPct: value.expectedReturnPct ?? undefined,
+    expectedDownsidePct: value.expectedDownsidePct ?? undefined,
+    primaryDrivers: Array.isArray(value.primaryDrivers) ? value.primaryDrivers : undefined,
+    primaryRisks: Array.isArray(value.primaryRisks) ? value.primaryRisks : undefined,
+    probabilityDistribution: Array.isArray(value.probabilityDistribution) ? value.probabilityDistribution : undefined,
+    thesisBreakers: Array.isArray(value.thesisBreakers) ? value.thesisBreakers : undefined,
+    engineSources: Array.isArray(value.engineSources) ? value.engineSources.map((s: any) => String(s)) : undefined,
     bullSignals: Array.isArray(value.bullSignals) ? value.bullSignals.map((s: any) => String(s)) : undefined,
     bearSignals: Array.isArray(value.bearSignals) ? value.bearSignals.map((s: any) => String(s)) : undefined,
     intelligence: value.intelligence && typeof value.intelligence === "object" ? value.intelligence : undefined,
@@ -323,7 +341,7 @@ interface DirectProfitModeProps {
      * instead of contradicting it.
      */
     directProfitContext: {
-      action: "BUY" | "SELL" | "WAIT";
+      action: "BUY" | "SELL" | "HOLD" | "REDUCE" | "EXIT";
       confidence: number;
       entryLow: number;
       entryHigh: number;
@@ -355,7 +373,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { indiaMode, baseCurrency, convertToBase } = useFX();
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const { logTrade } = useTradeLogger();
-  const { desirableZones } = useOutcomeGradient();
+  const { refresh: refreshWorkstation, ...workstationData } = useWorkstationData(activeTicker);
 
   useEffect(() => {
     if (activeTicker && !loading) {
@@ -443,55 +461,86 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setLiveCurrency(null);
     setLastPriceUpdate(0);
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("Analysis is taking too long. Please try again.")), ANALYSIS_TIMEOUT_MS);
-    });
+    refreshWorkstation();
+  }, [refreshWorkstation]);
 
+
+  useEffect(() => {
+    if (!activeTicker || !loading || workstationData.bootstrapping) return;
     try {
-      const response = await Promise.race([
-        governedInvoke<TradeResult>("direct-profit", {
-          body: {
-            ticker: normalizedTicker,
-            indiaMode,
-            desirableHint: (() => {
-              const norm = normalizedTicker.replace(/\.(NS|BO)$/i, "").toUpperCase();
-              const matches = desirableZones.filter(z =>
-                z.assets.some(a => a.replace(/\.(NS|BO)$/i, "").toUpperCase() === norm)
-              );
-              if (matches.length === 0) return null;
-              const avgPnl = matches.reduce((s, z) => s + z.avgPnlPct, 0) / matches.length;
-              return {
-                listed: true,
-                avgPnlPct: Number(avgPnl.toFixed(2)),
-                zoneCount: matches.length,
-                regimes: matches.map(z => z.regime).slice(0, 3),
-              };
-            })(),
-          },
-          tier: "ai",
-          force: true,
-        }),
-        timeoutPromise,
-      ]);
-
-      const { data, error } = response as Awaited<ReturnType<typeof governedInvoke<TradeResult>>>;
-      if (error) throw error;
-
-      const normalized = normalizeTradeResult(data);
-      if (!normalized) throw new Error("Direct Profit returned an incomplete trade plan. Please retry.");
-
-      setResult(normalized);
-      setLivePrice(normalized.currentPrice > 0 ? normalized.currentPrice : null);
-      setLiveCurrency(normalized.currency || null);
+      const graph = buildEvidenceGraph({
+        ticker: activeTicker,
+        analysis: workstationData.analysis,
+        bars: workstationData.bars,
+        dossier: workstationData.dossier,
+        quote: workstationData.quote,
+        financials: workstationData.financials,
+        fetchedAt: {
+          analysis: workstationData.status.analysis.fetchedAt,
+          bars: workstationData.status.bars.fetchedAt,
+          dossier: workstationData.status.dossier.fetchedAt,
+          quote: workstationData.status.quote.fetchedAt,
+          financials: workstationData.status.financials.fetchedAt,
+        },
+      });
+      const price = workstationData.quote?.price ?? workstationData.analysis?.currentPrice ?? graph.metrics.support?.value ?? 0;
+      const synthesis = synthesize(graph, workstationData.analysis, price || null);
+      const action = synthesis.action === "ACCUMULATE" ? "BUY" : synthesis.action === "AVOID" ? "EXIT" : synthesis.action;
+      const bull = synthesis.cases.find((c) => c.id === "bull");
+      const bear = synthesis.cases.find((c) => c.id === "bear");
+      const support = graph.metrics.support?.value ?? (price ? price * 0.97 : 0);
+      const resistance = graph.metrics.resistance?.value ?? bull?.target ?? (price ? price * 1.08 : 0);
+      const entryLow = graph.metrics.support?.value ?? (price ? price * 0.99 : 0);
+      const entryHigh = price || entryLow;
+      const drivers = synthesis.contributions
+        .filter((c) => c.scored > 0)
+        .sort((a, b) => b.scored - a.scored)
+        .slice(0, 5)
+        .map((c) => ({ id: c.id, label: graph.metrics[c.id].label, reason: graph.metrics[c.id].assessment.reason, weight: c.scored }));
+      const risks = synthesis.contributions
+        .filter((c) => c.scored < 0)
+        .sort((a, b) => a.scored - b.scored)
+        .slice(0, 5)
+        .map((c) => ({ id: c.id, label: graph.metrics[c.id].label, reason: graph.metrics[c.id].assessment.reason, weight: c.scored }));
+      const data: TradeResult = {
+        action,
+        confidence: synthesis.confidence,
+        entryLow: Number(entryLow.toFixed(2)),
+        entryHigh: Number(entryHigh.toFixed(2)),
+        targetPrice: Number((bull?.target ?? resistance).toFixed(2)),
+        stopLoss: Number((support * 0.98).toFixed(2)),
+        timeframe: "1-3 months",
+        direction: action === "BUY" ? "UP" : action === "EXIT" || action === "REDUCE" ? "DOWN" : "SIDEWAYS",
+        directionReason: synthesis.headline,
+        positiveNews: drivers[0]?.reason || "No positive evidence node dominates.",
+        negativeNews: risks[0]?.reason || "No primary risk node dominates.",
+        protection: synthesis.breakers.find((b) => b.state !== "intact")?.detail || `Invalidate below ${Number((support * 0.98).toFixed(2))}.`,
+        currentPrice: price || 0,
+        currency: workstationData.quote?.currency ?? workstationData.analysis?.currency,
+        quantScore: Math.round((synthesis.confidence + Math.max(0, synthesis.ledger.supporting - synthesis.ledger.opposing)) / 2),
+        riskRewardRatio: price && support ? Math.abs(((bull?.target ?? resistance) - price) / Math.max(0.01, price - support)) : undefined,
+        providersUsed: graph.coverage.sources.length,
+        consensus: synthesis.ledger.opposing === 0 ? "UNANIMOUS" : synthesis.ledger.supporting > synthesis.ledger.opposing ? "MAJORITY" : "SPLIT",
+        evidenceCount: graph.order.length,
+        expectedReturnPct: bull?.returnPct ?? null,
+        expectedDownsidePct: bear?.returnPct ?? null,
+        primaryDrivers: drivers,
+        primaryRisks: risks,
+        probabilityDistribution: synthesis.cases,
+        thesisBreakers: synthesis.breakers,
+        engineSources: graph.coverage.sources,
+      };
+      setResult(data);
+      setLivePrice(data.currentPrice > 0 ? data.currentPrice : null);
+      setLiveCurrency(data.currency || null);
       setLastPriceUpdate(Date.now());
     } catch (err: any) {
-      const message = typeof err?.message === "string" && err.message.trim()
-        ? err.message
-        : "Could not analyze this asset right now. Please try again.";
-      console.error("Direct profit error:", err);
-      setErrorMessage(message);
-    } finally { setLoading(false); }
-  }, [indiaMode]);
+      console.error("Direct profit evidence synthesis error:", err);
+      setErrorMessage("Could not synthesize the evidence graph for this asset.");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTicker, loading, workstationData]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
 
@@ -501,7 +550,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   };
 
   const addToPortfolio = () => {
-    if (!result || !activeTicker || result.action === "WAIT") return;
+    if (!result || !activeTicker || result.action !== "BUY") return;
     const exists = portfolio.some((p) => p.ticker === activeTicker);
     const entryPrice = (result.entryLow + result.entryHigh) / 2;
     const itemCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result.currency, indiaMode ? "INR" : "USD");
@@ -509,7 +558,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     if (!exists) {
       const item: PortfolioItem = {
         ticker: activeTicker,
-        action: result.action,
+        action: "BUY",
         entryPrice,
         targetPrice: result.targetPrice,
         stopLoss: result.stopLoss,
@@ -525,7 +574,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       setPortfolio((prev) => [item, ...prev]);
       logTrade({
         ticker: activeTicker,
-        action: result.action as "BUY" | "SELL",
+        action: "BUY",
         price: entryPrice,
         qty: 0,
         pnl: 0,
@@ -549,7 +598,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       });
       if (optimizedQty >= 1) {
         onAddToMainPortfolio(activeTicker, entryPrice, optimizedQty, {
-          action: result.action,
+          action: "BUY",
           confidence: result.confidence,
           entryLow: result.entryLow,
           entryHigh: result.entryHigh,
@@ -634,12 +683,12 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     let text = "";
     if (indiaMode) {
       if (result.action === "BUY") text = `खरीदें, ${cSym}${result.entryLow} से ${cSym}${result.entryHigh} के बीच। लक्ष्य ${cSym}${result.targetPrice}। ${cSym}${result.stopLoss} से नीचे जाएं तो बाहर निकलें। समय सीमा: ${result.timeframe}।`;
-      else if (result.action === "SELL") text = `बेचें, ${cSym}${result.entryLow} से ${cSym}${result.entryHigh} के बीच। लक्ष्य ${cSym}${result.targetPrice}। स्टॉप लॉस ${cSym}${result.stopLoss}। समय सीमा: ${result.timeframe}।`;
-      else text = `रुकें। संकेत मिश्रित हैं। विश्वास स्तर ${result.confidence} प्रतिशत है। ${result.directionReason}।`;
+      else if (result.action === "REDUCE" || result.action === "EXIT") text = `बेचें, ${cSym}${result.entryLow} से ${cSym}${result.entryHigh} के बीच। लक्ष्य ${cSym}${result.targetPrice}। स्टॉप लॉस ${cSym}${result.stopLoss}। समय सीमा: ${result.timeframe}।`;
+      else text = `${result.action}. विश्वास स्तर ${result.confidence} प्रतिशत है। ${result.directionReason}।`;
     } else {
       if (result.action === "BUY") text = `Buy between ${cSym}${result.entryLow} and ${cSym}${result.entryHigh}. Target ${cSym}${result.targetPrice}. Exit below ${cSym}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
-      else if (result.action === "SELL") text = `Sell between ${cSym}${result.entryLow} and ${cSym}${result.entryHigh}. Target ${cSym}${result.targetPrice}. Stop at ${cSym}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
-      else text = `Wait. Signals are mixed. Confidence is ${result.confidence} percent. ${result.directionReason}.`;
+      else if (result.action === "REDUCE" || result.action === "EXIT") text = `Sell between ${cSym}${result.entryLow} and ${cSym}${result.entryHigh}. Target ${cSym}${result.targetPrice}. Stop at ${cSym}${result.stopLoss}. Timeframe: ${result.timeframe}.`;
+      else text = `${result.action}. Confidence is ${result.confidence} percent. ${result.directionReason}.`;
     }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = indiaMode ? "hi-IN" : "en-US";
@@ -653,8 +702,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const activeCurrency = resolveAssetCurrency(activeTicker, liveCurrency || result?.currency, indiaMode ? "INR" : "USD");
   const cs = getCurrencySymbol(activeCurrency);
   const baseSym = getCurrencySymbol(baseCurrency);
-  const actionColor = result?.action === "BUY" ? "text-gain" : result?.action === "SELL" ? "text-loss" : "text-muted-foreground";
-  const actionBg = result?.action === "BUY" ? "bg-gain/10 border-gain/30" : result?.action === "SELL" ? "bg-loss/10 border-loss/30" : "bg-muted/20 border-border";
+  const actionColor = result?.action === "BUY" ? "text-gain" : result?.action === "REDUCE" || result?.action === "EXIT" ? "text-loss" : "text-muted-foreground";
+  const actionBg = result?.action === "BUY" ? "bg-gain/10 border-gain/30" : result?.action === "REDUCE" || result?.action === "EXIT" ? "bg-loss/10 border-loss/30" : "bg-muted/20 border-border";
   const dirIcon = result?.direction === "UP"
     ? <ArrowUp className="h-5 w-5 text-gain" />
     : result?.direction === "DOWN"
@@ -771,7 +820,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                   </div>
                   <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden">
                     <div
-                      className={`h-full transition-all ${result.action === "BUY" ? "bg-gain" : result.action === "SELL" ? "bg-loss" : "bg-muted-foreground/60"}`}
+                      className={`h-full transition-all ${result.action === "BUY" ? "bg-gain" : result.action === "REDUCE" || result.action === "EXIT" ? "bg-loss" : "bg-muted-foreground/60"}`}
                       style={{ width: `${Math.round(result.ensemble.calibratedProb * 100)}%` }}
                     />
                   </div>
@@ -812,10 +861,10 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             </div>
 
             {/* ── WAIT EXPLANATION ── */}
-            {result.action === "WAIT" && (result.waitReasons?.length || 0) > 0 && (
+            {result.action === "HOLD" && (result.waitReasons?.length || 0) > 0 && (
               <div className="border-b border-border bg-surface-2/30 p-4">
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
-                  Why WAIT — thresholds not met
+                  Why HOLD — evidence thresholds not met
                 </div>
                 <ul className="space-y-1.5">
                   {result.waitReasons!.map((r, i) => (
@@ -883,6 +932,52 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
             )}
 
+
+            {/* ── EVIDENCE-DRIVEN DECISION SURFACE ── */}
+            <div className="border-b border-border p-4 space-y-4 bg-surface-2/20">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Return</div>
+                  <div className={`text-xl font-black font-mono ${(result.expectedReturnPct ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{result.expectedReturnPct != null ? `${result.expectedReturnPct > 0 ? "+" : ""}${result.expectedReturnPct}%` : "—"}</div>
+                </div>
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Downside</div>
+                  <div className="text-xl font-black font-mono text-loss">{result.expectedDownsidePct != null ? `${result.expectedDownsidePct}%` : "—"}</div>
+                </div>
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Risk</div>
+                  <div className="text-base font-bold text-foreground">{rm?.cvar95 ? "High" : result.thesisBreakers?.some((b) => b.state === "tripped") ? "High" : result.thesisBreakers?.some((b) => b.state === "watch") ? "Moderate" : "Controlled"}</div>
+                </div>
+                <div className="rounded-lg bg-surface-2/40 p-3">
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Evidence</div>
+                  <div className="text-base font-bold text-foreground">{result.evidenceCount ?? 0} nodes</div>
+                </div>
+              </div>
+
+              {result.probabilityDistribution && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Probability distribution</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {result.probabilityDistribution.map((c) => (
+                      <div key={c.id} className="rounded-lg border border-border bg-background/40 p-2 text-center">
+                        <div className="text-[10px] uppercase text-muted-foreground">{c.label}</div>
+                        <div className="text-lg font-black font-mono text-foreground">{c.probability}%</div>
+                        <div className={`text-[10px] font-mono ${(c.returnPct ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{c.returnPct != null ? `${c.returnPct > 0 ? "+" : ""}${c.returnPct}%` : "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3">
+                <EvidenceList title="Primary Drivers" tone="gain" items={result.primaryDrivers || []} ticker={activeTicker} />
+                <EvidenceList title="Primary Risks" tone="loss" items={result.primaryRisks || []} ticker={activeTicker} />
+              </div>
+              <div className="text-[10px] font-mono text-muted-foreground">
+                Decision derived from {result.evidenceCount ?? 0} evidence nodes across {result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.
+              </div>
+            </div>
+
             {/* ── PRICE CHART ── */}
             {historicalPrices[activeTicker]?.closes?.length > 0 && (
               <div className="border-b border-border p-3 bg-surface-2/30">
@@ -938,7 +1033,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
 
               {/* ── EXPECTED PROFIT (probability-weighted, fat-tail adjusted) ── */}
-              {qe && result.action !== "WAIT" && (
+              {qe && result.action === "BUY" && (
                 <div className={`rounded-lg p-3 border ${qe.expectedProfit.perShare >= 0 ? "bg-gain/5 border-gain/25" : "bg-loss/5 border-loss/25"}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -1217,7 +1312,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
             {/* Actions */}
             <div className="border-t border-border p-3 flex items-center justify-between">
-              {result.action !== "WAIT" ? (
+              {result.action === "BUY" ? (
                 <Button
                   size="sm"
                   variant={added || alreadyInPortfolio ? "outline" : "default"}
@@ -1358,6 +1453,32 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 export default DirectProfitMode;
 
 // Small directional badge for quant-edge engine signals.
+const EvidenceList = ({ title, tone, items, ticker }: { title: string; tone: "gain" | "loss"; items: { id: string; label: string; reason: string; weight: number }[]; ticker: string }) => {
+  const color = tone === "gain" ? "text-gain" : "text-loss";
+  return (
+    <div className="rounded-lg border border-border bg-background/40 p-3">
+      <div className={`text-[10px] font-mono uppercase tracking-widest mb-2 ${color}`}>{title}</div>
+      <div className="space-y-1.5">
+        {items.length === 0 ? <div className="text-xs text-muted-foreground">No dominant node.</div> : items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => window.open(`/company/${encodeURIComponent(ticker)}?evidence=${encodeURIComponent(item.id)}`, "_blank")}
+            className="w-full text-left rounded-md px-2 py-1.5 hover:bg-surface-2/60 transition-colors"
+            title="Open this evidence in the Workstation Inspector"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-foreground">{item.label}</span>
+              <span className={`text-[10px] font-mono ${color}`}>{item.weight > 0 ? "+" : ""}{item.weight.toFixed(2)}</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground line-clamp-2">{item.reason}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const SignalBadge = ({ signal }: { signal: "BUY" | "SELL" | "NEUTRAL" }) => (
   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
     signal === "BUY" ? "bg-gain/15 text-gain" :
