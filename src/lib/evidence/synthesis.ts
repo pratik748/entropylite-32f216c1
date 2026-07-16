@@ -203,7 +203,15 @@ export function logNormalHorizon(
   const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
   const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
   // Evidence drift: momentum leads, contained risk supports; bounded ±0.75σ.
-  const tilt = clamp((0.5 * (momentum - 50) + 0.25 * (risk - 50)) / 50, -0.75, 0.75);
+  // Thesis breakers drag the drift — a tripped breaker is realised downside
+  // evidence, and the distribution that prices the cases and tail metrics
+  // must carry it, otherwise the verdict (which reacts to breakers) can
+  // contradict the expected return rendered next to it.
+  const breakers = buildBreakers(graph);
+  const breakerDrag =
+    0.3 * breakers.filter((b) => b.state === "tripped").length +
+    0.1 * breakers.filter((b) => b.state === "watch").length;
+  const tilt = clamp((0.5 * (momentum - 50) + 0.25 * (risk - 50)) / 50 - breakerDrag, -0.75, 0.75);
   return {
     m: tilt * sigma - (sigma * sigma) / 2,
     sigma,
@@ -399,7 +407,23 @@ export function synthesize(
     .slice(0, 6)
     .map((c) => ({ id: c.id, weight: c.scored }));
 
-  const action = actionFrom(net, breakers, nodes.length);
+  let action = actionFrom(net, breakers, nodes.length);
+
+  // Quantitative coherence gate: the verdict must not contradict the sign
+  // of the expected return implied by its own scenario distribution. An
+  // ACCUMULATE with non-positive probability-weighted return, or a REDUCE
+  // with positive expectancy and no tripped breaker, downgrades to HOLD —
+  // the numbers on the surface and the action above them come from one
+  // model or the ticket does not ship.
+  const cases = priceCases(buildCases(graph, pillars, analysis, price), analysis, price);
+  const evPct = cases.some((c) => c.returnPct != null)
+    ? cases.reduce((s, c) => s + (c.probability / 100) * (c.returnPct ?? 0), 0)
+    : null;
+  const trippedCount = breakers.filter((b) => b.state === "tripped").length;
+  if (evPct != null) {
+    if (action === "ACCUMULATE" && evPct <= 0) action = "HOLD";
+    if (action === "REDUCE" && evPct > 0 && trippedCount === 0) action = "HOLD";
+  }
 
   // Logistic confidence calibration: evidence volume, directional agreement
   // and the magnitude of the net contribution raise the logit; estimated
@@ -427,7 +451,9 @@ export function synthesize(
       : action === "HOLD"
         ? `The evidence on ${graph.ticker} is balanced (net ${net >= 0 ? "+" : ""}${net}) — hold existing exposure, add only on improved structure.`
         : action === "REDUCE"
-          ? `Opposing evidence outweighs support on ${graph.ticker} (net ${net}) — reduce exposure and defend the position.`
+          ? net <= -1.6
+            ? `Opposing evidence outweighs support on ${graph.ticker} (net ${net}) — reduce exposure and defend the position.`
+            : `A tripped thesis breaker overrides the evidence balance on ${graph.ticker} (net ${net >= 0 ? "+" : ""}${net}) — reduce exposure while it stands.`
           : `The evidence stack argues against holding ${graph.ticker} here — ${breakers.filter((b) => b.state === "tripped").length} breaker(s) tripped, net weight ${net}.`;
 
   const narrative: string[] = [];
@@ -449,7 +475,6 @@ export function synthesize(
   }
 
   const keyDrivers = movers.slice(0, 5);
-  const cases = priceCases(buildCases(graph, pillars, analysis, price), analysis, price);
 
   return {
     action,

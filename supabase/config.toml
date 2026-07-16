@@ -107,3 +107,34 @@ verify_jwt = false
 
 [functions.foresight-plan]
 verify_jwt = false
+
+# Client-invoked functions below were missing their verify_jwt declaration.
+# The browser authenticates with the publishable key (not a JWT), so the
+# platform default (verify_jwt = true) rejects these calls with 401 — the
+# direct-profit quant engine and the workstation financials feed were
+# unreachable in production because of it. twrd-ingest / twrd-feedback stay
+# undeclared on purpose: they are only called service-to-service.
+
+[functions.direct-profit]
+verify_jwt = false
+
+[functions.company-financials]
+verify_jwt = false
+
+[functions.entropy-brief]
+verify_jwt = false
+
+[functions.geo-events]
+verify_jwt = false
+
+[functions.reflexivity-engine]
+verify_jwt = false
+
+[functions.trade-lesson]
+verify_jwt = false
+
+[functions.fortress-intelligence]
+verify_jwt = false
+
+[functions.twrd-query]
+verify_jwt = false

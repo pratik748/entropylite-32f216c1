@@ -385,6 +385,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { desirableZones } = useOutcomeGradient();
   /** Quant-engine ticket from the direct-profit edge function; null when it failed and the evidence fallback owns the result. */
   const [edgeResult, setEdgeResult] = useState<TradeResult | null>(null);
+  /** Why the quant engine did not land — shown on the fallback surface so the swap is never silent. */
+  const [edgeError, setEdgeError] = useState<string | null>(null);
   const edgePendingRef = useRef(false);
 
   useEffect(() => {
@@ -468,6 +470,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setErrorMessage(null);
     setResult(null);
     setEdgeResult(null);
+    setEdgeError(null);
     setAdded(false);
     setActiveTicker(normalizedTicker);
     setLivePrice(null);
@@ -483,9 +486,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     refreshWorkstation();
     edgePendingRef.current = true;
 
-    try {
+    const attemptEngine = async (): Promise<TradeResult> => {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("direct-profit timeout")), ANALYSIS_TIMEOUT_MS);
+        setTimeout(() => reject(new Error(`timeout after ${ANALYSIS_TIMEOUT_MS / 1000}s`)), ANALYSIS_TIMEOUT_MS);
       });
       const response = await Promise.race([
         governedInvoke<TradeResult>("direct-profit", {
@@ -515,11 +518,23 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       const { data, error } = response as Awaited<ReturnType<typeof governedInvoke<TradeResult>>>;
       if (error) throw error;
       const normalized = normalizeTradeResult(data);
-      if (!normalized) throw new Error("incomplete trade plan");
-      setEdgeResult(normalized);
-    } catch (err) {
-      // Silent: the evidence-synthesis fallback below owns the result.
-      console.warn("direct-profit edge engine unavailable, using evidence synthesis:", err);
+      if (!normalized) throw new Error("engine returned an incomplete trade plan");
+      return normalized;
+    };
+
+    try {
+      setEdgeResult(await attemptEngine());
+    } catch (firstErr) {
+      // One retry — cold starts and transient 5xx are the common failure
+      // mode, and the evidence view renders in the meantime so a late
+      // quant ticket simply upgrades the surface in place.
+      try {
+        setEdgeResult(await attemptEngine());
+      } catch (err: any) {
+        console.warn("direct-profit edge engine unavailable, using evidence synthesis:", firstErr, err);
+        const reason = err?.message || err?.error?.message || String(err);
+        setEdgeError(String(reason).slice(0, 140));
+      }
     } finally {
       edgePendingRef.current = false;
     }
@@ -1068,20 +1083,32 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
             {/* ── DECISION SURFACE ── */}
             <div className="border-b border-border p-4 space-y-4 bg-surface-2/20">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Decision surface</div>
-                <span
-                  className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                    quantOwned ? "text-gain border-gain/30 bg-gain/10" : "text-warning border-warning/40 bg-warning/10"
-                  }`}
-                  title={
-                    quantOwned
-                      ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
-                      : "Quant engine unreachable — verdict synthesized locally from the workstation evidence graph."
-                  }
-                >
-                  {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                      quantOwned ? "text-gain border-gain/30 bg-gain/10" : "text-warning border-warning/40 bg-warning/10"
+                    }`}
+                    title={
+                      quantOwned
+                        ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
+                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. Verdict synthesized locally from the workstation evidence graph.`
+                    }
+                  >
+                    {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
+                  </span>
+                  {!quantOwned && (
+                    <button
+                      type="button"
+                      onClick={retryAnalysis}
+                      className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-surface-2/60 transition-colors"
+                      title="Re-run the analysis and retry the quant engine"
+                    >
+                      Retry engine
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-surface-2/40 p-3">
@@ -1130,7 +1157,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               <div className="text-[10px] font-mono text-muted-foreground">
                 {quantOwned
                   ? `Verdict from the quant ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
-                  : `Quant engine unreachable — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
+                  : `Quant engine unreachable${edgeError ? ` (${edgeError})` : ""} — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
               </div>
             </div>
 
