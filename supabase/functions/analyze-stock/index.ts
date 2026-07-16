@@ -527,7 +527,13 @@ serve(async (req) => {
       news.some((item) => item.sentiment < -20) ? "Recent headline flow includes adverse event language that can pressure the tape." : "Recent headline flow is not signaling a major negative shock.",
     ].slice(0, 4);
 
-    const monthlySigma = sigmaDaily > 0 ? sigmaDaily * Math.sqrt(21) : Math.max(Math.abs(changePct) / 100, 0.04);
+    // σ provenance is part of the payload: when price history is missing the
+    // ranges degrade to an ASSUMED 4% monthly σ, which produces the same
+    // ±4.6% band on every stock. That must never masquerade as a computed
+    // number — rangeModel below lets every consumer (desk simulation table,
+    // Monte Carlo bands, evidence graph) label the basis honestly.
+    const sigmaSource: "realized" | "assumed" = returns.length >= 20 && sigmaDaily > 0 ? "realized" : "assumed";
+    const monthlySigma = sigmaSource === "realized" ? sigmaDaily * Math.sqrt(21) : Math.max(Math.abs(changePct) / 100, 0.04);
     const bullRange: [number, number] = [
       round(currentPrice * (1 + monthlySigma * 0.45)),
       round(currentPrice * (1 + monthlySigma * 1.15)),
@@ -698,6 +704,16 @@ serve(async (req) => {
       bullRange,
       neutralRange,
       bearRange,
+      rangeModel: {
+        sigmaSource,
+        barsCount: closes.length,
+        returnsCount: returns.length,
+        monthlySigmaPct: round(monthlySigma * 100, 2),
+        formula: "bull = S·(1 + σₘ·[0.45, 1.15]), neutral = S·(1 ± σₘ·0.3), bear = S·(1 − σₘ·[1.15, 0.45])",
+        note: sigmaSource === "realized"
+          ? `σₘ = σ_daily·√21 from ${returns.length} daily returns`
+          : `price history unavailable (${closes.length} bar${closes.length === 1 ? "" : "s"}) — σₘ assumed at ${round(monthlySigma * 100, 1)}%; ranges are placeholders, not computed`,
+      },
       suggestion,
       confidence,
       confidenceReasoning,

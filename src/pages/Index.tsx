@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
 import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -25,6 +25,7 @@ import { useTradeLogger } from "@/hooks/useTradeLogger";
 import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
+import SystemPipeline from "@/components/system/SystemPipeline";
 import TickerStrip from "@/components/terminal/TickerStrip";
 import ThemeToggle from "@/components/ThemeToggle";
 import PageTransition from "@/components/PageTransition";
@@ -54,7 +55,7 @@ import Spotlight from "@/foresight/ui/Spotlight";
 import { onUIEvent } from "@/foresight/uiBus";
 import type { HostAdapter } from "@/foresight/types";
 
-type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress";
+type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system";
 
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
@@ -71,6 +72,7 @@ const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "augment",      label: "Augment",     icon: <Sparkles className="h-4 w-4" strokeWidth={1.75} /> },
   { id: "risk",         label: "Risk",        icon: <Shield className="h-4 w-4" strokeWidth={1.75} /> },
   { id: "fortress",     label: "Fortress",    icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.75} /> },
+  { id: "system",       label: "System",      icon: <Workflow className="h-4 w-4" strokeWidth={1.75} /> },
 ];
 
 const IndexContent = () => {
@@ -745,6 +747,11 @@ const IndexContent = () => {
               {activeTab === "fortress" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-8">
                   <FortressMode key={refreshKey} stocks={stocks} setStocks={setStocks} />
+                </div>
+              )}
+              {activeTab === "system" && (
+                <div className="px-3 sm:container py-3 sm:py-5 pb-8">
+                  <SystemPipeline stocks={stocks} onNavigate={(id) => handleTabSwitch(id as Tab)} />
                 </div>
               )}
             </PageTransition>

@@ -5,15 +5,26 @@ import {
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCurrency } from "@/lib/currency";
 
+interface RangeModel {
+  sigmaSource: "realized" | "assumed";
+  barsCount?: number;
+  returnsCount?: number;
+  monthlySigmaPct?: number;
+  formula?: string;
+  note?: string;
+}
+
 interface SimulationProps {
   currentPrice: number;
   bullRange: [number, number];
   neutralRange: [number, number];
   bearRange: [number, number];
   currency?: string;
+  /** σ provenance from analyze-stock — labels whether the bands are computed from realized returns or assumed. */
+  rangeModel?: RangeModel | null;
 }
 
-const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange, currency }: SimulationProps) => {
+const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange, currency, rangeModel }: SimulationProps) => {
   const { baseCurrency, convertToBase } = useFX();
   const sym = getCurrencySymbol(baseCurrency);
 
@@ -44,9 +55,25 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange, cur
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
-      <div className="mb-5 flex items-center gap-2">
-        <Target className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold text-foreground">3-Month Simulation</h2>
+      <div className="mb-5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold text-foreground">3-Month Simulation</h2>
+        </div>
+        {rangeModel && (
+          <span
+            className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+              rangeModel.sigmaSource === "realized"
+                ? "text-muted-foreground border-border bg-surface-2/60"
+                : "text-warning border-warning/40 bg-warning/10"
+            }`}
+            title={rangeModel.note || rangeModel.formula}
+          >
+            {rangeModel.sigmaSource === "realized"
+              ? `σₘ ${rangeModel.monthlySigmaPct != null ? `${rangeModel.monthlySigmaPct}% ` : ""}· realized`
+              : "assumed σ — history unavailable"}
+          </span>
+        )}
       </div>
 
       <div className="h-48 w-full mb-5">
@@ -76,6 +103,13 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange, cur
         <p className="text-xs text-muted-foreground">Current Price</p>
         <p className="font-mono text-lg font-bold text-foreground">{fmt(cp)}</p>
       </div>
+
+      {rangeModel && (
+        <p className={`mt-3 text-[10px] font-mono leading-relaxed ${rangeModel.sigmaSource === "assumed" ? "text-warning" : "text-muted-foreground/70"}`}>
+          {rangeModel.formula && <>{rangeModel.formula}<br /></>}
+          {rangeModel.note}
+        </p>
+      )}
     </div>
   );
 };

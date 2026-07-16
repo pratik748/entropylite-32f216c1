@@ -21,6 +21,7 @@ import {
   Gauge,
   Newspaper,
   ChevronDown,
+  Sigma,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ import { EMPTY_STATE_MESSAGE } from "@/lib/opportunities/types";
 import { useWorkstationData } from "@/hooks/useWorkstationData";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { buildEvidenceGraph } from "@/lib/evidence/build";
-import { synthesize, logNormalHorizon } from "@/lib/evidence/synthesis";
+import { synthesize, logNormalHorizon, type HorizonModel } from "@/lib/evidence/synthesis";
 import { lognormalEs } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
 
@@ -109,6 +110,8 @@ interface TradeResult {
     bearRange?: [number, number];
     sentiment?: number;
   };
+  /** Client-built calculation audit — every displayed number with its formula, inputs and downstream use. */
+  audit?: AuditRow[];
   ensemble?: {
     decision: "BUY" | "SELL" | "STAND_ASIDE";
     calibratedProb: number;
@@ -184,6 +187,239 @@ interface QuantEdge {
   };
 }
 
+/**
+ * One line of the quant audit: a displayed number, the formula that produced
+ * it, the actual inputs plugged in, and where the number is consumed. Built
+ * client-side from the same objects the surface renders — never restated by
+ * an LLM — so the audit cannot drift from the numbers it explains.
+ */
+interface AuditRow {
+  id: string;
+  metric: string;
+  value: string;
+  source: "quant engine" | "evidence synthesis" | "client";
+  formula: string;
+  computation: string;
+  usedFor: string;
+}
+
+function buildAuditTrail(opts: {
+  edge: TradeResult | null;
+  synthesis: Synthesis | null;
+  model: HorizonModel | null;
+  price: number | null;
+  evidenceEV: number | null;
+  evidenceES: number | null;
+  analysis: { bullRange?: [number, number]; bearRange?: [number, number] } | null;
+}): AuditRow[] {
+  const { edge, synthesis, model, price, evidenceEV, evidenceES, analysis } = opts;
+  const rows: AuditRow[] = [];
+  const f = (n: number | null | undefined, d = 2) => (n == null || !Number.isFinite(Number(n)) ? "—" : Number(n).toFixed(d));
+
+  const ens = edge?.ensemble;
+  const qe = edge?.quantEdge;
+  const entryMid = edge ? (edge.entryLow + edge.entryHigh) / 2 || edge.currentPrice : 0;
+
+  if (ens) {
+    rows.push({
+      id: "calibrated-prob",
+      metric: "Calibrated win-probability",
+      value: `${Math.round(ens.calibratedProb * 100)}%`,
+      source: "quant engine",
+      formula: "p = Platt(a + b·score + δ·bucket-diversity) over inverse-variance-weighted engine votes",
+      computation: `${ens.engineCount} engines voted (${ens.agreeingEngines.length} agree, ${ens.disagreeingEngines.length} against, ${ens.abstainingEngines.length} abstain) · agreement ${f(ens.agreement * 100, 0)}% · ${ens.consensusLabel.toLowerCase()}`,
+      usedFor: "Trade gate (needs ≥ 53% and E[R] ≥ 0.05R after costs) · displayed confidence · the win leg of expected profit",
+    });
+  }
+  if (qe?.expectedProfit) {
+    const ep = qe.expectedProfit;
+    const lossProb = 100 - ep.winProb;
+    const lambda = qe.fatTails?.tailMultiplier ?? 1;
+    rows.push({
+      id: "expected-profit",
+      metric: "Expected profit / share",
+      value: `${ep.perShare >= 0 ? "+" : ""}${f(ep.perShare)} (${ep.pct >= 0 ? "+" : ""}${f(ep.pct, 2)}%)`,
+      source: "quant engine",
+      formula: "E[π] = p·upside − (1−p)·downside·λ_tail − cost",
+      computation: `${f(ep.winProb, 1)}%·${f(ep.upsidePerShare)} − ${f(lossProb, 1)}%·${f(ep.downsidePerShare)}·λ${f(lambda)} − ${f(ep.costPerShare)} = ${f(ep.perShare)} on entry ${f(entryMid)}`,
+      usedFor: "Expected Return tile · the expected-utility trade/no-trade decision",
+    });
+  }
+  if (qe?.fatTails) {
+    rows.push({
+      id: "fat-tails",
+      metric: "Fat-tail multiplier",
+      value: `λ = ${f(qe.fatTails.tailMultiplier)}`,
+      source: "quant engine",
+      formula: "Cornish-Fisher left-tail scaling from realized skew and excess kurtosis",
+      computation: `skew ${f(qe.fatTails.skew)} · excess kurtosis ${f(qe.fatTails.excessKurtosis)} → λ ${f(qe.fatTails.tailMultiplier)}`,
+      usedFor: "Scales the loss leg of E[π] — a heavier left tail penalises the expected value before the gate sees it",
+    });
+  }
+  if (ens?.costHaircut != null) {
+    rows.push({
+      id: "cost-haircut",
+      metric: "Round-trip cost haircut",
+      value: `${f(ens.costHaircut * 100, 2)}%`,
+      source: "quant engine",
+      formula: "haircut = spread + fees by liquidity tier, charged on notional both ways",
+      computation: `${f(ens.costHaircut * 100, 2)}% of entry ${f(entryMid)} = ${f(entryMid * ens.costHaircut)}/share`,
+      usedFor: "Subtracted inside E[π] and E[R] — a ticket must clear its own trading costs to fire",
+    });
+  }
+  if (qe?.hedge?.cvar95PerShare != null && entryMid > 0) {
+    rows.push({
+      id: "engine-cvar",
+      metric: "Expected shortfall (CVaR 95, 1-day)",
+      value: `−${f(Math.abs(qe.hedge.cvar95PerShare / entryMid) * 100, 1)}% (${f(qe.hedge.cvar95PerShare)}/share)`,
+      source: "quant engine",
+      formula: "CVaR₉₅ = mean of the worst 5% of realized daily returns × price",
+      computation: `${f(qe.hedge.cvar95PerShare)}/share on entry ${f(entryMid)}${qe.hedge.var95PerShare != null ? ` · VaR₉₅ ${f(qe.hedge.var95PerShare)}/share` : ""}`,
+      usedFor: "Expected Shortfall tile · hedge and stop guidance",
+    });
+  }
+  if (edge && edge.action !== "HOLD") {
+    rows.push({
+      id: "trade-plan",
+      metric: "Trade plan levels",
+      value: `entry ${f(edge.entryLow)}–${f(edge.entryHigh)} · stop ${f(edge.stopLoss)} · target ${f(edge.targetPrice)}`,
+      source: "quant engine",
+      formula: "entry = S·(1 ± σ_d) · stop = 1.2σ_d vs support · target = stop-width × R implied by the after-cost edge, vs resistance",
+      computation: `risk/reward ${edge.riskRewardRatio != null ? `${f(edge.riskRewardRatio, 1)}:1` : "—"}${ens ? ` · E[R] after costs ${f(ens.expectedR)}` : ""}`,
+      usedFor: "Trade Plan panel · risk per share drives position sizing",
+    });
+  }
+  if (qe?.hedge?.kellyFraction != null) {
+    rows.push({
+      id: "kelly",
+      metric: "Kelly fraction",
+      value: `f* = ${f(qe.hedge.kellyFraction)}`,
+      source: "quant engine",
+      formula: "f* = ½·(p·b − q)/b — half-Kelly from realized win rate and win/loss ratio, capped at 0.25",
+      computation: `sizing multiplier ${f(qe.hedge.kellyFraction)} (0.10–1.00 clamp applied at order time)`,
+      usedFor: "Scales the 1%-risk budget when adding the position to the portfolio",
+    });
+  }
+  if (qe?.meanReversion) {
+    const mr = qe.meanReversion;
+    rows.push({
+      id: "mean-reversion",
+      metric: "Mean reversion (cointegration)",
+      value: `${mr.signal} · z = ${f(mr.residZ)}`,
+      source: "quant engine",
+      formula: `Engle–Granger cointegration vs ${mr.benchmark}: z = spread residual / σ_residual, half-life from AR(1) decay`,
+      computation: `cointegrated ${mr.cointegrated ? "yes" : "no"} · β ${f(mr.beta)} · half-life ${mr.halfLifeDays != null ? `${mr.halfLifeDays}d` : "—"}`,
+      usedFor: "Price-flow bucket vote in the ensemble — stretched spreads argue for reversion toward fair value",
+    });
+  }
+  if (qe?.walkForward) {
+    const wf = qe.walkForward;
+    rows.push({
+      id: "walk-forward",
+      metric: "Walk-forward edge",
+      value: `${wf.signal} · hit ${f(wf.hitRate, 0)}%`,
+      source: "quant engine",
+      formula: `distribution of realized T+${wf.horizonDays}d forward returns after comparable signals`,
+      computation: `n = ${wf.sample} · mean fwd ${f(wf.meanFwdPct)}% · fwd Sharpe ${f(wf.fwdSharpe)}`,
+      usedFor: "Evidence bucket vote — vetoes a direction the asset's own history has not paid",
+    });
+  }
+  if (qe?.structuralCredit) {
+    const sc = qe.structuralCredit;
+    rows.push({
+      id: "structural-credit",
+      metric: "Structural credit (Merton)",
+      value: `${sc.signal} · DD ${f(sc.distanceToDefault, 1)}σ`,
+      source: "quant engine",
+      formula: "Merton distance-to-default proxy from equity value, volatility and leverage → implied default probability",
+      computation: `implied PD ${f(sc.impliedPD, 1)}% · ${sc.severity}`,
+      usedFor: "Regime bucket vote — distress vetoes long tickets regardless of momentum",
+    });
+  }
+
+  if (synthesis) {
+    const net = Number(synthesis.contributions.reduce((s, c) => s + c.scored, 0).toFixed(2));
+    const tripped = synthesis.breakers.filter((b) => b.state === "tripped").length;
+    const watch = synthesis.breakers.filter((b) => b.state === "watch").length;
+    rows.push({
+      id: "net-weight",
+      metric: "Evidence net weight",
+      value: `net ${net >= 0 ? "+" : ""}${net}`,
+      source: "evidence synthesis",
+      formula: "Σ w·(1 + 0.25·aligned − 0.15·conflicting) per node, each clamped to ±1",
+      computation: `${synthesis.ledger.supporting} supporting · ${synthesis.ledger.opposing} opposing · ${synthesis.ledger.neutral} neutral · breakers: ${tripped} tripped / ${watch} watch`,
+      usedFor: "Fallback action gate: ACCUMULATE ≥ +1.6 with no breaker · REDUCE ≤ −1.6 or a tripped breaker · coherence-checked against Σ p·r",
+    });
+    if (model) {
+      rows.push({
+        id: "horizon-model",
+        metric: "Log-normal horizon model",
+        value: `m ${f(model.m * 100)}% · σ ${f(model.sigma * 100)}% over ${model.horizonSessions} sessions`,
+        source: "evidence synthesis",
+        formula: "GBM: σ = σ_ann·√(21/252) · m = tilt·σ − σ²/2 · tilt = clamp((0.5·(mom−50) + 0.25·(risk−50))/50 − 0.3·tripped − 0.1·watch, ±0.75)",
+        computation: `σ_ann ${f(model.annualVolPct, 1)}% from realized returns · breakers drag the drift so the distribution carries the same downside the verdict reacts to`,
+        usedFor: "One model behind the case probabilities, the fallback expected return and the fallback CVaR — they cannot disagree",
+      });
+    }
+    if (synthesis.cases.length > 0) {
+      const bullLo = Array.isArray(analysis?.bullRange) ? analysis!.bullRange![0] : null;
+      const bearHi = Array.isArray(analysis?.bearRange) ? analysis!.bearRange![1] : null;
+      rows.push({
+        id: "case-probs",
+        metric: "Case probabilities",
+        value: synthesis.cases.map((c) => `${c.label} ${c.probability}%`).join(" · "),
+        source: "evidence synthesis",
+        formula: "P(bull) = 1 − Φ((ln(bullLo/S) − m)/σ) · P(bear) = Φ((ln(bearHi/S) − m)/σ) · base = remainder (tails clamped 5–85%, base ≥ 8%)",
+        computation: bullLo != null && bearHi != null && price ? `S ${f(price)} · bull band low ${f(bullLo)} · bear band high ${f(bearHi)}` : "band inputs pending — prior 25/50/25 tilted by momentum and risk pillars",
+        usedFor: "Probability distribution panel · weights in Σ p·r",
+      });
+    }
+    if (evidenceEV != null) {
+      rows.push({
+        id: "prob-weighted-return",
+        metric: "Probability-weighted return",
+        value: `${evidenceEV >= 0 ? "+" : ""}${f(evidenceEV, 1)}%`,
+        source: "evidence synthesis",
+        formula: "Σ p·r across bull / base / bear",
+        computation: synthesis.cases.map((c) => `${c.probability}%·(${c.returnPct != null ? `${c.returnPct > 0 ? "+" : ""}${c.returnPct}%` : "—"})`).join(" + ") + ` = ${evidenceEV >= 0 ? "+" : ""}${f(evidenceEV, 1)}%`,
+        usedFor: "Expected Return tile when the quant engine is unreachable · coherence gate on the fallback action",
+      });
+    }
+    if (evidenceES != null) {
+      rows.push({
+        id: "evidence-es",
+        metric: "Expected shortfall (CVaR 95, 21 sessions)",
+        value: `${f(evidenceES, 1)}%`,
+        source: "evidence synthesis",
+        formula: "ES₅ = E[r | r ≤ q₅] in closed form under log-normal(m, σ)",
+        computation: model ? `m ${f(model.m * 100)}% · σ ${f(model.sigma * 100)}% → mean of the worst 5% of horizon outcomes` : "horizon model pending",
+        usedFor: "Expected Shortfall tile when the quant engine is unreachable",
+      });
+    }
+    rows.push({
+      id: "synthesis-confidence",
+      metric: "Synthesis confidence",
+      value: `${synthesis.confidence}%`,
+      source: "evidence synthesis",
+      formula: "35 + 55·sigmoid(−0.6 + 1.3·volume + 1.1·agreement + 0.9·tanh(|net|/4) − 1.2·estimated-share − 0.8·breaker-share)",
+      computation: `${synthesis.ledger.supporting + synthesis.ledger.opposing + synthesis.ledger.neutral} nodes scored · ${synthesis.ledger.estimated} estimated-provenance`,
+      usedFor: "Displayed confidence when the fallback owns the verdict — saturates smoothly in [35, 90], never certainty",
+    });
+  }
+
+  rows.push({
+    id: "position-sizing",
+    metric: "Position sizing",
+    value: "1% fixed-fractional risk · half-Kelly · confidence-scaled",
+    source: "client",
+    formula: "qty = ⌊(1% of portfolio) · clamp(f*, 0.1, 1) · max(0.5, conf/100) / |entry − stop|⌋, capped at 20% of portfolio notional",
+    computation: "computed at Add-to-Portfolio time from the live portfolio value and the ticket's entry/stop",
+    usedFor: "The quantity mirrored into the main portfolio",
+  });
+
+  return rows;
+}
+
 interface PortfolioItem {
   ticker: string;
   action: "BUY" | "SELL";
@@ -201,6 +437,17 @@ interface PortfolioItem {
 const STORAGE_KEY = "dp-portfolio";
 /** Ceiling for the quant edge engine; the evidence synthesis renders meanwhile. */
 const ANALYSIS_TIMEOUT_MS = 45000;
+
+/**
+ * Breadcrumb of the last quant-engine attempt, read by the System pipeline
+ * board so engine reachability is reported from real calls, never assumed.
+ */
+export const DP_ENGINE_STATUS_KEY = "dp-engine-status";
+function recordEngineStatus(state: "live" | "unreachable", reason?: string) {
+  try {
+    localStorage.setItem(DP_ENGINE_STATUS_KEY, JSON.stringify({ state, ts: Date.now(), ...(reason ? { reason } : {}) }));
+  } catch {}
+}
 
 function loadPortfolio(): PortfolioItem[] {
   try {
@@ -385,6 +632,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { desirableZones } = useOutcomeGradient();
   /** Quant-engine ticket from the direct-profit edge function; null when it failed and the evidence fallback owns the result. */
   const [edgeResult, setEdgeResult] = useState<TradeResult | null>(null);
+  /** Why the quant engine did not land — shown on the fallback surface so the swap is never silent. */
+  const [edgeError, setEdgeError] = useState<string | null>(null);
   const edgePendingRef = useRef(false);
 
   useEffect(() => {
@@ -468,6 +717,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setErrorMessage(null);
     setResult(null);
     setEdgeResult(null);
+    setEdgeError(null);
     setAdded(false);
     setActiveTicker(normalizedTicker);
     setLivePrice(null);
@@ -483,9 +733,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     refreshWorkstation();
     edgePendingRef.current = true;
 
-    try {
+    const attemptEngine = async (): Promise<TradeResult> => {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("direct-profit timeout")), ANALYSIS_TIMEOUT_MS);
+        setTimeout(() => reject(new Error(`timeout after ${ANALYSIS_TIMEOUT_MS / 1000}s`)), ANALYSIS_TIMEOUT_MS);
       });
       const response = await Promise.race([
         governedInvoke<TradeResult>("direct-profit", {
@@ -515,11 +765,26 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       const { data, error } = response as Awaited<ReturnType<typeof governedInvoke<TradeResult>>>;
       if (error) throw error;
       const normalized = normalizeTradeResult(data);
-      if (!normalized) throw new Error("incomplete trade plan");
-      setEdgeResult(normalized);
-    } catch (err) {
-      // Silent: the evidence-synthesis fallback below owns the result.
-      console.warn("direct-profit edge engine unavailable, using evidence synthesis:", err);
+      if (!normalized) throw new Error("engine returned an incomplete trade plan");
+      return normalized;
+    };
+
+    try {
+      setEdgeResult(await attemptEngine());
+      recordEngineStatus("live");
+    } catch (firstErr) {
+      // One retry — cold starts and transient 5xx are the common failure
+      // mode, and the evidence view renders in the meantime so a late
+      // quant ticket simply upgrades the surface in place.
+      try {
+        setEdgeResult(await attemptEngine());
+        recordEngineStatus("live");
+      } catch (err: any) {
+        console.warn("direct-profit edge engine unavailable, using evidence synthesis:", firstErr, err);
+        const reason = err?.message || err?.error?.message || String(err);
+        setEdgeError(String(reason).slice(0, 140));
+        recordEngineStatus("unreachable", String(reason).slice(0, 140));
+      }
     } finally {
       edgePendingRef.current = false;
     }
@@ -554,7 +819,18 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       if (graph.order.length === 0) {
         const settled = Object.values(workstationData.status).every((s) => s.state !== "loading");
         if (edgeResult) {
-          setResult(edgeResult);
+          setResult({
+            ...edgeResult,
+            audit: buildAuditTrail({
+              edge: edgeResult,
+              synthesis: null,
+              model: null,
+              price: edgeResult.currentPrice || null,
+              evidenceEV: null,
+              evidenceES: null,
+              analysis: null,
+            }),
+          });
           setLivePrice(edgeResult.currentPrice > 0 ? edgeResult.currentPrice : null);
           setLiveCurrency(edgeResult.currency || null);
           setLastPriceUpdate(Date.now());
@@ -652,6 +928,16 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             engineSources: evidenceView.engineSources,
           }
         : evidenceView;
+
+      merged.audit = buildAuditTrail({
+        edge: edgeResult,
+        synthesis,
+        model,
+        price: price || null,
+        evidenceEV: probWeightedReturn,
+        evidenceES: expectedShortfall,
+        analysis: workstationData.analysis,
+      });
 
       setResult(merged);
       setLivePrice(merged.currentPrice > 0 ? merged.currentPrice : null);
@@ -1068,20 +1354,32 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
             {/* ── DECISION SURFACE ── */}
             <div className="border-b border-border p-4 space-y-4 bg-surface-2/20">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Decision surface</div>
-                <span
-                  className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
-                    quantOwned ? "text-gain border-gain/30 bg-gain/10" : "text-warning border-warning/40 bg-warning/10"
-                  }`}
-                  title={
-                    quantOwned
-                      ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
-                      : "Quant engine unreachable — verdict synthesized locally from the workstation evidence graph."
-                  }
-                >
-                  {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                      quantOwned ? "text-gain border-gain/30 bg-gain/10" : "text-warning border-warning/40 bg-warning/10"
+                    }`}
+                    title={
+                      quantOwned
+                        ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
+                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. Verdict synthesized locally from the workstation evidence graph.`
+                    }
+                  >
+                    {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
+                  </span>
+                  {!quantOwned && (
+                    <button
+                      type="button"
+                      onClick={retryAnalysis}
+                      className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-surface-2/60 transition-colors"
+                      title="Re-run the analysis and retry the quant engine"
+                    >
+                      Retry engine
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-surface-2/40 p-3">
@@ -1130,7 +1428,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               <div className="text-[10px] font-mono text-muted-foreground">
                 {quantOwned
                   ? `Verdict from the quant ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
-                  : `Quant engine unreachable — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
+                  : `Quant engine unreachable${edgeError ? ` (${edgeError})` : ""} — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
               </div>
             </div>
 
@@ -1465,6 +1763,53 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                 )}
               </CollapsibleContent>
             </Collapsible>
+
+            {/* ── COLLAPSIBLE: quant audit — every number, its formula, its use ── */}
+            {result.audit && result.audit.length > 0 && (
+              <Collapsible>
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 text-sm font-semibold text-foreground hover:bg-surface-2/40 transition-colors group border-b border-border">
+                  <span className="flex items-center gap-2">
+                    <Sigma className="h-4 w-4 text-primary" />
+                    Quant audit
+                    <span className="text-[10px] font-mono font-normal text-muted-foreground">{result.audit.length} calculations</span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                  <div className="border-b border-border p-4 space-y-2">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Every number on this surface, the formula that produced it, the actual inputs plugged in, and where it is consumed.
+                      Built from the same objects the surface renders — not an LLM restatement — so it cannot drift from the numbers it explains.
+                    </p>
+                    {result.audit.map((row) => (
+                      <div key={row.id} className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-foreground">{row.metric}</span>
+                          <span
+                            className={`shrink-0 text-[8.5px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                              row.source === "quant engine"
+                                ? "text-gain border-gain/30 bg-gain/10"
+                                : row.source === "evidence synthesis"
+                                  ? "text-warning border-warning/40 bg-warning/10"
+                                  : "text-muted-foreground border-border bg-muted/20"
+                            }`}
+                          >
+                            {row.source}
+                          </span>
+                        </div>
+                        <div className="text-sm font-black font-mono text-foreground">{row.value}</div>
+                        <div className="text-[10px] font-mono text-muted-foreground leading-relaxed break-words">{row.formula}</div>
+                        <div className="text-[10px] font-mono text-foreground/80 leading-relaxed break-words">= {row.computation}</div>
+                        <div className="text-[10px] text-muted-foreground leading-relaxed">
+                          <span className="uppercase tracking-wider text-[8.5px] text-muted-foreground/70">Used for · </span>
+                          {row.usedFor}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             {/* Actions */}
             <div className="border-t border-border p-3 flex items-center justify-between">
