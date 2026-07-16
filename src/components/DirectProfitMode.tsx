@@ -282,6 +282,10 @@ function isTradeResult(value: any): value is TradeResult {
 }
 
 function normalizeTradeResult(value: any): TradeResult | null {
+  // The quant engine's no-trade verdict is WAIT; the client vocabulary calls
+  // it HOLD. Rejecting WAIT here silently discarded every stand-aside ticket
+  // from the engine and let the local synthesis own the result.
+  if (value && value.action === "WAIT") value = { ...value, action: "HOLD" };
   if (!isTradeResult(value)) return null;
 
   const normalizeNumber = (num: unknown, fallback = 0) => {
@@ -621,15 +625,25 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         engineSources: graph.coverage.sources,
       };
 
-      // The quant edge ticket owns the trade plan when it landed; the
-      // evidence view supplies the panels the function does not compute
-      // (drivers, risks, cases, breakers, distribution statistics).
+      // The quant edge ticket owns the trade plan AND the headline
+      // distribution numbers when it landed: its expected value is cost-
+      // and fat-tail-adjusted against the calibrated win probability, and
+      // its CVaR comes from realised returns. The synthesis figures fill
+      // in only when the engine did not produce the number. The evidence
+      // view supplies the panels the function does not compute (drivers,
+      // risks, cases, breakers).
+      const engineEV = edgeResult?.quantEdge?.expectedProfit;
+      const engineEntryMid = edgeResult ? (edgeResult.entryLow + edgeResult.entryHigh) / 2 || edgeResult.currentPrice : 0;
+      const engineCvarPerShare = edgeResult?.quantEdge?.hedge?.cvar95PerShare;
+      const engineCvarPct = engineCvarPerShare != null && engineEntryMid > 0
+        ? Number((-Math.abs(engineCvarPerShare / engineEntryMid) * 100).toFixed(1))
+        : null;
       const merged: TradeResult = edgeResult
         ? {
             ...evidenceView,
             ...edgeResult,
-            expectedReturnPct: evidenceView.expectedReturnPct,
-            expectedDownsidePct: evidenceView.expectedDownsidePct,
+            expectedReturnPct: engineEV ? engineEV.pct : evidenceView.expectedReturnPct,
+            expectedDownsidePct: engineCvarPct ?? evidenceView.expectedDownsidePct,
             primaryDrivers: evidenceView.primaryDrivers,
             primaryRisks: evidenceView.primaryRisks,
             probabilityDistribution: evidenceView.probabilityDistribution,
@@ -838,6 +852,13 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const clank = result?.clankSignals?.filter(s => s.active) || [];
   const news = result?.newsHeadlines || [];
   const qe = result?.quantEdge;
+  // Provenance flags — the ensemble/quantEdge blocks only ever come from the
+  // direct-profit edge function, so their presence means the quant engine
+  // owns the verdict; otherwise the local evidence synthesis is standing in.
+  const quantOwned = Boolean(result?.ensemble || result?.quantEdge);
+  const resultEntryMid = result ? (result.entryLow + result.entryHigh) / 2 || result.currentPrice : 0;
+  const returnFromEngine = Boolean(qe?.expectedProfit);
+  const downsideFromEngine = qe?.hedge?.cvar95PerShare != null && resultEntryMid > 0;
 
   return (
     <div className="h-full overflow-auto p-4">
@@ -1045,18 +1066,37 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             )}
 
 
-            {/* ── EVIDENCE-DRIVEN DECISION SURFACE ── */}
+            {/* ── DECISION SURFACE ── */}
             <div className="border-b border-border p-4 space-y-4 bg-surface-2/20">
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Decision surface</div>
+                <span
+                  className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                    quantOwned ? "text-gain border-gain/30 bg-gain/10" : "text-warning border-warning/40 bg-warning/10"
+                  }`}
+                  title={
+                    quantOwned
+                      ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
+                      : "Quant engine unreachable — verdict synthesized locally from the workstation evidence graph."
+                  }
+                >
+                  {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-surface-2/40 p-3">
                   <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Return · prob-weighted</div>
                   <div className={`text-xl font-black font-mono ${(result.expectedReturnPct ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{result.expectedReturnPct != null ? `${result.expectedReturnPct > 0 ? "+" : ""}${result.expectedReturnPct}%` : "—"}</div>
-                  <div className="text-[8.5px] text-muted-foreground/70">Σ p·r across bull/base/bear · 21 sessions</div>
+                  <div className="text-[8.5px] text-muted-foreground/70">
+                    {returnFromEngine ? "p·upside − (1−p)·downside·tail − costs · quant engine" : "Σ p·r across bull/base/bear · 21 sessions · local synthesis"}
+                  </div>
                 </div>
                 <div className="rounded-lg bg-surface-2/40 p-3">
                   <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Shortfall · CVaR 95</div>
                   <div className="text-xl font-black font-mono text-loss">{result.expectedDownsidePct != null ? `${result.expectedDownsidePct}%` : "—"}</div>
-                  <div className="text-[8.5px] text-muted-foreground/70">mean of the worst 5% of outcomes</div>
+                  <div className="text-[8.5px] text-muted-foreground/70">
+                    {downsideFromEngine ? "1-day CVaR from realised returns · quant engine" : "mean of the worst 5% of outcomes · 21 sessions · local synthesis"}
+                  </div>
                 </div>
                 <div className="rounded-lg bg-surface-2/40 p-3">
                   <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Risk</div>
@@ -1088,7 +1128,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                 <EvidenceList title="Primary Risks" tone="loss" items={result.primaryRisks || []} ticker={activeTicker} />
               </div>
               <div className="text-[10px] font-mono text-muted-foreground">
-                Decision derived from {result.evidenceCount ?? 0} evidence nodes across {result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.
+                {quantOwned
+                  ? `Verdict from the quant ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
+                  : `Quant engine unreachable — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
               </div>
             </div>
 
