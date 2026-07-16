@@ -71,6 +71,7 @@ const DeskAnalysisStack = ({ analysis, stocks, isMobile, onSelectTicker }: DeskA
               neutralRange={analysis.neutralRange}
               bearRange={analysis.bearRange}
               currency={analysis.currency}
+              rangeModel={analysis.rangeModel ?? null}
             />
             <Recommendation
               summary={analysis.summary}
