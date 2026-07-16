@@ -41,7 +41,7 @@ import { useWorkstationData } from "@/hooks/useWorkstationData";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { buildEvidenceGraph } from "@/lib/evidence/build";
 import { synthesize, logNormalHorizon, type HorizonModel } from "@/lib/evidence/synthesis";
-import { lognormalEs } from "@/lib/evidence/compute";
+import { lognormalEs, normalCdf } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
 
 interface RiskMetrics {
@@ -233,7 +233,7 @@ function buildAuditTrail(opts: {
   }
   if (qe?.expectedProfit) {
     const ep = qe.expectedProfit;
-    const lossProb = 100 - ep.winProb;
+    const p = ep.winProb / 100;
     const lambda = qe.fatTails?.tailMultiplier ?? 1;
     rows.push({
       id: "expected-profit",
@@ -241,7 +241,7 @@ function buildAuditTrail(opts: {
       value: `${ep.perShare >= 0 ? "+" : ""}${f(ep.perShare)} (${ep.pct >= 0 ? "+" : ""}${f(ep.pct, 2)}%)`,
       source: "quant engine",
       formula: "E[π] = p·upside − (1−p)·downside·λ_tail − cost",
-      computation: `${f(ep.winProb, 1)}%·${f(ep.upsidePerShare)} − ${f(lossProb, 1)}%·${f(ep.downsidePerShare)}·λ${f(lambda)} − ${f(ep.costPerShare)} = ${f(ep.perShare)} on entry ${f(entryMid)}`,
+      computation: `${f(p)}·${f(ep.upsidePerShare)} − ${f(1 - p)}·${f(ep.downsidePerShare)}·${f(lambda)} − ${f(ep.costPerShare)} = ${f(ep.perShare)} on entry ${f(entryMid)}`,
       usedFor: "Expected Return tile · the expected-utility trade/no-trade decision",
     });
   }
@@ -267,14 +267,15 @@ function buildAuditTrail(opts: {
       usedFor: "Subtracted inside E[π] and E[R] — a ticket must clear its own trading costs to fire",
     });
   }
-  if (qe?.hedge?.cvar95PerShare != null && entryMid > 0) {
+  const cvarBase = edge ? edge.currentPrice || entryMid : 0;
+  if (qe?.hedge?.cvar95PerShare != null && cvarBase > 0) {
     rows.push({
       id: "engine-cvar",
       metric: "Expected shortfall (CVaR 95, 1-day)",
-      value: `−${f(Math.abs(qe.hedge.cvar95PerShare / entryMid) * 100, 1)}% (${f(qe.hedge.cvar95PerShare)}/share)`,
+      value: `−${f(Math.abs(qe.hedge.cvar95PerShare / cvarBase) * 100, 1)}% (${f(qe.hedge.cvar95PerShare)}/share)`,
       source: "quant engine",
-      formula: "CVaR₉₅ = mean of the worst 5% of realized daily returns × price",
-      computation: `${f(qe.hedge.cvar95PerShare)}/share on entry ${f(entryMid)}${qe.hedge.var95PerShare != null ? ` · VaR₉₅ ${f(qe.hedge.var95PerShare)}/share` : ""}`,
+      formula: "CVaR₉₅ = mean of the worst 5% of realized daily returns × current price",
+      computation: `${f(qe.hedge.cvar95PerShare)}/share on price ${f(cvarBase)}${qe.hedge.var95PerShare != null ? ` · VaR₉₅ ${f(qe.hedge.var95PerShare)}/share` : ""}`,
       usedFor: "Expected Shortfall tile · hedge and stop guidance",
     });
   }
@@ -351,14 +352,15 @@ function buildAuditTrail(opts: {
       usedFor: "Fallback action gate: ACCUMULATE ≥ +1.6 with no breaker · REDUCE ≤ −1.6 or a tripped breaker · coherence-checked against Σ p·r",
     });
     if (model) {
+      const pProfit = normalCdf(model.m / model.sigma);
       rows.push({
         id: "horizon-model",
         metric: "Log-normal horizon model",
-        value: `m ${f(model.m * 100)}% · σ ${f(model.sigma * 100)}% over ${model.horizonSessions} sessions`,
+        value: `m ${f(model.m * 100)}% · σ ${f(model.sigma * 100)}% · P(profit) ${f(pProfit * 100, 0)}%`,
         source: "evidence synthesis",
-        formula: "GBM: σ = σ_ann·√(21/252) · m = tilt·σ − σ²/2 · tilt = clamp((0.5·(mom−50) + 0.25·(risk−50))/50 − 0.3·tripped − 0.1·watch, ±0.75)",
+        formula: "GBM over 21 sessions: σ = σ_ann·√(21/252) · m = tilt·σ − σ²/2 · tilt = clamp((0.5·(mom−50) + 0.25·(risk−50))/50 − 0.3·tripped − 0.1·watch, ±0.75) · P(profit) = Φ(m/σ)",
         computation: `σ_ann ${f(model.annualVolPct, 1)}% from realized returns · breakers drag the drift so the distribution carries the same downside the verdict reacts to`,
-        usedFor: "One model behind the case probabilities, the fallback expected return and the fallback CVaR — they cannot disagree",
+        usedFor: "One model behind the case probabilities, the fallback EV/CVaR, and the fallback trade gate (promote at P ≥ 53% with Σ p·r ≥ +1%, reduce at P ≤ 47% with Σ p·r ≤ −1%)",
       });
     }
     if (synthesis.cases.length > 0) {
@@ -797,6 +799,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     // result or the quant edge ticket has arrived and needs its evidence
     // panels merged in.
     if (!loading && !edgeResult) return;
+    // Engine-first: while the quant engine attempt is in flight the surface
+    // stays in its loading state. The evidence view renders as the RESULT
+    // only after the engine has definitively failed (edgeError set) — it
+    // never flashes first and gets replaced.
+    if (!edgeResult && edgePendingRef.current) return;
     try {
       const graph = buildEvidenceGraph({
         ticker: activeTicker,
@@ -888,7 +895,12 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         currentPrice: price || 0,
         currency: workstationData.quote?.currency ?? workstationData.analysis?.currency,
         quantScore: Math.round((synthesis.confidence + Math.max(0, synthesis.ledger.supporting - synthesis.ledger.opposing)) / 2),
-        riskRewardRatio: price && support ? Math.abs(((bull?.target ?? resistance) - price) / Math.max(0.01, price - support)) : undefined,
+        // R:R is only meaningful with price above the support that defines
+        // the risk leg — below it the clamped denominator fabricates
+        // absurd ratios (e.g. 800:1).
+        riskRewardRatio: price && support && price > support
+          ? Math.abs(((bull?.target ?? resistance) - price) / (price - support))
+          : undefined,
         providersUsed: graph.coverage.sources.length,
         consensus: synthesis.ledger.opposing === 0 ? "UNANIMOUS" : synthesis.ledger.supporting > synthesis.ledger.opposing ? "MAJORITY" : "SPLIT",
         evidenceCount: graph.order.length,
@@ -909,10 +921,13 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       // view supplies the panels the function does not compute (drivers,
       // risks, cases, breakers).
       const engineEV = edgeResult?.quantEdge?.expectedProfit;
-      const engineEntryMid = edgeResult ? (edgeResult.entryLow + edgeResult.entryHigh) / 2 || edgeResult.currentPrice : 0;
+      // The engine's VaR/CVaR per share are computed on CURRENT-price
+      // notional (computeRiskMetrics: notional = snap.currentPrice), so the
+      // percent conversion must use the same base — entry mid would skew it.
+      const engineCvarBase = edgeResult ? edgeResult.currentPrice || (edgeResult.entryLow + edgeResult.entryHigh) / 2 : 0;
       const engineCvarPerShare = edgeResult?.quantEdge?.hedge?.cvar95PerShare;
-      const engineCvarPct = engineCvarPerShare != null && engineEntryMid > 0
-        ? Number((-Math.abs(engineCvarPerShare / engineEntryMid) * 100).toFixed(1))
+      const engineCvarPct = engineCvarPerShare != null && engineCvarBase > 0
+        ? Number((-Math.abs(engineCvarPerShare / engineCvarBase) * 100).toFixed(1))
         : null;
       const merged: TradeResult = edgeResult
         ? {
@@ -952,7 +967,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     }
     // NOTE: no `finally` — the empty-graph early return must keep `loading`
     // true so this effect re-fires as the workstation sources hydrate.
-  }, [activeTicker, loading, workstationData, edgeResult]);
+    // edgeError is a dependency so the engine's definitive failure re-fires
+    // the effect and lets the labeled fallback take the surface.
+  }, [activeTicker, loading, workstationData, edgeResult, edgeError]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
 
@@ -1196,11 +1213,23 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         )}
 
         {loading && (
-          <div className="glass-panel rounded-xl p-6 space-y-4 animate-pulse">
-            <div className="h-16 bg-muted/30 rounded-lg" />
-            <div className="h-24 bg-muted/30 rounded-lg" />
-            <div className="h-12 bg-muted/30 rounded-lg" />
-            <div className="h-20 bg-muted/30 rounded-lg" />
+          <div className="glass-panel rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+                Quant engine running
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground/60">{activeTicker}</span>
+            </div>
+            <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+              ensemble consensus · cointegration · walk-forward · structural credit · cost-adjusted expected value
+            </div>
+            <div className="space-y-4 animate-pulse">
+              <div className="h-16 bg-muted/30 rounded-lg" />
+              <div className="h-24 bg-muted/30 rounded-lg" />
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-20 bg-muted/30 rounded-lg" />
+            </div>
           </div>
         )}
 

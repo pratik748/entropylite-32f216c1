@@ -425,6 +425,20 @@ export function synthesize(
     if (action === "REDUCE" && evPct > 0 && trippedCount === 0) action = "HOLD";
   }
 
+  // Symmetric decision-theoretic promotion — the mirror of the gate above,
+  // and the same philosophy as the quant engine's (trade when the calibrated
+  // probability sits off coin-flip AND expectancy clears costs). The
+  // net-weight thresholds alone (±1.6) parked most names at HOLD even when
+  // the horizon distribution had a real lean. Promotion demands probability
+  // AND expectancy AND structure together, so conviction can never be
+  // manufactured from a single number.
+  const horizonModel = logNormalHorizon(graph, pillars, price);
+  const pProfit = horizonModel ? normalCdf(horizonModel.m / horizonModel.sigma) : null;
+  if (action === "HOLD" && pProfit != null && evPct != null) {
+    if (pProfit >= 0.53 && evPct >= 1 && trippedCount === 0 && net > 0) action = "ACCUMULATE";
+    else if (pProfit <= 0.47 && evPct <= -1) action = "REDUCE";
+  }
+
   // Logistic confidence calibration: evidence volume, directional agreement
   // and the magnitude of the net contribution raise the logit; estimated
   // provenance and non-intact breakers lower it. The sigmoid is mapped onto
@@ -453,7 +467,9 @@ export function synthesize(
         : action === "REDUCE"
           ? net <= -1.6
             ? `Opposing evidence outweighs support on ${graph.ticker} (net ${net}) — reduce exposure and defend the position.`
-            : `A tripped thesis breaker overrides the evidence balance on ${graph.ticker} (net ${net >= 0 ? "+" : ""}${net}) — reduce exposure while it stands.`
+            : trippedCount > 0
+              ? `A tripped thesis breaker overrides the evidence balance on ${graph.ticker} (net ${net >= 0 ? "+" : ""}${net}) — reduce exposure while it stands.`
+              : `The horizon distribution leans against ${graph.ticker}${pProfit != null ? ` (P(profit) ${Math.round(pProfit * 100)}%` : "("}${evPct != null ? `, Σ p·r ${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%)` : ")"} — reduce exposure and defend the position.`
           : `The evidence stack argues against holding ${graph.ticker} here — ${breakers.filter((b) => b.state === "tripped").length} breaker(s) tripped, net weight ${net}.`;
 
   const narrative: string[] = [];
