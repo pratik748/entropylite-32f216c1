@@ -171,18 +171,54 @@ function buildBreakers(graph: EvidenceGraph): ThesisBreaker[] {
 }
 
 /** Horizon of the engine's simulated outcome distribution, in sessions. */
-const CASE_HORIZON_SESSIONS = 21;
+export const CASE_HORIZON_SESSIONS = 21;
+
+export interface HorizonModel {
+  /** Log-drift of ln(S_T/S0) over the full horizon (drift − σ²/2 already applied). */
+  m: number;
+  /** Log-volatility of ln(S_T/S0) over the full horizon. */
+  sigma: number;
+  /** Annualized volatility (%) the model was built from. */
+  annualVolPct: number;
+  horizonSessions: number;
+}
 
 /**
- * Log-normal case probabilities. Price is modelled as geometric Brownian
- * motion over the engine's 21-session simulation horizon with σ from the
- * realized-volatility node and a bounded evidence drift — the momentum and
- * risk pillars tilt the horizon mean by at most ±0.75σ. The bull case is
- * the probability of finishing inside the engine's bull band (≥ its lower
- * bound), the bear case of finishing inside the bear band (≤ its upper
- * bound); the base case is the remaining mass. Returns null when price,
- * volatility or the bands are unavailable so a prior-based fallback can
- * take over — the surface is never blank.
+ * The single log-normal model behind cases, Monte Carlo and tail metrics:
+ * geometric Brownian motion over the engine's 21-session horizon with σ
+ * from the realized-volatility node and a bounded evidence drift — the
+ * momentum and risk pillars tilt the horizon mean by at most ±0.75σ.
+ * Returns null when volatility or price are unavailable so callers can
+ * fall back to designed pending states — never invented numbers.
+ */
+export function logNormalHorizon(
+  graph: EvidenceGraph,
+  pillars: PillarScore[],
+  price: number | null,
+): HorizonModel | null {
+  const vol = graph.metrics["volatility"]?.value;
+  if (vol == null || vol <= 0 || price == null || price <= 0) return null;
+  const sigma = (vol / 100) * Math.sqrt(CASE_HORIZON_SESSIONS / 252);
+  if (!(sigma > 0)) return null;
+  const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
+  const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
+  // Evidence drift: momentum leads, contained risk supports; bounded ±0.75σ.
+  const tilt = clamp((0.5 * (momentum - 50) + 0.25 * (risk - 50)) / 50, -0.75, 0.75);
+  return {
+    m: tilt * sigma - (sigma * sigma) / 2,
+    sigma,
+    annualVolPct: vol,
+    horizonSessions: CASE_HORIZON_SESSIONS,
+  };
+}
+
+/**
+ * Log-normal case probabilities from the shared horizon model. The bull
+ * case is the probability of finishing inside the engine's bull band
+ * (≥ its lower bound), the bear case of finishing inside the bear band
+ * (≤ its upper bound); the base case is the remaining mass. Returns null
+ * when the model or the bands are unavailable so a prior-based fallback
+ * can take over — the surface is never blank.
  */
 function caseProbabilities(
   graph: EvidenceGraph,
@@ -190,19 +226,12 @@ function caseProbabilities(
   analysis: DeskAnalysis | null,
   price: number | null,
 ): { bull: number; base: number; bear: number } | null {
-  const vol = graph.metrics["volatility"]?.value;
+  const model = logNormalHorizon(graph, pillars, price);
   const bullLo = Array.isArray(analysis?.bullRange) ? analysis!.bullRange[0] : null;
   const bearHi = Array.isArray(analysis?.bearRange) ? analysis!.bearRange[1] : null;
-  if (vol == null || vol <= 0 || price == null || price <= 0) return null;
+  if (!model || price == null || price <= 0) return null;
   if (bullLo == null || bearHi == null || bullLo <= 0 || bearHi <= 0 || bearHi >= bullLo) return null;
-
-  const sigma = (vol / 100) * Math.sqrt(CASE_HORIZON_SESSIONS / 252);
-  if (!(sigma > 0)) return null;
-  const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
-  const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
-  // Evidence drift: momentum leads, contained risk supports; bounded ±0.75σ.
-  const tilt = clamp((0.5 * (momentum - 50) + 0.25 * (risk - 50)) / 50, -0.75, 0.75);
-  const m = tilt * sigma - (sigma * sigma) / 2; // log-drift over the horizon
+  const { m, sigma } = model;
 
   let bull = 1 - normalCdf((Math.log(bullLo / price) - m) / sigma);
   let bear = normalCdf((Math.log(bearHi / price) - m) / sigma);

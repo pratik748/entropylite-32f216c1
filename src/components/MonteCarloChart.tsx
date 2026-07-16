@@ -16,11 +16,40 @@ const NUM_SIMULATIONS = 10000;
 const NUM_DAYS = 252;
 const NUM_VISIBLE_PATHS = 40;
 
-function gaussianRandom(): number {
-  let u = 0, v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
-  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+/**
+ * Deterministic PRNG (mulberry32) seeded from the simulation inputs so the
+ * same ticker + price + bands always produce the same paths and statistics.
+ * Unseeded Math.random made every visit show different numbers, which reads
+ * as fabricated data in an evidence product.
+ */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seedFrom(ticker: string, price: number, lo: number, hi: number): number {
+  let h = 2166136261;
+  const s = `${ticker}|${price.toFixed(2)}|${lo.toFixed(2)}|${hi.toFixed(2)}`;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeGaussian(rand: () => number): () => number {
+  return () => {
+    let u = 0, v = 0;
+    while (u === 0) u = rand();
+    while (v === 0) v = rand();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  };
 }
 
 function percentile(arr: number[], p: number): number {
@@ -57,6 +86,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
   const { chartData, stats } = useMemo(() => {
     const upperBound = bullRange[1];
     const lowerBound = bearRange[0];
+    const gaussianRandom = makeGaussian(mulberry32(seedFrom(ticker, currentPrice, lowerBound, upperBound)));
     const annualVol = Math.max(0.05, (upperBound - lowerBound) / (2 * currentPrice));
     const dailyVol = annualVol / Math.sqrt(252);
     const dailyDrift = 0.0002;
@@ -203,7 +233,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         origDD, resDD, histogram,
       },
     };
-  }, [currentPrice, bullRange, bearRange]);
+  }, [currentPrice, bullRange, bearRange, ticker]);
 
   const getVisiblePrefixes = (): string[] => {
     switch (viewMode) {

@@ -37,8 +37,10 @@ import { useSymbolSuggest } from "@/components/SymbolSuggest";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { EMPTY_STATE_MESSAGE } from "@/lib/opportunities/types";
 import { useWorkstationData } from "@/hooks/useWorkstationData";
+import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { buildEvidenceGraph } from "@/lib/evidence/build";
-import { synthesize } from "@/lib/evidence/synthesis";
+import { synthesize, logNormalHorizon } from "@/lib/evidence/synthesis";
+import { lognormalEs } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
 
 interface RiskMetrics {
@@ -197,6 +199,8 @@ interface PortfolioItem {
 }
 
 const STORAGE_KEY = "dp-portfolio";
+/** Ceiling for the quant edge engine; the evidence synthesis renders meanwhile. */
+const ANALYSIS_TIMEOUT_MS = 45000;
 
 function loadPortfolio(): PortfolioItem[] {
   try {
@@ -374,6 +378,10 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { prices: historicalPrices, fetchHistorical } = useHistoricalPrices();
   const { logTrade } = useTradeLogger();
   const { refresh: refreshWorkstation, ...workstationData } = useWorkstationData(activeTicker);
+  const { desirableZones } = useOutcomeGradient();
+  /** Quant-engine ticket from the direct-profit edge function; null when it failed and the evidence fallback owns the result. */
+  const [edgeResult, setEdgeResult] = useState<TradeResult | null>(null);
+  const edgePendingRef = useRef(false);
 
   useEffect(() => {
     if (activeTicker && !loading) {
@@ -455,18 +463,71 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setLoading(true);
     setErrorMessage(null);
     setResult(null);
+    setEdgeResult(null);
     setAdded(false);
     setActiveTicker(normalizedTicker);
     setLivePrice(null);
     setLiveCurrency(null);
     setLastPriceUpdate(0);
 
+    // Two engines race for the same ticket. The quant edge function is the
+    // primary — it runs the full ensemble (cointegration, Merton proxy,
+    // walk-forward evidence, calibrated consensus, cost-adjusted expected
+    // value). The local evidence synthesis hydrates in parallel and owns
+    // the result if the function is unreachable, so the surface can never
+    // show a transport error.
     refreshWorkstation();
-  }, [refreshWorkstation]);
+    edgePendingRef.current = true;
+
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("direct-profit timeout")), ANALYSIS_TIMEOUT_MS);
+      });
+      const response = await Promise.race([
+        governedInvoke<TradeResult>("direct-profit", {
+          body: {
+            ticker: normalizedTicker,
+            indiaMode,
+            desirableHint: (() => {
+              const norm = normalizedTicker.replace(/\.(NS|BO)$/i, "").toUpperCase();
+              const matches = desirableZones.filter(z =>
+                z.assets.some(a => a.replace(/\.(NS|BO)$/i, "").toUpperCase() === norm)
+              );
+              if (matches.length === 0) return null;
+              const avgPnl = matches.reduce((s, z) => s + z.avgPnlPct, 0) / matches.length;
+              return {
+                listed: true,
+                avgPnlPct: Number(avgPnl.toFixed(2)),
+                zoneCount: matches.length,
+                regimes: matches.map(z => z.regime).slice(0, 3),
+              };
+            })(),
+          },
+          tier: "ai",
+          force: true,
+        }),
+        timeoutPromise,
+      ]);
+      const { data, error } = response as Awaited<ReturnType<typeof governedInvoke<TradeResult>>>;
+      if (error) throw error;
+      const normalized = normalizeTradeResult(data);
+      if (!normalized) throw new Error("incomplete trade plan");
+      setEdgeResult(normalized);
+    } catch (err) {
+      // Silent: the evidence-synthesis fallback below owns the result.
+      console.warn("direct-profit edge engine unavailable, using evidence synthesis:", err);
+    } finally {
+      edgePendingRef.current = false;
+    }
+  }, [refreshWorkstation, indiaMode, desirableZones]);
 
 
   useEffect(() => {
-    if (!activeTicker || !loading || workstationData.bootstrapping) return;
+    if (!activeTicker || workstationData.bootstrapping) return;
+    // Build (or rebuild) the evidence view whenever we're waiting for a
+    // result or the quant edge ticket has arrived and needs its evidence
+    // panels merged in.
+    if (!loading && !edgeResult) return;
     try {
       const graph = buildEvidenceGraph({
         ticker: activeTicker,
@@ -483,6 +544,24 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
           financials: workstationData.status.financials.fetchedAt,
         },
       });
+      // Empty graph: the evidence sources are still hydrating or settled
+      // unavailable. The edge ticket stands alone if it landed; otherwise
+      // report only once everything has actually settled.
+      if (graph.order.length === 0) {
+        const settled = Object.values(workstationData.status).every((s) => s.state !== "loading");
+        if (edgeResult) {
+          setResult(edgeResult);
+          setLivePrice(edgeResult.currentPrice > 0 ? edgeResult.currentPrice : null);
+          setLiveCurrency(edgeResult.currency || null);
+          setLastPriceUpdate(Date.now());
+          setLoading(false);
+        } else if (settled && !edgePendingRef.current) {
+          setErrorMessage("Could not assemble evidence for this asset right now. Retry in a moment.");
+          setLoading(false);
+        }
+        return;
+      }
+
       const price = workstationData.quote?.price ?? workstationData.analysis?.currentPrice ?? graph.metrics.support?.value ?? 0;
       const synthesis = synthesize(graph, workstationData.analysis, price || null);
       const action = synthesis.action === "ACCUMULATE" ? "BUY" : synthesis.action === "AVOID" ? "EXIT" : synthesis.action;
@@ -502,7 +581,18 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         .sort((a, b) => a.scored - b.scored)
         .slice(0, 5)
         .map((c) => ({ id: c.id, label: graph.metrics[c.id].label, reason: graph.metrics[c.id].assessment.reason, weight: c.scored }));
-      const data: TradeResult = {
+      // Expected return / downside are properties of the terminal
+      // distribution, not band edges: probability-weighted return across
+      // the log-normal cases, and closed-form expected shortfall (CVaR 95)
+      // from the same model. Band edges made the two numbers mirror each
+      // other, which read as invented data.
+      const model = logNormalHorizon(graph, synthesis.pillars, price || null);
+      const probWeightedReturn = synthesis.cases.some((c) => c.returnPct != null)
+        ? synthesis.cases.reduce((s, c) => s + (c.probability / 100) * (c.returnPct ?? 0), 0)
+        : null;
+      const expectedShortfall = model ? lognormalEs(model.m, model.sigma, 0.05) * 100 : null;
+
+      const evidenceView: TradeResult = {
         action,
         confidence: synthesis.confidence,
         entryLow: Number(entryLow.toFixed(2)),
@@ -522,25 +612,47 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         providersUsed: graph.coverage.sources.length,
         consensus: synthesis.ledger.opposing === 0 ? "UNANIMOUS" : synthesis.ledger.supporting > synthesis.ledger.opposing ? "MAJORITY" : "SPLIT",
         evidenceCount: graph.order.length,
-        expectedReturnPct: bull?.returnPct ?? null,
-        expectedDownsidePct: bear?.returnPct ?? null,
+        expectedReturnPct: probWeightedReturn != null ? Number(probWeightedReturn.toFixed(1)) : null,
+        expectedDownsidePct: expectedShortfall != null ? Number(expectedShortfall.toFixed(1)) : (bear?.returnPct ?? null),
         primaryDrivers: drivers,
         primaryRisks: risks,
         probabilityDistribution: synthesis.cases,
         thesisBreakers: synthesis.breakers,
         engineSources: graph.coverage.sources,
       };
-      setResult(data);
-      setLivePrice(data.currentPrice > 0 ? data.currentPrice : null);
-      setLiveCurrency(data.currency || null);
+
+      // The quant edge ticket owns the trade plan when it landed; the
+      // evidence view supplies the panels the function does not compute
+      // (drivers, risks, cases, breakers, distribution statistics).
+      const merged: TradeResult = edgeResult
+        ? {
+            ...evidenceView,
+            ...edgeResult,
+            expectedReturnPct: evidenceView.expectedReturnPct,
+            expectedDownsidePct: evidenceView.expectedDownsidePct,
+            primaryDrivers: evidenceView.primaryDrivers,
+            primaryRisks: evidenceView.primaryRisks,
+            probabilityDistribution: evidenceView.probabilityDistribution,
+            thesisBreakers: evidenceView.thesisBreakers,
+            evidenceCount: evidenceView.evidenceCount,
+            engineSources: evidenceView.engineSources,
+          }
+        : evidenceView;
+
+      setResult(merged);
+      setLivePrice(merged.currentPrice > 0 ? merged.currentPrice : null);
+      setLiveCurrency(merged.currency || null);
       setLastPriceUpdate(Date.now());
+      setErrorMessage(null);
+      setLoading(false);
     } catch (err: any) {
       console.error("Direct profit evidence synthesis error:", err);
-      setErrorMessage("Could not synthesize the evidence graph for this asset.");
-    } finally {
+      if (!edgeResult) setErrorMessage("Could not synthesize the evidence graph for this asset.");
       setLoading(false);
     }
-  }, [activeTicker, loading, workstationData]);
+    // NOTE: no `finally` — the empty-graph early return must keep `loading`
+    // true so this effect re-fires as the workstation sources hydrate.
+  }, [activeTicker, loading, workstationData, edgeResult]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
 
@@ -937,12 +1049,14 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             <div className="border-b border-border p-4 space-y-4 bg-surface-2/20">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-surface-2/40 p-3">
-                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Return</div>
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Return · prob-weighted</div>
                   <div className={`text-xl font-black font-mono ${(result.expectedReturnPct ?? 0) >= 0 ? "text-gain" : "text-loss"}`}>{result.expectedReturnPct != null ? `${result.expectedReturnPct > 0 ? "+" : ""}${result.expectedReturnPct}%` : "—"}</div>
+                  <div className="text-[8.5px] text-muted-foreground/70">Σ p·r across bull/base/bear · 21 sessions</div>
                 </div>
                 <div className="rounded-lg bg-surface-2/40 p-3">
-                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Downside</div>
+                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Expected Shortfall · CVaR 95</div>
                   <div className="text-xl font-black font-mono text-loss">{result.expectedDownsidePct != null ? `${result.expectedDownsidePct}%` : "—"}</div>
+                  <div className="text-[8.5px] text-muted-foreground/70">mean of the worst 5% of outcomes</div>
                 </div>
                 <div className="rounded-lg bg-surface-2/40 p-3">
                   <div className="text-[10px] uppercase text-muted-foreground tracking-wider">Risk</div>
