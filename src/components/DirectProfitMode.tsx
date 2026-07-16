@@ -113,7 +113,7 @@ interface TradeResult {
   /** Client-built calculation audit — every displayed number with its formula, inputs and downstream use. */
   audit?: AuditRow[];
   /** Set when the client repaired a degenerate server calibration (see repairDegenerateCalibration). */
-  recalibrated?: { storedProb: number; priorProb: number };
+  recalibrated?: { storedProb: number; priorProb: number; planRebuilt?: boolean };
   ensemble?: {
     decision: "BUY" | "SELL" | "STAND_ASIDE";
     /** Raw signed ensemble score in [-1, 1] — present on the wire, used for client recalibration. */
@@ -242,7 +242,7 @@ function buildAuditTrail(opts: {
       value: `${Math.round(edge.recalibrated.storedProb * 100)}% → ${Math.round(edge.recalibrated.priorProb * 100)}%`,
       source: "client",
       formula: "p = clamp(σ(3.2·|score| + 1.4·agreement − 0.7), 0.5, 0.95) — the documented prior calibration over the engine's raw ensemble",
-      computation: `stored nightly fit is degenerate (maps every input to the 0.5 clamp floor — no verdict could ever pass a gate); priors re-applied to the engine's own score/agreement, gate re-run at p ≥ 53%, E[R] ≥ 0.05R`,
+      computation: `stored nightly fit is degenerate (maps every input to the 0.5 clamp floor — no verdict could ever pass a gate); priors re-applied to the engine's own score/agreement, gate re-run at p ≥ 53%, E[R] ≥ 0.05R${edge.recalibrated.planRebuilt ? " · WAIT ticket levels were malformed for the direction — rebuilt σ-scaled around price (the server promote branch's own construction)" : ""}`,
       usedFor: "The verdict, confidence and expected profit above. Self-disables when the server-side calibration heals.",
     });
   }
@@ -501,18 +501,35 @@ function repairDegenerateCalibration(t: TradeResult): TradeResult {
   const bucketsOk = !bd || (bd.votingBuckets >= 1 && bd.agreeingBuckets >= 1);
   if (!(priorP >= 0.53 && expectedR >= 0.05 && ens.engineCount >= 2 && agreement >= 0.3 && bucketsOk)) return t;
 
-  // Promote using the engine's own ticket levels; mirror them around the
-  // current price if the plan's orientation doesn't match the direction.
+  // Promote using the engine's own ticket levels when their orientation
+  // matches the direction. WAIT tickets often carry narrative levels that
+  // are malformed as a plan (observed live: AAPL's target inside its entry
+  // band) — in that case rebuild them with the server promote branch's own
+  // construction: σ-scaled widths around the current price, with σ_daily
+  // recovered from the ticket's 1-day VaR95 (var95 ≈ price·σ_d·1.645).
   const cp = t.currentPrice;
+  if (!(cp > 0)) return t;
   let { entryLow, entryHigh, targetPrice, stopLoss } = t;
-  const longShaped = targetPrice > cp && stopLoss < cp;
-  if (dir === "SELL" && longShaped && cp > 0) {
-    const tgt = cp - (targetPrice - cp);
-    const stp = cp + (cp - stopLoss);
-    targetPrice = Number(tgt.toFixed(2));
-    stopLoss = Number(stp.toFixed(2));
-  } else if (dir === "BUY" && !longShaped && cp > 0) {
-    return t; // malformed plan for the direction — do not manufacture one
+  const wellFormed = dir === "BUY" ? targetPrice > cp && stopLoss < cp : targetPrice < cp && stopLoss > cp;
+  let planRebuilt = false;
+  if (!wellFormed) {
+    const var95 = t.riskMetrics?.var95;
+    const sigmaD = var95 && var95 > 0 ? Math.max(0.006, Math.min(0.02, var95 / (cp * 1.645))) : 0.012;
+    const stopWidth = Math.max(0.012, Math.min(0.04, sigmaD * 1.2));
+    const rMult = Math.max(1.5, Math.min(4, ((expectedR + 1) / Math.max(1 - priorP, 0.05)) * 0.5));
+    const targetWidth = Math.max(0.018, Math.min(0.08, stopWidth * rMult));
+    if (dir === "BUY") {
+      entryLow = Number((cp * (1 - sigmaD)).toFixed(2));
+      entryHigh = Number((cp * (1 + sigmaD * 0.35)).toFixed(2));
+      targetPrice = Number((cp * (1 + targetWidth)).toFixed(2));
+      stopLoss = Number((cp * (1 - stopWidth)).toFixed(2));
+    } else {
+      entryLow = Number((cp * (1 - sigmaD * 0.35)).toFixed(2));
+      entryHigh = Number((cp * (1 + sigmaD)).toFixed(2));
+      targetPrice = Number((cp * (1 - targetWidth)).toFixed(2));
+      stopLoss = Number((cp * (1 + stopWidth)).toFixed(2));
+    }
+    planRebuilt = true;
   }
   const entryMid = (entryLow + entryHigh) / 2 || cp;
   const rawUp = Math.abs(targetPrice - entryMid);
@@ -527,6 +544,8 @@ function repairDegenerateCalibration(t: TradeResult): TradeResult {
     direction: dir === "BUY" ? "UP" : "DOWN",
     directionReason: `Recalibrated consensus ${dir} — stored calibration degenerate`,
     confidence: Math.round(priorP * 100),
+    entryLow,
+    entryHigh,
     targetPrice,
     stopLoss,
     riskRewardRatio: Number(rr.toFixed(2)),
@@ -534,7 +553,7 @@ function repairDegenerateCalibration(t: TradeResult): TradeResult {
       ? `Trail stop at ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`
       : `Cover above ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`,
     waitReasons: undefined,
-    recalibrated: { storedProb: ens.calibratedProb, priorProb: Number(priorP.toFixed(3)) },
+    recalibrated: { storedProb: ens.calibratedProb, priorProb: Number(priorP.toFixed(3)), planRebuilt },
     ensemble: { ...ens, decision: dir, calibratedProb: Number(priorP.toFixed(3)), expectedR: Number(expectedR.toFixed(2)) },
     quantEdge: t.quantEdge
       ? {
