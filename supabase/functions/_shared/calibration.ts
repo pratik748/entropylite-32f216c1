@@ -10,6 +10,22 @@ const DEFAULTS: CalibrationParams = { alpha: 3.2, beta: 1.4, gamma: -0.7 };
 let cached: { params: CalibrationParams; at: number } | null = null;
 const TTL_MS = 5 * 60 * 1000;
 
+const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+
+/**
+ * A stored calibration is usable only if it can still discriminate: at full
+ * consensus (ensemble score 1, agreement 1) it must be able to express a
+ * probability that can clear a trade gate. A fit whose maximum output sits
+ * below 0.60 maps EVERY ticket to the 0.50 clamp floor — zero discrimination,
+ * every verdict becomes WAIT, the engine is silently dead (this exactly
+ * happened: α=0.97, β=0, γ=−2.67 ⇒ p_max=15%). Such fits are degenerate for
+ * decision purposes and must fall back to the priors.
+ */
+export function isUsableCalibration(p: CalibrationParams): boolean {
+  if (![p.alpha, p.beta, p.gamma].every(Number.isFinite)) return false;
+  return sigmoid(p.alpha + p.beta + p.gamma) >= 0.6;
+}
+
 export async function loadCalibration(): Promise<CalibrationParams> {
   if (cached && Date.now() - cached.at < TTL_MS) return cached.params;
   try {
@@ -26,11 +42,17 @@ export async function loadCalibration(): Promise<CalibrationParams> {
       cached = { params: DEFAULTS, at: Date.now() };
       return DEFAULTS;
     }
-    const params: CalibrationParams = {
+    const fitted: CalibrationParams = {
       alpha: Number(data.alpha) || DEFAULTS.alpha,
       beta: Number(data.beta) || DEFAULTS.beta,
       gamma: Number(data.gamma) ?? DEFAULTS.gamma,
     };
+    const params = isUsableCalibration(fitted) ? fitted : DEFAULTS;
+    if (params !== fitted) {
+      console.warn(
+        `calibration: stored fit rejected (α=${fitted.alpha}, β=${fitted.beta}, γ=${fitted.gamma} ⇒ p_max=${sigmoid(fitted.alpha + fitted.beta + fitted.gamma).toFixed(3)} < 0.6) — using priors`,
+      );
+    }
     cached = { params, at: Date.now() };
     return params;
   } catch {

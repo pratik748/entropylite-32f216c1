@@ -128,12 +128,30 @@ serve(async (req) => {
   const fit = fitPlatt(samples);
   report.calibration = { ...fit, samples: samples.length };
 
+  // A fit is storable only if it can still discriminate: at full consensus
+  // (score 1, agreement 1) it must be able to express p ≥ 0.60. When the
+  // sample's base win-rate is low the intercept swallows it and the whole
+  // curve sinks below the consumer's 0.5 clamp — every ticket then reads
+  // exactly 50% and no trade can ever fire (observed live: α=0.97, β=0,
+  // γ=−2.67 ⇒ p_max=15%). Such fits are recorded in the report but the
+  // stored row heals back to the priors so the engine stays alive.
+  const pMax = sigmoid(fit.alpha + fit.beta + fit.gamma);
+  const usable = pMax >= 0.6;
+  report.calibrationUsable = usable;
+  report.calibrationPMax = Number(pMax.toFixed(4));
+
   if (samples.length >= 30) {
+    const store = usable
+      ? { alpha: fit.alpha, beta: fit.beta, gamma: fit.gamma }
+      : { alpha: 3.2, beta: 1.4, gamma: -0.7 };
+    if (!usable) {
+      console.warn(`calibration-fit: fit rejected (p_max=${pMax.toFixed(3)} < 0.6, n=${samples.length}, brier=${fit.brier.toFixed(3)}) — storing priors`);
+    }
     await sb.from("calibration_params").upsert({
       id: 1,
-      alpha: Number(fit.alpha.toFixed(4)),
-      beta: Number(fit.beta.toFixed(4)),
-      gamma: Number(fit.gamma.toFixed(4)),
+      alpha: Number(store.alpha.toFixed(4)),
+      beta: Number(store.beta.toFixed(4)),
+      gamma: Number(store.gamma.toFixed(4)),
       n_samples: samples.length,
       brier_score: Number(fit.brier.toFixed(4)),
       fit_at: new Date().toISOString(),
