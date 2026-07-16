@@ -438,6 +438,17 @@ const STORAGE_KEY = "dp-portfolio";
 /** Ceiling for the quant edge engine; the evidence synthesis renders meanwhile. */
 const ANALYSIS_TIMEOUT_MS = 45000;
 
+/**
+ * Breadcrumb of the last quant-engine attempt, read by the System pipeline
+ * board so engine reachability is reported from real calls, never assumed.
+ */
+export const DP_ENGINE_STATUS_KEY = "dp-engine-status";
+function recordEngineStatus(state: "live" | "unreachable", reason?: string) {
+  try {
+    localStorage.setItem(DP_ENGINE_STATUS_KEY, JSON.stringify({ state, ts: Date.now(), ...(reason ? { reason } : {}) }));
+  } catch {}
+}
+
 function loadPortfolio(): PortfolioItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -760,16 +771,19 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
     try {
       setEdgeResult(await attemptEngine());
+      recordEngineStatus("live");
     } catch (firstErr) {
       // One retry — cold starts and transient 5xx are the common failure
       // mode, and the evidence view renders in the meantime so a late
       // quant ticket simply upgrades the surface in place.
       try {
         setEdgeResult(await attemptEngine());
+        recordEngineStatus("live");
       } catch (err: any) {
         console.warn("direct-profit edge engine unavailable, using evidence synthesis:", firstErr, err);
         const reason = err?.message || err?.error?.message || String(err);
         setEdgeError(String(reason).slice(0, 140));
+        recordEngineStatus("unreachable", String(reason).slice(0, 140));
       }
     } finally {
       edgePendingRef.current = false;
