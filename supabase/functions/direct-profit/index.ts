@@ -1127,6 +1127,16 @@ Deno.serve(async (req) => {
     // an explicit STAND_ASIDE reason — this is the single biggest lever
     // against day-to-day result inconsistency.
     const dirOf = (a: string): -1 | 0 | 1 => a === "BUY" ? 1 : a === "SELL" ? -1 : 0;
+    // Desirable-board memory as a proper ensemble member. The board's
+    // measured zone edge is Bayesian-shrunk toward zero with k = 3
+    // pseudo-observations (edge·n/(n+k)), so one lucky zone cannot
+    // dominate, conviction scales with evidence rather than with mere
+    // listing status, and the reliability prior itself grows with the
+    // number of matched zones. No override path exists downstream — if
+    // this edge is real it moves the calibrated probability and the gate
+    // resolves the direction on its own math.
+    const desirableZones = Math.max(0, Number(desirableHint?.zoneCount) || 0);
+    const desirableEdge = ((desirableHint?.avgPnlPct ?? 0) * desirableZones) / (desirableZones + 3);
     const engineSignals: EngineSignal[] = [
       {
         id: "deterministic",
@@ -1195,10 +1205,10 @@ Deno.serve(async (req) => {
       },
       {
         id: "desirable",
-        label: "ODGS desirable-asset memory",
-        direction: desirableHint?.listed ? 1 : 0,
-        confidence: Math.min(1, 0.5 + Math.max(0, (desirableHint?.avgPnlPct ?? 0) / 10)),
-        reliability: 0.60,
+        label: `ODGS desirable-asset memory (edge=${desirableEdge.toFixed(2)}%, n=${desirableZones})`,
+        direction: desirableHint?.listed ? (desirableEdge >= 0 ? 1 : -1) : 0,
+        confidence: Math.min(0.9, 0.4 + Math.abs(desirableEdge) / 6),
+        reliability: 0.55 + 0.10 * Math.min(1, desirableZones / 6),
         hasSignal: !!desirableHint?.listed,
       },
     ];
@@ -1284,6 +1294,26 @@ Deno.serve(async (req) => {
     const rrFromOutput = Number(output.riskRewardRatio);
     const haircut = costHaircut(resolvedTicker);
     const calibration = await loadCalibration();
+    // Decision-theoretic gate for a point-of-decision module. The shared
+    // screener defaults optimise precision over a whole universe (six
+    // AND-ed vetoes) — correct for scanning, but on a single user-chosen
+    // asset they resolved WAIT on the vast majority of names, including
+    // ones with a genuinely positive after-cost edge. Here the criterion
+    // is expected utility: trade whenever the Cornish-Fisher expected R
+    // after the round-trip cost haircut clears a small margin (0.05R) and
+    // the calibrated win-probability sits meaningfully off coin-flip
+    // (≥53%). Disagreement is not a veto — it already suppresses the
+    // calibrated probability through the Platt logit, and bucket
+    // diversification is rewarded continuously via δ instead of being
+    // demanded binarily.
+    const DP_GATES = {
+      minEngines: 2,
+      minVotingBuckets: 1,
+      minAgreeingBuckets: 1,
+      minCalibratedProb: 0.53,
+      minAgreement: 0.30,
+      minExpectedR: 0.05,
+    } as const;
     const consensus = runConsensus(engineSignals, {
       rUp: Number.isFinite(rrFromOutput) && rrFromOutput > 0 ? rrFromOutput : 2.0,
       rDown: 1.0,
@@ -1291,6 +1321,8 @@ Deno.serve(async (req) => {
       calibration,
       skew: momentSkew,
       excessKurt: momentKurt,
+      gates: DP_GATES,
+      bucketBonus: 0.35,
     });
 
     // Apply the gate. If the ensemble says STAND_ASIDE and we currently
@@ -1319,7 +1351,7 @@ Deno.serve(async (req) => {
       (output as any).waitReasons = [
         consensus.standAsideReason || "Engines disagree",
         bucketLine,
-        `Calibrated probability: ${(consensus.calibratedProb * 100).toFixed(0)}% (need ≥58%)`,
+        `Calibrated probability: ${(consensus.calibratedProb * 100).toFixed(0)}% (need ≥${(DP_GATES.minCalibratedProb * 100).toFixed(0)}%)`,
         haircut > 0.005 ? `Round-trip cost ${(haircut * 100).toFixed(2)}% (${tickerClass(resolvedTicker)})` : `Liquidity tier: ${tickerClass(resolvedTicker)}`,
         `Expected R after costs: ${consensus.expectedR.toFixed(2)}`,
         ...(flipHint ? [flipHint] : []),
@@ -1327,44 +1359,41 @@ Deno.serve(async (req) => {
       ];
     }
 
-    // ── SELF-SUGGESTION GUARD ──────────────────────────────────────────
-    // If this asset came from the Desirable board — i.e. Direct Profit
-    // surfaced it as an opportunity itself — resolving to WAIT is a direct
-    // self-contradiction. The board already validated a positive-edge zone,
-    // so a WAIT here is promoted to a directional ticket (default BUY, the
-    // side the desirable edge implies) UNLESS a genuine structural block
-    // exists: a critical CLANK constraint or deeply negative risk-adjusted
-    // return. The whole point of the module is to hand the user the trade
-    // it just recommended — not to shrug at its own pick.
-    const criticalBlock =
-      clankSignals.some((s) => s.severity === "CRITICAL") || riskMetrics.sharpeRatio < -0.9;
-    if (
-      output.action === "WAIT" &&
-      desirableHint?.listed &&
-      (desirableHint.avgPnlPct ?? 0) >= -1 &&
-      !criticalBlock
-    ) {
-      const dir: "BUY" | "SELL" = deterministic.action === "SELL" ? "SELL" : "BUY";
+    // ── SYMMETRIC GATE: the ensemble is authoritative in BOTH directions ─
+    // The gate above downgrades a directional ticket the engines cannot
+    // support; this branch is its mirror. When the calibrated consensus
+    // resolves BUY or SELL but the narrative layer sat at WAIT, the module
+    // promotes to the consensus direction with a volatility-scaled ticket.
+    // No special cases and no overrides: a Desirable-board pick gets its
+    // direction here only because its measured edge moved the calibrated
+    // probability through the ensemble like every other engine, and any
+    // structural block (critical CLANK, distress, negative walk-forward
+    // evidence) votes against it inside the same math.
+    if (consensus.decision !== "STAND_ASIDE" && output.action === "WAIT") {
+      const dir: "BUY" | "SELL" = consensus.decision;
       const cp = snap.currentPrice;
-      const entryWidth = Math.max(0.006, Math.min(0.02, tech.dailyVol / 100));
-      const targetWidth = Math.max(0.018, Math.min(0.08, entryWidth * 2.4));
-      const stopWidth = Math.max(0.012, Math.min(0.04, entryWidth * 1.2));
+      // Widths scale with realised daily volatility: entry band ≈ 1σ,
+      // stop ≈ 1.2σ, target = stop × R implied by the after-cost edge.
+      const sigma = Math.max(0.006, Math.min(0.02, tech.dailyVol / 100));
+      const stopWidth = Math.max(0.012, Math.min(0.04, sigma * 1.2));
+      const rMultiple = Math.max(1.5, Math.min(4, (consensus.expectedR + 1) / Math.max(1 - consensus.calibratedProb, 0.05) * 0.5));
+      const targetWidth = Math.max(0.018, Math.min(0.08, stopWidth * rMultiple));
       let eL = cp, eH = cp, tg = cp, sl = cp, rr = 0;
       if (dir === "BUY") {
-        eL = cp * (1 - entryWidth); eH = cp * (1 + entryWidth * 0.35);
+        eL = cp * (1 - sigma); eH = cp * (1 + sigma * 0.35);
         tg = Math.max(cp * (1 + targetWidth), tech.resistance || 0);
         sl = Math.min(cp * (1 - stopWidth), tech.support || cp * (1 - stopWidth));
         rr = (tg - (eL + eH) / 2) / Math.max((eL + eH) / 2 - sl, 0.01);
       } else {
-        eL = cp * (1 - entryWidth * 0.35); eH = cp * (1 + entryWidth);
+        eL = cp * (1 - sigma * 0.35); eH = cp * (1 + sigma);
         tg = Math.min(cp * (1 - targetWidth), tech.support || cp * (1 - targetWidth));
         sl = Math.max(cp * (1 + stopWidth), tech.resistance || cp * (1 + stopWidth));
         rr = ((eL + eH) / 2 - tg) / Math.max(sl - (eL + eH) / 2, 0.01);
       }
-      console.log(`direct-profit self-suggestion guard: WAIT → ${dir} (desirable avgPnl=${desirableHint.avgPnlPct})`);
+      console.log(`direct-profit consensus promote: WAIT → ${dir} (p=${consensus.calibratedProb}, E[R]=${consensus.expectedR})`);
       output.action = dir;
       output.direction = dir === "BUY" ? "UP" : "DOWN";
-      output.directionReason = `Desirable-board pick — ${(desirableHint.avgPnlPct ?? 0) >= 0 ? "positive" : "neutral"} historical edge`;
+      output.directionReason = `Ensemble consensus ${dir} — calibrated ${(consensus.calibratedProb * 100).toFixed(0)}% win-probability, ${consensus.expectedR.toFixed(2)}R expected after costs`;
       output.entryLow = roundPrice(eL);
       output.entryHigh = roundPrice(eH);
       output.targetPrice = roundPrice(tg);
@@ -1373,9 +1402,8 @@ Deno.serve(async (req) => {
       output.protection = dir === "BUY"
         ? `${resolvedTicker} ${roundPrice(sl)} PE as hedge. Trail stop at ${currencySymbol}${roundPrice(sl)}. Risk/share: ${currencySymbol}${roundPrice(cp - sl)}.`
         : `Cover above ${currencySymbol}${roundPrice(sl)} with ${resolvedTicker} ${roundPrice(sl)} CE. Max loss: ${currencySymbol}${roundPrice(sl - cp)}/share.`;
-      output.confidence = Math.max(Number(output.confidence) || 50, 55);
+      output.confidence = Math.round(consensus.calibratedProb * 100);
       (output as any).waitReasons = undefined;
-      (output as any).consensus = "DESIRABLE_CONVICTION";
     }
 
     // Re-calibrate the displayed confidence to the calibrated probability

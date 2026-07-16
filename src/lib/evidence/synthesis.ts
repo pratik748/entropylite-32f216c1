@@ -15,7 +15,7 @@ import type {
   Synthesis,
   ThesisBreaker,
 } from "./types";
-import { clamp, round } from "./compute";
+import { clamp, normalCdf, round } from "./compute";
 import type { Contribution } from "./types";
 import type { DeskAnalysis } from "./inputs";
 import { EVIDENCE_RELATIONS } from "./relations";
@@ -170,21 +170,80 @@ function buildBreakers(graph: EvidenceGraph): ThesisBreaker[] {
   return breakers;
 }
 
-function buildCases(graph: EvidenceGraph, pillars: PillarScore[]): ScenarioCase[] {
-  const g = graph.metrics;
-  const skew = g["monte_carlo_spread"]?.value ?? 0;
+/** Horizon of the engine's simulated outcome distribution, in sessions. */
+const CASE_HORIZON_SESSIONS = 21;
+
+/**
+ * Log-normal case probabilities. Price is modelled as geometric Brownian
+ * motion over the engine's 21-session simulation horizon with σ from the
+ * realized-volatility node and a bounded evidence drift — the momentum and
+ * risk pillars tilt the horizon mean by at most ±0.75σ. The bull case is
+ * the probability of finishing inside the engine's bull band (≥ its lower
+ * bound), the bear case of finishing inside the bear band (≤ its upper
+ * bound); the base case is the remaining mass. Returns null when price,
+ * volatility or the bands are unavailable so a prior-based fallback can
+ * take over — the surface is never blank.
+ */
+function caseProbabilities(
+  graph: EvidenceGraph,
+  pillars: PillarScore[],
+  analysis: DeskAnalysis | null,
+  price: number | null,
+): { bull: number; base: number; bear: number } | null {
+  const vol = graph.metrics["volatility"]?.value;
+  const bullLo = Array.isArray(analysis?.bullRange) ? analysis!.bullRange[0] : null;
+  const bearHi = Array.isArray(analysis?.bearRange) ? analysis!.bearRange[1] : null;
+  if (vol == null || vol <= 0 || price == null || price <= 0) return null;
+  if (bullLo == null || bearHi == null || bullLo <= 0 || bearHi <= 0 || bearHi >= bullLo) return null;
+
+  const sigma = (vol / 100) * Math.sqrt(CASE_HORIZON_SESSIONS / 252);
+  if (!(sigma > 0)) return null;
   const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
   const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
+  // Evidence drift: momentum leads, contained risk supports; bounded ±0.75σ.
+  const tilt = clamp((0.5 * (momentum - 50) + 0.25 * (risk - 50)) / 50, -0.75, 0.75);
+  const m = tilt * sigma - (sigma * sigma) / 2; // log-drift over the horizon
 
-  // Probabilities: start 25/50/25, tilt by momentum and risk pillars, renormalize.
-  let bullP = 25 + (momentum - 50) * 0.2 + (skew > 0 ? 4 : 0);
-  let bearP = 25 + (50 - risk) * 0.2 + (skew < 0 ? 4 : 0);
-  bullP = clamp(bullP, 10, 45);
-  bearP = clamp(bearP, 10, 45);
-  const baseP = 100 - bullP - bearP;
+  let bull = 1 - normalCdf((Math.log(bullLo / price) - m) / sigma);
+  let bear = normalCdf((Math.log(bearHi / price) - m) / sigma);
+  bull = clamp(bull, 0.05, 0.85);
+  bear = clamp(bear, 0.05, 0.85);
+  // Keep a real base case: shrink the tails proportionally if they crowd it out.
+  const minBase = 0.08;
+  if (bull + bear > 1 - minBase) {
+    const scale = (1 - minBase) / (bull + bear);
+    bull *= scale;
+    bear *= scale;
+  }
+  const bullPct = Math.round(bull * 100);
+  const bearPct = Math.round(bear * 100);
+  return { bull: bullPct, bear: bearPct, base: 100 - bullPct - bearPct };
+}
 
-  const price = g["market_cap"] ? null : null; // price handled below from ranges only
-  void price;
+function buildCases(
+  graph: EvidenceGraph,
+  pillars: PillarScore[],
+  analysis: DeskAnalysis | null,
+  price: number | null,
+): ScenarioCase[] {
+  const g = graph.metrics;
+
+  const quant = caseProbabilities(graph, pillars, analysis, price);
+  let bullP: number;
+  let bearP: number;
+  let baseP: number;
+  if (quant) {
+    ({ bull: bullP, bear: bearP, base: baseP } = quant);
+  } else {
+    // Prior fallback when the log-normal inputs are missing: 25/50/25
+    // tilted by the momentum and risk pillars and the simulated skew.
+    const skew = g["monte_carlo_spread"]?.value ?? 0;
+    const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
+    const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
+    bullP = clamp(25 + (momentum - 50) * 0.2 + (skew > 0 ? 4 : 0), 10, 45);
+    bearP = clamp(25 + (50 - risk) * 0.2 + (skew < 0 ? 4 : 0), 10, 45);
+    baseP = 100 - bullP - bearP;
+  }
 
   const mkCase = (
     id: ScenarioCase["id"],
@@ -313,12 +372,22 @@ export function synthesize(
 
   const action = actionFrom(net, breakers, nodes.length);
 
+  // Logistic confidence calibration: evidence volume, directional agreement
+  // and the magnitude of the net contribution raise the logit; estimated
+  // provenance and non-intact breakers lower it. The sigmoid is mapped onto
+  // [35, 90] so displayed confidence saturates smoothly at both ends instead
+  // of hitting an arbitrary linear clamp.
   const estimatedShare = graph.coverage.total > 0 ? graph.coverage.estimated / graph.coverage.total : 1;
   const agreement = nodes.length > 0 ? Math.abs(supporting - opposing) / nodes.length : 0;
-  const confidence = round(
-    clamp(38 + Math.min(nodes.length, 30) * 0.9 + agreement * 30 - estimatedShare * 14 - breakers.filter((b) => b.state !== "intact").length * 3, 35, 88),
-    0,
-  );
+  const breakerShare = breakers.length > 0 ? breakers.filter((b) => b.state !== "intact").length / breakers.length : 0;
+  const zConf =
+    -0.6 +
+    1.3 * (Math.min(nodes.length, 40) / 40) +
+    1.1 * agreement +
+    0.9 * Math.tanh(Math.abs(net) / 4) -
+    1.2 * estimatedShare -
+    0.8 * breakerShare;
+  const confidence = round(35 + 55 / (1 + Math.exp(-zConf)), 0);
 
   const strongestFor = movers.find((m) => m.weight > 0);
   const strongestAgainst = movers.find((m) => m.weight < 0);
@@ -351,7 +420,7 @@ export function synthesize(
   }
 
   const keyDrivers = movers.slice(0, 5);
-  const cases = priceCases(buildCases(graph, pillars), analysis, price);
+  const cases = priceCases(buildCases(graph, pillars, analysis, price), analysis, price);
 
   return {
     action,

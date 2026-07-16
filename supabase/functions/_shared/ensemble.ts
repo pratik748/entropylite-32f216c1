@@ -87,7 +87,12 @@ const MIN_AGREEING_BUCKETS = 2;     // need ≥2 of 3 buckets to agree on direct
 const MIN_EXPECTED_R = 0.20;
 
 /** Gate thresholds, exported so callers can classify STAND_ASIDE decisions
- *  with the exact same constants the gate itself used. */
+ *  with the exact same constants the gate itself used. These are the
+ *  SCREENER defaults (high precision, low recall — right for scanning a
+ *  universe). Point-of-decision callers analysing a single user-chosen
+ *  asset can pass `opts.gates` to run a decision-theoretic gate instead:
+ *  trade whenever expected value after costs and fat tails is positive
+ *  and the calibrated probability is meaningfully off coin-flip. */
 export const CONSENSUS_GATES = {
   minEngines: MIN_ENGINES_FOR_TRADE,
   minCalibratedProb: MIN_CALIBRATED_PROB,
@@ -96,6 +101,8 @@ export const CONSENSUS_GATES = {
   minAgreeingBuckets: MIN_AGREEING_BUCKETS,
   minExpectedR: MIN_EXPECTED_R,
 } as const;
+
+export type ConsensusGates = { -readonly [K in keyof typeof CONSENSUS_GATES]: number };
 
 export interface CalibrationParams {
   alpha: number;
@@ -138,6 +145,15 @@ export function runConsensus(
     skew?: number;
     /** Realised daily-return excess kurtosis; enables CF-adjusted rDown */
     excessKurt?: number;
+    /** Per-caller gate overrides; anything omitted keeps the screener default */
+    gates?: Partial<ConsensusGates>;
+    /**
+     * Diversification term δ added to the calibration logit per agreeing
+     * bucket beyond the first: z += δ·max(0, agreeingBuckets − 1).
+     * Rewards decorrelated confirmation continuously instead of binary
+     * bucket vetoes. Default 0 preserves the fitted calibration exactly.
+     */
+    bucketBonus?: number;
   },
 ): ConsensusResult {
   const active = signals.filter((s) => s.hasSignal !== false && s.direction !== 0);
@@ -185,13 +201,6 @@ export function runConsensus(
   const ensembleScore = totalWeight > 0 ? signedSum / totalWeight : 0;
   const agreement = totalWeight > 0 ? Math.abs(signedSum) / totalWeight : 0;
 
-  // Platt-style logistic calibration. Constants come from `calibration_params`
-  // table (refit nightly from realised outcomes) so the displayed
-  // probability actually corresponds to historical hit-rate.
-  const z = cal.alpha * Math.abs(ensembleScore) + cal.beta * agreement + cal.gamma;
-  const probDominant = 1 / (1 + Math.exp(-z));
-  const calibratedProb = clamp(probDominant, 0.5, 0.95);
-
   const dominant: EngineDirection = ensembleScore >= 0 ? 1 : -1;
   const agreeingEngines = active
     .filter((s) => s.direction === dominant)
@@ -206,26 +215,6 @@ export function runConsensus(
       : agreement >= 0.5
         ? "MAJORITY"
         : "SPLIT";
-
-  // Expected R-multiple AFTER round-trip cost. Indian small-caps with
-  // 1.5% haircut will routinely fall below threshold here — that is the
-  // feature. Cost in R-units = haircut/avgLoss% ≈ haircut/(0.02) for a
-  // typical 2% stop.
-  const haircutInR = haircut > 0 ? haircut / 0.02 : 0;
-  // Cornish-Fisher fat-tail aware expected R.  When skew is negative or
-  // kurtosis is fat (small caps with crash risk) the rDown leg is scaled
-  // up so the trade no longer fires on raw mean-revert math.
-  const cf = cfExpectedR({
-    p: calibratedProb,
-    rUp,
-    rDown,
-    skew: Number.isFinite(opts?.skew as number) ? (opts!.skew as number) : 0,
-    excessKurt: Number.isFinite(opts?.excessKurt as number) ? (opts!.excessKurt as number) : 0,
-    haircutInR,
-    conf: 0.95,
-  });
-  const expectedR = cf.expectedR;
-  const tailMultiplier = cf.tailMultiplier;
 
   // ── Bucket aggregation (decorrelation layer) ─────────────────
   const bucketMap = new Map<Bucket, { signed: number; weight: number; engines: number }>();
@@ -266,26 +255,62 @@ export function runConsensus(
     C: (buckets.find((b) => b.bucket === "C")?.direction ?? 0) as -1 | 0 | 1,
   };
 
+  // Platt-style logistic calibration. Constants come from `calibration_params`
+  // table (refit nightly from realised outcomes) so the displayed
+  // probability actually corresponds to historical hit-rate. The optional
+  // δ term folds bucket diversification into the logit — each agreeing
+  // orthogonal information source beyond the first shifts the calibrated
+  // probability up smoothly, replacing the old binary bucket veto for
+  // callers that opt in (δ = 0 leaves the fitted calibration untouched).
+  const delta = clamp(opts?.bucketBonus ?? 0, 0, 1);
+  const z = cal.alpha * Math.abs(ensembleScore)
+    + cal.beta * agreement
+    + delta * Math.max(0, agreeingBuckets - 1)
+    + cal.gamma;
+  const probDominant = 1 / (1 + Math.exp(-z));
+  const calibratedProb = clamp(probDominant, 0.5, 0.95);
+
+  // Expected R-multiple AFTER round-trip cost. Indian small-caps with
+  // 1.5% haircut will routinely fall below threshold here — that is the
+  // feature. Cost in R-units = haircut/avgLoss% ≈ haircut/(0.02) for a
+  // typical 2% stop.
+  const haircutInR = haircut > 0 ? haircut / 0.02 : 0;
+  // Cornish-Fisher fat-tail aware expected R.  When skew is negative or
+  // kurtosis is fat (small caps with crash risk) the rDown leg is scaled
+  // up so the trade no longer fires on raw mean-revert math.
+  const cf = cfExpectedR({
+    p: calibratedProb,
+    rUp,
+    rDown,
+    skew: Number.isFinite(opts?.skew as number) ? (opts!.skew as number) : 0,
+    excessKurt: Number.isFinite(opts?.excessKurt as number) ? (opts!.excessKurt as number) : 0,
+    haircutInR,
+    conf: 0.95,
+  });
+  const expectedR = cf.expectedR;
+  const tailMultiplier = cf.tailMultiplier;
+
   // ── Decision gate ────────────────────────────────────────────
+  const gates: ConsensusGates = { ...CONSENSUS_GATES, ...(opts?.gates ?? {}) };
   let decision: ConsensusDecision = dominant === 1 ? "BUY" : "SELL";
   let standAsideReason: string | undefined;
 
-  if (active.length < MIN_ENGINES_FOR_TRADE) {
+  if (active.length < gates.minEngines) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Only ${active.length} engine${active.length === 1 ? "" : "s"} have a view (need ${MIN_ENGINES_FOR_TRADE}+).`;
-  } else if (votingBuckets < MIN_VOTING_BUCKETS) {
+    standAsideReason = `Only ${active.length} engine${active.length === 1 ? "" : "s"} have a view (need ${gates.minEngines}+).`;
+  } else if (votingBuckets < gates.minVotingBuckets) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Only ${votingBuckets} of 3 info-buckets fired (need ${MIN_VOTING_BUCKETS}+: price-flow, fundamental, regime).`;
-  } else if (agreeingBuckets < MIN_AGREEING_BUCKETS) {
+    standAsideReason = `Only ${votingBuckets} of 3 info-buckets fired (need ${gates.minVotingBuckets}+: price-flow, fundamental, regime).`;
+  } else if (agreeingBuckets < gates.minAgreeingBuckets) {
     decision = "STAND_ASIDE";
     standAsideReason = `Buckets disagree — only ${agreeingBuckets} of ${votingBuckets} support ${dominant === 1 ? "BUY" : "SELL"}.`;
-  } else if (calibratedProb < MIN_CALIBRATED_PROB) {
+  } else if (calibratedProb < gates.minCalibratedProb) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Calibrated win-probability only ${(calibratedProb * 100).toFixed(0)}% (need ≥${(MIN_CALIBRATED_PROB * 100).toFixed(0)}%).`;
-  } else if (agreement < MIN_AGREEMENT) {
+    standAsideReason = `Calibrated win-probability only ${(calibratedProb * 100).toFixed(0)}% (need ≥${(gates.minCalibratedProb * 100).toFixed(0)}%).`;
+  } else if (agreement < gates.minAgreement) {
     decision = "STAND_ASIDE";
     standAsideReason = `Engine agreement only ${(agreement * 100).toFixed(0)}% — too split to trade.`;
-  } else if (expectedR < MIN_EXPECTED_R) {
+  } else if (expectedR < gates.minExpectedR) {
     decision = "STAND_ASIDE";
     if (tailMultiplier > 1.25) {
       standAsideReason = `Expected R after fat-tail adjustment only ${expectedR.toFixed(2)} — left-tail ${tailMultiplier.toFixed(2)}× normal (negative skew / fat kurtosis).`;

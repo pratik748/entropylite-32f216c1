@@ -4,6 +4,7 @@ import { buildEvidenceGraph, metricsForSection } from "@/lib/evidence/build";
 import { synthesize } from "@/lib/evidence/synthesis";
 import { connectedIds } from "@/lib/evidence/relations";
 import { diffAndStore, type EvidenceChange } from "@/lib/evidence/history";
+import { computeAvailableSections } from "./availability";
 import type { EvidenceGraph, EvidenceMetric, Synthesis } from "@/lib/evidence/types";
 
 interface EvidenceContextValue {
@@ -19,6 +20,8 @@ interface EvidenceContextValue {
   relatedIds: Set<string>;
   /** Material evidence changes since the last stored session. */
   changes: EvidenceChange[];
+  /** Section keys whose modules can render real content from the data on hand. */
+  availableSections: Set<string>;
   sectionMetrics: (sectionKey: string) => EvidenceMetric[];
   refresh: () => void;
 }
@@ -68,6 +71,8 @@ export function EvidenceProvider({ ticker, initialSelectedId, children }: { tick
 
   const relatedIds = useMemo(() => connectedIds(graph, selectedId), [graph, selectedId]);
 
+  const availableSections = useMemo(() => computeAvailableSections(data, graph), [data, graph]);
+
   const value = useMemo<EvidenceContextValue>(
     () => ({
       ticker,
@@ -79,10 +84,11 @@ export function EvidenceProvider({ ticker, initialSelectedId, children }: { tick
       selected: selectedId ? (graph.metrics[selectedId] ?? null) : null,
       relatedIds,
       changes,
+      availableSections,
       sectionMetrics: (sectionKey: string) => metricsForSection(graph, sectionKey),
       refresh,
     }),
-    [ticker, data, graph, synthesis, selectedId, relatedIds, changes, refresh],
+    [ticker, data, graph, synthesis, selectedId, relatedIds, changes, availableSections, refresh],
   );
 
   return <EvidenceContext.Provider value={value}>{children}</EvidenceContext.Provider>;

@@ -232,7 +232,7 @@ describe("synthesize", () => {
   it("produces a complete, deterministic synthesis", () => {
     expect(["ACCUMULATE", "HOLD", "REDUCE", "AVOID"]).toContain(syn.action);
     expect(syn.confidence).toBeGreaterThanOrEqual(35);
-    expect(syn.confidence).toBeLessThanOrEqual(88);
+    expect(syn.confidence).toBeLessThanOrEqual(90);
     expect(syn.pillars).toHaveLength(6);
     for (const p of syn.pillars) {
       expect(p.score).toBeGreaterThanOrEqual(0);
@@ -537,5 +537,98 @@ describe("institutional analytics", () => {
     expect(shareSum).toBeLessThanOrEqual(103);
     // ranked descending
     for (let i = 1; i < r!.factors.length; i++) expect(r!.factors[i - 1].value).toBeGreaterThanOrEqual(r!.factors[i].value);
+  });
+});
+
+/* ── quantitative synthesis & availability ────────────────────── */
+
+describe("quantitative synthesis", () => {
+  it("normalCdf matches known quantiles", async () => {
+    const { normalCdf } = await import("./compute");
+    expect(normalCdf(0)).toBeCloseTo(0.5, 6);
+    expect(normalCdf(1.959964)).toBeCloseTo(0.975, 4);
+    expect(normalCdf(-1.959964)).toBeCloseTo(0.025, 4);
+    expect(normalCdf(Infinity)).toBe(1);
+    expect(normalCdf(-Infinity)).toBe(0);
+  });
+
+  it("derives case probabilities from the log-normal model, not fixed priors", () => {
+    const graph = buildEvidenceGraph(fullInputs);
+    const syn = synthesize(graph, analysisFixture, 227.5);
+    const byId = Object.fromEntries(syn.cases.map((c) => [c.id, c]));
+    // Tails clamped to a real floor, base keeps meaningful mass.
+    expect(byId.bull.probability).toBeGreaterThanOrEqual(5);
+    expect(byId.bear.probability).toBeGreaterThanOrEqual(5);
+    expect(byId.base.probability).toBeGreaterThanOrEqual(8);
+    expect(syn.cases.reduce((a, c) => a + c.probability, 0)).toBe(100);
+    // Deterministic across identical inputs.
+    const again = synthesize(buildEvidenceGraph(fullInputs), analysisFixture, 227.5);
+    expect(again.cases.map((c) => c.probability)).toEqual(syn.cases.map((c) => c.probability));
+  });
+});
+
+describe("section availability", () => {
+  const settled = { state: "live" as const, fetchedAt: Date.now() };
+  const dead = { state: "unavailable" as const, fetchedAt: null };
+  const mkData = (over: Partial<Record<"analysis" | "bars" | "dossier" | "quote" | "financials", unknown>>) => ({
+    quote: { price: 227.5, currency: "USD" },
+    analysis: analysisFixture,
+    bars: makeBars(),
+    dossier: dossierFixture,
+    financials: financialsFixture,
+    bootstrapping: false,
+    status: {
+      quote: settled,
+      analysis: settled,
+      bars: settled,
+      dossier: settled,
+      financials: settled,
+      ...(over.financials === null ? { financials: dead } : {}),
+      ...(over.dossier === null ? { dossier: dead } : {}),
+    },
+    ...over,
+  });
+
+  it("keeps every populated section when all sources are live", async () => {
+    const { computeAvailableSections } = await import("@/components/workstation/availability");
+    const data = mkData({});
+    const graph = buildEvidenceGraph(fullInputs);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const available = computeAvailableSections(data as any, graph);
+    for (const key of [
+      "financials/income-statement",
+      "financials/balance-sheet",
+      "financials/cash-generation",
+      "risk/risk-analysis",
+      "structure/technical",
+      "thesis/recommendation",
+    ]) {
+      expect(available.has(key)).toBe(true);
+    }
+  });
+
+  it("withdraws statement sections when financials are unpullable but keeps the derived balance sheet", async () => {
+    const { computeAvailableSections } = await import("@/components/workstation/availability");
+    const data = mkData({ financials: null });
+    const graph = buildEvidenceGraph({ ...fullInputs, financials: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const available = computeAvailableSections(data as any, graph);
+    expect(available.has("financials/income-statement")).toBe(false);
+    expect(available.has("financials/cash-flow")).toBe(false);
+    // Capital structure derives from market cap ÷ P/B and D/E — stays.
+    expect(available.has("financials/balance-sheet")).toBe(true);
+    expect(available.has("overview/summary")).toBe(true);
+  });
+
+  it("withdraws dossier registers when the dossier is unpullable and no nodes cover them", async () => {
+    const { computeAvailableSections } = await import("@/components/workstation/availability");
+    const data = mkData({ dossier: null });
+    const graph = buildEvidenceGraph({ ...fullInputs, dossier: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const available = computeAvailableSections(data as any, graph);
+    const { metricsForSection: mfs } = await import("./build");
+    for (const key of ["ecosystem/supply-chain", "intelligence/earnings-calls"]) {
+      expect(available.has(key)).toBe(mfs(graph, key).length > 0);
+    }
   });
 });

@@ -17,6 +17,21 @@ export function mean(xs: number[]): number {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
+/**
+ * Standard normal CDF Φ(x) via the Zelen–Severo polynomial
+ * (Abramowitz & Stegun 26.2.17), |error| < 7.5e-8 — plenty for
+ * scenario probabilities.
+ */
+export function normalCdf(x: number): number {
+  if (!Number.isFinite(x)) return x > 0 ? 1 : 0;
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = Math.exp(-(x * x) / 2) / Math.sqrt(2 * Math.PI);
+  const poly =
+    t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  const p = 1 - d * poly;
+  return x >= 0 ? p : 1 - p;
+}
+
 export function sma(closes: number[], window: number): number | null {
   if (closes.length < window) return null;
   return mean(closes.slice(-window));
