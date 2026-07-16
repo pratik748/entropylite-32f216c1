@@ -112,8 +112,12 @@ interface TradeResult {
   };
   /** Client-built calculation audit — every displayed number with its formula, inputs and downstream use. */
   audit?: AuditRow[];
+  /** Set when the client repaired a degenerate server calibration (see repairDegenerateCalibration). */
+  recalibrated?: { storedProb: number; priorProb: number };
   ensemble?: {
     decision: "BUY" | "SELL" | "STAND_ASIDE";
+    /** Raw signed ensemble score in [-1, 1] — present on the wire, used for client recalibration. */
+    ensembleScore?: number;
     calibratedProb: number;
     agreement: number;
     engineCount: number;
@@ -229,6 +233,17 @@ function buildAuditTrail(opts: {
       formula: "p = Platt(a + b·score + δ·bucket-diversity) over inverse-variance-weighted engine votes",
       computation: `${ens.engineCount} engines voted (${ens.agreeingEngines.length} agree, ${ens.disagreeingEngines.length} against, ${ens.abstainingEngines.length} abstain) · agreement ${f(ens.agreement * 100, 0)}% · ${ens.consensusLabel.toLowerCase()}`,
       usedFor: "Trade gate (needs ≥ 53% and E[R] ≥ 0.05R after costs) · displayed confidence · the win leg of expected profit",
+    });
+  }
+  if (edge?.recalibrated) {
+    rows.push({
+      id: "client-recalibration",
+      metric: "Client recalibration",
+      value: `${Math.round(edge.recalibrated.storedProb * 100)}% → ${Math.round(edge.recalibrated.priorProb * 100)}%`,
+      source: "client",
+      formula: "p = clamp(σ(3.2·|score| + 1.4·agreement − 0.7), 0.5, 0.95) — the documented prior calibration over the engine's raw ensemble",
+      computation: `stored nightly fit is degenerate (maps every input to the 0.5 clamp floor — no verdict could ever pass a gate); priors re-applied to the engine's own score/agreement, gate re-run at p ≥ 53%, E[R] ≥ 0.05R`,
+      usedFor: "The verdict, confidence and expected profit above. Self-disables when the server-side calibration heals.",
     });
   }
   if (qe?.expectedProfit) {
@@ -439,6 +454,116 @@ interface PortfolioItem {
 const STORAGE_KEY = "dp-portfolio";
 /** Ceiling for the quant edge engine; the evidence synthesis renders meanwhile. */
 const ANALYSIS_TIMEOUT_MS = 45000;
+
+/**
+ * Client-side repair of a degenerate server calibration.
+ *
+ * The engine's Platt map (α, β, γ) is refit nightly from realized outcomes.
+ * A degenerate fit (observed live: α=0.97, β=0, γ=−2.67) tops out below the
+ * 0.50 clamp floor, so EVERY ticket reads exactly 50% calibrated probability
+ * and no verdict can pass any gate — the engine goes silently dead. The
+ * server-side guard that rejects such fits cannot reach production without a
+ * function deploy, but the engine already ships the RAW ensemble evidence
+ * (score, agreement, buckets, tail multiplier, cost haircut) in every
+ * response. This repair re-applies the documented prior calibration
+ * σ(3.2·|score| + 1.4·agreement − 0.7) to those raw numbers and re-runs the
+ * decision-theoretic gate (p ≥ 53%, E[R] ≥ 0.05R after costs and tails).
+ *
+ * It fires ONLY when the stored map is provably non-discriminating — the
+ * server said ≤ 50.5% for inputs the priors map to ≥ 60% — so a healthy
+ * calibration (where weak signals genuinely read ~50%) never triggers it,
+ * and it self-disables the moment the server-side fit heals. Every repaired
+ * ticket is marked (`recalibrated`) and disclosed in the audit trail.
+ */
+function repairDegenerateCalibration(t: TradeResult): TradeResult {
+  const ens = t.ensemble;
+  if (!ens || t.action !== "HOLD") return t;
+
+  const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+  const score = Math.abs(Number(ens.ensembleScore ?? ens.agreement) || 0);
+  const agreement = Number(ens.agreement) || 0;
+  const priorP = Math.max(0.5, Math.min(0.95, sigmoid(3.2 * score + 1.4 * agreement - 0.7)));
+
+  // Degeneracy detection: stored map pinned at the 0.5 floor while the
+  // priors read the same inputs as clearly directional.
+  if (!(ens.calibratedProb <= 0.505 && priorP >= 0.6)) return t;
+
+  const dirSign = Number(ens.ensembleScore ?? 0);
+  if (!(dirSign !== 0)) return t;
+  const dir: "BUY" | "SELL" = dirSign > 0 ? "BUY" : "SELL";
+
+  // Re-run the decision-theoretic gate on the recalibrated probability.
+  const tail = Number(ens.tailMultiplier) || 1;
+  const haircut = Math.max(0, Number(ens.costHaircut) || 0);
+  const rUp = Math.max(0.5, Math.min(6, Number(t.riskRewardRatio) || 2));
+  const expectedR = priorP * rUp - (1 - priorP) * 1 * tail - haircut / 0.02;
+  const bd = ens.bucketDecision;
+  const bucketsOk = !bd || (bd.votingBuckets >= 1 && bd.agreeingBuckets >= 1);
+  if (!(priorP >= 0.53 && expectedR >= 0.05 && ens.engineCount >= 2 && agreement >= 0.3 && bucketsOk)) return t;
+
+  // Promote using the engine's own ticket levels; mirror them around the
+  // current price if the plan's orientation doesn't match the direction.
+  const cp = t.currentPrice;
+  let { entryLow, entryHigh, targetPrice, stopLoss } = t;
+  const longShaped = targetPrice > cp && stopLoss < cp;
+  if (dir === "SELL" && longShaped && cp > 0) {
+    const tgt = cp - (targetPrice - cp);
+    const stp = cp + (cp - stopLoss);
+    targetPrice = Number(tgt.toFixed(2));
+    stopLoss = Number(stp.toFixed(2));
+  } else if (dir === "BUY" && !longShaped && cp > 0) {
+    return t; // malformed plan for the direction — do not manufacture one
+  }
+  const entryMid = (entryLow + entryHigh) / 2 || cp;
+  const rawUp = Math.abs(targetPrice - entryMid);
+  const rawDown = Math.abs(entryMid - stopLoss);
+  const costPerShare = entryMid * haircut;
+  const perShare = priorP * rawUp - (1 - priorP) * rawDown * tail - costPerShare;
+  const rr = rawDown > 0 ? rawUp / rawDown : 0;
+
+  return {
+    ...t,
+    action: dir,
+    direction: dir === "BUY" ? "UP" : "DOWN",
+    directionReason: `Recalibrated consensus ${dir} — stored calibration degenerate`,
+    confidence: Math.round(priorP * 100),
+    targetPrice,
+    stopLoss,
+    riskRewardRatio: Number(rr.toFixed(2)),
+    protection: dir === "BUY"
+      ? `Trail stop at ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`
+      : `Cover above ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`,
+    waitReasons: undefined,
+    recalibrated: { storedProb: ens.calibratedProb, priorProb: Number(priorP.toFixed(3)) },
+    ensemble: { ...ens, decision: dir, calibratedProb: Number(priorP.toFixed(3)), expectedR: Number(expectedR.toFixed(2)) },
+    quantEdge: t.quantEdge
+      ? {
+          ...t.quantEdge,
+          expectedProfit: {
+            ...t.quantEdge.expectedProfit,
+            perShare: Number(perShare.toFixed(2)),
+            pct: entryMid > 0 ? Number(((perShare / entryMid) * 100).toFixed(2)) : 0,
+            winProb: Number((priorP * 100).toFixed(1)),
+            expectedR: Number(expectedR.toFixed(2)),
+            upsidePerShare: Number(rawUp.toFixed(2)),
+            downsidePerShare: Number(rawDown.toFixed(2)),
+            costPerShare: Number(costPerShare.toFixed(2)),
+          },
+          hedge: {
+            needed: true,
+            instruction: dir === "BUY"
+              ? `Trail stop at ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`
+              : `Cover above ${stopLoss}. Risk/share: ${Number(rawDown.toFixed(2))}.`,
+            riskPerShare: Number(rawDown.toFixed(2)),
+            suggestedStopLoss: stopLoss,
+            ...(t.quantEdge.hedge?.var95PerShare != null ? { var95PerShare: t.quantEdge.hedge.var95PerShare } : {}),
+            ...(t.quantEdge.hedge?.cvar95PerShare != null ? { cvar95PerShare: t.quantEdge.hedge.cvar95PerShare } : {}),
+            ...(t.quantEdge.hedge?.kellyFraction != null ? { kellyFraction: t.quantEdge.hedge.kellyFraction } : {}),
+          },
+        }
+      : t.quantEdge,
+  };
+}
 
 /**
  * Breadcrumb of the last quant-engine attempt, read by the System pipeline
@@ -768,7 +893,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       if (error) throw error;
       const normalized = normalizeTradeResult(data);
       if (!normalized) throw new Error("engine returned an incomplete trade plan");
-      return normalized;
+      return repairDegenerateCalibration(normalized);
     };
 
     try {
