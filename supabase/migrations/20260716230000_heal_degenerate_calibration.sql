@@ -1,4 +1,4 @@
--- Heal a degenerate Platt calibration fit.
+-- Delete the stored Platt calibration row.
 --
 -- The nightly calibration-fit stored α=0.9672, β=0, γ=−2.6675. At full
 -- consensus (ensemble score 1, agreement 1) that curve tops out at
@@ -6,13 +6,8 @@
 -- ticket read exactly 50% calibrated probability, no gate could ever pass,
 -- and Direct Profit could not produce a single BUY/SELL.
 --
--- Reset any stored fit that cannot express p ≥ 0.60 at full consensus back
--- to the priors. The fitter and loader now guard against storing/using such
--- fits, so this cannot recur.
-update public.calibration_params
-set alpha = 3.2,
-    beta  = 1.4,
-    gamma = -0.7,
-    fit_at = now()
-where id = 1
-  and 1.0 / (1.0 + exp(-(alpha + beta + gamma))) < 0.6;
+-- The stored fit is no longer consumed anywhere (the engine runs on the
+-- priors; calibration-fit keeps fitting for observability only and deletes
+-- this row on every run). Deleting it also heals older deployed engine
+-- builds, whose loader falls back to the priors when the row is absent.
+delete from public.calibration_params where id = 1;

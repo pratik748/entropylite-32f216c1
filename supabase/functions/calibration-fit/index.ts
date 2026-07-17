@@ -126,37 +126,19 @@ serve(async (req) => {
   })).filter((s) => Number.isFinite(s.score) && Number.isFinite(s.agreement));
 
   const fit = fitPlatt(samples);
-  report.calibration = { ...fit, samples: samples.length };
-
-  // A fit is storable only if it can still discriminate: at full consensus
-  // (score 1, agreement 1) it must be able to express p ≥ 0.60. When the
-  // sample's base win-rate is low the intercept swallows it and the whole
-  // curve sinks below the consumer's 0.5 clamp — every ticket then reads
-  // exactly 50% and no trade can ever fire (observed live: α=0.97, β=0,
-  // γ=−2.67 ⇒ p_max=15%). Such fits are recorded in the report but the
-  // stored row heals back to the priors so the engine stays alive.
+  // Observability only. The engine no longer consumes stored fits — a
+  // degenerate fit (α=0.97, β=0, γ=−2.67 ⇒ p_max=15%, clamped to the 0.50
+  // floor) once mapped every ticket to a coin flip and silently killed
+  // every verdict in the product. The fit stays in the report so drift is
+  // visible; nothing is written for a decision path to read.
   const pMax = sigmoid(fit.alpha + fit.beta + fit.gamma);
-  const usable = pMax >= 0.6;
-  report.calibrationUsable = usable;
-  report.calibrationPMax = Number(pMax.toFixed(4));
+  report.calibration = { ...fit, samples: samples.length, pMax: Number(pMax.toFixed(4)), consumed: false };
 
-  if (samples.length >= 30) {
-    const store = usable
-      ? { alpha: fit.alpha, beta: fit.beta, gamma: fit.gamma }
-      : { alpha: 3.2, beta: 1.4, gamma: -0.7 };
-    if (!usable) {
-      console.warn(`calibration-fit: fit rejected (p_max=${pMax.toFixed(3)} < 0.6, n=${samples.length}, brier=${fit.brier.toFixed(3)}) — storing priors`);
-    }
-    await sb.from("calibration_params").upsert({
-      id: 1,
-      alpha: Number(store.alpha.toFixed(4)),
-      beta: Number(store.beta.toFixed(4)),
-      gamma: Number(store.gamma.toFixed(4)),
-      n_samples: samples.length,
-      brier_score: Number(fit.brier.toFixed(4)),
-      fit_at: new Date().toISOString(),
-    });
-  }
+  // Delete any previously stored row so no stale deployment can keep
+  // reading poison — older engine builds fall back to the priors the
+  // moment the row is gone.
+  const { error: delErr } = await sb.from("calibration_params").delete().eq("id", 1);
+  report.calibrationRowDeleted = !delErr;
 
   // ─── 3. Rebuild engine_reliability table from settled outcomes ──
   const { data: engineRows } = await sb
