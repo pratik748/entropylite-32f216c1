@@ -4,6 +4,7 @@
  */
 
 import type { HistoryPoint } from "./types";
+import { stdev, ANNUAL_RISK_FREE, TRADING_DAYS } from "@/lib/quant-engine";
 
 export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -82,13 +83,14 @@ export function dailyReturns(closes: number[]): number[] {
   return out;
 }
 
-/** Annualized volatility (%) from daily closes over the trailing window. */
+/**
+ * Annualized volatility (%) from daily closes over the trailing window.
+ * Sample stdev (ddof = 1) — the one system-wide volatility convention.
+ */
 export function annualizedVol(closes: number[], window = 60): number | null {
   const rets = dailyReturns(closes.slice(-(window + 1)));
   if (rets.length < 10) return null;
-  const mu = mean(rets);
-  const variance = mean(rets.map((r) => (r - mu) ** 2));
-  return round(Math.sqrt(variance) * Math.sqrt(252) * 100, 1);
+  return round(stdev(rets) * Math.sqrt(252) * 100, 1);
 }
 
 /** Total return (%) over the trailing n sessions. */
@@ -136,22 +138,22 @@ export function rollingVolSeries(closes: number[], window = 20): number[] {
   const rets = dailyReturns(closes);
   const out: number[] = [];
   for (let i = window; i <= rets.length; i++) {
-    const slice = rets.slice(i - window, i);
-    const mu = mean(slice);
-    const variance = mean(slice.map((r) => (r - mu) ** 2));
-    out.push(Math.sqrt(variance) * Math.sqrt(252) * 100);
+    out.push(stdev(rets.slice(i - window, i)) * Math.sqrt(252) * 100);
   }
   return out;
 }
 
-/** Realized Sharpe over the series (rf ≈ 0), annualized. */
+/**
+ * Realized Sharpe over the series, annualized. Sample stdev, excess over the
+ * system-wide ANNUAL_RISK_FREE — the same convention as the analysis engine,
+ * so this fallback can never silently disagree with the primary source.
+ */
 export function realizedSharpe(closes: number[]): number | null {
   const rets = dailyReturns(closes);
   if (rets.length < 40) return null;
-  const mu = mean(rets);
-  const sd = Math.sqrt(mean(rets.map((r) => (r - mu) ** 2)));
+  const sd = stdev(rets);
   if (sd === 0) return null;
-  return round((mu / sd) * Math.sqrt(252), 2);
+  return round(((mean(rets) - ANNUAL_RISK_FREE / TRADING_DAYS) / sd) * Math.sqrt(252), 2);
 }
 
 /** Ratio of recent average volume to the longer-run average. */

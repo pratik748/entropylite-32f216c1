@@ -26,8 +26,14 @@ interface MarketData {
   macro: {
     marketMood: string;
     moodScore: number;
-    fiiFlow: string;
-    diiFlow: string;
+    /** How moodScore was computed (server-side, from measured quotes). */
+    moodBasis?: string;
+    /** Null — no fund-flow data source is connected; never fabricated. */
+    fiiFlow: string | null;
+    diiFlow: string | null;
+    flowDataAvailable?: boolean;
+    /** Share of tracked indices trading up (measured). */
+    breadthPct?: number | null;
     vix: number;
     usdInr: number;
     crudeBrent: number;
@@ -37,12 +43,15 @@ interface MarketData {
     gbpUsd?: number;
     btcUsd?: number;
     ethUsd?: number;
+    /** Measured top moves from live quotes — not model output. */
     topMovers: { name: string; change: number }[];
+    /** Model-suggested watch items — not confirmed calendar entries. */
     keyEvents: string[];
     outlook: string;
     sectorRotation?: string;
     riskAppetite?: string;
     aiProvider?: string;
+    aiGeneratedFields?: string[];
   } | null;
   timestamp?: number;
 }
@@ -189,7 +198,11 @@ const MarketOverview = () => {
             <MacroCard icon={<BarChart3 className="h-4 w-4" />} label="Silver" value={data.macro.silverPrice ? `$${data.macro.silverPrice.toFixed(2)}` : ","} />
             <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Bitcoin" value={data.macro.btcUsd ? `$${data.macro.btcUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","} />
             <MacroCard icon={<Bitcoin className="h-4 w-4" />} label="Ethereum" value={data.macro.ethUsd ? `$${data.macro.ethUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","} />
-            <MacroCard icon={<Globe className="h-4 w-4" />} label="FII Flow" value={data.macro.fiiFlow} />
+            <MacroCard
+              icon={<Globe className="h-4 w-4" />}
+              label="Breadth"
+              value={data.macro.breadthPct != null ? `${data.macro.breadthPct}% up` : "—"}
+            />
           </div>
         </div>
       )}
@@ -207,14 +220,17 @@ const MarketOverview = () => {
                 )}
               </span>
             </div>
+            {data.macro.moodBasis && (
+              <p className="mb-3 text-[10px] text-muted-foreground/70">{data.macro.moodBasis}</p>
+            )}
             {data.macro.topMovers?.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Movers</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Movers · measured</p>
                 {data.macro.topMovers.map((m, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{m.name}</span>
                     <span className={`font-mono font-semibold ${m.change >= 0 ? "text-gain" : "text-loss"}`}>
-                      {m.change >= 0 ? "+" : ""}{m.change}%
+                      {m.change >= 0 ? "+" : ""}{m.change.toFixed(2)}%
                     </span>
                   </div>
                 ))}
@@ -224,7 +240,7 @@ const MarketOverview = () => {
 
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Key Events & Outlook</h3>
+              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Watch Items & Outlook · model commentary</h3>
               {data.macro.aiProvider && (
                 <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70 px-1.5 py-0.5 rounded border border-border/60">
                   AI: {data.macro.aiProvider}
@@ -238,7 +254,7 @@ const MarketOverview = () => {
                   {event}
                 </div>
               )) : (
-                <div className="text-xs text-muted-foreground/70 italic">No scheduled events parsed — refresh in a few seconds.</div>
+                <div className="text-xs text-muted-foreground/70 italic">No watch items returned — refresh in a few seconds.</div>
               )}
             </div>
             {data.macro.outlook && (

@@ -9,6 +9,14 @@ import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
 import { loadCalibration, logSignalOutcome } from "../_shared/calibration.ts";
 import { engleGrangerLite, mertonProxy, walkForwardEdge, returnMoments } from "../_shared/mathEdge.ts";
+import {
+  logReturns,
+  sampleStd,
+  sharpeRatio as canonSharpe,
+  sortinoRatio as canonSortino,
+  historicalVaRCVaR,
+  maxDrawdown as maxDrawdownDec,
+} from "../_shared/stats.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -279,13 +287,8 @@ function computeTechnicals(snap: MarketSnapshot): TechnicalSnapshot {
 
   const momentumScore = (currentPrice > sma5 ? 1 : -1) + (currentPrice > sma20 ? 1 : -1) + (sma5 > sma20 ? 1 : -1);
 
-  const returns20d: number[] = [];
-  for (let i = 1; i < prices20d.length; i++) {
-    if (prices20d[i - 1] > 0) returns20d.push((prices20d[i] - prices20d[i - 1]) / prices20d[i - 1]);
-  }
-  const meanReturn = returns20d.length > 0 ? returns20d.reduce((a, b) => a + b, 0) / returns20d.length : 0;
-  const variance = returns20d.length > 0 ? returns20d.reduce((a, b) => a + (b - meanReturn) ** 2, 0) / returns20d.length : 0;
-  const dailyVolRaw = Math.sqrt(variance);
+  const returns20d = logReturns(prices20d);
+  const dailyVolRaw = sampleStd(returns20d);
   const annualizedVol = dailyVolRaw * Math.sqrt(252) * 100;
   const zScore = sma20 > 0 && dailyVolRaw > 0 ? (currentPrice - sma20) / (sma20 * dailyVolRaw * Math.sqrt(20)) : 0;
 
@@ -316,13 +319,11 @@ function computeTechnicals(snap: MarketSnapshot): TechnicalSnapshot {
 /** Compute VaR, CVaR, Sharpe, Sortino, Max Drawdown, Kelly from historical closes */
 function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: number): RiskMetrics {
   const closes = snap.closes;
-  const returns: number[] = [];
-  for (let i = 1; i < closes.length; i++) {
-    if (closes[i - 1] > 0) returns.push((closes[i] - closes[i - 1]) / closes[i - 1]);
-  }
+  const returns = logReturns(closes);
 
-  if (returns.length < 3) {
-    // Not enough data — estimate from annualized vol
+  if (returns.length < 20) {
+    // Not enough data for historical VaR — parametric estimate from annualized vol
+    // (labeled an estimate; a 3-day sample must never masquerade as historical VaR)
     const dailyVol = tech.annualizedVol / (Math.sqrt(252) * 100) || 0.015;
     const notional = snap.currentPrice;
     return {
@@ -337,46 +338,17 @@ function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: 
     };
   }
 
-  const sorted = [...returns].sort((a, b) => a - b);
-  const n = sorted.length;
+  const n = returns.length;
 
-  // VaR: percentile of losses
-  const idx95 = Math.max(0, Math.floor(n * 0.05) - 1);
-  const idx99 = Math.max(0, Math.floor(n * 0.01) - 1);
-  const var95Pct = Math.abs(sorted[idx95]);
-  const var99Pct = Math.abs(sorted[idx99]);
-
-  // CVaR: average of returns below VaR threshold
-  const tailCount = Math.max(1, Math.ceil(n * 0.05));
-  const tailSum = sorted.slice(0, tailCount).reduce((s, v) => s + v, 0);
-  const cvar95Pct = Math.abs(tailSum / tailCount);
+  // Historical VaR / CVaR (canonical convention, matches the client engine)
+  const { varPct: var95Pct, cvarPct: cvar95Pct } = historicalVaRCVaR(returns, 0.95);
+  const { varPct: var99Pct } = historicalVaRCVaR(returns, 0.99);
 
   const notional = snap.currentPrice;
 
-  // Sharpe ratio (annualized, risk-free ≈ 4.5%)
-  const meanReturn = returns.reduce((s, v) => s + v, 0) / n;
-  const stdDev = Math.sqrt(returns.reduce((s, v) => s + (v - meanReturn) ** 2, 0) / n);
-  const annualReturn = meanReturn * 252;
-  const annualStd = stdDev * Math.sqrt(252);
-  const riskFreeRate = 0.045;
-  const sharpeRatio = annualStd > 0 ? Number(((annualReturn - riskFreeRate) / annualStd).toFixed(2)) : 0;
-
-  // Sortino ratio (downside deviation only)
-  const negReturns = returns.filter(r => r < 0);
-  const downsideVar = negReturns.length > 0
-    ? negReturns.reduce((s, v) => s + v ** 2, 0) / negReturns.length
-    : 0;
-  const downsideDev = Math.sqrt(downsideVar) * Math.sqrt(252);
-  const sortinoRatio = downsideDev > 0 ? Number(((annualReturn - riskFreeRate) / downsideDev).toFixed(2)) : 0;
-
-  // Max drawdown from closes
-  let peak = closes[0];
-  let maxDD = 0;
-  for (const p of closes) {
-    if (p > peak) peak = p;
-    const dd = (peak - p) / peak;
-    if (dd > maxDD) maxDD = dd;
-  }
+  const sharpeRatio = Number(canonSharpe(returns).toFixed(2));
+  const sortinoRatio = Number(canonSortino(returns).toFixed(2));
+  const maxDD = maxDrawdownDec(closes);
 
   // Beta estimate from VIX proxy
   const betaEstimate = vix > 0

@@ -3,6 +3,15 @@ import { requireAuth } from "../_shared/auth.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 import { fetchTickerLiveBundle, type TickerLiveBundle } from "../_shared/liveData.ts";
 import { fetchLiveWebContext } from "../_shared/callAI.ts";
+import {
+  mean,
+  sampleStd as stdev,
+  logReturns,
+  sharpeRatio,
+  sortinoRatio,
+  percentile,
+  maxDrawdown as maxDrawdownDec,
+} from "../_shared/stats.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,42 +48,10 @@ function round(value: number, digits = 2) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : 0;
 }
 
-function mean(values: number[]) {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function stdev(values: number[]) {
-  if (values.length < 2) return 0;
-  const m = mean(values);
-  return Math.sqrt(values.reduce((sum, value) => sum + (value - m) ** 2, 0) / (values.length - 1));
-}
-
-function percentile(values: number[], p: number) {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = clamp((sorted.length - 1) * p, 0, sorted.length - 1);
-  const lower = Math.floor(idx);
-  const upper = Math.ceil(idx);
-  if (lower === upper) return sorted[lower];
-  const weight = idx - lower;
-  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
-}
-
 function sma(values: number[], period: number) {
   if (values.length === 0) return 0;
   const slice = values.slice(-Math.min(period, values.length));
   return mean(slice);
-}
-
-function pctReturns(closes: number[]) {
-  const out: number[] = [];
-  for (let i = 1; i < closes.length; i++) {
-    const prev = closes[i - 1];
-    const cur = closes[i];
-    if (prev > 0 && cur > 0) out.push((cur - prev) / prev);
-  }
-  return out;
 }
 
 function rsi(closes: number[], period = 14) {
@@ -92,34 +69,9 @@ function rsi(closes: number[], period = 14) {
   return 100 - 100 / (1 + rs);
 }
 
-function sharpeFromReturns(returns: number[], annualRiskFree = 0.045) {
-  if (returns.length < 20) return 0;
-  const sigma = stdev(returns);
-  if (sigma === 0) return 0;
-  const rfDaily = annualRiskFree / 252;
-  return ((mean(returns) - rfDaily) / sigma) * Math.sqrt(252);
-}
-
-function sortinoFromReturns(returns: number[], annualRiskFree = 0.045) {
-  if (returns.length < 20) return 0;
-  const rfDaily = annualRiskFree / 252;
-  const downside = returns.filter((r) => r < rfDaily).map((r) => r - rfDaily);
-  if (downside.length === 0) return 0;
-  const downsideDev = Math.sqrt(mean(downside.map((d) => d * d)));
-  if (downsideDev === 0) return 0;
-  return ((mean(returns) - rfDaily) / downsideDev) * Math.sqrt(252);
-}
-
+/** This surface reports drawdown as a positive percent. */
 function maxDrawdown(closes: number[]) {
-  if (closes.length === 0) return 0;
-  let peak = closes[0];
-  let maxDd = 0;
-  for (const close of closes) {
-    if (close > peak) peak = close;
-    const dd = (peak - close) / peak;
-    if (dd > maxDd) maxDd = dd;
-  }
-  return maxDd * 100;
+  return maxDrawdownDec(closes) * 100;
 }
 
 async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
@@ -468,7 +420,7 @@ serve(async (req) => {
 
     const closes = bars?.closes || [currentPrice];
     const volumes = bars?.volumes || [volume];
-    const returns = pctReturns(closes);
+    const returns = logReturns(closes);
     const sigmaDaily = stdev(returns);
     const annualizedVol = sigmaDaily * Math.sqrt(252) * 100;
     const rsi14 = rsi(closes, 14);
@@ -478,8 +430,8 @@ serve(async (req) => {
     const latest20 = closes.slice(-20);
     const support = latest20.length > 0 ? percentile(latest20, 0.15) : currentPrice * 0.95;
     const resistance = latest20.length > 0 ? percentile(latest20, 0.85) : currentPrice * 1.05;
-    const realizedSharpe = sharpeFromReturns(returns);
-    const realizedSortino = sortinoFromReturns(returns);
+    const realizedSharpe = sharpeRatio(returns);
+    const realizedSortino = sortinoRatio(returns);
     const drawdown = maxDrawdown(closes);
     const changePct = prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0;
     const volumeRatio = mean(volumes.slice(-20)) > 0 ? volume / Math.max(mean(volumes.slice(-20)), 1) : 1;
@@ -498,6 +450,7 @@ serve(async (req) => {
     const dividendYield = bundle.screener?.dividendYield ?? bundle.yahoo?.dividendYield ?? null;
     const roe = bundle.screener?.roe ?? (bundle.yahoo?.returnOnEquity != null ? bundle.yahoo.returnOnEquity * 100 : null);
     const debtToEquity = bundle.yahoo?.debtToEquity ?? null;
+    const betaSource: "yahoo" | "vol_heuristic" = bundle.yahoo?.beta != null ? "yahoo" : "vol_heuristic";
     const beta = bundle.yahoo?.beta ?? round(clamp(annualizedVol / 22, 0.65, 2.75), 2);
     const marketCap = inferMarketCapCategory(isIndian, marketCapValue);
     const { news, overallSentiment, totalPressure } = mapNews(bundle);
@@ -732,6 +685,7 @@ serve(async (req) => {
       pbv: pbv != null ? round(pbv, 2) : null,
       dividendYield: dividendYield != null ? round(dividendYield, 2) : null,
       beta: round(beta, 2),
+      betaSource,
       roe: roe != null ? round(roe, 2) : null,
       debtToEquity: debtToEquity != null ? round(debtToEquity, 2) : null,
       esgScore: null,

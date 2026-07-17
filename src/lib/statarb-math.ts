@@ -26,9 +26,11 @@ export function mean(arr: number[]): number {
   return arr.length === 0 ? 0 : arr.reduce((s, v) => s + v, 0) / arr.length;
 }
 
+/** Sample standard deviation (ddof = 1) — the one system-wide convention. */
 export function stddev(arr: number[]): number {
+  if (arr.length < 2) return 0;
   const m = mean(arr);
-  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
 }
 
 export function returns(prices: number[]): number[] {

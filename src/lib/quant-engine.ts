@@ -6,10 +6,16 @@
  *
  * Conventions:
  *   - Returns are LOG returns: r_t = ln(P_t / P_{t-1})
- *   - σ (sigma) is daily stdev of log-returns
+ *   - σ (sigma) is daily stdev of log-returns (SAMPLE stdev, ddof = 1)
  *   - μ (mu) is mean daily log-return
  *   - Annualized: σ_y = σ * √252, μ_y = μ * 252
+ *   - Risk-adjusted ratios are excess over ANNUAL_RISK_FREE (one system-wide
+ *     assumption, mirrored by supabase/functions/_shared/stats.ts)
  */
+
+/** Single risk-free assumption for risk-adjusted ratios (annual, decimal). */
+export const ANNUAL_RISK_FREE = 0.045;
+export const TRADING_DAYS = 252;
 
 export interface PriceSeries {
   closes: number[];
@@ -278,13 +284,13 @@ export function beta(assetRets: number[], benchRets: number[]): number {
 }
 
 // ── 11. Sharpe & Sortino ────────────────────────────────────────
-export function sharpe(rets: number[], rfDaily = 0): number {
+export function sharpe(rets: number[], rfDaily = ANNUAL_RISK_FREE / TRADING_DAYS): number {
   const s = stdev(rets);
   if (s === 0) return 0;
   return ((mean(rets) - rfDaily) / s) * Math.sqrt(252);
 }
 
-export function sortino(rets: number[], rfDaily = 0): number {
+export function sortino(rets: number[], rfDaily = ANNUAL_RISK_FREE / TRADING_DAYS): number {
   const downside = rets.filter(r => r < rfDaily).map(r => r - rfDaily);
   if (downside.length === 0) return 0;
   const dSig = Math.sqrt(mean(downside.map(d => d * d)));

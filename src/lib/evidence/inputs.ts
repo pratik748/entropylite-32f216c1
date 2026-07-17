@@ -30,6 +30,8 @@ export interface DeskAnalysis {
   pbv?: number | null;
   dividendYield?: number | null;
   beta?: number;
+  /** "yahoo" = provider-published beta; "vol_heuristic" = estimated from realized vol. */
+  betaSource?: "yahoo" | "vol_heuristic" | string;
   roe?: number | null;
   debtToEquity?: number | null;
   technicals?: {

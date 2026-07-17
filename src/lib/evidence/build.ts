@@ -364,7 +364,7 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       provenance: "computed",
       source: SRC_PRICE,
       definition: "Annualized return per unit of volatility over the trailing year — risk-adjusted performance.",
-      calculation: `Mean daily return ÷ daily σ × √252 = ${fmtNum(sharpe)} over the trailing year.`,
+      calculation: `(Mean daily return − rf/252) ÷ daily σ × √252 = ${fmtNum(sharpe)} over the trailing year (rf = 4.5%/yr, system-wide convention).`,
       whyItMatters: "Separates names that went up calmly from names that went up violently — the latter give returns back faster in stress.",
       grade,
       reason:
@@ -674,15 +674,18 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
   const beta = a?.beta ?? null;
   if (beta != null) {
     const grade: Grade = beta <= 0.9 ? "good" : beta <= 1.3 ? "neutral" : "bad";
+    const betaFromProvider = a?.betaSource !== "vol_heuristic";
     push({
       id: "beta",
       label: "Beta",
       value: beta,
       format: "ratio",
-      provenance: "computed",
-      source: SRC_ENGINE,
+      provenance: betaFromProvider ? "reported" : "estimated",
+      source: betaFromProvider ? "Yahoo Finance · published beta" : SRC_ENGINE,
       definition: "Sensitivity of this name's returns to the broad market's returns.",
-      calculation: `Regression of daily returns on the index = ${fmtNum(beta)}.`,
+      calculation: betaFromProvider
+        ? `Provider-published beta (Yahoo Finance) = ${fmtNum(beta)}.`
+        : `No published beta available — estimated from realized vol (σ/22, clamped 0.65–2.75) = ${fmtNum(beta)}. Treat as a rough proxy, not a regression.`,
       whyItMatters: "Beta is the portfolio question: high-beta names double as index bets and drag the whole book in drawdowns.",
       grade,
       reason:

@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import {
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
@@ -15,34 +14,23 @@ const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadiu
 const ESGModule = ({ stocks }: Props) => {
   const analyzed = stocks.filter(s => s.analysis);
 
-  const { scores, policyChecks, avgScore, radarData, barData } = useMemo(() => {
-    if (analyzed.length === 0) return { scores: [], policyChecks: [], avgScore: 0, radarData: [], barData: [] };
+  const { scores, policyChecks, avgScore, barData } = useMemo(() => {
+    if (analyzed.length === 0) return { scores: [], policyChecks: [], avgScore: 0, barData: [] };
 
-    // No random fabrication. ESG numbers come either from a real `analysis.esgScore`
-    // returned by the intelligence layer, or we mark the row "Unrated" and exclude
-    // it from the average. E/S/G sub-scores are a deterministic decomposition of
-    // the overall score (no jitter) so the same input always yields the same output.
+    // Honesty rule: the provider gives us ONE overall ESG score per name.
+    // We do not manufacture E/S/G sub-scores from it — a decomposition we
+    // don't have is shown as "unavailable", not invented (even deterministically).
     const esgScores = analyzed.map(s => {
       const real = typeof s.analysis?.esgScore === "number" ? s.analysis.esgScore : null;
-      const overall = real;
-      // Deterministic sub-score split — Env tracks sector beta, Social tracks
-      // controversy hits already in analysis, Governance tracks data-quality.
-      // When the underlying score is missing, every cell shows "—".
-      const env = real != null ? Math.round(real * 0.92) : null;
-      const social = real != null ? Math.round(real * 0.97) : null;
-      const governance = real != null ? Math.round(Math.min(100, real * 1.05)) : null;
       return {
         ticker: s.ticker.replace(".NS", "").replace(".BO", ""),
-        overall,
-        env,
-        social,
-        governance,
+        overall: real,
         controversy: real == null ? "Unrated" : real > 70 ? "None" : real > 50 ? "Low" : "Medium",
         provenance: real != null ? "provider" : "unavailable",
       };
     });
 
-    const rated = esgScores.filter(e => e.overall != null) as Array<typeof esgScores[number] & { overall: number; env: number; social: number; governance: number }>;
+    const rated = esgScores.filter(e => e.overall != null) as Array<typeof esgScores[number] & { overall: number }>;
     const avg = rated.length > 0 ? rated.reduce((s, e) => s + e.overall, 0) / rated.length : 0;
     const minScore = rated.length > 0 ? Math.min(...rated.map(e => e.overall)) : 0;
     const minTicker = rated.find(e => e.overall === minScore)?.ticker || "—";
@@ -51,25 +39,13 @@ const ESGModule = ({ stocks }: Props) => {
       { policy: "Min ESG score > 50", status: rated.length === 0 ? "N/A" : minScore > 50 ? "PASS" : "WARNING", detail: rated.length ? `Min: ${minTicker} (${minScore})` : "No rated holdings" },
       { policy: "No high-controversy holdings", status: rated.every(e => e.controversy !== "High") ? "PASS" : "FAIL", detail: `${rated.filter(e => e.controversy === "High").length} flagged` },
       { policy: "Portfolio avg ESG > 60", status: rated.length === 0 ? "N/A" : avg > 60 ? "PASS" : "WARNING", detail: rated.length ? `Current: ${avg.toFixed(0)}` : "No rated holdings" },
-      { policy: "Governance score > 70 (all)", status: rated.length === 0 ? "N/A" : rated.every(e => e.governance > 70) ? "PASS" : "WARNING", detail: `${rated.filter(e => e.governance <= 70).length} below threshold` },
+      { policy: "All holdings rated", status: rated.length === esgScores.length ? "PASS" : "WARNING", detail: `${esgScores.length - rated.length} unrated` },
     ];
 
-    // Radar: portfolio average E/S/G (over rated holdings only)
-    const avgE = rated.length ? Math.round(rated.reduce((s, e) => s + e.env, 0) / rated.length) : 0;
-    const avgS = rated.length ? Math.round(rated.reduce((s, e) => s + e.social, 0) / rated.length) : 0;
-    const avgG = rated.length ? Math.round(rated.reduce((s, e) => s + e.governance, 0) / rated.length) : 0;
-    const radar = [
-      { factor: "Environment", value: avgE },
-      { factor: "Social", value: avgS },
-      { factor: "Governance", value: avgG },
-    ];
+    // Bar: per-stock overall score (the only figure we actually have)
+    const bar = rated.map(e => ({ name: e.ticker, Overall: e.overall }));
 
-    // Bar: per-stock E/S/G breakdown (rated only)
-    const bar = rated.map(e => ({
-      name: e.ticker, E: e.env, S: e.social, G: e.governance,
-    }));
-
-    return { scores: esgScores, policyChecks: policies, avgScore: avg, radarData: radar, barData: bar };
+    return { scores: esgScores, policyChecks: policies, avgScore: avg, barData: bar };
   }, [analyzed]);
 
   const scoreColor = (v: number) => v >= 75 ? "text-gain" : v >= 50 ? "text-warning" : "text-loss";
@@ -100,48 +76,32 @@ const ESGModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Portfolio ESG Profile</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData}>
-                <PolarGrid stroke={GRID} />
-                <PolarAngleAxis dataKey="factor" tick={{ fill: MUTED, fontSize: 11 }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: MUTED, fontSize: 9 }} />
-                <Radar dataKey="value" stroke="hsl(152,90%,45%)" fill="hsl(152,90%,45%)" fillOpacity={0.15} strokeWidth={2} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">ESG Breakdown by Stock</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ left: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
-                <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} domain={[0, 100]} />
-                <Tooltip contentStyle={tipStyle} />
-                <Legend wrapperStyle={{ fontSize: 10, color: MUTED }} />
-                <Bar dataKey="E" fill="hsl(152,70%,40%)" radius={[2, 2, 0, 0]} name="Environment" />
-                <Bar dataKey="S" fill="hsl(210,60%,55%)" radius={[2, 2, 0, 0]} name="Social" />
-                <Bar dataKey="G" fill="hsl(38,80%,50%)" radius={[2, 2, 0, 0]} name="Governance" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Chart Row — overall provider score only; E/S/G sub-scores are not
+          available from the connected source and are never synthesized. */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-1">ESG Score by Stock</h3>
+        <p className="text-[10px] text-muted-foreground mb-4">Provider overall score. E/S/G pillar sub-scores: no data source connected.</p>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barData} margin={{ left: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="name" tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} />
+              <YAxis tick={{ fill: MUTED, fontSize: 9 }} axisLine={{ stroke: GRID }} domain={[0, 100]} />
+              <Tooltip contentStyle={tipStyle} />
+              <Legend wrapperStyle={{ fontSize: 10, color: MUTED }} />
+              <Bar dataKey="Overall" fill="hsl(152,70%,40%)" radius={[2, 2, 0, 0]} name="Overall (provider)" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">ESG Score Breakdown</h3>
+        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">ESG Score Detail</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {["Ticker", "Overall", "Environment", "Social", "Governance", "Controversy"].map(h => (
+                {["Ticker", "Overall", "Controversy", "Source"].map(h => (
                   <th key={h} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{h}</th>
                 ))}
               </tr>
@@ -151,10 +111,8 @@ const ESGModule = ({ stocks }: Props) => {
                 <tr key={e.ticker} className="border-b border-border/50">
                   <td className="px-3 py-2 font-mono font-medium text-foreground">{e.ticker}</td>
                   <td className={`px-3 py-2 font-mono font-bold ${e.overall != null ? scoreColor(e.overall) : "text-muted-foreground"}`}>{e.overall ?? "—"}</td>
-                  <td className={`px-3 py-2 font-mono ${e.env != null ? scoreColor(e.env) : "text-muted-foreground"}`}>{e.env ?? "—"}</td>
-                  <td className={`px-3 py-2 font-mono ${e.social != null ? scoreColor(e.social) : "text-muted-foreground"}`}>{e.social ?? "—"}</td>
-                  <td className={`px-3 py-2 font-mono ${e.governance != null ? scoreColor(e.governance) : "text-muted-foreground"}`}>{e.governance ?? "—"}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{e.controversy}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{e.provenance}</td>
                 </tr>
               ))}
             </tbody>

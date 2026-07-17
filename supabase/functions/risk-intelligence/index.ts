@@ -209,6 +209,17 @@ serve(async (req) => {
           : "Truth confidence acceptable.",
       },
       source: "deterministic",
+      // Honest self-description: these figures are deterministic HEURISTICS
+      // (no return-history input reaches this function), not measured risk.
+      // Clients with real price history (useQuantSnapshot) must prefer their
+      // own measured VaR/CVaR and treat everything here as an estimate.
+      methodology: {
+        var: "heuristic — sigma inferred from VIX × beta × risk-score multipliers, not from return history",
+        cvar: "heuristic — scalar multiple of VaR, not a tail mean",
+        factorExposure: "heuristic proxies (PE buckets, cap mix, price-vs-cost momentum), not factor regressions",
+        stressScenarios: "scenario templates scaled by beta/concentration, not repriced portfolios",
+        confidence: "estimate",
+      },
       marketRegimeInput: marketRegime || null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

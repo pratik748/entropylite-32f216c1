@@ -184,6 +184,41 @@ serve(async (req) => {
     const realEth = ethData?.price || 0;
     const realSilver = silverData?.price || 0;
 
+    // ── Deterministic macro reads from the REAL quotes we just fetched ──
+    // Top movers are measured moves, never AI-invented names/percentages.
+    const regionScoped = region === "All"
+      ? indexData
+      : indexData.filter((i: any) => i?.region === region);
+    const moverPool = (regionScoped.length > 0 ? regionScoped : indexData) as any[];
+    const topMovers = [...moverPool, ...sectorData as any[]]
+      .filter((m: any) => m && Number.isFinite(m.changePct))
+      .sort((a: any, b: any) => Math.abs(b.changePct) - Math.abs(a.changePct))
+      .slice(0, 5)
+      .map((m: any) => ({ name: m.name, change: Number(m.changePct.toFixed(2)) }));
+
+    // Breadth: share of tracked indices trading up (measured).
+    const upCount = moverPool.filter((i: any) => (i?.changePct ?? 0) > 0).length;
+    const breadthPct = moverPool.length > 0 ? Math.round((upCount / moverPool.length) * 100) : null;
+
+    // Mood score, computed from data per the stated formula:
+    // VIX level 40% (14→+40 … 30→−40), index breadth 30%, avg index move 30%.
+    const vixComponent = realVix > 0 ? Math.max(-40, Math.min(40, ((22 - realVix) / 8) * 40)) : 0;
+    const breadthComponent = breadthPct != null ? ((breadthPct - 50) / 50) * 30 : 0;
+    const avgMove = moverPool.length > 0
+      ? moverPool.reduce((s: number, i: any) => s + (i?.changePct ?? 0), 0) / moverPool.length
+      : 0;
+    const moveComponent = Math.max(-30, Math.min(30, avgMove * 20));
+    const computedMoodScore = Math.round(vixComponent + breadthComponent + moveComponent);
+    const computedMood = realVix > 22 && avgMove < 0
+      ? "Risk-Off"
+      : computedMoodScore > 25
+        ? "Bullish"
+        : computedMoodScore < -25
+          ? "Bearish"
+          : Math.abs(vixComponent) > 20 && Math.sign(vixComponent) !== Math.sign(moveComponent)
+            ? "Cautious"
+            : "Neutral";
+
     let aiMacro: any = null;
     let aiProviderUsed: string | undefined;
     try {
@@ -207,39 +242,36 @@ serve(async (req) => {
             ? `USD/JPY proxy via DXY (n/a here)`
             : `DXY/USD majors: EUR/USD ${realEurUsd.toFixed(4)}, GBP/USD ${realGbpUsd.toFixed(4)}`;
 
+      const moversLine = topMovers.map((m) => `${m.name} ${m.change > 0 ? "+" : ""}${m.change}%`).join(", ");
       const result = await callAI({
         provider,
-        systemPrompt: `You are a sell-side global macro strategist publishing the morning regional note. Your job: take the LIVE prices given to you and translate them into a tight, defensible regional macro read — mood, flows, top movers, key events, outlook, sector rotation, risk appetite — for the trading floor.
+        systemPrompt: `You are a sell-side global macro strategist writing morning commentary. You are given LIVE measured prices, the measured top movers, and a mood score COMPUTED from that data. Your job is ONLY interpretation — you translate the given numbers into a regional read.
 
-REASONING FRAMEWORK:
-1. marketMood comes FROM the data: VIX < 15 + indices green = Bullish; VIX 15–22 mixed = Neutral; VIX > 22 + indices red = Risk-Off; large cross-asset divergence = Cautious.
-2. moodScore (-100 to +100) must be a quantitative read: weight VIX (40%), index breadth (30%), commodities/FX risk-on signal (30%).
-3. fiiFlow / diiFlow: directional + magnitude phrase ("FII +$1.2bn 5d net buy", "DII -$400m profit-taking"). Plausible scale for the region.
-4. topMovers: 3–5 names ACTUALLY relevant to the region — not US mega-caps when region=India.
-5. keyEvents: EXACTLY 3 concrete items happening THIS WEEK that matter for the region (central bank meeting, major earnings print, scheduled macro release, geopolitical event). Never leave this empty — if uncertain, use the most likely scheduled events for the current week (FOMC minutes, CPI, NFP, RBI MPC, ECB, major mega-cap earnings, OPEC, etc.).
-6. outlook: EXACTLY 3 sentences — (i) current regime read, (ii) next-week catalysts, (iii) asymmetric risk. Never empty.
-7. sectorRotation: name the rotation explicitly ("Defensives bid, semis bleed", "Banks lead on rate-cut bets").
-8. riskAppetite: 1 sentence, defended by the data.
+HARD RULES — the desk audits every claim:
+1. NEVER invent a number. Do not state fund-flow amounts, price levels, or percentage moves that are not in the data provided. If you don't have a figure, describe direction qualitatively or omit it.
+2. NEVER present an event as scheduled fact unless you are confident it is a recurring, well-known fixture (e.g. monthly CPI, FOMC cycle). watchItems are things to CHECK, phrased as watch items ("Watch for RBI MPC commentary"), not as confirmed calendar entries with dates.
+3. outlook: EXACTLY 3 sentences — (i) regime read from the given data, (ii) what to watch next, (iii) the asymmetric risk. Ground every claim in the numbers provided.
+4. sectorRotation: describe rotation ONLY if the given sector moves support it; otherwise say what the sector tape shows.
+5. riskAppetite: 1 sentence, defended by the given VIX/breadth/mover data.
+6. It is acceptable — preferred — to say a signal is unclear when the data is mixed.
 
-VOICE: trading-desk concise, no hedging, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON — every field populated, no nulls, no empty arrays.`,
+VOICE: trading-desk concise, no hedging filler, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON.`,
         userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus} (label: ${focusLabel}).
 
-Key data: ${indexSummary}, VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${fxLine}
+MEASURED DATA (the only numbers you may cite):
+Indices: ${indexSummary}
+VIX: ${realVix.toFixed(2)}, Crude: $${realCrude.toFixed(2)}, Gold: $${realGold.toFixed(0)}, BTC: $${realBtc.toFixed(0)}, ${fxLine}
+Top movers (measured): ${moversLine || "none available"}
+Breadth: ${breadthPct != null ? `${breadthPct}% of tracked indices up` : "unavailable"}
+Computed mood score: ${computedMoodScore} (${computedMood})
 
-Focus your analysis on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
+Focus on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
 {
-  "marketMood": "<Bullish|Bearish|Neutral|Cautious|Risk-Off>",
-  "moodScore": <-100 to 100>,
-  "fiiFlow": "<direction and magnitude for ${focusLabel} markets>",
-  "diiFlow": "<direction and magnitude>",
-  "topMovers": [{"name": "<stock/index relevant to ${focusLabel}>", "change": <% number>}],
-  "keyEvents": ["<event1 this week — ${focusLabel}>", "<event2 this week>", "<event3 this week>"],
-  "outlook": "<3-sentence ${focusLabel} market outlook — regime, catalysts, asymmetric risk>",
-  "sectorRotation": "<inflows vs outflows for ${focusLabel}>",
-  "riskAppetite": "<1 sentence>"
-}
-
-ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 sentences. Do not return empty arrays or empty strings.`,
+  "watchItems": ["<watch item 1 for ${focusLabel}>", "<watch item 2>", "<watch item 3>"],
+  "outlook": "<3-sentence ${focusLabel} read grounded in the measured data above>",
+  "sectorRotation": "<what the given sector tape shows for ${focusLabel}>",
+  "riskAppetite": "<1 sentence defended by the given data>"
+}`,
         maxTokens: 800,
         temperature: 0.3,
         provider,
@@ -248,24 +280,34 @@ ALL fields are mandatory. keyEvents MUST contain 3 strings. outlook MUST be 3 se
       console.log(`market-data used provider: ${result.provider}, region: ${region}, indiaMode: ${indiaMode}`);
       aiProviderUsed = result.provider;
       aiMacro = safeParseJSON(result.text);
-      if (!aiMacro?.keyEvents?.length || !aiMacro?.outlook) {
-        console.warn(`market-data: AI returned incomplete macro (events=${aiMacro?.keyEvents?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}) — provider=${result.provider}`);
+      if (!aiMacro?.watchItems?.length || !aiMacro?.outlook) {
+        console.warn(`market-data: AI returned incomplete commentary (watchItems=${aiMacro?.watchItems?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}) — provider=${result.provider}`);
       }
     } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {
-      marketMood: aiMacro?.marketMood || "Neutral",
-      moodScore: aiMacro?.moodScore || 0,
-      fiiFlow: aiMacro?.fiiFlow || "—",
-      diiFlow: aiMacro?.diiFlow || "—",
+      // Computed from measured quotes — formula documented above; never AI-invented.
+      marketMood: computedMood,
+      moodScore: computedMoodScore,
+      moodBasis: "computed: VIX 40% + index breadth 30% + avg index move 30%",
+      // No FII/DII flow data source is connected. We report that honestly
+      // instead of letting a model fabricate plausible-sounding figures.
+      fiiFlow: null,
+      diiFlow: null,
+      flowDataAvailable: false,
+      breadthPct,
       vix: realVix, usdInr: realUsdInr, crudeBrent: realCrude, goldPrice: realGold,
       silverPrice: realSilver, eurUsd: realEurUsd, gbpUsd: realGbpUsd, btcUsd: realBtc, ethUsd: realEth,
-      topMovers: aiMacro?.topMovers || [],
-      keyEvents: aiMacro?.keyEvents || [],
+      // Measured moves from the quotes fetched above — not model output.
+      topMovers,
+      // Model-suggested things to check — NOT confirmed calendar entries.
+      keyEvents: aiMacro?.watchItems || [],
       outlook: aiMacro?.outlook || "",
       sectorRotation: aiMacro?.sectorRotation || "",
       riskAppetite: aiMacro?.riskAppetite || "",
       aiProvider: aiProviderUsed,
+      // Fields whose text is model interpretation (grounded in measured data).
+      aiGeneratedFields: ["keyEvents", "outlook", "sectorRotation", "riskAppetite"],
     };
 
     return new Response(JSON.stringify({ indices: indexData, sectors: sectorData, macro, timestamp: Date.now() }), {
