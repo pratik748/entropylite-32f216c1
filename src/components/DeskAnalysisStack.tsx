@@ -58,6 +58,7 @@ const DeskAnalysisStack = ({ analysis, stocks, isMobile, onSelectTicker }: DeskA
             bullRange={analysis.bullRange}
             bearRange={analysis.bearRange}
             ticker={analysis.ticker}
+            currency={analysis.currency}
           />
           <NewsImpactTable
             news={analysis.news || []}
