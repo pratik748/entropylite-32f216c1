@@ -15,33 +15,39 @@
 
 @layer base {
   :root {
-    /* ── Graphite (default dark) · pure monochrome, no color cast ── */
-    --background: 0 0% 4%;
+    /* ── Graphite (default dark) · pure monochrome, no color cast ──
+       Finish polish (2026-07): richer near-black base with a deliberate,
+       evenly-stepped elevation ladder so panels float on the black; crisper
+       hairlines for cleaner definition. Shapes, radius and data colours are
+       unchanged — this only refines the surface finish. */
+    --background: 0 0% 2.5%;
     --foreground: 0 0% 95%;
 
-    --card: 0 0% 7%;
+    --card: 0 0% 5.5%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 8%;
+    --popover: 0 0% 6.5%;
     --popover-foreground: 0 0% 95%;
 
     --primary: 0 0% 94%;
     --primary-foreground: 0 0% 5%;
 
-    --secondary: 0 0% 11%;
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 66%;
 
-    --muted: 0 0% 10%;
+    --muted: 0 0% 8.5%;
     --muted-foreground: 0 0% 58%;
 
-    --accent: 0 0% 14%;
+    --accent: 0 0% 13%;
     --accent-foreground: 0 0% 95%;
 
     --destructive: 4 88% 59%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14%;
-    --input: 0 0% 12%;
+    /* Crisper hairline: slightly more luminous than the old 14% so the
+       1px frame reads clean and defined against the deeper base. */
+    --border: 0 0% 15%;
+    --input: 0 0% 13%;
     /* Monochrome focus ring */
     --ring: 0 0% 62%;
 
@@ -59,10 +65,10 @@
     --sentiment-negative: 4 92% 62%;
     --sentiment-neutral: 34 96% 54%;
 
-    /* Elevated surface ladder */
-    --surface-1: 0 0% 6%;
-    --surface-2: 0 0% 9%;
-    --surface-3: 0 0% 13%;
+    /* Elevated surface ladder — deliberate, even ~3% steps above the base. */
+    --surface-1: 0 0% 4.5%;
+    --surface-2: 0 0% 7.5%;
+    --surface-3: 0 0% 11.5%;
 
     /* ── Materials · layered translucency ── */
     --glass-bg: 0 0% 5% / 0.72;
@@ -74,10 +80,12 @@
     --material-regular: 0 0% 5% / 0.74;
     --material-thick: 0 0% 4% / 0.90;
 
-    /* ── Depth · diffuse ambient shadows, never harsh ── */
-    --shadow-1: 0 1px 2px hsl(0 0% 1% / 0.30), 0 2px 8px hsl(0 0% 1% / 0.22);
-    --shadow-2: 0 2px 4px hsl(0 0% 1% / 0.28), 0 8px 24px hsl(0 0% 1% / 0.32);
-    --shadow-3: 0 4px 12px hsl(0 0% 1% / 0.32), 0 20px 60px hsl(0 0% 1% / 0.44);
+    /* ── Depth · diffuse ambient shadows over a rich black, with a whisper
+       of top-edge sheen (inset highlight) so raised panels read as milled
+       metal, not flat fills. Finish only — geometry unchanged. ── */
+    --shadow-1: 0 1px 2px hsl(0 0% 0% / 0.40), 0 4px 14px hsl(0 0% 0% / 0.28), inset 0 1px 0 hsl(0 0% 100% / 0.028);
+    --shadow-2: 0 2px 6px hsl(0 0% 0% / 0.38), 0 10px 30px hsl(0 0% 0% / 0.40), inset 0 1px 0 hsl(0 0% 100% / 0.035);
+    --shadow-3: 0 6px 18px hsl(0 0% 0% / 0.42), 0 26px 70px hsl(0 0% 0% / 0.52), inset 0 1px 0 hsl(0 0% 100% / 0.04);
 
     --glow-primary: 0 0 20px hsl(0 0% 90% / 0.07);
     --glow-gain: 0 0 20px hsl(145 66% 46% / 0.16);
@@ -95,13 +103,13 @@
     --duration-base: 320ms;
     --duration-slow: 550ms;
 
-    --sidebar-background: 0 0% 4%;
+    --sidebar-background: 0 0% 2.5%;
     --sidebar-foreground: 0 0% 58%;
     --sidebar-primary: 0 0% 94%;
     --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 11%;
+    --sidebar-accent: 0 0% 10%;
     --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 12%;
+    --sidebar-border: 0 0% 14%;
     --sidebar-ring: 0 0% 62%;
 
     /* ── Public-site palette (space-separated RGB channels) ──
