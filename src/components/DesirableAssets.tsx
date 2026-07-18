@@ -85,25 +85,30 @@ interface Props {
   onAddToPortfolio: (ticker: string, price: number, qty: number) => void;
 }
 
+// Institutional voice: strategy category is conveyed by the label, not a
+// saturated rainbow. Chips are a single restrained neutral surface (the
+// public-site system forbids decorative blues/purples). Directional meaning
+// stays functional (hedges lean gain, leverage/vol leans loss).
+const CHIP_NEUTRAL = "bg-surface-2 text-secondary-foreground border-border";
 const strategyColors: Record<string, string> = {
-  equity: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  pair_trade: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  futures_leverage: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  vol_arb: "bg-red-500/10 text-red-400 border-red-500/20",
-  sector_hedge: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-  correlation_hedge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  mean_reversion: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  momentum: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+  equity: CHIP_NEUTRAL,
+  pair_trade: CHIP_NEUTRAL,
+  futures_leverage: "bg-loss/10 text-loss border-loss/20",
+  vol_arb: "bg-loss/10 text-loss border-loss/20",
+  sector_hedge: "bg-gain/10 text-gain border-gain/20",
+  correlation_hedge: "bg-gain/10 text-gain border-gain/20",
+  mean_reversion: CHIP_NEUTRAL,
+  momentum: CHIP_NEUTRAL,
 };
 
 const riskProfileColors: Record<string, string> = {
   aggressive: "bg-loss/10 text-loss",
   conservative: "bg-gain/10 text-gain",
-  short_term: "bg-amber-500/10 text-amber-400",
-  medium_term: "bg-blue-500/10 text-blue-400",
-  long_term: "bg-purple-500/10 text-purple-400",
-  income: "bg-emerald-500/10 text-emerald-400",
-  safe_haven: "bg-cyan-500/10 text-cyan-400",
+  short_term: "bg-surface-2 text-secondary-foreground",
+  medium_term: "bg-surface-2 text-secondary-foreground",
+  long_term: "bg-surface-2 text-secondary-foreground",
+  income: "bg-gain/10 text-gain",
+  safe_haven: "bg-surface-2 text-secondary-foreground",
   high_conviction: "bg-primary/10 text-primary",
 };
 
@@ -243,7 +248,7 @@ const Sparkline = ({ data, className = "" }: { data: number[]; className?: strin
 // Correlation color
 function corrColor(corr: number): string {
   if (corr < -0.2) return "text-gain";
-  if (corr < 0.3) return "text-emerald-400";
+  if (corr < 0.3) return "text-gain/80";
   if (corr < 0.5) return "text-warning";
   return "text-loss";
 }
@@ -1166,11 +1171,10 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                     <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
                     {(() => {
                       const hc = rec.horizonClass;
-                      const cls = hc === "intraday" ? "bg-red-500/10 text-red-400 border-red-500/20"
-                        : hc === "short_term" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                        : hc === "medium_term" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                        : hc === "long_term" ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                        : "bg-muted/30 text-muted-foreground border-border";
+                      // Horizon is a neutral category (label carries meaning);
+                      // only the fast intraday horizon gets a caution tint.
+                      const cls = hc === "intraday" ? "bg-warning/10 text-warning border-warning/20"
+                        : "bg-surface-2 text-secondary-foreground border-border";
                       const label = hc === "intraday" ? "INTRADAY"
                         : hc === "short_term" ? "SHORT-TERM"
                         : hc === "medium_term" ? "MID-TERM"
