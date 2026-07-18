@@ -282,6 +282,39 @@ describe("synthesize", () => {
     expect(["watch", "tripped"]).toContain(structure!.state);
   });
 
+  it("never trips the R:R breaker off a degenerate stop (risk leg inside noise)", () => {
+    // Price sits 0.2% above support → the risk leg is inside daily noise. Any
+    // ratio measured off it (a "23:1") is an artifact of the stop, not an edge.
+    const tightStop: DeskAnalysis = {
+      ...analysisFixture,
+      technicals: { ...analysisFixture.technicals!, support: 227, resistance: 243 },
+    };
+    const g = buildEvidenceGraph({ ...fullInputs, analysis: tightStop });
+    expect(g.metrics["support_distance"].value).toBeNull(); // no headline R:R fabricated
+    const rr = synthesize(g, tightStop, 227.5).breakers.find((b) => b.id === "rr_collapse")!;
+    expect(rr.state).not.toBe("tripped");
+  });
+
+  it("caps a spectacular R:R at 10:1 and keeps the breaker intact (no self-contradiction)", () => {
+    const bigRR: DeskAnalysis = {
+      ...analysisFixture,
+      technicals: { ...analysisFixture.technicals!, support: 223 }, // ~2% risk leg
+      bullRange: [400, 450],
+    };
+    const g = buildEvidenceGraph({ ...fullInputs, analysis: bigRR });
+    expect(g.metrics["support_distance"].value).toBeLessThanOrEqual(10);
+    const rr = synthesize(g, bigRR, 227.5).breakers.find((b) => b.id === "rr_collapse")!;
+    expect(rr.state).toBe("intact"); // a huge R:R must never read as "tripped"
+  });
+
+  it("reports zero-sentiment-with-headlines as no signal, not a measured neutral", () => {
+    const flat: DeskAnalysis = { ...analysisFixture, overallSentiment: 0, totalPressure: 0, news: [{ headline: "x", sentiment: 0 }] };
+    const np = buildEvidenceGraph({ ...fullInputs, analysis: flat }).metrics["news_pressure"];
+    expect(np.value).toBeNull();
+    expect(np.assessment.grade).toBe("unknown");
+    expect(np.displayText).toMatch(/no directional signal/i);
+  });
+
   it("keeps the ledger auditable", () => {
     const { supporting, opposing, neutral, movers } = syn.ledger;
     expect(supporting + opposing + neutral).toBe(graph.order.length);

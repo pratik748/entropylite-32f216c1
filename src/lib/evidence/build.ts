@@ -572,10 +572,23 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
 
   const support = a?.technicals?.support ?? null;
   const resistance = a?.technicals?.resistance ?? null;
+  // The upside target is the bull-case target when the engine produced one
+  // (the same level the trade and the scenario cases use); resistance is the
+  // conservative fallback. Using one target everywhere is what stops the
+  // synthesis breaker from disagreeing with the R:R shown on the ticket.
+  const rrTarget = (Array.isArray(a?.bullRange) ? a!.bullRange[1] : null) ?? resistance;
   if (support != null && price != null && price > 0) {
-    const dist = round(((price - support) / price) * 100, 1);
-    const upDist = resistance != null ? round(((resistance - price) / price) * 100, 1) : null;
-    const rr = upDist != null && dist > 0.5 ? round(upDist / dist, 1) : null;
+    const downPct = round(((price - support) / price) * 100, 1);
+    const upPct = rrTarget != null ? round(((rrTarget - price) / price) * 100, 1) : null;
+    // A risk leg tighter than 1.5% of price sits inside daily noise: any ratio
+    // measured off it (a "23:1" off a 1%-away stop) is an artifact of the stop,
+    // not an edge. We report the R:R as unstable rather than a headline number,
+    // and cap the displayed ratio at 10:1 so a near-degenerate stop can never
+    // masquerade as a spectacular payoff.
+    const stableRisk = downPct >= 1.5;
+    const rawRr = upPct != null && upPct > 0 && stableRisk ? upPct / downPct : null;
+    const capped = rawRr != null && rawRr > 10;
+    const rr = rawRr != null ? round(Math.min(rawRr, 10), 1) : null;
     const grade: Grade = rr == null ? "neutral" : rr >= 1.5 ? "good" : rr >= 1 ? "neutral" : "bad";
     push({
       id: "support_distance",
@@ -584,18 +597,22 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       format: "ratio",
       provenance: "computed",
       source: SRC_ENGINE,
-      definition: "Upside to resistance versus downside to support — the payoff shape of an entry at the current price.",
-      calculation: `Upside to ${fmtNum(resistance)} (${fmtNum(upDist, 1)}%) ÷ downside to ${fmtNum(support)} (${fmtNum(dist, 1)}%) = ${rr == null ? "—" : `${fmtNum(rr, 1)}:1`}.`,
-      whyItMatters: "Position entries live or die on payoff asymmetry; below 1.5:1 the desk's own discipline says pass.",
+      definition: "Upside to the bull target versus downside to support — the payoff shape of an entry at the current price.",
+      calculation: stableRisk
+        ? `Upside to ${fmtNum(rrTarget)} (${fmtNum(upPct, 1)}%) ÷ downside to ${fmtNum(support)} (${fmtNum(downPct, 1)}%) = ${rr == null ? "—" : `${capped ? "≥" : ""}${fmtNum(rr, 1)}:1`}.`
+        : `Downside to support is only ${fmtNum(downPct, 1)}% — inside daily noise — so the ratio is unstable and no headline R:R is claimed. Wait for a defined stop.`,
+      whyItMatters: "Position entries live or die on payoff asymmetry; below 1.5:1 the desk's own discipline says pass — and a stop inside the noise is not a stop.",
       grade,
       reason:
         rr == null
-          ? "Price is sitting on support — the ratio is unstable at this level."
-          : rr >= 1.5
-            ? `${fmtNum(rr, 1)}:1 clears the 1.5:1 entry bar — asymmetry favors longs.`
-            : rr >= 1
-              ? `${fmtNum(rr, 1)}:1 is thin — payoff does not yet favor adding.`
-              : `${fmtNum(rr, 1)}:1 — more room below than above; entries here are structurally poor.`,
+          ? `Risk leg only ${fmtNum(downPct, 1)}% from support — too tight to define a real R:R at this price.`
+          : capped
+            ? `≥10:1 — but that comes off a ${fmtNum(downPct, 1)}% stop; treat the headline ratio with caution, the stop is the binding constraint.`
+            : rr >= 1.5
+              ? `${fmtNum(rr, 1)}:1 clears the 1.5:1 entry bar — asymmetry favors longs.`
+              : rr >= 1
+                ? `${fmtNum(rr, 1)}:1 is thin — payoff does not yet favor adding.`
+                : `${fmtNum(rr, 1)}:1 — more room below than above; entries here are structurally poor.`,
       importance: 0.45,
       pillar: "momentum",
       sections: ["structure/technical", "risk/scenarios"],
@@ -898,20 +915,36 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
 
   const sentiment = a?.overallSentiment ?? null;
   if (sentiment != null) {
-    const grade: Grade = sentiment >= 15 ? "good" : sentiment >= -15 ? "neutral" : "bad";
+    const newsCount = (a?.news || []).length;
+    const pressure = a?.totalPressure ?? null;
+    // The headline scorer is a keyword lexicon: it returns exactly 0 when no
+    // directional words fire. A flat 0 with no news, or a 0 sentiment AND 0
+    // pressure across a real headline set, is "nothing scored" — NOT a
+    // measured neutral. Report it as no signal (value null, graded unknown so
+    // it never inflates the momentum pillar) instead of a confident "0%".
+    const noSignal = newsCount === 0 || (sentiment === 0 && (pressure == null || pressure === 0));
+    const grade: Grade = noSignal ? "unknown" : sentiment >= 15 ? "good" : sentiment >= -15 ? "neutral" : "bad";
     push({
       id: "news_pressure",
       label: "News sentiment & pressure",
-      value: sentiment,
+      value: noSignal ? null : sentiment,
+      displayText: noSignal ? (newsCount === 0 ? "No recent headlines" : "No directional signal") : undefined,
       format: "signed",
       provenance: "computed",
       source: SRC_ENGINE,
       definition: "Net sentiment of recent real headlines, scored −100…+100, with short-horizon price pressure.",
-      calculation: `Scored headline set (${(a?.news || []).length} items) → sentiment ${fmtNum(sentiment, 0)}, net pressure ${fmtNum(a?.totalPressure, 0)}%.`,
+      calculation: noSignal
+        ? (newsCount === 0
+            ? "No recent headlines retrieved for this name."
+            : `${newsCount} headline${newsCount === 1 ? "" : "s"} retrieved, but the keyword scorer found no directional sentiment — no score is claimed (this is not a measured neutral).`)
+        : `Scored headline set (${newsCount} items) → sentiment ${fmtNum(sentiment, 0)}, net pressure ${fmtNum(pressure, 0)}%.`,
       whyItMatters: "Headline flow moves the next week; fundamentals move the next year. Both matter to entry timing.",
       grade,
-      reason:
-        sentiment >= 15
+      reason: noSignal
+        ? (newsCount === 0
+            ? "No recent headline flow to read for this name."
+            : "Headlines are present but none scored directionally — treated as no signal, not confirmed-neutral.")
+        : sentiment >= 15
           ? "Headline flow is constructive — no near-term narrative headwind."
           : sentiment >= -15
             ? "Headline flow is balanced — the tape is trading structure, not stories."

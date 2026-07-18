@@ -99,7 +99,7 @@ function buildBreakers(graph: EvidenceGraph): ThesisBreaker[] {
       state: v == null ? "watch" : v < 1 ? "tripped" : v < 1.3 ? "watch" : "intact",
       detail:
         v == null
-          ? "Price is sitting on support — the payoff ratio is unstable."
+          ? "Risk leg is inside daily noise (stop < 1.5% away) — no stable risk:reward at this price; wait for a defined stop."
           : `Current structure ${v}:1 against the 1.5:1 entry discipline.`,
       nodeIds: ["support_distance"],
     });

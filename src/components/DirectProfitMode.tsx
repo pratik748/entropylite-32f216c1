@@ -1059,12 +1059,19 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         currentPrice: price || 0,
         currency: workstationData.quote?.currency ?? workstationData.analysis?.currency,
         quantScore: Math.round((synthesis.confidence + Math.max(0, synthesis.ledger.supporting - synthesis.ledger.opposing)) / 2),
-        // R:R is only meaningful with price above the support that defines
-        // the risk leg — below it the clamped denominator fabricates
-        // absurd ratios (e.g. 800:1).
-        riskRewardRatio: price && support && price > support
-          ? Math.abs(((bull?.target ?? resistance) - price) / (price - support))
-          : undefined,
+        // R:R is only meaningful when the risk leg is a real stop, not noise.
+        // A stop tighter than 1.5% of price makes the denominator tiny and
+        // fabricates absurd ratios (23:1, 800:1) that are an artifact of the
+        // stop, not an edge — so we require a meaningful risk leg and cap the
+        // ratio at 10:1. Same guard as the evidence graph's support_distance,
+        // so the ticket and the synthesis never disagree.
+        riskRewardRatio: (() => {
+          if (!price || !support || price <= support) return undefined;
+          if ((price - support) / price < 0.015) return undefined;
+          const target = bull?.target ?? resistance;
+          if (target == null || target <= price) return undefined;
+          return Math.min(Math.abs((target - price) / (price - support)), 10);
+        })(),
         providersUsed: graph.coverage.sources.length,
         consensus: synthesis.ledger.opposing === 0 ? "UNANIMOUS" : synthesis.ledger.supporting > synthesis.ledger.opposing ? "MAJORITY" : "SPLIT",
         evidenceCount: graph.order.length,
