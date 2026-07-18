@@ -1,9 +1,11 @@
 import { useMemo } from "react";
-import { Briefcase, ShieldAlert, Newspaper, ArrowRight } from "lucide-react";
+import { Briefcase, ShieldAlert, Newspaper, ArrowRight, SigmaSquare, Droplets } from "lucide-react";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 import { useInstitutionalAnalytics } from "@/hooks/useInstitutionalAnalytics";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
+import { useFactorModel } from "@/hooks/useFactorModel";
+import { liquidityProfile } from "@/lib/quant/liquidity";
 import { computePortfolioHealth, healthInputFromSnapshot } from "@/lib/portfolio-health";
 import {
   aggregateBookNews, buildBookDirectives, sortDirectives, summarizeBook,
@@ -68,11 +70,34 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
   const norm = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(30000);
   const snap = ia.snapshot;
+  const hasInr = useMemo(() => norm.holdings.some((h) => h.currency === "INR"), [norm.holdings]);
+  const factor = useFactorModel(snap, hasInr);
 
   const health = useMemo(() => {
     const input = healthInputFromSnapshot(snap, regime?.regime);
     return input ? computePortfolioHealth(input) : null;
   }, [snap, regime?.regime]);
+
+  // Liquidity: real 20d median volumes through the same history pipeline.
+  const liquidity = useMemo(() => {
+    if (!snap.ready) return null;
+    return liquidityProfile(
+      norm.holdings.map((h) => ({
+        ticker: h.ticker,
+        quantity: h.quantity,
+        valueBase: h.value,
+        volumes: snap.volumesByTicker[h.ticker],
+      })),
+    );
+  }, [snap, norm.holdings]);
+
+  // Share of book VALUE inside the quant coverage (assets with ≥30d history).
+  const coveredValueShare = useMemo(() => {
+    if (norm.totalValue <= 0) return 0;
+    const covered = norm.holdings.reduce(
+      (s, h) => s + (snap.weights[h.ticker] != null ? h.value : 0), 0);
+    return covered / norm.totalValue;
+  }, [norm.holdings, norm.totalValue, snap.weights]);
 
   // ── Assemble per-position inputs on the covered-book weight basis ──
   const positions = useMemo<BookPositionInput[]>(() => {
@@ -141,7 +166,10 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
           <Briefcase className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-[13px] font-semibold tracking-tight text-foreground">Book Synthesis</h2>
           <span className="font-mono text-[10px] text-muted-foreground/70">
-            {analyzedCount} positions · {snap.ready ? `${snap.lookbackDays}d history` : "assembling history…"}
+            {analyzedCount} positions · {snap.ready
+              ? `${snap.lookbackDays}d history · quant covers ${Math.round(coveredValueShare * 100)}% of value`
+              : "assembling history…"}
+            {norm.livePricedShare < 1 && ` · ${Math.round(norm.livePricedShare * 100)}% live-priced`}
           </span>
         </div>
         <div className="flex items-center gap-2.5">
@@ -167,7 +195,11 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
 
       {/* ── Vitals ── */}
       <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
-        <Cell label="Book value" value={norm.fmt(norm.totalValue)} sub={`base ${norm.baseCurrency}`} />
+        <Cell
+          label="Book value"
+          value={norm.fmt(norm.totalValue)}
+          sub={`base ${norm.baseCurrency} · every position${norm.livePricedShare < 1 ? ` · ${Math.round((1 - norm.livePricedShare) * 100)}% at cost basis` : ""}${norm.fxAllLive ? "" : " · fallback FX"}`}
+        />
         <Cell
           label="P&L"
           value={`${norm.totalPnl >= 0 ? "+" : "−"}${norm.fmt(Math.abs(norm.totalPnl))}`}
@@ -318,6 +350,133 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
         </>
       )}
 
+      {/* ── Factor decomposition — the regression layer ── */}
+      {factor.ready && factor.model?.portfolio && (
+        <>
+          <SectionHead
+            title="Factor decomposition"
+            note={`OLS on ETF/index-proxy daily returns · ${factor.model.portfolio.n}d · avg R² ${factor.model.portfolio.avgR2.toFixed(2)}`}
+          />
+          <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
+            <Cell
+              label="Systematic share"
+              value={`${(factor.model.portfolio.systematicShare * 100).toFixed(0)}%`}
+              color={factor.model.portfolio.systematicShare > 0.8 ? "text-warning" : undefined}
+              sub="of model variance is factor-driven"
+            />
+            <Cell label="Systematic σ" value={`${(factor.model.portfolio.sysVolAnnual * 100).toFixed(1)}%`} sub="eᵀΣ_f e · annualized" />
+            <Cell label="Idiosyncratic σ" value={`${(factor.model.portfolio.idioVolAnnual * 100).toFixed(1)}%`} sub="Σwᵢ²σ²(εᵢ) · annualized" />
+            <Cell
+              label="Model σ vs realized"
+              value={`${(factor.model.portfolio.totalVolAnnual * 100).toFixed(1)}% / ${(snap.portfolio.sigmaAnnual * 100).toFixed(1)}%`}
+              sub="factor model vs measured book σ"
+            />
+          </div>
+          <div className="divide-y divide-border/50 border-b border-border">
+            {factor.model.factors.map((f) => {
+              const p = factor.model!.portfolio!;
+              const exp = p.exposures[f.id] ?? 0;
+              const contrib = p.contributions[f.id] ?? 0;
+              const scen = factor.model!.scenarios.find((s) => s.factorId === f.id);
+              return (
+                <div key={f.id} className="flex items-center gap-2 px-4 py-1.5">
+                  <SigmaSquare className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                  <span className="w-40 shrink-0 truncate text-[12px] text-foreground">{f.label}</span>
+                  <span className={`w-14 shrink-0 text-right font-mono text-[11px] tabular-nums ${Math.abs(exp) >= 0.5 ? "text-foreground" : "text-muted-foreground"}`} title="Portfolio factor exposure Σwᵢβᵢ">
+                    β {exp >= 0 ? "+" : ""}{exp.toFixed(2)}
+                  </span>
+                  <div className="hidden h-[3px] min-w-0 flex-1 overflow-hidden bg-muted sm:block" title="Share of systematic variance (Euler)">
+                    <div className={contrib >= 0 ? "h-full bg-muted-foreground" : "h-full bg-loss"} style={{ width: `${Math.min(100, Math.abs(contrib) * 100)}%` }} />
+                  </div>
+                  <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground" title="Share of systematic variance">
+                    {(contrib * 100).toFixed(0)}%
+                  </span>
+                  {scen && (
+                    <span className={`w-24 shrink-0 text-right font-mono text-[10px] tabular-nums ${scen.impactPct < 0 ? "text-loss" : "text-gain"}`} title={`If ${f.label} moves ${scen.shockPct.toFixed(1)}% (−2σ month), first-order book impact`}>
+                      −2σ → {scen.impactPct >= 0 ? "+" : ""}{scen.impactPct.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {factor.fullBeta != null && factor.rollingBeta.length > 0 && (() => {
+            const recent = factor.rollingBeta[factor.rollingBeta.length - 1];
+            const drift = Math.abs(recent - (factor.fullBeta as number));
+            return (
+              <p className={`border-b border-border px-4 py-1.5 font-mono text-[10px] ${drift > 0.3 ? "text-warning" : "text-muted-foreground"}`}>
+                β stability vs {factor.marketFactorLabel}: 60d {recent.toFixed(2)} vs full-sample {(factor.fullBeta as number).toFixed(2)}
+                {drift > 0.3 ? " — market sensitivity has shifted regime; stress numbers scale with the 60d figure" : " — stable"}
+              </p>
+            );
+          })()}
+          {factor.model.coveredWeight < 0.999 && (
+            <p className="border-b border-border px-4 py-1.5 font-mono text-[9.5px] text-muted-foreground/60">
+              model fits {Math.round(factor.model.coveredWeight * 100)}% of covered weight — assets with thin factor overlap are excluded, not guessed
+            </p>
+          )}
+        </>
+      )}
+
+      {/* ── Liquidity & capacity ── */}
+      {liquidity && (
+        <>
+          <SectionHead
+            title="Liquidity & capacity"
+            note={`exit at ${Math.round(liquidity.participation * 100)}% of 20d median volume · participation constraint, not an impact model`}
+          />
+          <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
+            <Cell label="Exitable in 1d" value={`${(liquidity.shareWithin.d1 * 100).toFixed(0)}%`} color={liquidity.shareWithin.d1 < 0.5 ? "text-warning" : "text-gain"} sub="of volume-covered value" />
+            <Cell label="Within 5d" value={`${(liquidity.shareWithin.d5 * 100).toFixed(0)}%`} sub="of volume-covered value" />
+            <Cell label="Within 20d" value={`${(liquidity.shareWithin.d20 * 100).toFixed(0)}%`} color={liquidity.shareWithin.d20 < 1 ? "text-loss" : undefined} sub="of volume-covered value" />
+            <Cell label="Weighted exit" value={`${liquidity.weightedDaysToExit.toFixed(1)}d`} sub={`volume data covers ${Math.round(liquidity.coveredValueShare * 100)}% of book`} />
+          </div>
+          {liquidity.perPosition.filter((p) => p.daysToExit != null && p.daysToExit > 5).slice(0, 3).map((p) => (
+            <div key={p.ticker} className="flex items-center gap-2 border-b border-border/50 px-4 py-1.5">
+              <Droplets className="h-3 w-3 shrink-0 text-warning" />
+              <span className="w-16 shrink-0 font-mono text-[12px] font-semibold text-foreground">{p.ticker}</span>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                {(p.daysToExit as number).toFixed(1)} trading days to exit · position is {(p.advMultiple as number).toFixed(1)}× one day's volume
+              </span>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{norm.fmt(p.valueBase)}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* ── Exposures ── */}
+      {ia.exposure && (ia.exposure.sector.length > 1 || ia.exposure.currency.length > 1) && (
+        <>
+          <SectionHead title="Exposures" note="base-currency value weights" />
+          <div className="grid grid-cols-1 divide-y divide-border border-b border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <div className="px-4 py-2 space-y-1">
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Sector</p>
+              {ia.exposure.sector.slice(0, 4).map((b) => (
+                <div key={b.label} className="flex items-center gap-2 font-mono text-[10.5px]">
+                  <span className="w-28 truncate text-foreground">{b.label}</span>
+                  <div className="h-[3px] min-w-0 flex-1 overflow-hidden bg-muted">
+                    <div className={`h-full ${b.weight > 0.5 ? "bg-warning" : "bg-muted-foreground"}`} style={{ width: `${Math.min(100, b.weight * 100)}%` }} />
+                  </div>
+                  <span className="w-10 text-right tabular-nums text-muted-foreground">{(b.weight * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2 space-y-1">
+              <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Currency</p>
+              {ia.exposure.currency.slice(0, 4).map((b) => (
+                <div key={b.label} className="flex items-center gap-2 font-mono text-[10.5px]">
+                  <span className="w-28 truncate text-foreground">{b.label}</span>
+                  <div className="h-[3px] min-w-0 flex-1 overflow-hidden bg-muted">
+                    <div className="h-full bg-muted-foreground" style={{ width: `${Math.min(100, b.weight * 100)}%` }} />
+                  </div>
+                  <span className="w-10 text-right tabular-nums text-muted-foreground">{(b.weight * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ── Stress ── */}
       {(worstReplay || topStresses.length > 0) && (
         <>
@@ -373,6 +532,10 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
             ? `${ia.recommended.label} on shrunk Σ (${ia.recommended.diagnostics.confidence} confidence) — same engine as Augment · Portfolio Construction`
             : "unavailable (needs ≥2 assets with return history)"}{" "}
           · directive = optimizer ∧ desk verdict ∧ news, conflicts → REVIEW · health = same gauge math as the Daily Briefing
+          {factor.ready && factor.model?.portfolio && (
+            <> · factor model = ridge-OLS on {factor.model.factors.length} ETF/index proxies, Σ_f sample covariance, residuals assumed uncorrelated</>
+          )}
+          {liquidity && <> · liquidity = 20d median volume, {Math.round(liquidity.participation * 100)}% participation, no impact model</>}
         </p>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-[9.5px] text-muted-foreground/60">

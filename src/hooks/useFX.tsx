@@ -15,10 +15,32 @@ interface FXContextType {
   convert: (amount: number, fromCurrency: string, toCurrency?: string) => number;
   convertToBase: (amount: number, fromCurrency: string) => number;
   getRate: (from: string, to: string) => number;
+  /** True when the live feed supplied this currency's rate (vs static fallback). */
+  rateIsLive: (currency: string) => boolean;
   fxImpact: (assetReturn: number, fxReturn: number) => { alpha: number; fxContrib: number; total: number };
   stressTest: (amount: number, fromCurrency: string, shockPct: number) => number;
   isLoading: boolean;
   lastUpdate: number | null;
+}
+
+/**
+ * Static USD-per-unit fallbacks for EVERY supported currency. Used only when
+ * the live fx-rates feed lacks a currency. Before this table existed, a
+ * missing rate silently became 1.0 — an INR position would be valued at
+ * ~83× its true USD worth, which is exactly how two tabs can disagree on
+ * what the same book is worth. A stale approximate rate, disclosed via
+ * `rateIsLive`, is institutionally acceptable; a silent 83× error is not.
+ */
+const FALLBACK_USD_RATES: Record<string, number> = {
+  USD: 1, INR: 1 / 83.5, EUR: 1.08, GBP: 1.27, JPY: 1 / 150, CNY: 1 / 7.2,
+  KRW: 1 / 1350, BRL: 1 / 5.0, RUB: 1 / 90, TRY: 1 / 32, CHF: 1.12, AUD: 0.66,
+  CAD: 0.73, SGD: 0.74, HKD: 1 / 7.8, SEK: 1 / 10.5, NOK: 1 / 10.6, DKK: 1 / 6.9,
+  NZD: 0.60, ZAR: 1 / 18.5, MXN: 1 / 17, PLN: 1 / 4.0, THB: 1 / 36,
+};
+
+/** USD value of one unit, preferring live rates, then fallback, then 1 (USD-like). */
+function usdRate(rates: Record<string, number>, currency: string): number {
+  return rates[currency] ?? FALLBACK_USD_RATES[currency] ?? 1;
 }
 
 const FXContext = createContext<FXContextType | null>(null);
@@ -54,8 +76,8 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error("FX rates error:", e);
-      // Fallback rates
-      setRates({ USD: 1, INR: 1 / 83.5, EUR: 1.08, GBP: 1.27, JPY: 1 / 150, CNY: 1 / 7.2 });
+      // Full static fallback so no supported currency ever converts at 1:1.
+      setRates({ ...FALLBACK_USD_RATES });
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +105,13 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
 
   const getRate = useCallback((from: string, to: string): number => {
     if (from === to) return 1;
-    const fromUsd = rates[from] || 1;
-    const toUsd = rates[to] || 1;
-    return fromUsd / toUsd;
+    return usdRate(rates, from) / usdRate(rates, to);
   }, [rates]);
+
+  const rateIsLive = useCallback(
+    (currency: string): boolean => currency === "USD" || (lastUpdate != null && rates[currency] != null),
+    [rates, lastUpdate],
+  );
 
   const convert = useCallback((amount: number, fromCurrency: string, toCurrency?: string): number => {
     const target = toCurrency || baseCurrency;
@@ -116,7 +141,7 @@ export function FXProvider({ children }: { children: React.ReactNode }) {
     <FXContext.Provider value={{
       rates, baseCurrency, setBaseCurrency,
       indiaMode, setIndiaMode,
-      convert, convertToBase, getRate, fxImpact, stressTest,
+      convert, convertToBase, getRate, rateIsLive, fxImpact, stressTest,
       isLoading, lastUpdate,
     }}>
       {children}

@@ -16,6 +16,7 @@ vi.mock("@/hooks/useFX", () => ({
     baseCurrency: "USD",
     indiaMode: false,
     convertToBase: (amount: number) => amount,
+    rateIsLive: () => true,
   }),
 }));
 

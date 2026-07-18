@@ -44,6 +44,7 @@ import { governedInvoke } from "@/lib/apiGovernor";
 import { toast } from "@/hooks/use-toast";
 import { normalizeUserTicker } from "@/lib/ticker";
 import { useCloudPortfolio } from "@/hooks/useCloudPortfolio";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FXProvider, useFX } from "@/hooks/useFX";
 import { useIntelligenceRefresh } from "@/hooks/useIntelligenceRefresh";
@@ -89,7 +90,7 @@ const IndexContent = () => {
   const isMobile = useIsMobile();
   const { refreshKey, isRefreshing } = useIntelligenceRefresh();
   const { ingestTrade, desirableZones } = useOutcomeGradient();
-  const { convertToBase, baseCurrency } = useFX();
+  const { baseCurrency } = useFX();
 
   // First-time tutorial: open after portfolio loaded
   useEffect(() => {
@@ -126,36 +127,27 @@ const IndexContent = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Live total portfolio value in base currency (used for risk-budgeted position sizing)
-  const portfolioValueBase = useMemo(() => {
-    return stocks.reduce((sum, s) => {
-      if (!s.analysis?.currentPrice) return sum;
-      const ccy = s.analysis.currency || "USD";
-      return sum + convertToBase(s.analysis.currentPrice * s.quantity, ccy);
-    }, 0);
-  }, [stocks, convertToBase]);
+  // The one book valuation (FX-normalized, every position) — the same spine
+  // the blotter, Book mode and Augment read, so no surface can disagree.
+  const { totalValue: portfolioValueBase, holdings: bookHoldings } = useNormalizedPortfolio(stocks);
 
   // Register holdings with the shared Opportunity Engine repository so its
   // ranking is diversification-aware (correlation vs current exposure) and
-  // sizing can quote whole units. One registration, every consumer benefits.
+  // sizing can quote whole units. Weights come from base-currency values —
+  // mixing native currencies here previously skewed every weight.
   useEffect(() => {
-    const weighted = stocks
-      .map((s) => {
-        const px = s.analysis?.currentPrice || s.buyPrice;
-        return { symbol: s.ticker, value: px * s.quantity };
-      })
-      .filter((p) => p.value > 0);
-    const total = weighted.reduce((sum, p) => sum + p.value, 0);
+    const weighted = bookHoldings.filter((h) => h.value > 0);
+    const total = weighted.reduce((sum, h) => sum + h.value, 0);
     setPortfolioContext(
       total > 0
         ? {
-            positions: weighted.map((p) => ({ symbol: p.symbol, weight: p.value / total })),
+            positions: weighted.map((h) => ({ symbol: h.rawTicker, weight: h.value / total })),
             value: portfolioValueBase > 0 ? portfolioValueBase : undefined,
             currency: baseCurrency,
           }
         : null,
     );
-  }, [stocks, portfolioValueBase, baseCurrency]);
+  }, [bookHoldings, portfolioValueBase, baseCurrency]);
 
   // Force refresh when user switches tabs
   const handleTabSwitch = useCallback(

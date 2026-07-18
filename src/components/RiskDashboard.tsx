@@ -35,7 +35,7 @@ function computeVaRCVaR(stocks: PortfolioStock[], totalValueBase: number) {
 
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
-  const { totalValue, fmt } = useNormalizedPortfolio(stocks);
+  const { totalValue, fmt, holdings } = useNormalizedPortfolio(stocks);
   const staticVars = computeVaRCVaR(stocks, totalValue);
   const snap = useQuantSnapshot(stocks);
 
@@ -192,11 +192,12 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     fill: (s.analysis.riskScore || 0) >= 60 ? "hsl(0, 84%, 55%)" : (s.analysis.riskScore || 0) >= 35 ? "hsl(38, 92%, 55%)" : "hsl(152, 82%, 42%)",
   }));
 
+  // Sector weights from base-currency values (shared spine) — native-value
+  // sums previously overweighted whichever currency had bigger numerals.
   const sectorMap: Record<string, number> = {};
-  analyzed.forEach((s) => {
-    const sector = s.analysis.sector || s.ticker.replace(".NS", "").replace(".BO", "");
-    const value = (s.analysis.currentPrice || s.buyPrice) * s.quantity;
-    sectorMap[sector] = (sectorMap[sector] || 0) + value;
+  holdings.forEach((h) => {
+    const sector = h.sector !== "Unknown" ? h.sector : h.ticker;
+    sectorMap[sector] = (sectorMap[sector] || 0) + h.value;
   });
   const concentrationData = Object.entries(sectorMap)
     .map(([name, value]) => ({ name, pct: totalValue > 0 ? (value / totalValue) * 100 : 0, value }))

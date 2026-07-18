@@ -1,5 +1,49 @@
 # Desk Book Mode — full-portfolio synthesis
 
+## The one valuation (why tabs used to disagree on book value)
+
+Three separate defects let one surface say 5.3M while another said 3M for
+the same book, all fixed at the spine:
+
+1. **Dropped positions** — modules valued only positions whose analysis
+   had completed. `useNormalizedPortfolio` now values EVERY position;
+   ones awaiting analysis are priced at cost basis and flagged
+   (`priceBasis: "cost"`), never silently excluded.
+2. **Silent 1:1 FX** — `useFX.getRate` treated any missing rate as 1.0,
+   so an INR position without a live rate was worth 83× its true USD
+   value on some tabs. A full static fallback table now backs every
+   supported currency, and `rateIsLive` discloses fallback conversions.
+3. **Divergent currency resolution** — the blotter assumed
+   `analysis.currency || "USD"`, the allocation chart used suffix
+   inference only, the normalized hook used both. Everything now resolves
+   through `resolveAssetCurrency` inside the one hook.
+
+Consumers of the spine after this change: blotter, allocation chart, P&L
+waterfall, Desk Book mode, all Augment modules, the Risk tab, and the
+Opportunity Engine portfolio context in `Index.tsx`. None of them computes
+value independently anymore.
+
+## Factor decomposition (the regression layer)
+
+`src/lib/quant/factor-model.ts` fits a multi-factor time-series model:
+ridge-stabilized OLS of each asset's daily returns on ETF/index factor
+proxies (S&P 500, NIFTY 50 for INR books, TLT rates, HYG credit, UUP
+dollar, GLD gold, USO oil) fetched through the same governed
+historical-prices pipeline as every asset series. Outputs: per-asset betas
+with R² and idiosyncratic vol; portfolio factor exposures Σwᵢβᵢ;
+systematic vs idiosyncratic variance split (eᵀΣ_f e vs Σwᵢ²σ²(εᵢ));
+Euler factor contributions (sum to 1 by construction); −2σ single-factor
+partial shocks; and a 60d rolling market beta vs full-sample beta for
+regime-shift detection. Every simplification (proxy factors, uncorrelated
+residuals, first-order shocks) is printed in the UI, not hidden.
+
+## Liquidity & capacity (what big books actually need)
+
+`src/lib/quant/liquidity.ts` uses real 20-day median volumes: per-position
+days-to-exit at a 20% participation cap, book share exitable within
+1/5/20 trading days, and the positions that are capacity risks (> 5 days).
+It is a participation constraint, not an impact model, and says so.
+
 The Desk's center pane now has two views: **Instrument** (the existing
 single-position pass) and **Book** (a whole-portfolio pass). Book view is
 the default when no instrument is focused and the book holds ≥ 2 analyzed
