@@ -13,8 +13,14 @@
  *     assumption, mirrored by supabase/functions/_shared/stats.ts)
  */
 
-/** Single risk-free assumption for risk-adjusted ratios (annual, decimal). */
-export const ANNUAL_RISK_FREE = 0.045;
+import { riskFreeFor } from "@/lib/riskFree";
+
+/**
+ * Default risk-free assumption (annual, decimal) = the USD snapshot rate
+ * from the risk-free architecture (src/lib/riskFree.ts). Currency-aware
+ * callers must pass `riskFreeFor(currency).annualRate` explicitly.
+ */
+export const ANNUAL_RISK_FREE = riskFreeFor("USD").annualRate;
 export const TRADING_DAYS = 252;
 
 export interface PriceSeries {
@@ -273,14 +279,15 @@ export function rollingHistoricalVaR(
 }
 
 // ── 10. Beta to a benchmark ─────────────────────────────────────
-export function beta(assetRets: number[], benchRets: number[]): number {
-  const n = Math.min(assetRets.length, benchRets.length);
-  if (n < 10) return 1;
-  const a = assetRets.slice(-n);
-  const b = benchRets.slice(-n);
-  const cov = pearson(a, b) * stdev(a) * stdev(b);
-  const v = variance(b);
-  return v === 0 ? 1 : cov / v;
+/**
+ * @deprecated Prefer `betaRegression`, which returns null on insufficient
+ * data (instead of a false-neutral 1.0) and reports SE, R² and a CI.
+ * Returns null when the sample is too small or the benchmark has no variance —
+ * an unknown beta is null, never a silent 1.0 that reads as "market-like".
+ */
+export function beta(assetRets: number[], benchRets: number[]): number | null {
+  const reg = betaRegression(assetRets, benchRets);
+  return reg ? reg.beta : null;
 }
 
 // ── 11. Sharpe & Sortino ────────────────────────────────────────
@@ -290,12 +297,99 @@ export function sharpe(rets: number[], rfDaily = ANNUAL_RISK_FREE / TRADING_DAYS
   return ((mean(rets) - rfDaily) / s) * Math.sqrt(252);
 }
 
+/**
+ * Annualized Sortino. NOTE the compatibility convention: when the sample has
+ * NO downside observations, Sortino is mathematically unbounded (excellent),
+ * but we return 0 here to keep a numeric contract shared with the edge spine.
+ * Callers that must distinguish "no downside" from "poor" should check the
+ * downside count themselves; the residual-risk register documents this.
+ */
 export function sortino(rets: number[], rfDaily = ANNUAL_RISK_FREE / TRADING_DAYS): number {
   const downside = rets.filter(r => r < rfDaily).map(r => r - rfDaily);
   if (downside.length === 0) return 0;
   const dSig = Math.sqrt(mean(downside.map(d => d * d)));
   if (dSig === 0) return 0;
   return ((mean(rets) - rfDaily) / dSig) * Math.sqrt(252);
+}
+
+// ── 11b. Uncertainty on the estimates themselves ─────────────────
+// (Mirrored by supabase/functions/_shared/stats.ts; truth-spine test
+//  asserts identical outputs.)
+
+/**
+ * Annualized Sharpe with its asymptotic standard error (Lo, 2002, iid case):
+ *   SE(SR_daily) = sqrt((1 + SR_daily²/2) / n),  annualized by √252.
+ * Understated under autocorrelation/fat tails — the caveat ships in `method`.
+ */
+export function sharpeWithSE(
+  rets: number[],
+  annualRiskFree = ANNUAL_RISK_FREE,
+): { sharpe: number; se: number; n: number; method: string } | null {
+  const n = rets.length;
+  if (n < 40) return null;
+  const s = stdev(rets);
+  if (s === 0) return null;
+  const rfDaily = annualRiskFree / TRADING_DAYS;
+  const srDaily = (mean(rets) - rfDaily) / s;
+  const seDaily = Math.sqrt((1 + (srDaily * srDaily) / 2) / n);
+  return {
+    sharpe: srDaily * Math.sqrt(TRADING_DAYS),
+    se: seDaily * Math.sqrt(TRADING_DAYS),
+    n,
+    method: "Lo (2002) iid asymptotic SE; understated under autocorrelation or fat tails",
+  };
+}
+
+/** Annualized vol with normal-theory SE ≈ σ̂/√(2(n−1)). Decimal units. */
+export function volWithSE(
+  rets: number[],
+): { vol: number; se: number; n: number; method: string } | null {
+  const n = rets.length;
+  if (n < 20) return null;
+  const vol = stdev(rets) * Math.sqrt(TRADING_DAYS);
+  if (vol <= 0) return null;
+  return {
+    vol,
+    se: vol / Math.sqrt(2 * (n - 1)),
+    n,
+    method: "normal-theory SE; understated under vol clustering (GARCH effects)",
+  };
+}
+
+/**
+ * OLS beta of asset on benchmark daily returns, with SE, R² and 95% CI.
+ * Returns null (never a fabricated 1.0) when the sample is insufficient —
+ * unlike the legacy `beta()` below, which is kept only for callers that
+ * have not yet grown a null-path and is deprecated.
+ */
+export function betaRegression(
+  assetRets: number[],
+  benchRets: number[],
+): { beta: number; alphaDaily: number; se: number; ci95: [number, number]; r2: number; n: number } | null {
+  const n = Math.min(assetRets.length, benchRets.length);
+  if (n < 40) return null;
+  const a = assetRets.slice(-n);
+  const b = benchRets.slice(-n);
+  const mb = mean(b);
+  const ma = mean(a);
+  let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (b[i] - mb) ** 2;
+    sxy += (b[i] - mb) * (a[i] - ma);
+  }
+  if (sxx <= 0) return null;
+  const betaHat = sxy / sxx;
+  const alphaDaily = ma - betaHat * mb;
+  let sse = 0, sst = 0;
+  for (let i = 0; i < n; i++) {
+    const resid = a[i] - alphaDaily - betaHat * b[i];
+    sse += resid * resid;
+    sst += (a[i] - ma) ** 2;
+  }
+  const sigma2 = sse / Math.max(1, n - 2);
+  const se = Math.sqrt(sigma2 / sxx);
+  const r2 = sst > 0 ? 1 - sse / sst : 0;
+  return { beta: betaHat, alphaDaily, se, ci95: [betaHat - 1.96 * se, betaHat + 1.96 * se], r2, n };
 }
 
 // ── 12. Merton Structural Credit (Distance-to-Default) ──────────

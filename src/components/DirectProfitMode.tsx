@@ -136,8 +136,24 @@ interface TradeResult {
     };
     costHaircut?: number;
     tailMultiplier?: number;
+    /** What kind of probability calibratedProb is ("prior_platt_map" = hand-set map, not empirical). */
+    probBasis?: string;
   };
   quantEdge?: QuantEdge;
+  /** Phase II: what the win-probability IS and the empirical evidence for it. */
+  probabilityProvenance?: {
+    basis: string;
+    meaning: string;
+    reliability: {
+      createdAt: string;
+      windowDays: number;
+      nSettled: number;
+      brierDisplayed: number | null;
+      hitRate: number | null;
+      bins: Array<{ pLow: number; pHigh: number; meanForecast: number; meanOutcome: number; n: number }>;
+      notes: string | null;
+    } | null;
+  };
 }
 
 interface QuantEdge {
@@ -225,13 +241,17 @@ function buildAuditTrail(opts: {
   const entryMid = edge ? (edge.entryLow + edge.entryHigh) / 2 || edge.currentPrice : 0;
 
   if (ens) {
+    const rel = edge?.probabilityProvenance?.reliability;
+    const relLine = rel && rel.nSettled >= 30 && rel.hitRate != null
+      ? ` · Empirical check (${rel.windowDays}d, n=${rel.nSettled} settled): realized win rate ${Math.round(rel.hitRate * 100)}%, Brier ${rel.brierDisplayed ?? "—"}`
+      : " · Empirical check: not enough settled outcomes yet — treat as a model score, not a frequency";
     rows.push({
       id: "calibrated-prob",
-      metric: "Calibrated win-probability",
+      metric: "Model win-probability (prior map)",
       value: `${Math.round(ens.calibratedProb * 100)}%`,
       source: "quant engine",
-      formula: "p = Platt(a + b·score + δ·bucket-diversity) over inverse-variance-weighted engine votes",
-      computation: `${ens.engineCount} engines voted (${ens.agreeingEngines.length} agree, ${ens.disagreeingEngines.length} against, ${ens.abstainingEngines.length} abstain) · agreement ${f(ens.agreement * 100, 0)}% · ${ens.consensusLabel.toLowerCase()}`,
+      formula: "p = σ(a·|score| + b·agreement + δ·bucket-diversity + γ) with HAND-SET priors — a monotone score on a probability scale, not an empirically fitted frequency",
+      computation: `${ens.engineCount} engines voted (${ens.agreeingEngines.length} agree, ${ens.disagreeingEngines.length} against, ${ens.abstainingEngines.length} abstain) · agreement ${f(ens.agreement * 100, 0)}% · ${ens.consensusLabel.toLowerCase()}${relLine}`,
       usedFor: "Trade gate (needs ≥ 53% and E[R] ≥ 0.05R after costs) · displayed confidence · the win leg of expected profit",
     });
   }
@@ -1407,7 +1427,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               {result.ensemble && (
                 <div className="mt-3 mx-auto max-w-xs">
                   <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
-                    <span>Calibrated win-prob</span>
+                    <span title="Prior-map model probability — a hand-set monotone map of engine score and agreement, not an empirically calibrated frequency. See the audit trail for the empirical reliability check.">
+                      Model win-prob · prior map
+                    </span>
                     <span className="text-foreground font-semibold">{Math.round(result.ensemble.calibratedProb * 100)}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden">
@@ -1420,6 +1442,22 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     <span>{result.ensemble.engineCount} engines · {result.ensemble.consensusLabel.toLowerCase()}</span>
                     <span>R≈{result.ensemble.expectedR.toFixed(2)}</span>
                   </div>
+                  {(() => {
+                    const rel = result.probabilityProvenance?.reliability;
+                    if (rel && rel.nSettled >= 30 && rel.hitRate != null) {
+                      return (
+                        <div className="mt-1 text-[10px] text-muted-foreground/80 font-mono">
+                          Track record ({rel.windowDays}d, n={rel.nSettled}): {Math.round(rel.hitRate * 100)}% of fired signals won
+                          {rel.brierDisplayed != null ? ` · Brier ${rel.brierDisplayed.toFixed(3)}` : ""}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-1 text-[10px] text-muted-foreground/60 font-mono">
+                        No settled track record yet — prob is a model score, not a tested frequency
+                      </div>
+                    );
+                  })()}
                   {result.ensemble.bucketDirs && (
                     <div className="mt-2 grid grid-cols-3 gap-1 text-[10px] font-mono">
                       {(["A","B","C"] as const).map((b) => {
@@ -1473,7 +1511,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                         Engine consensus
                       </div>
                       <div className="text-[10px] font-mono text-muted-foreground">
-                        {(result.ensemble.calibratedProb * 100).toFixed(0)}% calibrated · {(result.ensemble.agreement * 100).toFixed(0)}% agree
+                        {(result.ensemble.calibratedProb * 100).toFixed(0)}% model win-prob · {(result.ensemble.agreement * 100).toFixed(0)}% agree
                       </div>
                     </div>
                     <div className="h-1.5 w-full bg-muted/30 rounded overflow-hidden mb-3">

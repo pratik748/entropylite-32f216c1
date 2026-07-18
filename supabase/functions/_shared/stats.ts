@@ -20,8 +20,14 @@
  * never by shadowing these names.
  */
 
-/** Single risk-free assumption for edge-side risk-adjusted ratios (annual, decimal). */
-export const ANNUAL_RISK_FREE = 0.045;
+import { riskFreeFor } from "./riskFree.ts";
+
+/**
+ * Default risk-free assumption (annual, decimal) = the USD snapshot rate.
+ * Currency-aware callers must pass `riskFreeFor(currency).annualRate`
+ * explicitly instead of relying on this default.
+ */
+export const ANNUAL_RISK_FREE = riskFreeFor("USD").annualRate;
 
 export const TRADING_DAYS = 252;
 
@@ -89,6 +95,86 @@ export function sortinoRatio(dailyReturns: number[], annualRiskFree = ANNUAL_RIS
   const downsideDev = Math.sqrt(mean(downside.map((d) => d * d)));
   if (downsideDev === 0) return 0;
   return ((mean(dailyReturns) - rfDaily) / downsideDev) * Math.sqrt(TRADING_DAYS);
+}
+
+/**
+ * Annualized Sharpe with its asymptotic standard error (Lo, 2002, iid case):
+ *   SE(SR_daily) = sqrt((1 + SR_daily²/2) / n),  annualized by √252.
+ * The SE understates uncertainty under autocorrelation/fat tails — that
+ * caveat ships in `method`. Returns null when the sample is too small for
+ * the ratio to mean anything.
+ */
+export function sharpeWithSE(
+  dailyReturns: number[],
+  annualRiskFree = ANNUAL_RISK_FREE,
+): { sharpe: number; se: number; n: number; method: string } | null {
+  const n = dailyReturns.length;
+  if (n < 40) return null;
+  const sd = sampleStd(dailyReturns);
+  if (sd === 0) return null;
+  const rfDaily = annualRiskFree / TRADING_DAYS;
+  const srDaily = (mean(dailyReturns) - rfDaily) / sd;
+  const seDaily = Math.sqrt((1 + (srDaily * srDaily) / 2) / n);
+  return {
+    sharpe: srDaily * Math.sqrt(TRADING_DAYS),
+    se: seDaily * Math.sqrt(TRADING_DAYS),
+    n,
+    method: "Lo (2002) iid asymptotic SE; understated under autocorrelation or fat tails",
+  };
+}
+
+/**
+ * Annualized volatility with its approximate standard error:
+ *   SE(σ̂) ≈ σ̂ / sqrt(2(n−1))   (normal-theory approximation).
+ * Decimal units (0.32 = 32%/yr).
+ */
+export function volWithSE(
+  dailyReturns: number[],
+): { vol: number; se: number; n: number; method: string } | null {
+  const n = dailyReturns.length;
+  if (n < 20) return null;
+  const vol = sampleStd(dailyReturns) * Math.sqrt(TRADING_DAYS);
+  if (vol <= 0) return null;
+  return {
+    vol,
+    se: vol / Math.sqrt(2 * (n - 1)),
+    n,
+    method: "normal-theory SE; understated under vol clustering (GARCH effects)",
+  };
+}
+
+/**
+ * OLS beta of asset on benchmark daily returns, with SE, R² and 95% CI.
+ * Returns null (never a fabricated 1.0) when the sample is insufficient.
+ */
+export function betaRegression(
+  assetRets: number[],
+  benchRets: number[],
+): { beta: number; alphaDaily: number; se: number; ci95: [number, number]; r2: number; n: number } | null {
+  const n = Math.min(assetRets.length, benchRets.length);
+  if (n < 40) return null;
+  const a = assetRets.slice(-n);
+  const b = benchRets.slice(-n);
+  const mb = mean(b);
+  const ma = mean(a);
+  let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (b[i] - mb) ** 2;
+    sxy += (b[i] - mb) * (a[i] - ma);
+  }
+  if (sxx <= 0) return null;
+  const beta = sxy / sxx;
+  const alphaDaily = ma - beta * mb;
+  let sse = 0, sst = 0;
+  for (let i = 0; i < n; i++) {
+    const resid = a[i] - alphaDaily - beta * b[i];
+    sse += resid * resid;
+    sst += (a[i] - ma) ** 2;
+  }
+  const sigma2 = sse / Math.max(1, n - 2);
+  const se = Math.sqrt(sigma2 / sxx);
+  const r2 = sst > 0 ? 1 - sse / sst : 0;
+  return { beta, alphaDaily, se, ci95: [beta - 1.96 * se, beta + 1.96 * se], r2, n };
 }
 
 /** Maximum peak-to-trough drawdown as a POSITIVE decimal (0.23 = −23%). */

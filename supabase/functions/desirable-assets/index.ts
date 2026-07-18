@@ -16,6 +16,8 @@ import {
   maxDrawdown as maxDrawdownDec,
   pearsonCorrelation,
 } from "../_shared/stats.ts";
+import { riskFreeFor } from "../_shared/riskFree.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1465,7 +1467,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       if (td.closes.length < 20) { thinData++; bumpReject("F0_thin_history"); continue; }
 
       const returns = logReturns(td.closes);
-      const sr = sharpeRatio(returns);
+      const sr = sharpeRatio(returns, riskFreeFor(baseCurrency).annualRate);
       const mdd = maxDrawdown(td.closes);
       const vol = annualizedVol(returns);
       const zs = zScore(td.closes);
@@ -2445,6 +2447,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       // Real-time grounding (Google Search) included in this generation cycle.
       // Empty when grounding was unavailable.
       liveWebContext: webBlock || "",
+      // Which model/version produced this payload (institutional memory).
+      model: modelInfo("desirable-assets"),
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },

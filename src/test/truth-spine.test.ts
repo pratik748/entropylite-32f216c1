@@ -18,6 +18,9 @@ import {
   maxDrawdown as edgeMaxDD,
   annualizedVol as edgeAnnVol,
   historicalVaRCVaR,
+  sharpeWithSE as edgeSharpeSE,
+  volWithSE as edgeVolSE,
+  betaRegression as edgeBetaReg,
   ANNUAL_RISK_FREE as EDGE_RF,
 } from "../../supabase/functions/_shared/stats";
 
@@ -33,6 +36,10 @@ import {
   ANNUAL_RISK_FREE as CLIENT_RF,
   TRADING_DAYS,
 } from "../lib/quant-engine";
+
+import { RISK_FREE_SNAPSHOT as EDGE_RF_TABLE, riskFreeFor as edgeRiskFreeFor } from "../../supabase/functions/_shared/riskFree";
+import { RISK_FREE_SNAPSHOT as CLIENT_RF_TABLE, riskFreeFor as clientRiskFreeFor } from "../lib/riskFree";
+import { sharpeWithSE as clientSharpeSE, volWithSE as clientVolSE, betaRegression as clientBetaReg } from "../lib/quant-engine";
 
 /** Deterministic pseudo-random walk (LCG) — no Math.random in tests. */
 function lcgCloses(n: number, seed = 42, drift = 0.0004, vol = 0.015): number[] {
@@ -94,6 +101,80 @@ describe("edge/client truth-spine agreement", () => {
   it("annualizes vol with √252 sample stdev", () => {
     const rets = clientLogReturns(closes);
     expect(edgeAnnVol(rets)).toBeCloseTo(clientStdev(rets) * Math.sqrt(TRADING_DAYS), 12);
+  });
+});
+
+describe("uncertainty estimators agree across spines and behave sanely", () => {
+  const closes = lcgCloses(252, 7);
+  const rets = clientLogReturns(closes);
+  const benchCloses = lcgCloses(252, 99, 0.0003, 0.01);
+  const benchRets = clientLogReturns(benchCloses);
+
+  it("Sharpe SE identical on both spines and shrinks with sample size", () => {
+    const e = edgeSharpeSE(rets)!;
+    const c = clientSharpeSE(rets)!;
+    expect(e.sharpe).toBeCloseTo(c.sharpe, 12);
+    expect(e.se).toBeCloseTo(c.se, 12);
+    const short = clientSharpeSE(rets.slice(0, 60))!;
+    expect(short.se).toBeGreaterThan(c.se);
+  });
+
+  it("vol SE identical on both spines", () => {
+    const e = edgeVolSE(rets)!;
+    const c = clientVolSE(rets)!;
+    expect(e.vol).toBeCloseTo(c.vol, 12);
+    expect(e.se).toBeCloseTo(c.se, 12);
+  });
+
+  it("beta regression identical on both spines with a finite CI", () => {
+    const e = edgeBetaReg(rets, benchRets)!;
+    const c = clientBetaReg(rets, benchRets)!;
+    expect(e.beta).toBeCloseTo(c.beta, 12);
+    expect(e.se).toBeCloseTo(c.se, 12);
+    expect(e.ci95[0]).toBeLessThan(e.beta);
+    expect(e.ci95[1]).toBeGreaterThan(e.beta);
+  });
+
+  it("uncertainty functions refuse tiny samples instead of guessing", () => {
+    expect(clientSharpeSE(rets.slice(0, 10))).toBeNull();
+    expect(clientVolSE(rets.slice(0, 5))).toBeNull();
+    expect(clientBetaReg(rets.slice(0, 10), benchRets.slice(0, 10))).toBeNull();
+  });
+
+  it("regression of a series on itself has beta 1 and R² 1", () => {
+    const r = clientBetaReg(rets, rets)!;
+    expect(r.beta).toBeCloseTo(1, 9);
+    expect(r.r2).toBeCloseTo(1, 9);
+  });
+});
+
+describe("risk-free architecture", () => {
+  it("edge and client snapshots are identical (mirrored modules)", () => {
+    expect(CLIENT_RF_TABLE).toEqual(EDGE_RF_TABLE);
+  });
+
+  it("resolves per-currency rates and never silently shares them", () => {
+    expect(edgeRiskFreeFor("INR").annualRate).not.toBe(edgeRiskFreeFor("USD").annualRate);
+    expect(clientRiskFreeFor("INR")).toEqual(edgeRiskFreeFor("INR"));
+  });
+
+  it("declares USD fallback for unknown currencies instead of hiding it", () => {
+    const r = edgeRiskFreeFor("XXX");
+    expect(r.currency).toBe("USD");
+    expect(r.fallbackFrom).toBe("XXX");
+  });
+
+  it("every snapshot entry carries provenance (asOf, source, basis)", () => {
+    for (const rate of Object.values(EDGE_RF_TABLE)) {
+      expect(rate.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(rate.source.length).toBeGreaterThan(10);
+      expect(rate.basis).toBe("static_snapshot");
+    }
+  });
+
+  it("the default ANNUAL_RISK_FREE equals the USD snapshot on both spines", () => {
+    expect(EDGE_RF).toBe(edgeRiskFreeFor("USD").annualRate);
+    expect(CLIENT_RF).toBe(clientRiskFreeFor("USD").annualRate);
   });
 });
 

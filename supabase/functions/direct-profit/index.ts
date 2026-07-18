@@ -7,7 +7,7 @@ import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
-import { loadCalibration, logSignalOutcome } from "../_shared/calibration.ts";
+import { loadCalibration, loadReliabilityReport, logSignalOutcome } from "../_shared/calibration.ts";
 import { engleGrangerLite, mertonProxy, walkForwardEdge, returnMoments } from "../_shared/mathEdge.ts";
 import {
   logReturns,
@@ -17,6 +17,8 @@ import {
   historicalVaRCVaR,
   maxDrawdown as maxDrawdownDec,
 } from "../_shared/stats.ts";
+import { riskFreeFor } from "../_shared/riskFree.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -346,8 +348,10 @@ function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: 
 
   const notional = snap.currentPrice;
 
-  const sharpeRatio = Number(canonSharpe(returns).toFixed(2));
-  const sortinoRatio = Number(canonSortino(returns).toFixed(2));
+  // Currency-appropriate risk-free (INR names vs the INR bill, not USD).
+  const rf = riskFreeFor(snap.currency).annualRate;
+  const sharpeRatio = Number(canonSharpe(returns, rf).toFixed(2));
+  const sortinoRatio = Number(canonSortino(returns, rf).toFixed(2));
   const maxDD = maxDrawdownDec(closes);
 
   // Beta estimate from VIX proxy
@@ -1265,7 +1269,10 @@ Deno.serve(async (req) => {
 
     const rrFromOutput = Number(output.riskRewardRatio);
     const haircut = costHaircut(resolvedTicker);
-    const calibration = await loadCalibration();
+    const [calibration, reliabilityReport] = await Promise.all([
+      loadCalibration(),
+      loadReliabilityReport(),
+    ]);
     // Decision-theoretic gate for a point-of-decision module. The shared
     // screener defaults optimise precision over a whole universe (six
     // AND-ed vetoes) — correct for scanning, but on a single user-chosen
@@ -1515,6 +1522,18 @@ Deno.serve(async (req) => {
         costHaircut: haircut,
       }).catch(() => {});
     }
+
+    // Phase II — the probability's provenance travels with the ticket.
+    // `basis` says what kind of number the win-probability is; `reliability`
+    // is the empirical evidence (settled-outcome bins) for how much belief
+    // it has earned. Null reliability means "no evidence yet", never
+    // "calibrated".
+    (output as any).model = modelInfo("direct-profit");
+    (output as any).probabilityProvenance = {
+      basis: consensus.probBasis,
+      meaning: "hand-set prior Platt map of (ensemble score, agreement) — a model score on a probability scale, not an empirically calibrated frequency",
+      reliability: reliabilityReport,
+    };
 
     console.log(`direct-profit result: ${resolvedTicker} → ${output.action} (${output.confidence}%) | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 

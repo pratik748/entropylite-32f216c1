@@ -28,10 +28,10 @@ const categoryColors: Record<string, string> = {
 const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTableProps) => {
   return (
     <div className="rounded-xl border border-border bg-card p-6 animate-slide-up">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold text-foreground">Related News Impact</h2>
+          <h2 className="text-base font-semibold text-foreground">Related News — Sentiment Pressure</h2>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm">
@@ -41,13 +41,17 @@ const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTa
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-sm">
-            <span className="text-muted-foreground">Pressure:</span>
+            <span className="text-muted-foreground">Net pressure:</span>
             <span className={`font-mono font-semibold ${totalPressure >= 0 ? "text-gain" : "text-loss"}`}>
-              {totalPressure >= 0 ? "+" : ""}{totalPressure.toFixed(1)}%
+              {totalPressure >= 0 ? "+" : ""}{totalPressure.toFixed(1)}
             </span>
           </div>
         </div>
       </div>
+      <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground/70">
+        Scores reflect headline tone and source weight only. They are not measured or predicted price moves,
+        and no causal link between a headline and price is claimed.
+      </p>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -56,9 +60,9 @@ const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTa
               <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Headline</th>
               <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Category</th>
               <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">Sentiment</th>
-              <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">Short-term</th>
-              <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">Long-term</th>
-              <th className="pb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">Confidence</th>
+              <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right" title="Sentiment pressure score, not a predicted price move">ST pressure</th>
+              <th className="pb-3 pr-4 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right" title="Sentiment pressure score, not a predicted price move">LT pressure</th>
+              <th className="pb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right" title="Source trust: filing > major outlet > aggregator. Not a probability.">Source trust</th>
             </tr>
           </thead>
           <tbody>
@@ -107,9 +111,11 @@ const SentimentBadge = ({ value }: { value: number }) => {
   );
 };
 
+// A dimensionless sentiment-pressure score — deliberately NOT rendered with a
+// "%" so it is never mistaken for a predicted price move.
 const ImpactValue = ({ value }: { value: number }) => (
   <span className={`font-mono text-sm font-medium ${value > 0 ? "text-gain" : value < 0 ? "text-loss" : "text-muted-foreground"}`}>
-    {value > 0 ? "+" : ""}{value.toFixed(1)}%
+    {value > 0 ? "+" : ""}{value.toFixed(1)}
   </span>
 );
 

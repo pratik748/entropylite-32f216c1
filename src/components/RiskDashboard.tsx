@@ -124,6 +124,28 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     ];
   }, [analyzed, aiData]);
 
+  // Historical stress — MEASURED: the worst realized loss windows of this
+  // actual portfolio's return series. No template, no scaling: this is what
+  // the current weights actually did over the sample.
+  const measuredStress = useMemo(() => {
+    const rets = snap.portfolio.returns;
+    if (!snap.ready || rets.length < 60) return null;
+    const worstWindow = (w: number) => {
+      let worst = 0;
+      for (let i = 0; i + w <= rets.length; i++) {
+        let cum = 0;
+        for (let j = i; j < i + w; j++) cum += rets[j];
+        if (cum < worst) worst = cum;
+      }
+      return Math.expm1(worst); // log-return sum → simple return
+    };
+    return [
+      { label: "Worst day", pct: worstWindow(1) },
+      { label: "Worst 5-day run", pct: worstWindow(5) },
+      { label: "Worst 20-day run", pct: worstWindow(20) },
+    ].map((s) => ({ ...s, loss: snap.totalValue * Math.abs(s.pct) }));
+  }, [snap]);
+
   // Stress scenarios from AI or static
   const stressScenarios = useMemo(() => {
     if (aiData?.stressScenarios?.length > 0) return aiData.stressScenarios;
@@ -483,9 +505,33 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       )}
 
-      {/* Stress Scenarios */}
+      {/* Historical stress — measured from this portfolio's actual returns */}
+      {measuredStress && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Historical Stress · measured</h3>
+            <span className="text-[10px] font-mono text-muted-foreground">worst realized windows · {snap.lookbackDays}d · current weights</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {measuredStress.map((s) => (
+              <div key={s.label} className="rounded-lg bg-surface-2 p-4 border border-border/50">
+                <p className="text-sm font-medium text-foreground mb-2">{s.label}</p>
+                <p className="font-mono text-2xl font-bold text-loss">{(s.pct * 100).toFixed(1)}%</p>
+                <p className="font-mono text-xs text-loss mt-1">
+                  ${s.loss.toLocaleString("en-US", { maximumFractionDigits: 0 })} at today's value
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hypothetical stress templates — NOT repriced portfolios */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Stress Scenarios</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Scenario Templates · hypothetical</h3>
+          <span className="text-[10px] font-mono text-warning/90">fixed shocks scaled by beta/concentration — not a repriced portfolio</span>
+        </div>
         <div className="grid gap-3 md:grid-cols-3">
           {stressScenarios.map((s: any) => (
             <div key={s.scenario} className="rounded-lg bg-surface-2 p-4 border border-border/50">

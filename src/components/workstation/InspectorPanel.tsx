@@ -74,6 +74,20 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
       <p className="text-[11.5px] leading-relaxed text-muted-foreground">{metric.calculation}</p>
       <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.06em] text-muted-foreground/60">{metric.source}</p>
 
+      {metric.uncertainty && (
+        <>
+          <Label>Uncertainty</Label>
+          <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+            {metric.uncertainty.se != null && <>SE ±{metric.uncertainty.se}</>}
+            {metric.uncertainty.ci95 && (
+              <> · 95% interval {metric.uncertainty.ci95[0]} to {metric.uncertainty.ci95[1]}</>
+            )}
+            {metric.uncertainty.n != null && <> · n={metric.uncertainty.n}</>}
+          </p>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground/70">{metric.uncertainty.method}</p>
+        </>
+      )}
+
       <Label>Assessment</Label>
       <p className={`flex items-start gap-1.5 text-[11.5px] leading-relaxed ${gradeText[metric.assessment.grade]}`}>
         <span className="mt-1.5"><GradeDot grade={metric.assessment.grade} /></span>

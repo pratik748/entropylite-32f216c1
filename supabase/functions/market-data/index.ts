@@ -310,7 +310,7 @@ Focus on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
       aiGeneratedFields: ["keyEvents", "outlook", "sectorRotation", "riskAppetite"],
     };
 
-    return new Response(JSON.stringify({ indices: indexData, sectors: sectorData, macro, timestamp: Date.now() }), {
+    return new Response(JSON.stringify({ indices: indexData, sectors: sectorData, macro, model: modelInfo("market-data-macro"), timestamp: Date.now() }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
     });
   } catch (error) {

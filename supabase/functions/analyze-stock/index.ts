@@ -12,6 +12,8 @@ import {
   percentile,
   maxDrawdown as maxDrawdownDec,
 } from "../_shared/stats.ts";
+import { riskFreeFor } from "../_shared/riskFree.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -240,8 +242,14 @@ function mapNews(bundle: TickerLiveBundle) {
     const category = newsCategory(item.title, item.source);
     const baseImpact = Math.max(0.8, Math.abs(sentiment) / 18);
     const sourceBoost = /bse|sec/i.test(item.source) ? 1.35 : /moneycontrol/i.test(item.source) ? 1.1 : 1;
+    // These are SENTIMENT-PRESSURE scores (sign and magnitude of headline
+    // tone, source-weighted) — NOT measured or predicted price moves. There
+    // is no event study behind them. Field names kept for API compatibility;
+    // the UI and explanation label them honestly as pressure, not % returns.
     const shortTermImpact = round(Math.sign(sentiment) * baseImpact * sourceBoost, 1);
     const longTermImpact = round(Math.sign(sentiment) * baseImpact * 0.6 * sourceBoost, 1);
+    // "confidence" here is SOURCE TRUST (filing > major outlet > aggregator),
+    // not a probability of any outcome.
     const confidence = /bse|sec/i.test(item.source) ? 90 : /yahoo/i.test(item.source) ? 78 : 72;
     return {
       headline: item.title,
@@ -251,7 +259,7 @@ function mapNews(bundle: TickerLiveBundle) {
       shortTermImpact,
       longTermImpact,
       confidence,
-      explanation: `${item.source} item. Impact score is inferred directly from headline wording and event type.`,
+      explanation: `${item.source} item. Pressure score reflects headline tone and source weight only — it is not a measured or predicted price move, and no causal link to price is claimed.`,
     };
   });
   const overallSentiment = news.length > 0 ? round(mean(news.map((item) => item.sentiment)), 0) : 0;
@@ -430,8 +438,11 @@ serve(async (req) => {
     const latest20 = closes.slice(-20);
     const support = latest20.length > 0 ? percentile(latest20, 0.15) : currentPrice * 0.95;
     const resistance = latest20.length > 0 ? percentile(latest20, 0.85) : currentPrice * 1.05;
-    const realizedSharpe = sharpeRatio(returns);
-    const realizedSortino = sortinoRatio(returns);
+    // Currency-appropriate risk-free: an INR name is scored against the INR
+    // bill rate, not a silently inherited USD assumption.
+    const riskFree = riskFreeFor(currency);
+    const realizedSharpe = sharpeRatio(returns, riskFree.annualRate);
+    const realizedSortino = sortinoRatio(returns, riskFree.annualRate);
     const drawdown = maxDrawdown(closes);
     const changePct = prevClose > 0 ? ((currentPrice - prevClose) / prevClose) * 100 : 0;
     const volumeRatio = mean(volumes.slice(-20)) > 0 ? volume / Math.max(mean(volumes.slice(-20)), 1) : 1;
@@ -445,6 +456,56 @@ serve(async (req) => {
       ? bundle.screener?.marketCap ?? null
       : bundle.yahoo?.marketCap ?? null;
     const sector = bundle.screener?.industry || bundle.yahoo?.sector || bundle.yahoo?.industry || null;
+
+    // ── Cross-source conflict detection ─────────────────────────────
+    // When Screener and Yahoo both report the same fact and materially
+    // disagree, the disagreement is information: record it and ship it
+    // instead of silently letting fixed precedence destroy it.
+    type SourceConflict = {
+      field: string;
+      values: Array<{ source: string; value: number }>;
+      relDiffPct: number;
+      resolution: string;
+    };
+    const sourceConflicts: SourceConflict[] = [];
+    const checkConflict = (
+      field: string,
+      a: { source: string; value: number | null | undefined },
+      b: { source: string; value: number | null | undefined },
+      thresholdPct: number,
+      resolution: string,
+    ) => {
+      const va = a.value, vb = b.value;
+      if (va == null || vb == null || !(va > 0) || !(vb > 0)) return;
+      const rel = Math.abs(va - vb) / ((va + vb) / 2) * 100;
+      if (rel > thresholdPct) {
+        sourceConflicts.push({
+          field,
+          values: [
+            { source: a.source, value: round(va, 2) },
+            { source: b.source, value: round(vb, 2) },
+          ],
+          relDiffPct: round(rel, 1),
+          resolution,
+        });
+      }
+    };
+    if (isIndian && bundle.screener && bundle.yahoo) {
+      checkConflict("price",
+        { source: "screener.in", value: bundle.screener.currentPrice },
+        { source: "yahoo", value: bundle.yahoo.price },
+        2, "quote feed price used for display; conflict may indicate a stale scrape or BSE/NSE venue gap");
+      checkConflict("pe",
+        { source: "screener.in", value: bundle.screener.pe },
+        { source: "yahoo", value: bundle.yahoo.pe },
+        20, "screener.in preferred (standalone vs consolidated definitions differ between sources)");
+      // Screener market cap is ₹ Cr (1 Cr = 1e7); Yahoo is raw INR.
+      checkConflict("marketCap",
+        { source: "screener.in (₹)", value: bundle.screener.marketCap != null ? bundle.screener.marketCap * 1e7 : null },
+        { source: "yahoo (₹)", value: bundle.yahoo.marketCap },
+        10, "screener.in preferred for Indian names; check share-count basis if the gap persists");
+    }
+
     const pe = bundle.screener?.pe ?? bundle.yahoo?.pe ?? null;
     const pbv = bundle.screener?.pb ?? bundle.yahoo?.priceToBook ?? null;
     const dividendYield = bundle.screener?.dividendYield ?? bundle.yahoo?.dividendYield ?? null;
@@ -709,7 +770,23 @@ serve(async (req) => {
         sigmaAnnual: round(annualizedVol, 2),
         sessions: returns.length,
         source: bars?.source || "spot-only",
+        // Which risk-free assumption the ratios above used, with provenance.
+        riskFree: {
+          currency: riskFree.currency,
+          annualRate: riskFree.annualRate,
+          tenor: riskFree.tenor,
+          asOf: riskFree.asOf,
+          basis: riskFree.basis,
+          ...(riskFree.fallbackFrom ? { fallbackFrom: riskFree.fallbackFrom } : {}),
+        },
       },
+      // Material disagreements between data sources for the same fact.
+      // Empty array = sources agreed (or only one source spoke). Preserved
+      // rather than silently resolved — disagreement is information.
+      sourceConflicts,
+      // Which model/version produced this payload, with validation status
+      // and known limitations (institutional memory).
+      model: modelInfo("analyze-stock"),
       // Real-time web grounding (Google Search). Empty string when grounding
       // is unavailable or the model returned nothing. UI can render this as
       // a "Live Web Pulse" panel.

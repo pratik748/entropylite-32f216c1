@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { veracityGate, aggregateVeracity } from "../_shared/twrd/gate.ts";
 import type { RawSignal } from "../_shared/twrd/types.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,6 +132,9 @@ serve(async (req) => {
         impact: round(impact, 1),
         recovery,
         pnlLoss: round(totalValue * Math.abs(impact) / 100, 0),
+        // Honest typing: a named fixed shock scaled by beta/concentration.
+        // NOT a historical replay and NOT a repriced portfolio.
+        basis: "hypothetical_template",
       };
     };
 
@@ -209,6 +213,7 @@ serve(async (req) => {
           : "Truth confidence acceptable.",
       },
       source: "deterministic",
+      model: modelInfo("risk-intelligence"),
       // Honest self-description: these figures are deterministic HEURISTICS
       // (no return-history input reaches this function), not measured risk.
       // Clients with real price history (useQuantSnapshot) must prefer their

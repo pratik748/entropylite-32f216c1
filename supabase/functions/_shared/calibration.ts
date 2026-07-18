@@ -18,6 +18,54 @@ export async function loadCalibration(): Promise<CalibrationParams> {
   return DEFAULTS;
 }
 
+export interface ReliabilityReport {
+  createdAt: string;
+  windowDays: number;
+  nSettled: number;
+  /** Brier score of the probabilities the product displayed (lower = better; 0.25 = coin flip on a 50% base). */
+  brierDisplayed: number | null;
+  /** Realized win rate over all settled displayed signals. */
+  hitRate: number | null;
+  /** Reliability bins: displayed-prob band vs realized frequency. */
+  bins: Array<{ pLow: number; pHigh: number; meanForecast: number; meanOutcome: number; n: number }>;
+  notes: string | null;
+}
+
+/**
+ * Latest nightly reliability report for the displayed prior-map probability.
+ * This is the empirical evidence that decides how much belief the number
+ * deserves. Returns null when the table is missing or empty — callers must
+ * treat "no evidence yet" as exactly that, never as "calibrated".
+ */
+export async function loadReliabilityReport(): Promise<ReliabilityReport | null> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+      || Deno.env.get("SUPABASE_ANON_KEY")
+      || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+    if (!url || !key) return null;
+    const sb = createClient(url, key);
+    const { data, error } = await sb
+      .from("calibration_reports")
+      .select("created_at, window_days, n_settled, brier_displayed, hit_rate, bins, notes")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      createdAt: String(data.created_at),
+      windowDays: Number(data.window_days) || 90,
+      nSettled: Number(data.n_settled) || 0,
+      brierDisplayed: data.brier_displayed != null ? Number(data.brier_displayed) : null,
+      hitRate: data.hit_rate != null ? Number(data.hit_rate) : null,
+      bins: Array.isArray(data.bins) ? data.bins : [],
+      notes: data.notes != null ? String(data.notes) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fire-and-forget log of a fired signal to `signal_outcomes` so the
  * nightly job can mark it to market T+5 days later.

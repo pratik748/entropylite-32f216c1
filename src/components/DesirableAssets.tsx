@@ -1001,7 +1001,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                             ? "bg-primary/15 text-primary"
                             : "bg-loss/10 text-loss"
                       }`}
-                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "—"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "—"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% calibrated · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
+                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "—"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "—"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% model win-prob (prior map, not an empirical frequency) · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
                     >
                       {rec.bucketConsensus === "ALL_3" ? "3/3" : rec.bucketConsensus === "TWO_OF_3" ? "2/3" : rec.bucketConsensus === "SPLIT" ? "SPLIT" : "1/3"} · {Math.round(rec.consensus.calibratedProb * 100)}%
                     </span>
