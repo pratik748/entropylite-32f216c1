@@ -8,6 +8,8 @@
 //   L3  Merton-proxy distance-to-default → structural credit veto
 //   L4  Walk-forward forward-return  → veto signals with no historical edge
 
+import { mean, sampleVariance as variance } from "./stats.ts";
+
 // ── §0 normal helpers ──────────────────────────────────────────────────────
 export function normInv(p: number): number {
   if (p <= 0) return -Infinity;
@@ -27,17 +29,6 @@ export function normInv(p: number): number {
   }
   const q = Math.sqrt(-2 * Math.log(1 - p));
   return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
-}
-
-function mean(xs: number[]): number {
-  if (xs.length === 0) return 0;
-  let s = 0; for (const x of xs) s += x; return s / xs.length;
-}
-function variance(xs: number[]): number {
-  if (xs.length < 2) return 0;
-  const m = mean(xs); let s = 0;
-  for (const x of xs) s += (x - m) ** 2;
-  return s / (xs.length - 1);
 }
 
 /** Sample skewness and excess kurtosis (Pearson). */

@@ -30,6 +30,8 @@ export interface DeskAnalysis {
   pbv?: number | null;
   dividendYield?: number | null;
   beta?: number;
+  /** "yahoo" = provider-published beta; "vol_heuristic" = estimated from realized vol. */
+  betaSource?: "yahoo" | "vol_heuristic" | string;
   roe?: number | null;
   debtToEquity?: number | null;
   technicals?: {
@@ -44,12 +46,28 @@ export interface DeskAnalysis {
   volatility?: number;
   overallSentiment?: number;
   totalPressure?: number;
+  /** Material cross-source disagreements detected by the engine. */
+  sourceConflicts?: Array<{
+    field?: string;
+    values?: Array<{ source?: string; value?: number }>;
+    relDiffPct?: number;
+    resolution?: string;
+  }>;
   quantMetrics?: {
     sharpe1y?: number;
     sortino1y?: number;
     maxDrawdown?: number;
     sigmaAnnual?: number;
     sessions?: number;
+    /** Risk-free assumption the ratios used, with provenance. */
+    riskFree?: {
+      currency?: string;
+      annualRate?: number;
+      tenor?: string;
+      asOf?: string;
+      basis?: string;
+      fallbackFrom?: string;
+    };
   };
 }
 

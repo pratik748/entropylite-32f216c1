@@ -17,7 +17,7 @@ export interface OpportunityFactors {
   eNet: number;
   /** P(real) × FSS ∈ [0,1] */
   robustness: number;
-  /** calibrated P(direction correct) ∈ [0,1] */
+  /** model P(direction correct) ∈ [0,1] — prior Platt map, audited nightly, not an empirical frequency */
   conviction: number;
   /** payoff asymmetry 2Ω/(1+Ω) ∈ [0,2]; 1 = symmetric */
   asymmetry: number;

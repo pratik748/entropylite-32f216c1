@@ -148,7 +148,7 @@ export interface ValidatedOpportunity {
   sparkline: number[];
   tradePlan: TradePlan;
 
-  confidence: number;        // 0..1 calibrated probability, capped at 0.95 — never certainty
+  confidence: number;        // 0..1 model win-prob (prior Platt map, NOT an empirical frequency), capped at 0.95
   confidenceDrivers: string[];
   expectedEdgePct: number;   // decimal; sign follows direction
   downsideRiskPct: number;   // decimal, positive (95% CF-VaR over horizon)

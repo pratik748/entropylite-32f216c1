@@ -50,8 +50,19 @@ export interface ConsensusResult {
   decision: ConsensusDecision;
   /** Raw bullish ensemble score in [-1, +1] (signed by direction) */
   ensembleScore: number;
-  /** Calibrated probability that the dominant side is correct, 0..1 */
+  /**
+   * Model win-probability for the dominant side, 0..1.
+   *
+   * HONESTY NOTE: despite the field name (kept for API compatibility), this
+   * is a PRIOR-MAP probability — a hand-set monotone Platt-form map of
+   * (ensemble score, agreement), NOT an empirically calibrated probability.
+   * Its empirical reliability is measured nightly against realized outcomes
+   * (calibration_reports); consult that evidence before treating the number
+   * as a frequency. `probBasis` states this in-band.
+   */
   calibratedProb: number;
+  /** What kind of probability `calibratedProb` is. Always "prior_platt_map" today. */
+  probBasis: "prior_platt_map" | "empirical_fit";
   /** Agreement 0..1 — 1 = all engines on same side, 0 = perfect split */
   agreement: number;
   /** How many engines actually contributed a non-zero vote */
@@ -177,6 +188,7 @@ export function runConsensus(
       decision: "STAND_ASIDE",
       ensembleScore: 0,
       calibratedProb: 0.5,
+      probBasis: "prior_platt_map",
       agreement: 0,
       engineCount: 0,
       agreeingEngines: [],
@@ -255,13 +267,15 @@ export function runConsensus(
     C: (buckets.find((b) => b.bucket === "C")?.direction ?? 0) as -1 | 0 | 1,
   };
 
-  // Platt-style logistic calibration. Constants come from `calibration_params`
-  // table (refit nightly from realised outcomes) so the displayed
-  // probability actually corresponds to historical hit-rate. The optional
-  // δ term folds bucket diversification into the logit — each agreeing
-  // orthogonal information source beyond the first shifts the calibrated
-  // probability up smoothly, replacing the old binary bucket veto for
-  // callers that opt in (δ = 0 leaves the fitted calibration untouched).
+  // Platt-FORM logistic map with HAND-SET priors (α=3.2, β=1.4, γ=−0.7).
+  // The nightly refit is observability-only and is NOT consumed here (a
+  // degenerate fit once silently killed every verdict), so this number is a
+  // prior-map model probability, not an empirically calibrated frequency.
+  // Whether it deserves belief is measured separately: calibration-fit bins
+  // displayed probabilities against realized outcomes into
+  // `calibration_reports` for the UI to show. The optional δ term folds
+  // bucket diversification into the logit — each agreeing orthogonal
+  // information source beyond the first shifts the probability up smoothly.
   const delta = clamp(opts?.bucketBonus ?? 0, 0, 1);
   const z = cal.alpha * Math.abs(ensembleScore)
     + cal.beta * agreement
@@ -306,7 +320,7 @@ export function runConsensus(
     standAsideReason = `Buckets disagree — only ${agreeingBuckets} of ${votingBuckets} support ${dominant === 1 ? "BUY" : "SELL"}.`;
   } else if (calibratedProb < gates.minCalibratedProb) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Calibrated win-probability only ${(calibratedProb * 100).toFixed(0)}% (need ≥${(gates.minCalibratedProb * 100).toFixed(0)}%).`;
+    standAsideReason = `Model win-probability only ${(calibratedProb * 100).toFixed(0)}% (need ≥${(gates.minCalibratedProb * 100).toFixed(0)}%).`;
   } else if (agreement < gates.minAgreement) {
     decision = "STAND_ASIDE";
     standAsideReason = `Engine agreement only ${(agreement * 100).toFixed(0)}% — too split to trade.`;
@@ -325,6 +339,7 @@ export function runConsensus(
     decision,
     ensembleScore: Number(ensembleScore.toFixed(3)),
     calibratedProb: Number(calibratedProb.toFixed(3)),
+    probBasis: "prior_platt_map",
     agreement: Number(agreement.toFixed(3)),
     engineCount: active.length,
     agreeingEngines,

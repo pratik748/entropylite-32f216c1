@@ -9,6 +9,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
 import TruthBadge from "@/components/twrd/TruthBadge";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
+import { historicalCVaR } from "@/lib/quant-engine";
 import { pc1Concentration, jacobiEigen, marchenkoPastur } from "@/lib/portfolio-math";
 
 interface RiskDashboardProps {
@@ -76,8 +77,19 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     [analyzed]
   );
 
-  // Use AI data if available, otherwise static
-  const vars = aiData ? {
+  // VaR priority: MEASURED history first (real return series), then the
+  // server heuristic, then the static heuristic. The measured numbers must
+  // never be displaced by an estimate when both exist.
+  const varSource: "measured" | "heuristic" = snap.ready && snap.portfolio.var95 > 0 ? "measured" : "heuristic";
+  const vars = varSource === "measured" ? {
+    var95: snap.portfolio.var95,
+    var99: snap.portfolio.var99,
+    cvar95: snap.portfolio.cvar95,
+    cvar99: historicalCVaR(snap.totalValue, snap.portfolio.returns, 0.99),
+    // No liquidity model exists for measured data — surface the heuristic
+    // only under its own label, never as a measured figure.
+    liquidityVar: aiData?.liquidityVar ?? 0,
+  } : aiData ? {
     var95: aiData.var95 || staticVars.var95,
     var99: aiData.var99 || staticVars.var99,
     cvar95: aiData.cvar95 || staticVars.cvar95,
@@ -111,6 +123,28 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       { factor: "Low Vol", exposure: +(avgRisk < 40 ? 0.3 : -0.2).toFixed(2), contribution: Math.round(avgRisk < 40 ? 5 : -3) },
     ];
   }, [analyzed, aiData]);
+
+  // Historical stress — MEASURED: the worst realized loss windows of this
+  // actual portfolio's return series. No template, no scaling: this is what
+  // the current weights actually did over the sample.
+  const measuredStress = useMemo(() => {
+    const rets = snap.portfolio.returns;
+    if (!snap.ready || rets.length < 60) return null;
+    const worstWindow = (w: number) => {
+      let worst = 0;
+      for (let i = 0; i + w <= rets.length; i++) {
+        let cum = 0;
+        for (let j = i; j < i + w; j++) cum += rets[j];
+        if (cum < worst) worst = cum;
+      }
+      return Math.expm1(worst); // log-return sum → simple return
+    };
+    return [
+      { label: "Worst day", pct: worstWindow(1) },
+      { label: "Worst 5-day run", pct: worstWindow(5) },
+      { label: "Worst 20-day run", pct: worstWindow(20) },
+    ].map((s) => ({ ...s, loss: snap.totalValue * Math.abs(s.pct) }));
+  }, [snap]);
 
   // Stress scenarios from AI or static
   const stressScenarios = useMemo(() => {
@@ -178,11 +212,21 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const [selectedRegime, setSelectedRegime] = useState<"bull" | "bear">("bull");
   const [riskTab, setRiskTab] = useState<"analytics" | "clank">("analytics");
 
-  const CORR_LABELS = analyzed.length > 0 
-    ? analyzed.map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
-    : ["Asset 1", "Asset 2"];
+  // Correlations: measured from real return history when available.
+  // The beta-based construction is a heuristic FALLBACK and is labeled as
+  // such; it must never silently stand in for measured correlations.
+  const corrIsMeasured = snap.ready && snap.correlation.tickers.length >= 2;
+
+  const CORR_LABELS = corrIsMeasured
+    ? snap.correlation.tickers.map(t => t.replace(".NS", "").replace(".BO", ""))
+    : analyzed.length > 0
+      ? analyzed.map(s => s.ticker.replace(".NS", "").replace(".BO", ""))
+      : ["Asset 1", "Asset 2"];
 
   const corrMatrix = useMemo(() => {
+    if (corrIsMeasured) {
+      return snap.correlation.matrix.map(row => row.map(v => +v.toFixed(2)));
+    }
     const betas = analyzed.map(s => s.analysis?.beta || 1);
     const n = betas.length;
     const matrix: number[][] = [];
@@ -196,7 +240,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       }
     }
     return matrix;
-  }, [analyzed, selectedRegime]);
+  }, [corrIsMeasured, snap.correlation, analyzed, selectedRegime]);
 
   const corrColor = (v: number) => {
     if (v >= 0.8) return "bg-loss/40 text-loss";
@@ -218,7 +262,11 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {aiData && !aiLoading && (
         <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-2">
           <Brain className="h-4 w-4 text-gain" />
-          <span className="text-xs text-gain">AI-Driven Risk Analysis</span>
+          <span className="text-xs text-gain">
+            {varSource === "measured"
+              ? "VaR/CVaR measured from return history · scenario & factor figures are heuristic estimates"
+              : "Heuristic risk estimates — return history not yet loaded"}
+          </span>
           {volatilityRegime && <span className="ml-auto text-xs font-mono text-foreground">Regime: {volatilityRegime}</span>}
         </div>
       )}
@@ -279,18 +327,18 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {/* VaR Stats */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {[
-          { label: "VaR (95%)", value: vars.var95 },
-          { label: "VaR (99%)", value: vars.var99 },
-          { label: "CVaR (95%)", value: vars.cvar95 },
-          { label: "CVaR (99%)", value: vars.cvar99 },
-          { label: "Liquidity VaR", value: vars.liquidityVar },
+          { label: "VaR (95%)", value: vars.var95, basis: varSource === "measured" ? `1-day historical · ${snap.lookbackDays}d` : "1-day heuristic estimate" },
+          { label: "VaR (99%)", value: vars.var99, basis: varSource === "measured" ? `1-day historical · ${snap.lookbackDays}d` : "1-day heuristic estimate" },
+          { label: "CVaR (95%)", value: vars.cvar95, basis: varSource === "measured" ? `tail mean · ${snap.lookbackDays}d` : "1-day heuristic estimate" },
+          { label: "CVaR (99%)", value: vars.cvar99, basis: varSource === "measured" ? `tail mean · ${snap.lookbackDays}d` : "1-day heuristic estimate" },
+          { label: "Liquidity VaR", value: vars.liquidityVar, basis: "heuristic estimate" },
         ].map(s => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
             <p className="mt-1 font-mono text-lg font-bold text-loss">
-              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : ","}
+              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
             </p>
-            <p className="text-[9px] text-muted-foreground">1-day parametric</p>
+            <p className="text-[9px] text-muted-foreground">{s.basis}</p>
           </div>
         ))}
       </div>
@@ -457,9 +505,33 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       )}
 
-      {/* Stress Scenarios */}
+      {/* Historical stress — measured from this portfolio's actual returns */}
+      {measuredStress && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Historical Stress · measured</h3>
+            <span className="text-[10px] font-mono text-muted-foreground">worst realized windows · {snap.lookbackDays}d · current weights</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {measuredStress.map((s) => (
+              <div key={s.label} className="rounded-lg bg-surface-2 p-4 border border-border/50">
+                <p className="text-sm font-medium text-foreground mb-2">{s.label}</p>
+                <p className="font-mono text-2xl font-bold text-loss">{(s.pct * 100).toFixed(1)}%</p>
+                <p className="font-mono text-xs text-loss mt-1">
+                  ${s.loss.toLocaleString("en-US", { maximumFractionDigits: 0 })} at today's value
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hypothetical stress templates — NOT repriced portfolios */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Stress Scenarios</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Scenario Templates · hypothetical</h3>
+          <span className="text-[10px] font-mono text-warning/90">fixed shocks scaled by beta/concentration — not a repriced portfolio</span>
+        </div>
         <div className="grid gap-3 md:grid-cols-3">
           {stressScenarios.map((s: any) => (
             <div key={s.scenario} className="rounded-lg bg-surface-2 p-4 border border-border/50">
@@ -480,17 +552,28 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {corrMatrix.length > 1 && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Correlation by Regime</h3>
-            <div className="flex gap-1">
-              {(["bull", "bear"] as const).map(r => (
-                <button key={r} onClick={() => setSelectedRegime(r)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    selectedRegime === r ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
-                  }`}>
-                  {r === "bull" ? "Bull" : "Bear"}
-                </button>
-              ))}
-            </div>
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+              {corrIsMeasured ? "Correlation · measured" : "Correlation · estimated"}
+            </h3>
+            {corrIsMeasured ? (
+              <span className="text-[10px] font-mono text-muted-foreground">
+                Pearson on {snap.lookbackDays}d daily log returns
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-warning">beta heuristic — no return history yet</span>
+                <div className="flex gap-1">
+                  {(["bull", "bear"] as const).map(r => (
+                    <button key={r} onClick={() => setSelectedRegime(r)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        selectedRegime === r ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                      }`}>
+                      {r === "bull" ? "Bull" : "Bear"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

@@ -5,6 +5,7 @@ import {
 import { Shield, AlertTriangle, Zap, BarChart3, RefreshCw } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
 
 interface Props { stocks: PortfolioStock[]; }
 type HedgeMode = "defensive" | "balanced" | "aggressive";
@@ -23,14 +24,22 @@ interface ActiveHedge {
 
 const HedgingModule = ({ stocks }: Props) => {
   const { totalValue, holdings, fmt, baseCurrency, sym, convertToBase } = useNormalizedPortfolio(stocks);
+  const snap = useQuantSnapshot(stocks);
   const [mode, setMode] = useState<HedgeMode>("balanced");
 
-  const { hedges, metrics, portfolioGreeks, riskBudget, notionalBarData, greeksCompareData } = useMemo(() => {
-    if (holdings.length === 0) return { hedges: [], metrics: [], portfolioGreeks: null, riskBudget: null, notionalBarData: [], greeksCompareData: [] };
+  const { hedges, metrics, portfolioGreeks, riskBudget, notionalBarData, greeksCompareData, volBasis } = useMemo(() => {
+    if (holdings.length === 0) return { hedges: [], metrics: [], portfolioGreeks: null, riskBudget: null, notionalBarData: [], greeksCompareData: [], volBasis: "none" as const };
 
     const weightedBeta = holdings.reduce((s, h) => s + h.beta * (h.value / totalValue), 0);
     const weightedRisk = holdings.reduce((s, h) => s + h.risk * (h.value / totalValue), 0);
-    const portfolioVol = (weightedRisk / 100) * 0.25;
+    // Portfolio vol: MEASURED from the covariance snapshot when history is
+    // loaded; the risk-score heuristic survives only as a labeled fallback.
+    const volIsMeasured = snap.ready && snap.portfolio.sigmaAnnual > 0;
+    const portfolioVol = volIsMeasured ? snap.portfolio.sigmaAnnual : (weightedRisk / 100) * 0.25;
+    const assetVol = (h: { ticker: string; rawTicker?: string }): number | null => {
+      const s = snap.assetStats[h.ticker] ?? (h.rawTicker ? snap.assetStats[h.rawTicker] : undefined);
+      return s ? s.sigmaAnnual : null;
+    };
     const portfolioDelta = weightedBeta * totalValue / 100;
     const portfolioGamma = portfolioDelta * 0.05;
     const portfolioVega = totalValue * portfolioVol * 0.01;
@@ -61,7 +70,8 @@ const HedgingModule = ({ stocks }: Props) => {
     // Per-position tail risk
     const topRisk = [...holdings].sort((a, b) => b.risk * b.value - a.risk * a.value).filter(h => h.risk >= cfg.minUrgency);
     topRisk.forEach(h => {
-      const posVol = (h.risk / 100) * 0.018 * Math.sqrt(252);
+      // Measured per-name vol when history exists; heuristic only as fallback.
+      const posVol = assetVol(h) ?? (h.risk / 100) * 0.018 * Math.sqrt(252);
       const putDelta = -0.30 * (h.risk / 50);
       const notional = h.value * posVol * cfg.hedgeRatio;
       hedgeList.push({
@@ -135,8 +145,9 @@ const HedgingModule = ({ stocks }: Props) => {
       portfolioGreeks: { delta: portfolioDelta, gamma: portfolioGamma, vega: portfolioVega, beta: weightedBeta, vol: portfolioVol, netDelta, netGamma, netTheta },
       riskBudget: { weightedRisk, totalHedgeCost, costPct: (totalHedgeCost / totalValue) * 100 },
       notionalBarData: notionalBars, greeksCompareData: greeksCompare,
+      volBasis: (volIsMeasured ? "measured" : "heuristic") as "measured" | "heuristic" | "none",
     };
-  }, [holdings, totalValue, fmt, mode, baseCurrency, convertToBase]);
+  }, [holdings, totalValue, fmt, mode, baseCurrency, convertToBase, snap]);
 
   if (holdings.length === 0) {
     return (
@@ -163,6 +174,9 @@ const HedgingModule = ({ stocks }: Props) => {
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-foreground" />
           <span className="text-sm font-bold text-foreground uppercase tracking-wider">Active Hedging Engine</span>
+          <span className={`text-[10px] font-mono ${volBasis === "measured" ? "text-muted-foreground" : "text-warning/90"}`}>
+            {volBasis === "measured" ? "σ measured · 1y history" : "σ heuristic — history not loaded"} · greeks are sizing illustrations, not option-chain quotes
+          </span>
         </div>
         <div className="flex gap-1.5">
           {(["defensive", "balanced", "aggressive"] as HedgeMode[]).map(m => (

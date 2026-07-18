@@ -247,7 +247,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
               value: opportunities.length > 0 ? `${opportunities[0].symbol} ${(opportunities[0].confidence * 100).toFixed(0)}%` : "—",
             },
           ]}
-          note="Ranked by |edge| × calibrated confidence / risk. Confidence is capped at 95% — never certainty."
+          note="Ranked by |edge| × model win-prob / risk. The probability is a prior map (capped at 95%), audited nightly against realized outcomes."
           action={{ label: "Discover", onClick: () => onNavigate("desirable") }}
         />
         <LayerCard
@@ -269,7 +269,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           note={
             engineCrumb?.state === "unreachable"
               ? `Last attempt failed${engineCrumb.reason ? `: ${engineCrumb.reason}` : ""}. The surface falls back to evidence synthesis and says so.`
-              : "Calibrated ensemble: cost-adjusted expected value, cointegration, walk-forward, structural credit. Every ticket ships with its audit."
+              : "Ensemble with prior-map probability: cost-adjusted expected value, cointegration, walk-forward, structural credit. Every ticket ships with its audit and its empirical track record."
           }
         />
       </div>

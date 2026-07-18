@@ -10,7 +10,7 @@
  *    Keating & Shadwick (2002, Omega); Grinold & Kahn (2000, IR/TE).
  */
 
-import { mean, stdev } from "@/lib/quant-engine";
+import { mean, stdev, ANNUAL_RISK_FREE } from "@/lib/quant-engine";
 import {
   type PerformanceMetrics, type BenchmarkRelativeMetrics, type RollingMetrics,
   type RollingPoint, type MetricValue, metric, gradeSample,
@@ -36,13 +36,13 @@ export function annualizedVol(rets: number[]): number {
   return stdev(rets) * Math.sqrt(TRADING_DAYS);
 }
 
-export function sharpeRatio(rets: number[], rfAnnual = 0.05): number {
+export function sharpeRatio(rets: number[], rfAnnual = ANNUAL_RISK_FREE): number {
   const vol = annualizedVol(rets);
   if (vol <= 0) return 0;
   return (mean(rets) * TRADING_DAYS - rfAnnual) / vol;
 }
 
-export function sortinoRatio(rets: number[], rfAnnual = 0.05): number {
+export function sortinoRatio(rets: number[], rfAnnual = ANNUAL_RISK_FREE): number {
   const rfDaily = rfAnnual / TRADING_DAYS;
   const downside = rets.filter(r => r < rfDaily).map(r => r - rfDaily);
   if (downside.length === 0) return 0;

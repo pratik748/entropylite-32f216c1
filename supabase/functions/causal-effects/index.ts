@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,9 +24,14 @@ serve(async (req) => {
 REASONING FRAMEWORK — for every effect you write:
 1. Identify the transmission channel (rates, credit, FX, commodities, supply chain, sentiment, regulatory, fiscal).
 2. Name the mechanism in one clause ("USD strengthens → EM debt service costs rise → BRL/ZAR/TRY underperform").
-3. Calibrate magnitude to historical analogues — a Fed +50bp surprise moves 2Y ~15–25bp; a crude +10% shock hits airlines ~3–6%; an EM currency crisis bleeds equities 8–15% over 2–4 weeks.
-4. Confidence reflects how mechanical the link is (rates → bond prices ≈ 0.9; geopolitical → sentiment ≈ 0.4–0.6).
+3. Calibrate magnitude to historical analogues — a Fed +50bp surprise moves 2Y ~15–25bp; a crude +10% shock hits airlines ~3–6%; an EM currency crisis bleeds equities 8–15% over 2–4 weeks. These are ANALOGUES, not forecasts — say so.
+4. Confidence reflects how mechanical the link is (rates → bond prices ≈ 0.9; geopolitical → sentiment ≈ 0.4–0.6). It is your subjective read of mechanism strength, NOT a calibrated probability. Use lower confidence freely; do not manufacture precision.
 5. Time horizons must escalate by order: 1st-order intraday→days, 2nd-order weeks, 3rd-order months/structural.
+
+HONESTY RULES (a sovereign fund audits these):
+- Every effect is a HYPOTHESIS about a mechanism, not an established fact. Do not assert that the event "will" cause a move; assert that the mechanism, IF it operates as in past analogues, points a given direction.
+- If a link is speculative or the mechanism is unclear, say so and lower confidence — an honest "uncertain" beats a fabricated number.
+- Never invent a specific magnitude you cannot tie to a named analogue.
 
 SCENARIO TREE RULES:
 - Probabilities across Bull/Base/Bear/Tail-Risk MUST sum to 1.0 (±0.02).
@@ -67,7 +73,13 @@ Return JSON:
     });
 
     console.log(`causal-effects used provider: ${result.provider}`);
-    const parsed = safeParseJSON(result.text);
+    const parsed = safeParseJSON(result.text) ?? {};
+
+    // Ship the honest semantics with the payload: this is a model-authored
+    // hypothesis tree with uncalibrated confidence, never established causality.
+    (parsed as Record<string, unknown>).model = modelInfo("causal-effects");
+    (parsed as Record<string, unknown>).disclaimer =
+      "Model-generated hypothetical cascade. Effects are proposed transmission mechanisms, not established causes; confidence and branch probabilities are uncalibrated model estimates, not forecasts.";
 
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: any) {

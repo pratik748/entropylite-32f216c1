@@ -7,6 +7,17 @@ import { runConsensus, type EngineSignal, type ConsensusResult } from "../_share
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
 import { loadCalibration } from "../_shared/calibration.ts";
 import { returnMoments, walkForwardEdge, mertonProxy, cfExpectedR } from "../_shared/mathEdge.ts";
+import {
+  mean,
+  sampleStd as stddev,
+  logReturns,
+  sharpeRatio,
+  annualizedVolPct,
+  maxDrawdown as maxDrawdownDec,
+  pearsonCorrelation,
+} from "../_shared/stats.ts";
+import { riskFreeFor } from "../_shared/riskFree.ts";
+import { modelInfo } from "../_shared/modelRegistry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -452,55 +463,9 @@ async function fetchYahooChart(symbol: string, range = "3mo", interval = "1d") {
 }
 
 // ── Quantitative math ──────────────────────────────────────────────
-function logReturns(prices: number[]): number[] {
-  const r: number[] = [];
-  for (let i = 1; i < prices.length; i++) {
-    if (prices[i] > 0 && prices[i - 1] > 0) r.push(Math.log(prices[i] / prices[i - 1]));
-  }
-  return r;
-}
-
-function mean(arr: number[]): number {
-  return arr.length === 0 ? 0 : arr.reduce((a, b) => a + b, 0) / arr.length;
-}
-
-function stddev(arr: number[]): number {
-  if (arr.length < 2) return 0;
-  const m = mean(arr);
-  return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1));
-}
-
-function sharpeRatio(returns: number[], rfDaily = 0.0002): number {
-  if (returns.length < 10) return 0;
-  const excessMean = mean(returns) - rfDaily;
-  const sd = stddev(returns);
-  return sd === 0 ? 0 : (excessMean / sd) * Math.sqrt(252);
-}
-
+/** This surface reports drawdown as a positive percent. */
 function maxDrawdown(prices: number[]): number {
-  if (prices.length < 2) return 0;
-  let peak = prices[0], mdd = 0;
-  for (const p of prices) {
-    if (p > peak) peak = p;
-    const dd = (peak - p) / peak;
-    if (dd > mdd) mdd = dd;
-  }
-  return mdd * 100;
-}
-
-function pearsonCorrelation(a: number[], b: number[]): number {
-  const n = Math.min(a.length, b.length);
-  if (n < 10) return 0;
-  const ma = mean(a.slice(0, n)), mb = mean(b.slice(0, n));
-  let num = 0, da = 0, db = 0;
-  for (let i = 0; i < n; i++) {
-    const xa = a[i] - ma, xb = b[i] - mb;
-    num += xa * xb;
-    da += xa * xa;
-    db += xb * xb;
-  }
-  const denom = Math.sqrt(da * db);
-  return denom === 0 ? 0 : num / denom;
+  return maxDrawdownDec(prices) * 100;
 }
 
 function zScore(prices: number[], window = 20): number {
@@ -511,8 +476,9 @@ function zScore(prices: number[], window = 20): number {
   return s === 0 ? 0 : (prices[prices.length - 1] - m) / s;
 }
 
+/** This surface reports annualized vol as a percent. */
 function annualizedVol(returns: number[]): number {
-  return stddev(returns) * Math.sqrt(252) * 100;
+  return annualizedVolPct(returns);
 }
 
 // ── Max profit target using quant methods ──────────────────────────
@@ -1501,7 +1467,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       if (td.closes.length < 20) { thinData++; bumpReject("F0_thin_history"); continue; }
 
       const returns = logReturns(td.closes);
-      const sr = sharpeRatio(returns);
+      const sr = sharpeRatio(returns, riskFreeFor(baseCurrency).annualRate);
       const mdd = maxDrawdown(td.closes);
       const vol = annualizedVol(returns);
       const zs = zScore(td.closes);
@@ -2481,6 +2447,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       // Real-time grounding (Google Search) included in this generation cycle.
       // Empty when grounding was unavailable.
       liveWebContext: webBlock || "",
+      // Which model/version produced this payload (institutional memory).
+      model: modelInfo("desirable-assets"),
       timestamp: Date.now(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },

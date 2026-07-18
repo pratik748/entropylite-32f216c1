@@ -13,6 +13,7 @@ import {
   annualizedVol,
   clamp,
   concentrationIndex,
+  dailyReturns,
   maxDrawdown,
   mean,
   percentileOfLast,
@@ -25,6 +26,7 @@ import {
   trailingReturn,
   volumeTrend,
 } from "./compute";
+import { sharpeWithSE, volWithSE, ANNUAL_RISK_FREE } from "@/lib/quant-engine";
 
 export interface Bars {
   closes: number[];
@@ -84,6 +86,7 @@ interface NodeSpec {
   relatedIds?: string[];
   updatedAt?: number | null;
   displayText?: string;
+  uncertainty?: EvidenceMetric["uncertainty"];
 }
 
 /** Mechanical confidence: provenance base plus a small sample bonus. */
@@ -111,6 +114,7 @@ function makeNode(spec: NodeSpec): EvidenceMetric {
     confidence: round(Math.min(0.95, PROVENANCE_CONFIDENCE[spec.provenance] + sampleBonus), 2),
     updatedAt: spec.updatedAt ?? null,
     displayText: spec.displayText,
+    uncertainty: spec.uncertainty,
   };
 }
 
@@ -356,6 +360,9 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
   const sharpe = a?.quantMetrics?.sharpe1y ?? (closes.length ? realizedSharpe(closes.slice(-252)) : null);
   if (sharpe != null) {
     const grade: Grade = sharpe >= 0.8 ? "good" : sharpe >= 0 ? "neutral" : "bad";
+    // Uncertainty of the estimate itself (Lo 2002 SE) from the same window.
+    const rfRate = a?.quantMetrics?.riskFree?.annualRate ?? ANNUAL_RISK_FREE;
+    const sharpeU = closes.length ? sharpeWithSE(dailyReturns(closes.slice(-252)), rfRate) : null;
     push({
       id: "sharpe_1y",
       label: "Realized Sharpe (1y)",
@@ -364,7 +371,13 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       provenance: "computed",
       source: SRC_PRICE,
       definition: "Annualized return per unit of volatility over the trailing year — risk-adjusted performance.",
-      calculation: `Mean daily return ÷ daily σ × √252 = ${fmtNum(sharpe)} over the trailing year.`,
+      calculation: (() => {
+        const rf = a?.quantMetrics?.riskFree;
+        const rfText = rf?.annualRate != null
+          ? `rf = ${(rf.annualRate * 100).toFixed(2)}% (${rf.currency ?? "USD"} ${rf.tenor ?? "3M"} bill, ${rf.basis ?? "static_snapshot"} as of ${rf.asOf ?? "—"}${rf.fallbackFrom ? `, substituted for ${rf.fallbackFrom}` : ""})`
+          : `rf = USD snapshot rate (see src/lib/riskFree.ts)`;
+        return `(Mean daily return − rf/252) ÷ daily σ × √252 = ${fmtNum(sharpe)} over the trailing year; ${rfText}.`;
+      })(),
       whyItMatters: "Separates names that went up calmly from names that went up violently — the latter give returns back faster in stress.",
       grade,
       reason:
@@ -377,6 +390,14 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       pillar: "quality",
       sections: ["valuation/historical-performance", "risk/risk-analysis"],
       relatedIds: ["volatility", "tsr_1y", "max_drawdown"],
+      uncertainty: sharpeU
+        ? {
+            se: round(sharpeU.se, 2),
+            ci95: [round(sharpeU.sharpe - 1.96 * sharpeU.se, 2), round(sharpeU.sharpe + 1.96 * sharpeU.se, 2)],
+            n: sharpeU.n,
+            method: sharpeU.method,
+          }
+        : undefined,
     });
   }
 
@@ -646,6 +667,8 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
     const volSeries = closes.length ? rollingVolSeries(closes) : [];
     const volPct = volSeries.length ? percentileOfLast(volSeries) : null;
     const grade: Grade = vol <= 25 ? "good" : vol <= 45 ? "neutral" : "bad";
+    // SE of the vol estimate over the same trailing window (percent units).
+    const volU = closes.length ? volWithSE(dailyReturns(closes.slice(-61))) : null;
     push({
       id: "volatility",
       label: "Realized volatility (ann.)",
@@ -668,21 +691,32 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       sections: ["risk/risk-analysis", "structure/technical", "risk/sensitivity", "structure/options"],
       percentiles: volPct != null ? { history: volPct } : {},
       relatedIds: ["beta", "max_drawdown", "sharpe_1y"],
+      uncertainty: volU
+        ? {
+            se: round(volU.se * 100, 1),
+            ci95: [round((volU.vol - 1.96 * volU.se) * 100, 1), round((volU.vol + 1.96 * volU.se) * 100, 1)],
+            n: volU.n,
+            method: volU.method,
+          }
+        : undefined,
     });
   }
 
   const beta = a?.beta ?? null;
   if (beta != null) {
     const grade: Grade = beta <= 0.9 ? "good" : beta <= 1.3 ? "neutral" : "bad";
+    const betaFromProvider = a?.betaSource !== "vol_heuristic";
     push({
       id: "beta",
       label: "Beta",
       value: beta,
       format: "ratio",
-      provenance: "computed",
-      source: SRC_ENGINE,
+      provenance: betaFromProvider ? "reported" : "estimated",
+      source: betaFromProvider ? "Yahoo Finance · published beta" : SRC_ENGINE,
       definition: "Sensitivity of this name's returns to the broad market's returns.",
-      calculation: `Regression of daily returns on the index = ${fmtNum(beta)}.`,
+      calculation: betaFromProvider
+        ? `Provider-published beta (Yahoo Finance) = ${fmtNum(beta)}.`
+        : `No published beta available — estimated from realized vol (σ/22, clamped 0.65–2.75) = ${fmtNum(beta)}. Treat as a rough proxy, not a regression.`,
       whyItMatters: "Beta is the portfolio question: high-beta names double as index bets and drag the whole book in drawdowns.",
       grade,
       reason:
@@ -722,6 +756,33 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
       pillar: "risk",
       sections: ["risk/stress", "valuation/historical-performance", "risk/risk-analysis"],
       relatedIds: ["volatility", "pos_52w"],
+    });
+  }
+
+  // Cross-source disagreement is evidence in its own right: when two
+  // sources materially conflict on the same fact, the analyst sees the
+  // conflict instead of a silently chosen winner.
+  const conflicts = (a?.sourceConflicts ?? []).filter((c) => c?.field && (c.relDiffPct ?? 0) > 0);
+  if (conflicts.length > 0) {
+    const worst = conflicts.reduce((m, c) => Math.max(m, c.relDiffPct ?? 0), 0);
+    push({
+      id: "source_conflicts",
+      label: "Data source conflicts",
+      value: conflicts.length,
+      format: "number",
+      provenance: "computed",
+      source: "cross-source comparison · screener.in vs yahoo",
+      definition: "Count of facts where two data sources materially disagree (price >2%, P/E >20%, market cap >10%).",
+      calculation: conflicts
+        .map((c) => `${c.field}: ${(c.values ?? []).map((v) => `${v.source}=${v.value}`).join(" vs ")} (Δ${c.relDiffPct}%) — ${c.resolution ?? ""}`)
+        .join(" · "),
+      whyItMatters: "Disagreeing sources mean at least one is stale, uses a different definition, or covers a different venue — numbers built on the conflicted field inherit that uncertainty.",
+      grade: worst > 15 ? "bad" : "neutral",
+      reason: `${conflicts.length} conflicting field${conflicts.length === 1 ? "" : "s"}; largest gap ${worst.toFixed(1)}%. Figures derived from these fields carry extra uncertainty.`,
+      importance: 0.3,
+      pillar: "risk",
+      sections: ["risk/risk-analysis", "overview/summary"],
+      relatedIds: ["pe_ratio", "market_cap"],
     });
   }
 

@@ -60,6 +60,21 @@ export interface EvidenceMetric {
   updatedAt: number | null;
   /** Text rendered when value is null but a qualitative read exists (e.g. "Large Cap"). */
   displayText?: string;
+  /**
+   * Statistical uncertainty of the value itself, when measurable.
+   * A point estimate without this field is either exact (reported) or its
+   * uncertainty has not been quantified — never "certain by omission".
+   */
+  uncertainty?: {
+    /** Standard error, same units as `value`. */
+    se?: number;
+    /** 95% interval, same units as `value`. */
+    ci95?: [number, number];
+    /** Sample size behind the estimate. */
+    n?: number;
+    /** How the uncertainty was computed and what it understates. */
+    method: string;
+  };
 }
 
 /* ── Relationship engine ───────────────────────────────────────── */

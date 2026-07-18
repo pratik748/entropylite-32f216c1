@@ -114,7 +114,7 @@ serve(async (req) => {
   const since = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
   const { data: settledRows } = await sb
     .from("signal_outcomes")
-    .select("ensemble_score, agreement, outcome_won")
+    .select("ensemble_score, agreement, calibrated_prob, outcome_won")
     .not("outcome_won", "is", null)
     .gte("fired_at", since)
     .limit(5000);
@@ -122,6 +122,7 @@ serve(async (req) => {
   const samples = (settledRows || []).map((r: any) => ({
     score: Number(r.ensemble_score) || 0,
     agreement: Number(r.agreement) || 0,
+    displayedProb: Number(r.calibrated_prob) || 0,
     won: Number(r.outcome_won) || 0,
   })).filter((s) => Number.isFinite(s.score) && Number.isFinite(s.agreement));
 
@@ -133,6 +134,52 @@ serve(async (req) => {
   // visible; nothing is written for a decision path to read.
   const pMax = sigmoid(fit.alpha + fit.beta + fit.gamma);
   report.calibration = { ...fit, samples: samples.length, pMax: Number(pMax.toFixed(4)), consumed: false };
+
+  // ─── 2b. Reliability of the probabilities the product DISPLAYED ───
+  // This is the evidence that decides whether the prior-map probability
+  // deserves belief: bin displayed calibrated_prob against realized wins,
+  // score with Brier, and store the curve for the UI. (Phase II: a model's
+  // confidence is only meaningful once tested against reality.)
+  const displayed = samples.filter((s) => s.displayedProb > 0 && s.displayedProb <= 1);
+  let brierDisplayed: number | null = null;
+  let hitRate: number | null = null;
+  const NBINS = 10;
+  const bins = Array.from({ length: NBINS }, (_, b) => ({
+    pLow: b / NBINS, pHigh: (b + 1) / NBINS, meanForecast: 0, meanOutcome: 0, n: 0,
+  }));
+  if (displayed.length > 0) {
+    let bSum = 0, wins = 0;
+    for (const s of displayed) {
+      bSum += (s.displayedProb - s.won) ** 2;
+      wins += s.won;
+      const b = Math.min(NBINS - 1, Math.floor(s.displayedProb * NBINS));
+      bins[b].meanForecast += s.displayedProb;
+      bins[b].meanOutcome += s.won;
+      bins[b].n++;
+    }
+    for (const b of bins) {
+      if (b.n > 0) {
+        b.meanForecast = Number((b.meanForecast / b.n).toFixed(4));
+        b.meanOutcome = Number((b.meanOutcome / b.n).toFixed(4));
+      }
+    }
+    brierDisplayed = Number((bSum / displayed.length).toFixed(4));
+    hitRate = Number((wins / displayed.length).toFixed(4));
+  }
+  const { error: reportErr } = await sb.from("calibration_reports").insert({
+    window_days: 90,
+    n_settled: displayed.length,
+    brier_displayed: brierDisplayed,
+    brier_refit: samples.length >= 30 ? Number(fit.brier.toFixed(4)) : null,
+    hit_rate: hitRate,
+    bins: bins.filter((b) => b.n > 0),
+    refit_params: { alpha: fit.alpha, beta: fit.beta, gamma: fit.gamma, pMax: Number(pMax.toFixed(4)), consumed: false },
+    notes: displayed.length < 30
+      ? "insufficient settled sample — reliability not yet meaningful"
+      : null,
+  });
+  report.reliability_report_written = !reportErr;
+  if (reportErr) console.warn("calibration_reports insert failed:", reportErr.message);
 
   // Delete any previously stored row so no stale deployment can keep
   // reading poison — older engine builds fall back to the priors the
