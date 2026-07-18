@@ -43,6 +43,7 @@ import { buildEvidenceGraph } from "@/lib/evidence/build";
 import { synthesize, logNormalHorizon, type HorizonModel } from "@/lib/evidence/synthesis";
 import { lognormalEs, normalCdf } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
+import { formatRiskReward, RR_ENTRY_BAR } from "@/lib/riskReward";
 
 interface RiskMetrics {
   var95: number;
@@ -321,7 +322,7 @@ function buildAuditTrail(opts: {
       value: `entry ${f(edge.entryLow)}–${f(edge.entryHigh)} · stop ${f(edge.stopLoss)} · target ${f(edge.targetPrice)}`,
       source: "quant engine",
       formula: "entry = S·(1 ± σ_d) · stop = 1.2σ_d vs support · target = stop-width × R implied by the after-cost edge, vs resistance",
-      computation: `risk/reward ${edge.riskRewardRatio != null ? `${f(edge.riskRewardRatio, 1)}:1` : "—"}${ens ? ` · E[R] after costs ${f(ens.expectedR)}` : ""}`,
+      computation: `risk/reward ${formatRiskReward(edge.riskRewardRatio)}${ens ? ` · E[R] after costs ${f(ens.expectedR)}` : ""}`,
       usedFor: "Trade Plan panel · risk per share drives position sizing",
     });
   }
@@ -1779,7 +1780,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                       )}
                       {result.riskRewardRatio !== undefined && result.riskRewardRatio > 0 && (
                         <div className="text-center">
-                          <div className={`text-lg font-bold ${result.riskRewardRatio >= 2 ? "text-gain" : "text-loss"}`}>{result.riskRewardRatio.toFixed(1)}:1</div>
+                          <div className={`text-lg font-bold ${result.riskRewardRatio >= RR_ENTRY_BAR ? "text-gain" : "text-loss"}`}>{formatRiskReward(result.riskRewardRatio)}</div>
                           <div className="text-[10px] text-muted-foreground">Risk/Reward</div>
                         </div>
                       )}

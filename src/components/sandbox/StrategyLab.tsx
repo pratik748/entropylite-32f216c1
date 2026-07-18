@@ -13,6 +13,7 @@ import { useStrategyMemory, type GeneratedStrategy, type StrategyMemoryEntry } f
 import { governedInvoke } from "@/lib/apiGovernor";
 import { getCurrencySymbol } from "@/lib/currency";
 import { useFX } from "@/hooks/useFX";
+import { normalizeRiskRewardText } from "@/lib/riskReward";
 import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -514,7 +515,7 @@ const TradeCard = ({ instruction: inst }: { instruction: TradeInstruction }) => 
         {inst.take_profit_price != null && inst.take_profit_price > 0 && (
           <DetailCell label="Take Profit" value={fmt(inst.take_profit_price)} highlight="gain" />
         )}
-        <DetailCell label="R:R" value={inst.risk_reward} />
+        <DetailCell label="R:R" value={normalizeRiskRewardText(inst.risk_reward)} />
         <DetailCell label="Horizon" value={inst.time_horizon} />
       </div>
     </div>

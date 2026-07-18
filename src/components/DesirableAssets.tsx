@@ -10,6 +10,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { normalizeRiskRewardText } from "@/lib/riskReward";
 
 interface Recommendation {
   ticker: string;
@@ -1163,7 +1164,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   </div>
                   <div>
                     <p className="text-[8px] text-muted-foreground uppercase">R:R</p>
-                    <p className="font-mono text-sm font-bold text-foreground">{rec.riskReward || ","}</p>
+                    <p className="font-mono text-sm font-bold text-foreground">{normalizeRiskRewardText(rec.riskReward)}</p>
                     {(() => {
                       const hc = rec.horizonClass;
                       const cls = hc === "intraday" ? "bg-red-500/10 text-red-400 border-red-500/20"

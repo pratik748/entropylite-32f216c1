@@ -2,18 +2,27 @@ import { useMemo, useEffect, useState } from "react";
 import { TrendingUp, Zap, Brain } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
+import { normalizeRiskRewardText } from "@/lib/riskReward";
 
 interface Props { stocks: PortfolioStock[]; }
 
+/**
+ * Crown opportunities. Two provenances, kept honest:
+ *  - AI (crown-intelligence): may carry expectedEdge / confidence / riskReward
+ *    computed server-side under the ≥2:1 gate — shown labeled as AI estimates.
+ *  - Local screen: pattern flags from observed position facts (risk score,
+ *    beta, realized P&L) ONLY. It carries no edge, confidence or R:R —
+ *    those cannot be derived from a screen and are never fabricated here.
+ */
 interface Opportunity {
   type: string;
   signal: string;
   asset: string;
   action: string;
-  expectedEdge: string;
-  confidence: number;
+  expectedEdge?: string;
+  confidence?: number;
   urgency: "High" | "Medium" | "Low";
-  riskReward: string;
+  riskReward?: string;
 }
 
 const CrownLayer = ({ stocks }: Props) => {
@@ -21,7 +30,7 @@ const CrownLayer = ({ stocks }: Props) => {
   const [aiOpps, setAiOpps] = useState<Opportunity[] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Static fallback
+  // Local pattern screen — observed facts only, no invented numbers.
   const staticOpps = useMemo((): Opportunity[] => {
     if (analyzed.length === 0) return [];
     const opps: Opportunity[] = [];
@@ -31,16 +40,17 @@ const CrownLayer = ({ stocks }: Props) => {
       const pnlPct = ((st.analysis.currentPrice - st.buyPrice) / st.buyPrice) * 100;
       const ticker = st.ticker.replace(".NS", "").replace(".BO", "");
       if (risk > 55 && beta > 1.2) {
-        opps.push({ type: "Crowded Trade", signal: `High risk (${risk}) + high beta (${beta.toFixed(1)})`, asset: ticker, action: "Monitor for short squeeze", expectedEdge: `+${(beta * 3).toFixed(0)}%`, confidence: Math.min(85, Math.round(60 + risk * 0.3)), urgency: risk > 70 ? "High" : "Medium", riskReward: `1:${(beta * 2.5).toFixed(1)}` });
+        opps.push({ type: "Crowded Trade", signal: `Risk score ${risk} with β ${beta.toFixed(1)} — squeeze-prone profile`, asset: ticker, action: "Monitor for short squeeze", urgency: risk > 70 ? "High" : "Medium" });
       }
       if (pnlPct < -15) {
-        opps.push({ type: "Forced Seller", signal: `${ticker} down ${pnlPct.toFixed(1)}%`, asset: ticker, action: "Place limit buy orders 2-3% below", expectedEdge: "+5-8% reversion", confidence: Math.min(75, Math.round(50 + Math.abs(pnlPct) * 0.5)), urgency: pnlPct < -25 ? "High" : "Medium", riskReward: "1:2.5" });
+        opps.push({ type: "Forced Seller", signal: `${ticker} ${pnlPct.toFixed(1)}% below cost — capitulation zone`, asset: ticker, action: "Watch for seller exhaustion before averaging", urgency: pnlPct < -25 ? "High" : "Medium" });
       }
       if (pnlPct > 10 && risk < 45) {
-        opps.push({ type: "Momentum", signal: `${ticker} up ${pnlPct.toFixed(1)}% low risk`, asset: ticker, action: "Add on dips, trail stop -8%", expectedEdge: `+${(pnlPct * 0.4).toFixed(0)}%`, confidence: Math.min(80, Math.round(60 + pnlPct * 0.3)), urgency: "Low", riskReward: `1:${(pnlPct / 8).toFixed(1)}` });
+        opps.push({ type: "Momentum", signal: `${ticker} +${pnlPct.toFixed(1)}% with risk score ${risk}`, asset: ticker, action: "Add on dips, trail stop -8%", urgency: "Low" });
       }
     });
-    return opps.sort((a, b) => b.confidence - a.confidence);
+    const urgencyRank = { High: 0, Medium: 1, Low: 2 } as const;
+    return opps.sort((a, b) => urgencyRank[a.urgency] - urgencyRank[b.urgency]);
   }, [analyzed]);
 
   // AI fetch
@@ -59,6 +69,7 @@ const CrownLayer = ({ stocks }: Props) => {
   }, [analyzed.map(s => s.ticker).join(",")]);
 
   const opportunities = aiOpps || staticOpps;
+  const isLocalScreen = !aiOpps;
 
   if (opportunities.length === 0 && !aiLoading) {
     return (
@@ -83,6 +94,11 @@ const CrownLayer = ({ stocks }: Props) => {
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Risk → Profit Conversion Engine</h3>
           {aiOpps && <Brain className="h-3.5 w-3.5 text-gain" />}
           <span className="rounded bg-gain/20 px-2 py-0.5 font-mono text-[10px] text-gain">{opportunities.length} signals</span>
+          {isLocalScreen && !aiLoading && (
+            <span className="ml-auto rounded bg-surface-3 px-2 py-0.5 font-mono text-[9px] text-muted-foreground" title="Pattern flags from observed position facts. Edge, confidence and R:R require the AI pass and are not estimated locally.">
+              local screen · no edge estimates
+            </span>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -106,14 +122,18 @@ const CrownLayer = ({ stocks }: Props) => {
                   }`}>{opp.urgency}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground">R:R {opp.riskReward}</span>
-                  <span className={`font-mono text-sm font-bold ${opp.confidence >= 70 ? "text-gain" : "text-foreground"}`}>{opp.confidence}%</span>
+                  {opp.riskReward != null && (
+                    <span className="font-mono text-xs text-muted-foreground" title="AI-estimated trade structure">R:R {normalizeRiskRewardText(opp.riskReward)}</span>
+                  )}
+                  {opp.confidence != null && (
+                    <span className={`font-mono text-sm font-bold ${opp.confidence >= 70 ? "text-gain" : "text-foreground"}`}>{opp.confidence}%</span>
+                  )}
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground mb-1">{opp.signal}</p>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
                 <p className="text-xs text-foreground font-medium">→ {opp.action}</p>
-                <span className="font-mono text-xs text-gain">{opp.expectedEdge}</span>
+                {opp.expectedEdge != null && <span className="font-mono text-xs text-gain" title="AI-estimated edge">{opp.expectedEdge}</span>}
               </div>
             </div>
           ))}
