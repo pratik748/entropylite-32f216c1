@@ -59,17 +59,15 @@
     }
     </script>
 
-    <!-- Apply theme before paint to avoid flash. Default is Light — dark/palantir are opt-in. -->
+    <!-- Follow the device theme before paint (no manual toggle). Device dark →
+         pure-black terminal (the unclassed :root); device light → .light. -->
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('entropy-theme') || 'light';
-          if (t === 'light' || t === 'palantir') {
-            document.documentElement.classList.add(t);
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.documentElement.classList.add('light');
           }
-        } catch (e) {
-          document.documentElement.classList.add('light');
-        }
+        } catch (e) {}
       })();
     </script>
   </head>

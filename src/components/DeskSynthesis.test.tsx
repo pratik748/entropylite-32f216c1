@@ -77,9 +77,9 @@ describe("DeskSynthesis", () => {
 
   it("renders the core synthesis sections", () => {
     renderSynthesis();
-    expect(screen.getByText("Pillar verdicts")).toBeInTheDocument();
+    expect(screen.getByText("Pillars")).toBeInTheDocument();
     expect(screen.getByText("Scenario distribution")).toBeInTheDocument();
-    expect(screen.getByText("What's driving the verdict")).toBeInTheDocument();
+    expect(screen.getByText("What's driving it")).toBeInTheDocument();
     // All six pillars present.
     for (const p of ["Valuation", "Quality", "Growth", "Health", "Momentum", "Risk"]) {
       expect(screen.getAllByText(p).length).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ describe("DeskSynthesis", () => {
 
   it("links to the full Workstation for node-level inspection", () => {
     renderSynthesis();
-    const link = screen.getByRole("link", { name: /Inspect every node/ });
+    const link = screen.getByRole("link", { name: /open workstation/i });
     expect(link).toHaveAttribute("href", "/company/AAPL");
   });
 });

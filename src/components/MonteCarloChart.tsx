@@ -310,26 +310,9 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
           <Dice5 className="h-5 w-5 text-foreground" />
           <h2 className="text-base font-semibold text-foreground">Monte Carlo Engine</h2>
           <span className="rounded bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-            {NUM_SIMULATIONS.toLocaleString()} paths · {NUM_DAYS}d · GBM{calibration.jumpProb > 0 ? "+jumps" : ""}
+            {NUM_SIMULATIONS.toLocaleString()} paths · {NUM_DAYS}d · GBM
           </span>
         </div>
-      </div>
-
-      {/* Calibration provenance — an institutional simulation states its inputs. */}
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 font-mono text-[10px] ${
-        calibration.source === "historical" ? "border-border bg-surface-2 text-muted-foreground" : "border-warning/20 bg-warning/5 text-warning/90"
-      }`}>
-        <span className="uppercase tracking-wider font-semibold">
-          {calibration.source === "historical" ? "Historical calibration" : "Proxy calibration"}
-        </span>
-        <span>μ {(calibration.muAnnual * 100).toFixed(1)}%/yr</span>
-        <span>σ {(calibration.sigmaAnnual * 100).toFixed(1)}%/yr</span>
-        {calibration.jumpProb > 0 && <span>jumps {(calibration.jumpProb * 100).toFixed(2)}%/day</span>}
-        <span className="text-muted-foreground/70">
-          {calibration.source === "historical"
-            ? `drift = rf + ½(realized−rf), clamped ±40% · ${calibration.sessions}d history · rf ${(calibration.rf.annualRate * 100).toFixed(2)}% ${calibration.rf.currency}`
-            : `σ from analyst band width · drift = risk-free (no price history loaded)`}
-        </span>
       </div>
 
       {/* Key Stats Grid */}
