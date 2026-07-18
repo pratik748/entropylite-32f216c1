@@ -20,7 +20,7 @@
        evenly-stepped elevation ladder so panels float on the black; crisper
        hairlines for cleaner definition. Shapes, radius and data colours are
        unchanged — this only refines the surface finish. */
-    --background: 0 0% 2.5%;
+    --background: 0 0% 0%;
     --foreground: 0 0% 95%;
 
     --card: 0 0% 5.5%;
@@ -103,7 +103,7 @@
     --duration-base: 320ms;
     --duration-slow: 550ms;
 
-    --sidebar-background: 0 0% 2.5%;
+    --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 0 0% 58%;
     --sidebar-primary: 0 0% 94%;
     --sidebar-primary-foreground: 0 0% 5%;

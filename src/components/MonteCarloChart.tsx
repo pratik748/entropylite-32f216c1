@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Dice5, ShieldAlert, TrendingDown, BarChart3 } from "lucide-react";
 import { useFX } from "@/hooks/useFX";
 import { getCurrencySymbol, formatCompact } from "@/lib/currency";
+import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
+import { computeAssetStats } from "@/lib/quant-engine";
+import { riskFreeFor } from "@/lib/riskFree";
 
 interface MonteCarloChartProps {
   currentPrice: number;
@@ -83,13 +86,66 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
   const sym = getCurrencySymbol(baseCurrency);
   const fmtPrice = (v: number) => `${sym}${convertToBase(v, assetCurrency).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
+  // Pull the asset's real 1-year daily closes so the simulation is calibrated
+  // to how THIS name actually trades — not a constant drift and a vol backed
+  // out of analyst price bands.
+  const { prices, fetchHistorical } = useHistoricalPrices();
+  useEffect(() => {
+    if (ticker) fetchHistorical([ticker], "1y");
+  }, [ticker, fetchHistorical]);
+
+  /**
+   * Simulation calibration. Historical when we have the real series; otherwise
+   * an explicitly-labeled proxy. Institutional drift treatment: one year of
+   * daily returns is far too noisy to extrapolate raw (the mean is the hardest
+   * moment to estimate), so realized drift is shrunk 50% toward the currency
+   * risk-free and clamped to ±40%/yr rather than projecting last year forward.
+   */
+  const calibration = useMemo(() => {
+    const rf = riskFreeFor(assetCurrency);
+    const rfDaily = rf.annualRate / 252;
+    const closes = prices[ticker]?.closes ?? [];
+    const stats = closes.length >= 60 ? computeAssetStats(ticker, { closes }) : null;
+    if (stats) {
+      const shrunkDaily = rfDaily + 0.5 * (stats.mu - rfDaily);
+      const clampedAnnual = Math.max(-0.40, Math.min(0.40, shrunkDaily * 252));
+      return {
+        source: "historical" as const,
+        driftDaily: clampedAnnual / 252,
+        sigmaDaily: stats.sigma,
+        jumpProb: stats.jumpProb,
+        jumpSize: stats.jumpSize,
+        sessions: stats.n,
+        muAnnual: clampedAnnual,
+        sigmaAnnual: stats.sigmaAnnual,
+        rf,
+      };
+    }
+    const annualVol = Math.max(0.05, (bullRange[1] - bearRange[0]) / (2 * currentPrice));
+    return {
+      source: "proxy" as const,
+      driftDaily: rfDaily,
+      sigmaDaily: annualVol / Math.sqrt(252),
+      jumpProb: 0,
+      jumpSize: 0,
+      sessions: 0,
+      muAnnual: rf.annualRate,
+      sigmaAnnual: annualVol,
+      rf,
+    };
+  }, [prices, ticker, assetCurrency, bullRange, bearRange, currentPrice]);
+
   const { chartData, stats } = useMemo(() => {
-    const upperBound = bullRange[1];
-    const lowerBound = bearRange[0];
-    const gaussianRandom = makeGaussian(mulberry32(seedFrom(ticker, currentPrice, lowerBound, upperBound)));
-    const annualVol = Math.max(0.05, (upperBound - lowerBound) / (2 * currentPrice));
-    const dailyVol = annualVol / Math.sqrt(252);
-    const dailyDrift = 0.0002;
+    const dailyVol = calibration.sigmaDaily;
+    const dailyDrift = calibration.driftDaily;
+    const jProb = calibration.jumpProb;
+    const jSize = calibration.jumpSize;
+    const jStd = Math.abs(jSize) * 0.5;
+    // Shared uniform stream → deterministic, reproducible per calibration.
+    const rand = mulberry32(seedFrom(ticker, currentPrice, dailyVol * 1e4, dailyDrift * 1e6));
+    const gaussianRandom = makeGaussian(rand);
+    // Merton jump: Bernoulli(jProb) discontinuity, mean jSize, dispersion jStd.
+    const jumpDraw = () => (jProb > 0 && rand() < jProb ? jSize + jStd * gaussianRandom() : 0);
 
     const sampleEvery = Math.max(1, Math.floor(NUM_DAYS / 120));
     const stepsCount = Math.ceil(NUM_DAYS / sampleEvery) + 1;
@@ -109,7 +165,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
 
       for (let d = 1; d <= NUM_DAYS; d++) {
         const z = gaussianRandom();
-        price = price * Math.exp((dailyDrift - 0.5 * dailyVol * dailyVol) + dailyVol * z);
+        price = price * Math.exp((dailyDrift - 0.5 * dailyVol * dailyVol) + dailyVol * z + jumpDraw());
         price = Math.max(price, 0.01);
         if (price > peak) peak = price;
         const dd = (peak - price) / peak;
@@ -233,7 +289,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         origDD, resDD, histogram,
       },
     };
-  }, [currentPrice, bullRange, bearRange, ticker]);
+  }, [currentPrice, calibration, ticker]);
 
   const getVisiblePrefixes = (): string[] => {
     switch (viewMode) {

@@ -86,9 +86,32 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * The terminal follows the device colour scheme — no manual toggle. Device
+ * dark → the unclassed :root (pure-black terminal); device light → .light.
+ * Listens live so a system switch reflows without a reload, and clears any
+ * stale preference left by the removed toggle.
+ */
+function SystemThemeSync() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const apply = () => {
+      root.classList.remove("palantir");
+      root.classList.toggle("light", mq.matches);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    try { localStorage.removeItem("entropy-theme"); } catch { /* ignore */ }
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <SystemThemeSync />
       <Toaster />
       <Sonner />
       <BrowserRouter>
