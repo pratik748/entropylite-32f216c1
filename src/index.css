@@ -37,31 +37,27 @@
     --accent: 0 0% 14%;
     --accent-foreground: 0 0% 95%;
 
-    --destructive: 4 55% 52%;
+    --destructive: 4 88% 59%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 12%;
+    --border: 0 0% 14%;
     --input: 0 0% 12%;
     /* Monochrome focus ring */
     --ring: 0 0% 62%;
 
-    /* Institutional geometry: square. Matches the public-site system
-       (radius 0). Panels, buttons, tables and inputs are square; the only
-       round elements are pills/dots/avatars via `rounded-full`. The dominant
-       `rounded-xl` card lands at a crisp 4px (radius + 4px). */
-    --radius: 0rem;
+    /* Continuous-corner geometry */
+    --radius: 0.75rem;
 
-    /* Semantic data colors — aligned to the public-site functional accents
-       (pos/neg/signal). Calm institutional greens/reds, NOT neon: the same
-       values the marketing terminal uses, so data reads the same everywhere. */
-    --gain: 147 34% 46%;    /* pos  #4E9E72 */
-    --loss: 4 50% 54%;      /* neg  #C4564F */
-    --warning: 32 80% 54%;  /* signal #E8912D */
+    /* Semantic system colors — gain/loss/warning stay chromatic (data),
+       info is neutral: the base theme carries no accent hue. */
+    --gain: 145 66% 46%;
+    --loss: 4 92% 62%;
+    --warning: 34 96% 54%;
     --info: 0 0% 72%;
 
-    --sentiment-positive: 147 34% 46%;
-    --sentiment-negative: 4 50% 54%;
-    --sentiment-neutral: 32 80% 54%;
+    --sentiment-positive: 145 66% 46%;
+    --sentiment-negative: 4 92% 62%;
+    --sentiment-neutral: 34 96% 54%;
 
     /* Elevated surface ladder */
     --surface-1: 0 0% 6%;
@@ -83,16 +79,13 @@
     --shadow-2: 0 2px 4px hsl(0 0% 1% / 0.28), 0 8px 24px hsl(0 0% 1% / 0.32);
     --shadow-3: 0 4px 12px hsl(0 0% 1% / 0.32), 0 20px 60px hsl(0 0% 1% / 0.44);
 
-    /* Institutional rule: elevation is a surface step, not a glow. Coloured
-       halos around gain/loss/primary are removed (the public site forbids
-       glows and neon); glass panels keep only a neutral hairline-depth shadow. */
-    --glow-primary: none;
-    --glow-gain: none;
-    --glow-loss: none;
+    --glow-primary: 0 0 20px hsl(0 0% 90% / 0.07);
+    --glow-gain: 0 0 20px hsl(145 66% 46% / 0.16);
+    --glow-loss: 0 0 20px hsl(4 92% 62% / 0.16);
     --glow-glass: var(--shadow-1);
-    --glow-glass-primary: var(--shadow-1);
-    --glow-glass-loss: var(--shadow-1);
-    --glow-glass-gain: var(--shadow-1);
+    --glow-glass-primary: var(--shadow-2), inset 0 1px 0 hsl(0 0% 85% / 0.06);
+    --glow-glass-loss: 0 0 28px hsl(4 92% 62% / 0.12), inset 0 1px 0 hsl(4 80% 80% / 0.08);
+    --glow-glass-gain: 0 0 28px hsl(145 66% 46% / 0.12), inset 0 1px 0 hsl(145 60% 80% / 0.08);
 
     /* ── Motion · Apple spring-adjacent curves ── */
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);

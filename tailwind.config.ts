@@ -143,14 +143,10 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
-      /* Institutional square geometry. `--radius` is 0 in the terminal, so
-         lg/md/sm collapse to square; xl keeps a crisp 4px on the dominant
-         card. The large steps are tightened from the old bulbous values so
-         no surface reads as a rounded consumer card. */
       borderRadius: {
-        "4xl": "0.625rem",
-        "3xl": "0.5rem",
-        "2xl": "0.375rem",
+        "4xl": "2rem",
+        "3xl": "1.75rem",
+        "2xl": "1.375rem",
         xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 4px)",

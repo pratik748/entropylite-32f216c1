@@ -29,10 +29,10 @@ interface Props {
 }
 
 const TONE_BAR: Record<Insight["tone"], string> = {
-  bullish: "bg-gain",
-  bearish: "bg-loss",
-  warning: "bg-warning",
-  neutral: "bg-muted-foreground",
+  bullish: "bg-emerald-500",
+  bearish: "bg-rose-500",
+  warning: "bg-amber-500",
+  neutral: "bg-zinc-400",
 };
 
 const SHARE_URL = "https://entropylite.in";

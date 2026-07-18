@@ -1,17 +1,9 @@
 # Entropy Public-Site Design System
 
 Fixed institutional dark system for every public surface (`/`, `/about`, `/backbone`, `/data`,
-`/cadence`, `/pricing`, `/access`, `/disclaimer`, auth, 404). The public site does **not** follow the
+`/cadence`, `/pricing`, `/access`, `/disclaimer`, auth, 404). The terminal (`/dashboard`) keeps
+its own themeable system and is out of scope here. The public site does **not** follow the
 terminal theme toggle — it is one fixed voice.
-
-> **Terminal alignment (2026-07):** the terminal (`/dashboard`) now embodies this same
-> institutional language at the token level while staying themeable (dark/light). Specifically it
-> adopts: **square geometry** (`--radius: 0`; the dominant `rounded-xl` card lands at a crisp 4px,
-> pills/dots stay `rounded-full`), the **calm functional accents** (`--gain`/`--loss`/`--warning`
-> mapped to the public-site `pos`/`neg`/`signal` values — no neon), **elevation by surface step,
-> not glow** (coloured gain/loss/primary halos removed), and **hairline structure** (`--border`
-> at the public `hairline` value). Category chips are restrained neutral surfaces — no decorative
-> rainbow. The terminal keeps its theme toggle; only its visual grammar was aligned.
 
 Implementation: React + Vite + Tailwind. Tokens live in `tailwind.config.ts` (`carbon`,
 `hairline`, `signal`, `pos`, `neg`, `gilt`) and `src/index.css` (`.mkt-*` classes).
