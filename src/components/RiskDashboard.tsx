@@ -9,6 +9,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { governedInvoke } from "@/lib/apiGovernor";
 import TruthBadge from "@/components/twrd/TruthBadge";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { historicalCVaR } from "@/lib/quant-engine";
 import { pc1Concentration, jacobiEigen, marchenkoPastur } from "@/lib/portfolio-math";
 
@@ -16,25 +17,26 @@ interface RiskDashboardProps {
   stocks: PortfolioStock[];
 }
 
-// Static fallback
-function computeVaRCVaR(stocks: PortfolioStock[]) {
+// Static fallback — heuristic VaR on the FX-normalized book value, so the
+// numbers live in the same base currency as every other module's totals.
+function computeVaRCVaR(stocks: PortfolioStock[], totalValueBase: number) {
   const analyzed = stocks.filter(s => s.analysis);
-  if (analyzed.length === 0) return { var95: 0, var99: 0, cvar95: 0, cvar99: 0, liquidityVar: 0 };
-  const totalValue = analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0);
+  if (analyzed.length === 0 || totalValueBase <= 0) return { var95: 0, var99: 0, cvar95: 0, cvar99: 0, liquidityVar: 0 };
   const avgRisk = analyzed.reduce((s, st) => s + (st.analysis.riskScore || 40), 0) / analyzed.length;
   const dailyVol = (avgRisk / 100) * 0.025;
   return {
-    var95: totalValue * dailyVol * 1.645,
-    var99: totalValue * dailyVol * 2.326,
-    cvar95: totalValue * dailyVol * 2.063,
-    cvar99: totalValue * dailyVol * 2.665,
-    liquidityVar: totalValue * dailyVol * 1.645 * 1.35,
+    var95: totalValueBase * dailyVol * 1.645,
+    var99: totalValueBase * dailyVol * 2.326,
+    cvar95: totalValueBase * dailyVol * 2.063,
+    cvar99: totalValueBase * dailyVol * 2.665,
+    liquidityVar: totalValueBase * dailyVol * 1.645 * 1.35,
   };
 }
 
 const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
   const analyzed = stocks.filter((s) => s.analysis);
-  const staticVars = computeVaRCVaR(stocks);
+  const { totalValue, fmt } = useNormalizedPortfolio(stocks);
+  const staticVars = computeVaRCVaR(stocks, totalValue);
   const snap = useQuantSnapshot(stocks);
 
   // Real PC1 systemic-concentration flag from Σ (no AI, no fabrication)
@@ -71,11 +73,6 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       .catch(() => {})
       .finally(() => setAiLoading(false));
   }, [analyzed.map(s => s.ticker).join(",")]);
-
-  const totalValue = useMemo(() => 
-    analyzed.reduce((s, st) => s + (st.analysis.currentPrice || st.buyPrice) * st.quantity, 0),
-    [analyzed]
-  );
 
   // VaR priority: MEASURED history first (real return series), then the
   // server heuristic, then the static heuristic. The measured numbers must
@@ -336,7 +333,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
             <p className="mt-1 font-mono text-lg font-bold text-loss">
-              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+              {s.value > 0 ? fmt(s.value) : "—"}
             </p>
             <p className="text-[9px] text-muted-foreground">{s.basis}</p>
           </div>
@@ -518,7 +515,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
                 <p className="text-sm font-medium text-foreground mb-2">{s.label}</p>
                 <p className="font-mono text-2xl font-bold text-loss">{(s.pct * 100).toFixed(1)}%</p>
                 <p className="font-mono text-xs text-loss mt-1">
-                  ${s.loss.toLocaleString("en-US", { maximumFractionDigits: 0 })} at today's value
+                  {fmt(s.loss)} at today's value
                 </p>
               </div>
             ))}
@@ -540,7 +537,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
               <p className="text-[10px] text-muted-foreground mt-1">Recovery: {s.recovery}</p>
               {(s.pnlLoss || totalValue > 0) && (
                 <p className="font-mono text-xs text-loss mt-1">
-                  P&L: ${(s.pnlLoss || totalValue * Math.abs(s.impact) / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })} loss
+                  P&L: {fmt(s.pnlLoss || totalValue * Math.abs(s.impact) / 100)} loss
                 </p>
               )}
             </div>

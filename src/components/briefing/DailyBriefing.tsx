@@ -6,7 +6,7 @@ import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { useReadingStreak } from "@/hooks/useReadingStreak";
 import { evaluateConstraints, computeClankScore, clankLevel } from "@/lib/clank-engine";
-import { computePortfolioHealth } from "@/lib/portfolio-health";
+import { computePortfolioHealth, healthInputFromSnapshot } from "@/lib/portfolio-health";
 
 /**
  * SCR-01 · Daily Briefing — the anchor ritual of the Behavioral OS.
@@ -50,16 +50,8 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
 
   // ── Portfolio Health vital ──
   const health = useMemo(() => {
-    if (!snapshot.ready) return null;
-    const weights = Object.values(snapshot.weights);
-    return computePortfolioHealth({
-      weights,
-      var95Daily: snapshot.portfolio.var95,
-      totalValue: snapshot.totalValue,
-      sharpeAnnual: snapshot.portfolio.sharpe,
-      sigmaAnnual: snapshot.portfolio.sigmaAnnual,
-      regime: regime?.regime,
-    });
+    const input = healthInputFromSnapshot(snapshot, regime?.regime);
+    return input ? computePortfolioHealth(input) : null;
   }, [snapshot, regime?.regime]);
 
   // ── "For you" — holdings that crossed a line ──

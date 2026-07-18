@@ -17,6 +17,7 @@ import {
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useMacroIntelligence } from "@/hooks/useMacroIntelligence";
 import { useMarketRegime } from "@/hooks/useMarketRegime";
+import { normalizeRiskRewardText } from "@/lib/riskReward";
 
 interface Props {
   stocks: PortfolioStock[];
@@ -272,7 +273,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">R:R</div>
-                <div className="text-xs font-bold text-foreground">{d.risk_reward?.toFixed(1)}x</div>
+                <div className="text-xs font-bold text-foreground">{normalizeRiskRewardText(d.risk_reward)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Confidence</div>
@@ -692,7 +693,7 @@ const DerivativesEngine = ({ stocks }: Props) => {
             <div className="grid grid-cols-4 gap-2 mb-2">
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">R:R</div>
-                <div className="text-xs font-bold text-foreground">{o.risk_reward?.toFixed(1)}x</div>
+                <div className="text-xs font-bold text-foreground">{normalizeRiskRewardText(o.risk_reward)}</div>
               </div>
               <div className="text-center">
                 <div className="text-[8px] text-muted-foreground">Exp. Return</div>

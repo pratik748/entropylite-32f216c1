@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow, Briefcase, LineChart } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
 import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -13,6 +13,7 @@ import LiveNewsFeed from "@/components/LiveNewsFeed";
 
 import LoadingState from "@/components/LoadingState";
 import DeskAnalysisStack from "@/components/DeskAnalysisStack";
+import DeskPortfolioMode from "@/components/DeskPortfolioMode";
 import type { HistoryEntry } from "@/components/AnalysisHistory";
 import MarketOverview from "@/components/MarketOverview";
 import EntropySandbox from "@/components/sandbox/EntropySandbox";
@@ -177,7 +178,10 @@ const IndexContent = () => {
 
   useEffect(() => {
     const offNav = onUIEvent("navigate", ({ tab }) => handleTabSwitch(tab as Tab));
-    const offStock = onUIEvent("set_active_stock", ({ positionId }) => setActiveStockId(positionId));
+    const offStock = onUIEvent("set_active_stock", ({ positionId }) => {
+      setActiveStockId(positionId);
+      setDeskView("position");
+    });
     return () => { offNav(); offStock(); };
   }, [handleTabSwitch]);
 
@@ -203,6 +207,11 @@ const IndexContent = () => {
     priceStatusRef.current = priceStatus;
   }, [priceStatus]);
 
+  // ── Desk view: single-instrument vs full-book synthesis ──
+  // null = auto (book when ≥2 analyzed positions and no instrument focused).
+  const [deskView, setDeskView] = useState<"position" | "book" | null>(null);
+  const analyzedCount = stocks.filter((s) => s.analysis).length;
+
   const activeStock = stocks.find((s) => s.id === activeStockId) ?? null;
   const isLoading = activeStock?.isLoading ?? false;
   const rawAnalysis = activeStock?.analysis ?? null;
@@ -214,6 +223,27 @@ const IndexContent = () => {
   const analysis = analysisIsStub ? null : rawAnalysis;
   const effectiveLoading = isLoading || analysisIsStub;
   const showMobileDashboardDock = isMobile && activeTab === "dashboard";
+
+  // Resolve the desk view. Explicit choice wins; auto shows the book when
+  // there is no focused instrument and the book has enough analyzed
+  // positions to say anything credible.
+  const bookAvailable = analyzedCount >= 2;
+  const autoDeskView: "position" | "book" =
+    analysis || effectiveLoading ? "position" : bookAvailable ? "book" : "position";
+  const resolvedDeskView: "position" | "book" =
+    deskView === "book" ? (bookAvailable ? "book" : "position") : deskView ?? autoDeskView;
+
+  const focusPosition = useCallback((id: string) => {
+    setActiveStockId(id);
+    setDeskView("position");
+  }, []);
+  const focusTicker = useCallback((rawTicker: string) => {
+    const s = stocksRef.current.find((x) => x.ticker === rawTicker);
+    if (s) {
+      setActiveStockId(s.id);
+      setDeskView("position");
+    }
+  }, []);
 
   // Real-time price subscription
   useEffect(() => {
@@ -349,14 +379,14 @@ const IndexContent = () => {
     const existing = stocks.find((s) => s.ticker === normalizedTicker);
     if (existing) {
       setStocks((prev) => prev.map((s) => (s.id === existing.id ? { ...s, buyPrice, quantity } : s)));
-      setActiveStockId(existing.id);
+      focusPosition(existing.id);
       analyzeStock(existing.id, normalizedTicker, buyPrice, quantity);
       registerWatch(normalizedTicker, buyPrice, quantity);
     } else {
       const newId = crypto.randomUUID();
       const newStock: PortfolioStock = { id: newId, ticker: normalizedTicker, buyPrice, quantity, isLoading: false };
       setStocks((prev) => [...prev, newStock]);
-      setActiveStockId(newId);
+      focusPosition(newId);
       analyzeStock(newId, normalizedTicker, buyPrice, quantity);
       registerWatch(normalizedTicker, buyPrice, quantity);
       logTrade({
@@ -489,6 +519,40 @@ const IndexContent = () => {
     );
   }
 
+  // Instrument ↔ Book segmented control for the Desk center pane.
+  const deskViewToggle = (
+    <div className="flex items-center justify-between gap-2">
+      <div className="inline-flex items-center rounded-md border border-border bg-surface-1 p-0.5">
+        {([
+          { id: "position" as const, label: "Instrument", icon: <LineChart className="h-3 w-3" strokeWidth={1.75} />, enabled: true, hint: "Single-position analysis" },
+          { id: "book" as const, label: "Book", icon: <Briefcase className="h-3 w-3" strokeWidth={1.75} />, enabled: bookAvailable, hint: bookAvailable ? "Full-portfolio synthesis — quant, verdicts, news" : "Needs at least two analyzed positions" },
+        ]).map((v) => (
+          <button
+            key={v.id}
+            onClick={() => v.enabled && setDeskView(v.id)}
+            disabled={!v.enabled}
+            title={v.hint}
+            className={`flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              resolvedDeskView === v.id
+                ? "bg-surface-3 text-foreground"
+                : v.enabled
+                  ? "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground/40 cursor-not-allowed"
+            }`}
+          >
+            {v.icon}
+            <span>{v.label}</span>
+          </button>
+        ))}
+      </div>
+      {resolvedDeskView === "book" && (
+        <span className="hidden font-mono text-[9px] text-muted-foreground/60 sm:inline">
+          whole-book pass · one spine, three signal families
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <ForesightProvider host={foresightHost}>
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -609,16 +673,34 @@ const IndexContent = () => {
                     <div data-tour="stock-input">
                       <StockInput onAnalyze={handleAnalyze} isLoading={isLoading} />
                     </div>
-                    {effectiveLoading && <LoadingState />}
-                    <DeskAnalysisStack
-                      analysis={effectiveLoading ? null : analysis}
-                      stocks={stocks}
-                      isMobile
-                      onSelectTicker={(ticker) => {
-                        const stock = stocks.find(s => s.ticker === ticker || s.ticker.replace(".NS", "").replace(".BO", "") === ticker);
-                        if (stock) setActiveStockId(stock.id);
-                      }}
-                    />
+                    {deskViewToggle}
+                    {resolvedDeskView === "book" ? (
+                      <ModuleErrorBoundary
+                        title="Book synthesis recovered"
+                        description="The portfolio pass hit a render error. Retry remounts just this module."
+                      >
+                        <DeskPortfolioMode
+                          stocks={stocks}
+                          onSelectTicker={(t) => {
+                            focusTicker(t);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        />
+                      </ModuleErrorBoundary>
+                    ) : (
+                      <>
+                        {effectiveLoading && <LoadingState />}
+                        <DeskAnalysisStack
+                          analysis={effectiveLoading ? null : analysis}
+                          stocks={stocks}
+                          isMobile
+                          onSelectTicker={(ticker) => {
+                            const stock = stocks.find(s => s.ticker === ticker || s.ticker.replace(".NS", "").replace(".BO", "") === ticker);
+                            if (stock) focusPosition(stock.id);
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 ) : (
                   /* Desktop: Bloomberg-style resizable 3-column layout */
@@ -629,7 +711,7 @@ const IndexContent = () => {
                         <PortfolioBlotter
                           stocks={stocks}
                           activeStockId={activeStockId}
-                          onSelectStock={setActiveStockId}
+                          onSelectStock={focusPosition}
                           onRemoveStock={handleRemoveStock}
                           onAnalyze={handleAnalyze}
                           isLoading={isLoading}
@@ -647,29 +729,41 @@ const IndexContent = () => {
                         {/* Top center: Main analysis */}
                         <ResizablePanel defaultSize={65} minSize={30}>
                           <div className="h-full overflow-auto p-3 space-y-3">
-                            {!effectiveLoading && !analysis && (
-                              <div className="flex flex-col items-center justify-center rounded-xl border border-border/70 bg-card py-20 shadow-soft animate-scale-in">
-                                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-border/70 bg-surface-2">
-                                  <Activity className="h-6 w-6 text-muted-foreground animate-breathe" strokeWidth={1.5} />
-                                </div>
-                                <p className="data-label mb-2.5">No instrument selected</p>
-                                <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
-                                <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
-                                  Add any global asset — equities, crypto, FX or commodities — and twelve
-                                  engines will run a full pass with live pricing. Every position opens into
-                                  the Equity Workstation: evidence graph, thesis engine, and risk lab.
-                                </p>
-                                <p className="mt-5 text-caption-1 text-muted-foreground/60">
-                                  Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere
-                                </p>
-                              </div>
+                            {deskViewToggle}
+                            {resolvedDeskView === "book" ? (
+                              <ModuleErrorBoundary
+                                title="Book synthesis recovered"
+                                description="The portfolio pass hit a render error. Retry remounts just this module."
+                              >
+                                <DeskPortfolioMode stocks={stocks} onSelectTicker={focusTicker} />
+                              </ModuleErrorBoundary>
+                            ) : (
+                              <>
+                                {!effectiveLoading && !analysis && (
+                                  <div className="flex flex-col items-center justify-center rounded-xl border border-border/70 bg-card py-20 shadow-soft animate-scale-in">
+                                    <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-border/70 bg-surface-2">
+                                      <Activity className="h-6 w-6 text-muted-foreground animate-breathe" strokeWidth={1.5} />
+                                    </div>
+                                    <p className="data-label mb-2.5">No instrument selected</p>
+                                    <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
+                                    <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
+                                      Add any global asset — equities, crypto, FX or commodities — and twelve
+                                      engines will run a full pass with live pricing. Every position opens into
+                                      the Equity Workstation: evidence graph, thesis engine, and risk lab.
+                                    </p>
+                                    <p className="mt-5 text-caption-1 text-muted-foreground/60">
+                                      Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere
+                                    </p>
+                                  </div>
+                                )}
+                                {effectiveLoading && <LoadingState />}
+                                <DeskAnalysisStack
+                                  analysis={effectiveLoading ? null : analysis}
+                                  stocks={stocks}
+                                  isMobile={false}
+                                />
+                              </>
                             )}
-                            {effectiveLoading && <LoadingState />}
-                            <DeskAnalysisStack
-                              analysis={effectiveLoading ? null : analysis}
-                              stocks={stocks}
-                              isMobile={false}
-                            />
                           </div>
                         </ResizablePanel>
                       </ResizablePanelGroup>
@@ -785,9 +879,7 @@ const IndexContent = () => {
                       <PortfolioBlotter
                         stocks={stocks}
                         activeStockId={activeStockId}
-                        onSelectStock={(id) => {
-                          setActiveStockId(id);
-                        }}
+                        onSelectStock={focusPosition}
                         onRemoveStock={handleRemoveStock}
                         onAnalyze={handleAnalyze}
                         isLoading={isLoading}

@@ -36,6 +36,32 @@ function ramp(v: number, lo: number, hi: number): number {
   return clamp(((v - lo) / (hi - lo)) * 100);
 }
 
+/**
+ * The one sanctioned mapping from a quant snapshot to HealthInput. Every
+ * surface that shows Portfolio Health (Daily Briefing, Desk book mode, …)
+ * must build its input through this helper so the same book can never score
+ * differently on different screens. Structurally typed to stay hook-free.
+ */
+export function healthInputFromSnapshot(
+  snapshot: {
+    ready: boolean;
+    totalValue: number;
+    weights: Record<string, number>;
+    portfolio: { var95: number; sharpe: number; sigmaAnnual: number };
+  },
+  regime?: string,
+): HealthInput | null {
+  if (!snapshot.ready) return null;
+  return {
+    weights: Object.values(snapshot.weights),
+    var95Daily: snapshot.portfolio.var95,
+    totalValue: snapshot.totalValue,
+    sharpeAnnual: snapshot.portfolio.sharpe,
+    sigmaAnnual: snapshot.portfolio.sigmaAnnual,
+    regime,
+  };
+}
+
 export function computePortfolioHealth(input: HealthInput): HealthResult | null {
   const { weights, var95Daily, totalValue, sharpeAnnual, sigmaAnnual, regime } = input;
   const n = weights.length;
