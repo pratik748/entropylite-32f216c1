@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Activity, Shield, Globe, Target, BarChart3,
   TrendingUp, Layers, Zap, ArrowRight, ArrowUpRight, Plus,
-  FlaskConical,
+  FlaskConical, Briefcase, SigmaSquare, Droplets,
 } from "lucide-react";
 import PublicNav from "@/components/PublicNav";
 import SiteFooter from "@/components/marketing/SiteFooter";
@@ -27,6 +27,8 @@ const METHODS = [
   "Merton 1974",
   "Ornstein–Uhlenbeck",
   "Cointegration",
+  "Multi-factor OLS",
+  "Euler risk decomposition",
   "Shannon entropy",
   "Bayesian priors",
   "CLANK constraints",
@@ -65,11 +67,14 @@ const CAPABILITIES = [
   { icon: BarChart3, title: "Company dossiers", desc: "A twelve-dimension read on any company: management, capital flows, narrative, structural risk and beyond." },
   { icon: FlaskConical, title: "Strategy factory", desc: "Spin up a scenario, calibrate it to the current regime, and paper-test the hypothesis before risking capital." },
   { icon: Zap, title: "Causal cascade modelling", desc: "First-, second- and third-order effects propagated across sectors, currencies and asset classes — pre-trade." },
+  { icon: Briefcase, title: "Book Synthesis", desc: "A whole-portfolio pass on the Desk: optimizer targets, desk verdicts and news pressure merged into add / trim / review directives — conflicts surfaced, never averaged away." },
+  { icon: SigmaSquare, title: "Factor risk decomposition", desc: "Multi-factor regressions against named index and ETF proxies: portfolio betas, systematic vs idiosyncratic risk, Euler factor contributions, −2σ factor shocks." },
+  { icon: Droplets, title: "Liquidity & capacity", desc: "Days-to-exit per position from real 20-day median volumes at a stated participation cap, with a book-level liquidation ladder." },
 ];
 
 const PIPELINE = [
   { step: "01", title: "Ingest", desc: "Live prices, geopolitics, multi-source news, FX and institutional flow signals stream in continuously — timestamped, normalized to your base currency." },
-  { step: "02", title: "Quantify", desc: "Volatility, drift, correlation, covariance, VaR, CVaR and distance-to-default computed per holding, live." },
+  { step: "02", title: "Quantify", desc: "Volatility, drift, correlation, covariance, VaR, CVaR, distance-to-default and multi-factor betas computed per holding, live." },
   { step: "03", title: "Constrain", desc: "CLANK overlays structural limits — gamma walls, rebalance flows, liquidity vacuums — onto the probabilistic read." },
   { step: "04", title: "Simulate", desc: "10,000-path Monte Carlo and causal cascades resolve each event into a distribution of outcomes with attached probabilities." },
   { step: "05", title: "Decide", desc: "The strategy layer emits concrete positioning — entry levels, projected ranges, invalidation zones, risk-budgeted size." },
@@ -214,7 +219,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 mt-12 border-t border-l border-hairline bg-carbon-950">
             {[
-              { n: "Layer 01", t: "Position", d: "Multi-currency, multi-exchange — normalized to your base currency in real time." },
+              { n: "Layer 01", t: "Position", d: "Multi-currency, multi-exchange — one valuation spine prices every position in your base currency, so no two screens ever disagree on what the book is worth." },
               { n: "Layer 02", t: "Probability", d: "10,000 GBM paths over a 252-day horizon, with profit probability and tail risk." },
               { n: "Layer 03", t: "Risk surface", d: "VaR and CVaR at 95% and 99% confidence, recomputed live per asset." },
               { n: "Layer 04", t: "Flow", d: "An institutional flow read across ETF rebalances, dealer gamma and dark pools." },

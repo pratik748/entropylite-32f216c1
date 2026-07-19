@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Briefcase, ShieldAlert, Newspaper, ArrowRight, SigmaSquare, Droplets } from "lucide-react";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 import { useInstitutionalAnalytics } from "@/hooks/useInstitutionalAnalytics";
@@ -12,6 +12,28 @@ import {
   DRIFT_MATERIAL_PP, NEWS_PRESSURE_BAR,
   type BookDirective, type BookPositionInput, type SignalVote,
 } from "@/lib/desk-book";
+import {
+  buildGrowthSeries, rollingVolSeries, riskWeightRows, driftRows,
+  liquidityLadderPoints, betaSeriesPoints, factorBarRows,
+} from "@/lib/desk-book-charts";
+import {
+  GrowthChart, UnderwaterChart, RollingVolChart, RollingVarChart,
+  RiskWeightChart, DriftChart, FactorExposureChart, BetaStabilityChart,
+  LiquidityLadderChart,
+} from "@/components/DeskBookCharts";
+import type { OptimizerId } from "@/lib/analytics/types";
+import { OPTIMIZER_LABELS } from "@/lib/analytics/optimizers";
+
+/** Target models the analyst can flip between (same engine as Augment). */
+const TARGET_MODELS: Array<{ id: OptimizerId; short: string }> = [
+  { id: "equal_weight", short: "EW" },
+  { id: "min_variance", short: "MinVar" },
+  { id: "risk_parity", short: "ERC" },
+  { id: "hrp", short: "HRP" },
+  { id: "mean_variance", short: "MV" },
+];
+
+const PARTICIPATION_CHOICES = [0.1, 0.2, 0.3];
 
 /**
  * Desk Book Mode — the full-portfolio pass. One surface, one spine:
@@ -66,7 +88,12 @@ const Cell = ({ label, value, color, sub }: { label: string; value: string; colo
 );
 
 const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
-  const ia = useInstitutionalAnalytics(stocks);
+  // Analyst controls — target model feeds the SAME optimizer engine Augment
+  // uses; participation resizes the liquidity constraint. Both disclosed.
+  const [targetModel, setTargetModel] = useState<OptimizerId>("hrp");
+  const [participation, setParticipation] = useState(0.2);
+
+  const ia = useInstitutionalAnalytics(stocks, { recommendedId: targetModel });
   const norm = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(30000);
   const snap = ia.snapshot;
@@ -88,8 +115,9 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
         valueBase: h.value,
         volumes: snap.volumesByTicker[h.ticker],
       })),
+      participation,
     );
-  }, [snap, norm.holdings]);
+  }, [snap, norm.holdings, participation]);
 
   // Share of book VALUE inside the quant coverage (assets with ≥30d history).
   const coveredValueShare = useMemo(() => {
@@ -137,6 +165,24 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
   );
   const summary = useMemo(() => summarizeBook(directives), [directives]);
   const news = useMemo(() => aggregateBookNews(positions), [positions]);
+
+  // ── Chart data (pure transforms, tested in desk-book-charts.ts) ──
+  const growth = useMemo(
+    () => (snap.ready ? buildGrowthSeries(snap.portfolio.returns, ia.benchmarkReturns) : []),
+    [snap, ia.benchmarkReturns],
+  );
+  const rollingVol = useMemo(
+    () => (snap.ready ? rollingVolSeries(snap.portfolio.returns, 60) : []),
+    [snap],
+  );
+  const rwRows = useMemo(() => riskWeightRows(ia.attribution?.positions ?? []), [ia.attribution]);
+  const dRows = useMemo(() => driftRows(directives), [directives]);
+  const ladder = useMemo(() => liquidityLadderPoints(liquidity?.perPosition ?? []), [liquidity]);
+  const betaPts = useMemo(() => betaSeriesPoints(factor.rollingBeta), [factor.rollingBeta]);
+  const fRows = useMemo(
+    () => factorBarRows(factor.model?.factors ?? [], factor.model?.portfolio?.exposures ?? {}),
+    [factor.model],
+  );
 
   const analyzedCount = norm.holdings.length;
   if (analyzedCount < 2) {
@@ -193,6 +239,47 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
         .
       </p>
 
+      {/* ── Analyst controls — one row, above every chart they affect ── */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border px-4 py-2">
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Target model</span>
+          <div className="inline-flex items-center rounded-md border border-border bg-surface-1 p-0.5">
+            {TARGET_MODELS.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setTargetModel(m.id)}
+                title={OPTIMIZER_LABELS[m.id]}
+                className={`rounded-[4px] px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                  targetModel === m.id ? "bg-surface-3 text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m.short}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Exit participation</span>
+          <div className="inline-flex items-center rounded-md border border-border bg-surface-1 p-0.5">
+            {PARTICIPATION_CHOICES.map((p) => (
+              <button
+                key={p}
+                onClick={() => setParticipation(p)}
+                title={`Assume exits at ${Math.round(p * 100)}% of 20-day median daily volume`}
+                className={`rounded-[4px] px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                  participation === p ? "bg-surface-3 text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {Math.round(p * 100)}%
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="ml-auto hidden font-mono text-[9px] text-muted-foreground/50 lg:inline">
+          controls re-run the engines — nothing is cached into the verdicts
+        </span>
+      </div>
+
       {/* ── Vitals ── */}
       <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
         <Cell
@@ -238,6 +325,41 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
           sub={ia.benchmarkReady ? `vs ${ia.benchmarkTicker}` : ia.betaBasis}
         />
       </div>
+
+      {/* ── Performance — growth of 1.0 and the underwater curve ── */}
+      {growth.length >= 20 && (
+        <>
+          <SectionHead
+            title="Performance"
+            note={`growth of 1.0, ${growth.length} sessions${ia.benchmarkReady ? ` · vs ${ia.benchmarkTicker}, common base` : ""} · drawdown from running peak`}
+          />
+          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+            <GrowthChart data={growth} benchmarkLabel={ia.benchmarkReady ? ia.benchmarkTicker : null} />
+            <UnderwaterChart data={growth} />
+          </div>
+        </>
+      )}
+
+      {/* ── Rolling risk — how the book's risk moved, not just where it is ── */}
+      {(rollingVol.length > 0 || snap.portfolio.rollingVar.length > 0) && (
+        <>
+          <SectionHead title="Rolling risk" note="60-day trailing windows over the book's own return history" />
+          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+            {rollingVol.length > 0 && (
+              <div>
+                <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">σ annualized · 60d window</p>
+                <RollingVolChart data={rollingVol} />
+              </div>
+            )}
+            {snap.portfolio.rollingVar.length > 0 && (
+              <div>
+                <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">1-day tail loss at today's value</p>
+                <RollingVarChart data={snap.portfolio.rollingVar} fmt={norm.fmt} />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── Health gauges — same computation as the Daily Briefing ── */}
       {health && (
@@ -312,6 +434,30 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
           </button>
         ))}
       </div>
+
+      {/* ── Capital vs risk + drift — where the money sits vs where the risk sits ── */}
+      {(rwRows.length >= 2 || dRows.length >= 2) && (
+        <>
+          <SectionHead
+            title="Capital vs risk"
+            note={`risk = Euler share of portfolio variance from Σ · target = ${ia.recommended?.label ?? OPTIMIZER_LABELS[targetModel]}`}
+          />
+          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+            {rwRows.length >= 2 && (
+              <div>
+                <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Weight vs risk contribution</p>
+                <RiskWeightChart rows={rwRows} />
+              </div>
+            )}
+            {dRows.length >= 2 && (
+              <div>
+                <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Held vs target allocation</p>
+                <DriftChart rows={dRows} targetLabel={ia.recommended?.label ?? OPTIMIZER_LABELS[targetModel]} />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── Book news impact ── */}
       {news && (
@@ -400,6 +546,25 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               );
             })}
           </div>
+          {(fRows.length >= 2 || betaPts.length > 0) && (
+            <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+              {fRows.length >= 2 && (
+                <div>
+                  <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Factor exposures · signed β</p>
+                  <FactorExposureChart rows={fRows} />
+                </div>
+              )}
+              {betaPts.length > 0 && (
+                <div>
+                  <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                    Rolling 60d β vs {factor.marketFactorLabel}
+                    {factor.fullBeta != null && <span className="text-muted-foreground/60"> · dashed = full sample</span>}
+                  </p>
+                  <BetaStabilityChart points={betaPts} fullBeta={factor.fullBeta} />
+                </div>
+              )}
+            </div>
+          )}
           {factor.fullBeta != null && factor.rollingBeta.length > 0 && (() => {
             const recent = factor.rollingBeta[factor.rollingBeta.length - 1];
             const drift = Math.abs(recent - (factor.fullBeta as number));
@@ -431,6 +596,14 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
             <Cell label="Within 20d" value={`${(liquidity.shareWithin.d20 * 100).toFixed(0)}%`} color={liquidity.shareWithin.d20 < 1 ? "text-loss" : undefined} sub="of volume-covered value" />
             <Cell label="Weighted exit" value={`${liquidity.weightedDaysToExit.toFixed(1)}d`} sub={`volume data covers ${Math.round(liquidity.coveredValueShare * 100)}% of book`} />
           </div>
+          {ladder.length >= 2 && (
+            <div className="border-b border-border px-3 py-2">
+              <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                Liquidation ladder · cumulative share exitable at {Math.round(liquidity.participation * 100)}% participation
+              </p>
+              <LiquidityLadderChart points={ladder} />
+            </div>
+          )}
           {liquidity.perPosition.filter((p) => p.daysToExit != null && p.daysToExit > 5).slice(0, 3).map((p) => (
             <div key={p.ticker} className="flex items-center gap-2 border-b border-border/50 px-4 py-1.5">
               <Droplets className="h-3 w-3 shrink-0 text-warning" />

@@ -37,6 +37,20 @@ partial shocks; and a 60d rolling market beta vs full-sample beta for
 regime-shift detection. Every simplification (proxy factors, uncorrelated
 residuals, first-order shocks) is printed in the UI, not hidden.
 
+## Charts & analyst tools (the quantitative spine, visible)
+
+`src/components/DeskBookCharts.tsx` renders thin JSX over tested transforms
+in `src/lib/desk-book-charts.ts`: growth-of-1.0 vs benchmark (common base,
+one axis), underwater drawdown, rolling 60d σ and VaR/CVaR, capital-weight
+vs Euler-risk-contribution bars (the risk-parity diagnostic), held-vs-target
+allocation, signed factor-β bars, rolling-β stability vs the full-sample β,
+and the liquidation ladder. Dataviz discipline: one axis per chart, identity
+by lightness + line style with legends (never hue alone), polarity anchored
+to zero baselines, crosshair tooltips everywhere, no smoothing or
+interpolation. Analyst controls: the target-model selector re-runs the same
+optimizer engine Augment uses (EW / MinVar / ERC / HRP / MV), and the exit
+participation control (10/20/30%) re-prices the liquidity constraint.
+
 ## Liquidity & capacity (what big books actually need)
 
 `src/lib/quant/liquidity.ts` uses real 20-day median volumes: per-position
