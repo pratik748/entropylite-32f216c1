@@ -174,6 +174,16 @@ export function createEngineHandler(
   return async (req: Request): Promise<Response> => {
     if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+    // Unauthenticated liveness probe. A GET returns 200 the moment the
+    // function is deployed, so the deploy can be verified with a plain
+    // `curl` — no login, no data exposed. POST still requires auth.
+    if (req.method === "GET") {
+      return new Response(
+        JSON.stringify({ status: "ok", service: "opportunity-engine", profile: profile.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     try {
       const user = await loaders.requireUser(req);
       const body: EngineRequest = await req.json().catch(() => ({}));
