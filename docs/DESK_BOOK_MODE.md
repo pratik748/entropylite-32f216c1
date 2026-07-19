@@ -100,6 +100,43 @@ proves the surface stays honest with zero network: unmeasured quantities
 render "—", the optimizer is disclosed as unavailable, verdict-driven
 directives still work).
 
+## Simulation Lab (distributions, not predictions)
+
+`src/lib/quant/simulation.ts` — five seeded, deterministic generators over
+the book's own daily return history: i.i.d. historical bootstrap,
+stationary block bootstrap (mean 5d blocks, keeps vol clustering),
+parametric Gaussian (σ from the selected covariance model, zero drift by
+design), heavy-tailed Student-t (ν fitted from realized kurtosis,
+variance-matched), and regime-conditioned bootstrap (resamples only days
+whose trailing-vol tercile matches today's). A news scenario is a
+user-defined shock: pick a factor and a σ multiplier, and the shock lands
+at day 0 through the book's fitted factor β, with the engine generating
+the aftermath. Outputs: percentile fans, terminal histograms, VaR/ES at
+horizon, and an engine-disagreement table — the spread between models is
+model risk, shown rather than hidden. Engines that cannot run honestly say
+"unavailable"; nothing is silently substituted. Every run stamps its seed,
+method and Σ-model metadata.
+
+## Covariance model registry
+
+`src/lib/quant/covariance-registry.ts` — no single estimator is "the"
+truth. Sample, EWMA (λ=0.94), Ledoit–Wolf, DCC-lite and Marchenko–Pastur
+cleaned estimators behind one descriptor
+`{ estimator, window, decay, shrinkage, cleaning, asOf }`; every consumer
+states which model produced its Σ, and the Σ-model control in the
+Simulation Lab visibly re-prices the parametric engines.
+
+## Honest controls
+
+The Book's target-model selector runs with `strictRecommended`: a selected
+optimizer that fails to converge says "not converged — no targets shown"
+instead of silently substituting another model's numbers (which made the
+control appear dead). The default face of the Book is minimal — verdict,
+vitals, Simulation Lab, directives, model integrity — with everything
+supporting (performance, rolling risk, health gauges, news, factor
+detail, liquidity, exposures, stress, insights, methodology) one click
+away behind disclosure rows.
+
 ## Model integrity (the numbers audit themselves)
 
 `src/lib/quant/integrity.ts` — credibility is not more decimals; it is each

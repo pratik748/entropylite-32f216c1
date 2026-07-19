@@ -77,7 +77,17 @@ export function pickBenchmark(currencies: string[]): string {
 
 export function useInstitutionalAnalytics(
   stocks: PortfolioStock[],
-  opts?: { constraints?: OptimizerConstraints; recommendedId?: OptimizerId },
+  opts?: {
+    constraints?: OptimizerConstraints;
+    recommendedId?: OptimizerId;
+    /**
+     * When true, `recommended` is EXACTLY the requested optimizer or null —
+     * no silent fallback to a different model. A surface that offers a
+     * model selector must set this, otherwise a failed selection quietly
+     * shows another model's numbers and the control appears dead.
+     */
+    strictRecommended?: boolean;
+  },
 ): InstitutionalAnalytics {
   const norm = useNormalizedPortfolio(stocks);
   const snapshot = useQuantSnapshot(stocks);
@@ -94,6 +104,7 @@ export function useInstitutionalAnalytics(
 
   const constraints = opts?.constraints;
   const recommendedId = opts?.recommendedId ?? "hrp";
+  const strictRecommended = opts?.strictRecommended ?? false;
 
   return useMemo<InstitutionalAnalytics>(() => {
     const { holdings, totalValue, totalInvested, totalPnl, fmt, baseCurrency } = norm;
@@ -215,10 +226,12 @@ export function useInstitutionalAnalytics(
       };
       optimizers = runAllOptimizers(input);
     }
-    const recommended = optimizers.find(o => o.id === recommendedId && o.diagnostics.converged)
-      ?? optimizers.find(o => o.id === "risk_parity" && o.diagnostics.converged)
-      ?? optimizers.find(o => o.diagnostics.converged)
-      ?? null;
+    const recommended = strictRecommended
+      ? (optimizers.find(o => o.id === recommendedId && o.diagnostics.converged) ?? null)
+      : (optimizers.find(o => o.id === recommendedId && o.diagnostics.converged)
+          ?? optimizers.find(o => o.id === "risk_parity" && o.diagnostics.converged)
+          ?? optimizers.find(o => o.diagnostics.converged)
+          ?? null);
 
     // ── Stress & replay ──────────────────────────────────────────
     const stressPositions = holdings.map(h => ({
@@ -288,5 +301,5 @@ export function useInstitutionalAnalytics(
       report,
       recommended,
     };
-  }, [norm, snapshot, benchPrices, benchLoading, benchmarkTicker, constraints, recommendedId]);
+  }, [norm, snapshot, benchPrices, benchLoading, benchmarkTicker, constraints, recommendedId, strictRecommended]);
 }

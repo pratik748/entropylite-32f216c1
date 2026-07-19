@@ -24,6 +24,7 @@ import {
 import { kupiecBacktest, sharpeReport, volatilityCI } from "@/lib/quant/integrity";
 import type { OptimizerId } from "@/lib/analytics/types";
 import { OPTIMIZER_LABELS } from "@/lib/analytics/optimizers";
+import DeskSimulationLab from "@/components/DeskSimulationLab";
 
 /** Target models the analyst can flip between (same engine as Augment). */
 const TARGET_MODELS: Array<{ id: OptimizerId; short: string }> = [
@@ -80,6 +81,26 @@ const SectionHead = ({ title, note }: { title: string; note?: string }) => (
   </div>
 );
 
+/**
+ * Collapsible depth. The Book's default face stays minimal — verdict,
+ * vitals, simulation, directives, integrity — and everything supporting
+ * lives one click away instead of shouting from the front.
+ */
+const Disclosure = ({ title, note, defaultOpen = false, children }: {
+  title: string; note?: string; defaultOpen?: boolean; children: React.ReactNode;
+}) => (
+  <details className="group/disc border-b border-border" open={defaultOpen}>
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-surface-1/40 px-4 py-1.5 transition-colors hover:bg-surface-2">
+      <span className="font-mono text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="mr-1.5 inline-block transition-transform group-open/disc:rotate-90">▸</span>
+        {title}
+      </span>
+      {note && <span className="hidden truncate font-mono text-[9px] text-muted-foreground/45 sm:inline">{note}</span>}
+    </summary>
+    {children}
+  </details>
+);
+
 const Cell = ({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) => (
   <div className="px-4 py-2">
     <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
@@ -94,7 +115,9 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
   const [targetModel, setTargetModel] = useState<OptimizerId>("hrp");
   const [participation, setParticipation] = useState(0.2);
 
-  const ia = useInstitutionalAnalytics(stocks, { recommendedId: targetModel });
+  // strictRecommended: a selected model that fails says so — it is never
+  // silently swapped for another model's numbers.
+  const ia = useInstitutionalAnalytics(stocks, { recommendedId: targetModel, strictRecommended: true });
   const norm = useNormalizedPortfolio(stocks);
   const regime = useMarketRegime(30000);
   const snap = ia.snapshot;
@@ -272,6 +295,11 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               </button>
             ))}
           </div>
+          {snap.ready && !ia.recommended && (
+            <span className="font-mono text-[10px] text-warning" title="The selected optimizer failed on this book's covariance — no other model is silently substituted.">
+              {OPTIMIZER_LABELS[targetModel]}: not converged — no targets shown
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Exit participation</span>
@@ -341,25 +369,30 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
         />
       </div>
 
-      {/* ── Performance — growth of 1.0 and the underwater curve ── */}
+      {/* ── Simulation Lab — the scenario engine, front and center ── */}
+      <SectionHead
+        title="Simulation lab"
+        note="5 seeded generators · Σ-model registry · news scenarios via factor β — distributions, not predictions"
+      />
+      <DeskSimulationLab snap={snap} factor={factor} bookValue={norm.totalValue} fmt={norm.fmt} />
+
+      {/* ── Performance — collapsed depth ── */}
       {growth.length >= 20 && (
-        <>
-          <SectionHead
-            title="Performance"
-            note={`growth of 1.0, ${growth.length} sessions${ia.benchmarkReady ? ` · vs ${ia.benchmarkTicker}, common base` : ""} · drawdown from running peak`}
-          />
-          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+        <Disclosure
+          title="Performance"
+          note={`growth of 1.0, ${growth.length} sessions${ia.benchmarkReady ? ` · vs ${ia.benchmarkTicker}, common base` : ""} · drawdown from running peak`}
+        >
+          <div className="grid grid-cols-1 gap-2 px-3 py-2 lg:grid-cols-2">
             <GrowthChart data={growth} benchmarkLabel={ia.benchmarkReady ? ia.benchmarkTicker : null} />
             <UnderwaterChart data={growth} />
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Rolling risk — how the book's risk moved, not just where it is ── */}
+      {/* ── Rolling risk — collapsed depth ── */}
       {(rollingVol.length > 0 || snap.portfolio.rollingVar.length > 0) && (
-        <>
-          <SectionHead title="Rolling risk" note="60-day trailing windows over the book's own return history" />
-          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+        <Disclosure title="Rolling risk" note="60-day trailing windows over the book's own return history">
+          <div className="grid grid-cols-1 gap-2 px-3 py-2 lg:grid-cols-2">
             {rollingVol.length > 0 && (
               <div>
                 <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">σ annualized · 60d window</p>
@@ -373,7 +406,7 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               </div>
             )}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {/* ── Model integrity — every headline number audits itself ── */}
@@ -422,11 +455,10 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
         </>
       )}
 
-      {/* ── Health gauges — same computation as the Daily Briefing ── */}
+      {/* ── Health gauges — collapsed depth (score stays in the header) ── */}
       {health && (
-        <>
-          <SectionHead title="Health" note="identical gauge math to SCR-01 briefing · healthInputFromSnapshot" />
-          <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
+        <Disclosure title="Health" note="identical gauge math to SCR-01 briefing · healthInputFromSnapshot">
+          <div className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
             {health.gauges.map((g) => (
               <div key={g.key} className="px-3 py-2">
                 <div className="flex items-baseline justify-between">
@@ -442,7 +474,7 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               </div>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {/* ── Directives — the add / trim / review ledger ── */}
@@ -498,12 +530,12 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
 
       {/* ── Capital vs risk + drift — where the money sits vs where the risk sits ── */}
       {(rwRows.length >= 2 || dRows.length >= 2) && (
-        <>
-          <SectionHead
-            title="Capital vs risk"
-            note={`risk = Euler share of portfolio variance from Σ · target = ${ia.recommended?.label ?? OPTIMIZER_LABELS[targetModel]}`}
-          />
-          <div className="grid grid-cols-1 gap-2 border-b border-border px-3 py-2 lg:grid-cols-2">
+        <Disclosure
+          title="Capital vs risk"
+          defaultOpen
+          note={`risk = Euler share of portfolio variance from Σ · target = ${ia.recommended ? ia.recommended.label : `${OPTIMIZER_LABELS[targetModel]} (not converged)`}`}
+        >
+          <div className="grid grid-cols-1 gap-2 px-3 py-2 lg:grid-cols-2">
             {rwRows.length >= 2 && (
               <div>
                 <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Weight vs risk contribution</p>
@@ -517,17 +549,16 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               </div>
             )}
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Book news impact ── */}
+      {/* ── Book news impact — collapsed depth ── */}
       {news && (
-        <>
-          <SectionHead
-            title="News pressure on the book"
-            note={`weight-averaged · covers ${(news.coverageWeight * 100).toFixed(0)}% of book · ${news.itemCount} headlines`}
-          />
-          <div className="border-b border-border px-4 py-2.5">
+        <Disclosure
+          title="News pressure on the book"
+          note={`weight-averaged · covers ${(news.coverageWeight * 100).toFixed(0)}% of book · ${news.itemCount} headlines`}
+        >
+          <div className="px-4 py-2.5">
             <div className="mb-1.5 flex items-center gap-3 font-mono text-[11px] tabular-nums">
               <Newspaper className="h-3 w-3 text-muted-foreground" />
               <span className={news.weightedPressure >= 0 ? "text-gain" : "text-loss"}>
@@ -554,16 +585,15 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               trades alone here; it corroborates or contests the quant and verdict signals above.
             </p>
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Factor decomposition — the regression layer ── */}
+      {/* ── Factor decomposition — collapsed depth ── */}
       {factor.ready && factor.model?.portfolio && (
-        <>
-          <SectionHead
-            title="Factor decomposition"
-            note={`OLS on ETF/index-proxy daily returns · ${factor.model.portfolio.n}d · avg R² ${factor.model.portfolio.avgR2.toFixed(2)}`}
-          />
+        <Disclosure
+          title="Factor decomposition"
+          note={`OLS on ETF/index-proxy daily returns · ${factor.model.portfolio.n}d · avg R² ${factor.model.portfolio.avgR2.toFixed(2)}`}
+        >
           <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
             <Cell
               label="Systematic share"
@@ -641,16 +671,15 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               model fits {Math.round(factor.model.coveredWeight * 100)}% of covered weight — assets with thin factor overlap are excluded, not guessed
             </p>
           )}
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Liquidity & capacity ── */}
+      {/* ── Liquidity & capacity — collapsed depth ── */}
       {liquidity && (
-        <>
-          <SectionHead
-            title="Liquidity & capacity"
-            note={`exit at ${Math.round(liquidity.participation * 100)}% of 20d median volume · participation constraint, not an impact model`}
-          />
+        <Disclosure
+          title="Liquidity & capacity"
+          note={`exit at ${Math.round(liquidity.participation * 100)}% of 20d median volume · participation constraint, not an impact model`}
+        >
           <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
             <Cell label="Exitable in 1d" value={`${(liquidity.shareWithin.d1 * 100).toFixed(0)}%`} color={liquidity.shareWithin.d1 < 0.5 ? "text-warning" : "text-gain"} sub="of volume-covered value" />
             <Cell label="Within 5d" value={`${(liquidity.shareWithin.d5 * 100).toFixed(0)}%`} sub="of volume-covered value" />
@@ -675,14 +704,13 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{norm.fmt(p.valueBase)}</span>
             </div>
           ))}
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Exposures ── */}
+      {/* ── Exposures — collapsed depth ── */}
       {ia.exposure && (ia.exposure.sector.length > 1 || ia.exposure.currency.length > 1) && (
-        <>
-          <SectionHead title="Exposures" note="base-currency value weights" />
-          <div className="grid grid-cols-1 divide-y divide-border border-b border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+        <Disclosure title="Exposures" note="base-currency value weights">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             <div className="px-4 py-2 space-y-1">
               <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Sector</p>
               {ia.exposure.sector.slice(0, 4).map((b) => (
@@ -708,14 +736,13 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               ))}
             </div>
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Stress ── */}
+      {/* ── Stress — collapsed depth ── */}
       {(worstReplay || topStresses.length > 0) && (
-        <>
-          <SectionHead title="Stress" note="measured windows are this book's own history · scenarios are β-propagated hypotheticals" />
-          <div className="grid grid-cols-1 divide-y divide-border border-b border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <Disclosure title="Stress" note="measured windows are this book's own history · scenarios are β-propagated hypotheticals">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             {ia.replays.map((r) => (
               <Cell
                 key={r.windowDays}
@@ -735,14 +762,13 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               />
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Insights (cited) ── */}
+      {/* ── Insights (cited) — collapsed depth ── */}
       {topInsights.length > 0 && (
-        <>
-          <SectionHead title="What the numbers flag" note="deterministic rules over cited metrics — no generative step" />
-          <div className="divide-y divide-border/50 border-b border-border">
+        <Disclosure title="What the numbers flag" note="deterministic rules over cited metrics — no generative step">
+          <div className="divide-y divide-border/50">
             {topInsights.map((ins) => (
               <div key={ins.id} className="flex items-start gap-2 px-4 py-1.5">
                 <ShieldAlert className={`mt-0.5 h-3 w-3 shrink-0 ${ins.severity === "action" ? "text-loss" : ins.severity === "watch" ? "text-warning" : "text-muted-foreground/50"}`} />
@@ -755,10 +781,11 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
               </div>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
-      {/* ── Methodology footer ── */}
+      {/* ── Methodology — collapsed; provenance is depth, not front matter ── */}
+      <Disclosure title="Methodology & provenance" note="every basis, threshold and assumption behind the numbers above">
       <div className="space-y-1.5 px-4 py-2.5">
         <p className="font-mono text-[9.5px] leading-relaxed text-muted-foreground/70">
           weights = covered-book capital weights ({coveredCount}/{analyzedCount} with ≥30d history) · target ={" "}
@@ -781,6 +808,7 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
           </span>
         </div>
       </div>
+      </Disclosure>
     </div>
   );
 };
