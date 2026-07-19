@@ -55,6 +55,8 @@ const TRADING_DAYS = 252;
 export interface OlsFit {
   alpha: number;
   betas: number[];
+  /** t-statistics of the factor betas (ridge-approximate SEs, λ ≈ 1e-4). */
+  tStats: number[];
   r2: number;
   /** Daily residual volatility. */
   residVolDaily: number;
@@ -105,9 +107,19 @@ export function ridgeOls(y: number[], X: number[][], lambda = 1e-4): OlsFit | nu
     sst += (y[t] - yMean) ** 2;
   }
   const r2 = sst > 0 ? Math.max(0, 1 - ssr / sst) : 0;
-  const residVolDaily = Math.sqrt(ssr / Math.max(1, n - p));
+  const dof = Math.max(1, n - p);
+  const residVolDaily = Math.sqrt(ssr / dof);
 
-  return { alpha: beta[0], betas: beta.slice(1), r2, residVolDaily, n };
+  // t-stats via SE_j = √(σ²_ε · [(XᵀX+λR)⁻¹]_jj) — with the tiny λ used
+  // here this is the classical OLS SE to numerical precision.
+  const sigma2 = ssr / dof;
+  const tStats: number[] = [];
+  for (let j = 1; j < p; j++) {
+    const se = Math.sqrt(Math.max(0, sigma2 * inv[j][j]));
+    tStats.push(se > 0 ? beta[j] / se : 0);
+  }
+
+  return { alpha: beta[0], betas: beta.slice(1), tStats, r2, residVolDaily, n };
 }
 
 /** Sample covariance matrix of tail-aligned return series (columns of `series`). */
@@ -131,6 +143,8 @@ export interface AssetFactorFit {
   ticker: string;
   weight: number;
   betas: Record<string, number>;
+  /** t-statistic per factor beta. */
+  tStats: Record<string, number>;
   r2: number;
   idioVolAnnual: number;
   n: number;
@@ -162,6 +176,8 @@ export interface FactorModelResult {
     contributions: Record<string, number>;
     /** Weight-averaged regression R². */
     avgR2: number;
+    /** Share of fitted weight whose market-factor beta has |t| ≥ 2. */
+    marketBetaSignificantShare: number;
     n: number;
   } | null;
   factorStats: Record<string, { sigmaAnnual: number; n: number }>;
@@ -213,11 +229,13 @@ export function computeFactorModel(opts: {
     const fit = ridgeOls(y, X);
     if (!fit) continue;
     const betas: Record<string, number> = {};
-    usableFactors.forEach((f, j) => { betas[f.id] = fit.betas[j]; });
+    const tStats: Record<string, number> = {};
+    usableFactors.forEach((f, j) => { betas[f.id] = fit.betas[j]; tStats[f.id] = fit.tStats[j]; });
     perAsset.push({
       ticker,
       weight: w,
       betas,
+      tStats,
       r2: fit.r2,
       idioVolAnnual: fit.residVolDaily * Math.sqrt(TRADING_DAYS),
       n: fit.n,
@@ -258,6 +276,9 @@ export function computeFactorModel(opts: {
   });
 
   const avgR2 = perAsset.reduce((s, a, i) => s + wNorm[i] * a.r2, 0);
+  const marketId = usableFactors[0].id;
+  const marketBetaSignificantShare = perAsset.reduce(
+    (s, a, i) => s + (Math.abs(a.tStats[marketId] ?? 0) >= 2 ? wNorm[i] : 0), 0);
   const minN = Math.min(...perAsset.map((a) => a.n));
 
   // Single-factor partial shocks: −2σ over ~21 trading days.
@@ -284,6 +305,7 @@ export function computeFactorModel(opts: {
       systematicShare: totalVarDaily > 0 ? sysVarDaily / totalVarDaily : 0,
       contributions,
       avgR2,
+      marketBetaSignificantShare,
       n: minN,
     },
     factorStats,

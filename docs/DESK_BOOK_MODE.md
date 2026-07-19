@@ -100,6 +100,33 @@ proves the surface stays honest with zero network: unmeasured quantities
 render "—", the optimizer is disclosed as unavailable, verdict-driven
 directives still work).
 
+## Model integrity (the numbers audit themselves)
+
+`src/lib/quant/integrity.ts` — credibility is not more decimals; it is each
+figure carrying its uncertainty and an out-of-sample check:
+
+- **Kupiec (1995) POF backtest**, run walking out-of-sample: each day's loss
+  is compared against the VaR estimated from the trailing 60-day window that
+  ended the day before. The Book states breaches vs promised coverage, the
+  likelihood-ratio p-value, and a verdict (consistent / underestimates /
+  overestimates risk).
+- **Sharpe ± SE** via Lo (2002)/Mertens skew-kurtosis-adjusted standard
+  errors (reusing `quant/validation.ts`), plus the Probabilistic Sharpe
+  Ratio vs 0 — "Sharpe 0.82 ± 0.31, P(SR>0) 74%" instead of a bare 0.82.
+- **σ 95% CI** from the chi-square interval (Wilson–Hilferty quantiles,
+  i.i.d. approximation stated).
+- **Factor-beta t-statistics** in the factor model, with the share of
+  fitted weight whose market beta is significant (|t| ≥ 2) reported — a
+  regression whose betas aren't significant says so on the surface.
+
+## OLED true-black dark theme
+
+The dark base was already 0%, but panels sat at 5.5–11.5% lightness and the
+viewport is mostly panels — the screen read charcoal. The elevation ladder
+is now compressed to true black (card 2%, surfaces 2.5/4.5/8%) with
+hairline borders and shadows carrying the structure, and the public site's
+carbon base moved from #050505 to #000. Light themes untouched.
+
 ## Coherence repairs shipped with this feature ("repair before repartition")
 
 1. **Risk:reward canon** — `src/lib/riskReward.ts`. The same trade used to

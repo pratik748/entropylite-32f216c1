@@ -21,6 +21,7 @@ import {
   RiskWeightChart, DriftChart, FactorExposureChart, BetaStabilityChart,
   LiquidityLadderChart,
 } from "@/components/DeskBookCharts";
+import { kupiecBacktest, sharpeReport, volatilityCI } from "@/lib/quant/integrity";
 import type { OptimizerId } from "@/lib/analytics/types";
 import { OPTIMIZER_LABELS } from "@/lib/analytics/optimizers";
 
@@ -175,6 +176,20 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
     () => (snap.ready ? rollingVolSeries(snap.portfolio.returns, 60) : []),
     [snap],
   );
+  // ── Model integrity: the numbers audit themselves ──
+  const kupiec = useMemo(
+    () => (snap.ready ? kupiecBacktest(snap.portfolio.returns, { window: 60, confidence: 0.95 }) : null),
+    [snap],
+  );
+  const sharpeRep = useMemo(
+    () => (snap.ready ? sharpeReport(snap.portfolio.returns) : null),
+    [snap],
+  );
+  const volCi = useMemo(
+    () => (snap.ready ? volatilityCI(snap.portfolio.sigmaDaily, snap.lookbackDays) : null),
+    [snap],
+  );
+
   const rwRows = useMemo(() => riskWeightRows(ia.attribution?.positions ?? []), [ia.attribution]);
   const dRows = useMemo(() => driftRows(directives), [directives]);
   const ladder = useMemo(() => liquidityLadderPoints(liquidity?.perPosition ?? []), [liquidity]);
@@ -356,6 +371,52 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
                 <p className="px-1 pb-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">1-day tail loss at today's value</p>
                 <RollingVarChart data={snap.portfolio.rollingVar} fmt={norm.fmt} />
               </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Model integrity — every headline number audits itself ── */}
+      {(kupiec || sharpeRep || volCi) && (
+        <>
+          <SectionHead
+            title="Model integrity"
+            note="out-of-sample backtest + estimation uncertainty on the numbers above"
+          />
+          <div className="grid grid-cols-2 divide-x divide-border border-b border-border sm:grid-cols-4">
+            {kupiec && (
+              <Cell
+                label="VaR₉₅ backtest"
+                value={`${kupiec.breaches}/${kupiec.tests} breaches`}
+                color={
+                  kupiec.verdict === "consistent" ? "text-gain"
+                  : kupiec.verdict === "underestimates risk" ? "text-loss" : "text-warning"
+                }
+                sub={`expected ${(kupiec.expectedRate * 100).toFixed(0)}% · Kupiec p=${kupiec.pValue.toFixed(2)} · ${kupiec.verdict}`}
+              />
+            )}
+            {sharpeRep && (
+              <Cell
+                label="Sharpe ± SE"
+                value={`${sharpeRep.sharpeAnnual.toFixed(2)} ± ${sharpeRep.seAnnual.toFixed(2)}`}
+                color={sharpeRep.psrVsZero >= 0.95 ? "text-gain" : sharpeRep.psrVsZero <= 0.5 ? "text-loss" : undefined}
+                sub={`Lo(2002) SE · P(SR>0) ${(sharpeRep.psrVsZero * 100).toFixed(0)}%`}
+              />
+            )}
+            {volCi && (
+              <Cell
+                label="σ 95% CI"
+                value={`${(volCi.lowAnnual * 100).toFixed(1)}–${(volCi.highAnnual * 100).toFixed(1)}%`}
+                sub={`χ² interval · ${volCi.n}d · i.i.d. approximation`}
+              />
+            )}
+            {factor.model?.portfolio && (
+              <Cell
+                label="Market β significance"
+                value={`${(factor.model.portfolio.marketBetaSignificantShare * 100).toFixed(0)}%`}
+                color={factor.model.portfolio.marketBetaSignificantShare < 0.5 ? "text-warning" : undefined}
+                sub="of fitted weight with |t| ≥ 2 on the market factor"
+              />
             )}
           </div>
         </>
@@ -709,6 +770,7 @@ const DeskPortfolioMode = ({ stocks, onSelectTicker }: Props) => {
             <> · factor model = ridge-OLS on {factor.model.factors.length} ETF/index proxies, Σ_f sample covariance, residuals assumed uncorrelated</>
           )}
           {liquidity && <> · liquidity = 20d median volume, {Math.round(liquidity.participation * 100)}% participation, no impact model</>}
+          {kupiec && <> · integrity = walking 60d Kupiec POF backtest, Lo(2002) Sharpe SE, χ² σ interval (Wilson–Hilferty)</>}
         </p>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-[9.5px] text-muted-foreground/60">

@@ -15,30 +15,32 @@
 
 @layer base {
   :root {
-    /* ── Graphite (default dark) · pure monochrome, no color cast ──
-       Finish polish (2026-07): richer near-black base with a deliberate,
-       evenly-stepped elevation ladder so panels float on the black; crisper
-       hairlines for cleaner definition. Shapes, radius and data colours are
-       unchanged — this only refines the surface finish. */
+    /* ── OLED black (default dark) · pure monochrome, no color cast ──
+       True-black finish (2026-07): the base AND the panel fills sit at or
+       within a whisper of 0% so an OLED panel actually turns its pixels
+       off — the previous 5.5–11.5% card ladder read as charcoal because
+       the viewport is mostly cards. Structure is carried by the hairline
+       borders and shadows, not by surface lightness. Shapes, radius and
+       data colours unchanged. */
     --background: 0 0% 0%;
     --foreground: 0 0% 95%;
 
-    --card: 0 0% 5.5%;
+    --card: 0 0% 2%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 6.5%;
+    --popover: 0 0% 4.5%;
     --popover-foreground: 0 0% 95%;
 
     --primary: 0 0% 94%;
     --primary-foreground: 0 0% 5%;
 
-    --secondary: 0 0% 10%;
+    --secondary: 0 0% 8%;
     --secondary-foreground: 0 0% 66%;
 
-    --muted: 0 0% 8.5%;
+    --muted: 0 0% 7%;
     --muted-foreground: 0 0% 58%;
 
-    --accent: 0 0% 13%;
+    --accent: 0 0% 11%;
     --accent-foreground: 0 0% 95%;
 
     --destructive: 4 88% 59%;
@@ -65,20 +67,21 @@
     --sentiment-negative: 4 92% 62%;
     --sentiment-neutral: 34 96% 54%;
 
-    /* Elevated surface ladder — deliberate, even ~3% steps above the base. */
-    --surface-1: 0 0% 4.5%;
-    --surface-2: 0 0% 7.5%;
-    --surface-3: 0 0% 11.5%;
+    /* Elevated surface ladder — compressed toward true black; hairlines
+       and shadows do the separating, lightness only whispers. */
+    --surface-1: 0 0% 2.5%;
+    --surface-2: 0 0% 4.5%;
+    --surface-3: 0 0% 8%;
 
     /* ── Materials · layered translucency ── */
-    --glass-bg: 0 0% 5% / 0.72;
+    --glass-bg: 0 0% 3% / 0.72;
     --glass-border: 0 0% 82% / 0.09;
     --glass-highlight: 0 0% 90% / 0.06;
     --glass-refraction: 0 0% 70% / 0.03;
 
-    --material-thin: 0 0% 6% / 0.55;
-    --material-regular: 0 0% 5% / 0.74;
-    --material-thick: 0 0% 4% / 0.90;
+    --material-thin: 0 0% 4% / 0.55;
+    --material-regular: 0 0% 3% / 0.74;
+    --material-thick: 0 0% 2% / 0.90;
 
     /* ── Depth · diffuse ambient shadows over a rich black, with a whisper
        of top-edge sheen (inset highlight) so raised panels read as milled
@@ -119,11 +122,13 @@
        file). Defaults below are the original institutional dark values, so
        the default look is byte-for-byte unchanged. */
     --pub-white: 255 255 255;
-    --pub-carbon-950: 5 5 5;
-    --pub-carbon-900: 10 10 10;
-    --pub-carbon-850: 14 14 14;
-    --pub-carbon-800: 18 18 18;
-    --pub-carbon-750: 23 23 23;
+    /* OLED true black: the page base turns pixels off; the band ladder
+       shifts down with it so relative elevation is preserved. */
+    --pub-carbon-950: 0 0 0;
+    --pub-carbon-900: 6 6 6;
+    --pub-carbon-850: 10 10 10;
+    --pub-carbon-800: 14 14 14;
+    --pub-carbon-750: 19 19 19;
     --pub-hairline-faint: 22 22 22;
     --pub-hairline: 31 31 31;
     --pub-hairline-strong: 43 43 43;
