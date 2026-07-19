@@ -3,6 +3,7 @@ import { useEvidence } from "../EvidenceContext";
 import { MetricRow } from "../Metric";
 import ContributionWaterfall from "../ContributionWaterfall";
 import { formatCurrency } from "@/lib/currency";
+import { formatRiskReward } from "@/lib/riskReward";
 import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 import type { Action, ScenarioCase } from "@/lib/evidence/types";
@@ -278,7 +279,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             )}
             {support?.value != null && (
               <li>
-                Entry structure is {support.value}:1 risk-reward
+                Entry structure is {formatRiskReward(support.value)} reward-to-risk
                 {support.value < 1.5 ? " — below the 1.5:1 bar, so scale in on structure, not at market" : " — clears the 1.5:1 entry bar"}.
               </li>
             )}
