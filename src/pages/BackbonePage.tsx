@@ -16,8 +16,10 @@ const STACK = [
       "parametric / historical VaR, CVaR (Expected Shortfall)",
       "rolling 60-day VaR backtest (Kupiec-style breach count)",
       "Sharpe, Sortino, beta, Merton 1974 distance-to-default",
+      "multi-factor ridge-OLS vs index/ETF proxies — systematic vs idiosyncratic split, Euler factor contributions",
+      "liquidity ladder — days-to-exit from 20-day median ADV at a stated participation cap",
     ],
-    file: "src/lib/quant-engine.ts",
+    file: "src/lib/quant-engine.ts · src/lib/quant/factor-model.ts",
   },
   {
     icon: Network,

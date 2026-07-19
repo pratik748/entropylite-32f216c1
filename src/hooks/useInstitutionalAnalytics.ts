@@ -48,6 +48,8 @@ export interface InstitutionalAnalytics {
   snapshot: QuantSnapshot;
   benchmarkTicker: string;
   benchmarkReady: boolean;
+  /** Benchmark daily log-return series (tail-alignable); null before load. */
+  benchmarkReturns: number[] | null;
   performance: PerformanceMetrics | null;
   risk: RiskMetrics | null;
   exposure: ExposureAnalysis | null;
@@ -97,7 +99,7 @@ export function useInstitutionalAnalytics(
     const { holdings, totalValue, totalInvested, totalPnl, fmt, baseCurrency } = norm;
     const empty: InstitutionalAnalytics = {
       ready: false, loading: snapshot.loading || benchLoading, snapshot,
-      benchmarkTicker, benchmarkReady: false,
+      benchmarkTicker, benchmarkReady: false, benchmarkReturns: null,
       performance: null, risk: null, exposure: null, attribution: null,
       optimizers: [], betasByTicker: null, betaBasis: "unavailable",
       stresses: [], replays: [], sensitivity: [], insights: [], report: null,
@@ -271,6 +273,7 @@ export function useInstitutionalAnalytics(
       snapshot,
       benchmarkTicker,
       benchmarkReady,
+      benchmarkReturns: benchRets,
       performance,
       risk,
       exposure,

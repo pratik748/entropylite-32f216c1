@@ -1,28 +1,23 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
-import { useFX } from "@/hooks/useFX";
-import { getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 
 interface Props {
   stocks: PortfolioStock[];
 }
 
 const PnLWaterfall = ({ stocks }: Props) => {
-  const { baseCurrency, convertToBase } = useFX();
-  const sym = getCurrencySymbol(baseCurrency);
+  // Shared valuation spine — P&L figures here match the blotter exactly.
+  const { sym, holdings } = useNormalizedPortfolio(stocks);
 
-  const analyzed = stocks.filter(s => s.analysis);
-  if (analyzed.length === 0) return null;
+  const priced = holdings.filter(h => h.priceBasis === "live");
+  if (priced.length === 0) return null;
 
-  const data = analyzed.map(s => {
-    const ccy = resolveAssetCurrency(s.ticker, s.analysis?.currency);
-    const pnl = convertToBase((s.analysis!.currentPrice - s.buyPrice) * s.quantity, ccy);
-    return {
-      name: s.ticker.replace(".NS", "").replace(".BO", ""),
-      pnl: Math.round(pnl),
-      fill: pnl >= 0 ? "hsl(var(--gain))" : "hsl(var(--loss))",
-    };
-  }).sort((a, b) => b.pnl - a.pnl);
+  const data = priced.map(h => ({
+    name: h.ticker,
+    pnl: Math.round(h.pnl),
+    fill: h.pnl >= 0 ? "hsl(var(--gain))" : "hsl(var(--loss))",
+  })).sort((a, b) => b.pnl - a.pnl);
 
   const totalPnl = data.reduce((s, d) => s + d.pnl, 0);
   data.push({ name: "TOTAL", pnl: totalPnl, fill: totalPnl >= 0 ? "hsl(var(--primary))" : "hsl(var(--loss))" });

@@ -5,7 +5,7 @@ import { workstationPath } from "@/components/workstation/registry";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { type PriceStatusMap } from "@/pages/Index";
 import { type TickerThreat } from "@/hooks/useGeoIntelligence";
-import { useFX } from "@/hooks/useFX";
+import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { getCurrencySymbol } from "@/lib/currency";
 import StockInput from "@/components/StockInput";
 
@@ -27,9 +27,15 @@ const THREAT_COLORS: Record<string, string> = {
   low: "text-muted-foreground bg-surface-3",
 };
 
+/**
+ * The desk ledger. Valuation comes exclusively from useNormalizedPortfolio
+ * — the same spine Book mode and Augment read — so the TOTAL here can never
+ * disagree with any other module. Every position appears, including ones
+ * awaiting analysis (priced at cost, marked "cost").
+ */
 const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock, onAnalyze, isLoading, priceStatus, tickerThreats }: PortfolioBlotterProps) => {
   const navigate = useNavigate();
-  const { baseCurrency, convertToBase } = useFX();
+  const { baseCurrency, holdings, totalValue, fmt, fxAllLive } = useNormalizedPortfolio(stocks);
   const [flashMap, setFlashMap] = useState<Record<string, "gain" | "loss">>({});
   const prevPrices = useRef<Record<string, number>>({});
   const baseSym = getCurrencySymbol(baseCurrency);
@@ -52,14 +58,6 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
     }
   }, [stocks]);
 
-  const analyzed = stocks.filter(s => s.analysis);
-
-  // Compute total value in base currency
-  const totalValue = analyzed.reduce((sum, s) => {
-    const ccy = s.analysis!.currency || "USD";
-    return sum + convertToBase(s.analysis!.currentPrice * s.quantity, ccy);
-  }, 0);
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 border-b border-border" data-tour="stock-input">
@@ -69,7 +67,12 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
       {/* Base currency indicator */}
       <div className="px-2 py-1 border-b border-border/50 flex items-center justify-between">
         <span className="font-mono text-[8px] text-muted-foreground">BASE</span>
-        <span className="font-mono text-[9px] text-primary font-semibold">{baseCurrency} {baseSym}</span>
+        <span className="font-mono text-[9px] text-primary font-semibold">
+          {baseCurrency} {baseSym}
+          {!fxAllLive && (
+            <span className="ml-1 text-warning" title="One or more holdings converted with a static fallback FX rate — live feed pending">FX~</span>
+          )}
+        </span>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -85,48 +88,45 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
             </tr>
           </thead>
           <tbody>
-            {analyzed.map(s => {
-              const a = s.analysis!;
-              const ccy = a.currency || "USD";
-              const nativeSym = getCurrencySymbol(ccy);
-              const nativePrice = a.currentPrice ?? 0;
-              const priceInBase = convertToBase(a.currentPrice, ccy);
-              const buyInBase = convertToBase(s.buyPrice, ccy);
-              const pnl = (priceInBase - buyInBase) * s.quantity;
-              const pnlPct = buyInBase > 0 ? ((priceInBase - buyInBase) / buyInBase) * 100 : 0;
-              const posValue = priceInBase * s.quantity;
-              const weight = totalValue > 0 ? (posValue / totalValue) * 100 : 0;
-              const flash = flashMap[s.id];
-              const isActive = s.id === activeStockId;
+            {holdings.map(h => {
+              const nativeSym = getCurrencySymbol(h.currency);
+              const weight = totalValue > 0 ? (h.value / totalValue) * 100 : 0;
+              const flash = flashMap[h.id];
+              const isActive = h.id === activeStockId;
 
               return (
                 <tr
-                  key={s.id}
-                  onClick={() => onSelectStock(s.id)}
+                  key={h.id}
+                  onClick={() => onSelectStock(h.id)}
                   className={`border-b border-border/30 cursor-pointer transition-colors h-6 group/row
                     ${isActive ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"}
                     ${flash === "gain" ? "flash-green" : flash === "loss" ? "flash-red" : ""}`}
                 >
                   <td className="px-2 py-0.5 flex items-center">
-                    <span className="font-semibold text-foreground">{s.ticker}</span>
-                    {ccy !== baseCurrency && (
-                      <span className="text-[7px] text-muted-foreground/60 ml-0.5">{ccy}</span>
+                    <span className="font-semibold text-foreground">{h.rawTicker}</span>
+                    {h.currency !== baseCurrency && (
+                      <span className="text-[7px] text-muted-foreground/60 ml-0.5">{h.currency}</span>
                     )}
-                    {tickerThreats?.[s.ticker] && tickerThreats[s.ticker].threatLevel !== "none" && (
-                      <span className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0 text-[7px] font-bold uppercase ${THREAT_COLORS[tickerThreats[s.ticker].threatLevel] || ""}`} title={tickerThreats[s.ticker].threats.join(", ")}>
+                    {h.priceBasis === "cost" && (
+                      <span className="ml-1 rounded bg-surface-3 px-1 text-[7px] uppercase text-muted-foreground" title="No live price yet — valued at cost basis until analysis runs">
+                        cost
+                      </span>
+                    )}
+                    {tickerThreats?.[h.rawTicker] && tickerThreats[h.rawTicker].threatLevel !== "none" && (
+                      <span className={`ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0 text-[7px] font-bold uppercase ${THREAT_COLORS[tickerThreats[h.rawTicker].threatLevel] || ""}`} title={tickerThreats[h.rawTicker].threats.join(", ")}>
                         <AlertTriangle className="h-2 w-2" />
-                        {tickerThreats[s.ticker].threatLevel === "critical" ? "!" : tickerThreats[s.ticker].score}
+                        {tickerThreats[h.rawTicker].threatLevel === "critical" ? "!" : tickerThreats[h.rawTicker].score}
                       </span>
                     )}
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(workstationPath(s.ticker)); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(workstationPath(h.rawTicker)); }}
                       className="ml-auto p-0.5 rounded text-muted-foreground/60 transition-colors hover:bg-surface-3 hover:text-foreground"
                       title="Open Equity Workstation"
                     >
                       <FileSearch className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); onRemoveStock(s.id); }}
+                      onClick={(e) => { e.stopPropagation(); onRemoveStock(h.id); }}
                       className="opacity-0 group-hover/row:opacity-100 transition-opacity p-0.5 rounded hover:bg-loss/10 hover:text-loss text-muted-foreground"
                       title="Remove"
                     >
@@ -134,23 +134,23 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                     </button>
                   </td>
                   <td className="px-2 py-0.5 text-right text-foreground tabular-nums">
-                    <span>{nativeSym}{nativePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    {ccy !== baseCurrency && (
-                      <span className="text-[7px] text-muted-foreground/50 ml-0.5">≈{baseSym}{priceInBase.toFixed(2)}</span>
+                    <span>{nativeSym}{h.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    {h.currency !== baseCurrency && h.quantity > 0 && (
+                      <span className="text-[7px] text-muted-foreground/50 ml-0.5">≈{baseSym}{(h.value / h.quantity).toFixed(2)}</span>
                     )}
                   </td>
-                  <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
-                    {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                  <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${h.priceBasis === "cost" ? "text-muted-foreground/50" : h.pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
+                    {h.priceBasis === "cost" ? "—" : `${h.pnlPct >= 0 ? "+" : ""}${h.pnlPct.toFixed(2)}%`}
                   </td>
-                  <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{s.quantity}</td>
-                  <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
-                    {pnl >= 0 ? "+" : ""}{baseSym}{Math.abs(pnl).toFixed(0)}
+                  <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{h.quantity}</td>
+                  <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${h.priceBasis === "cost" ? "text-muted-foreground/50" : h.pnl >= 0 ? "text-gain" : "text-loss"}`}>
+                    {h.priceBasis === "cost" ? "—" : `${h.pnl >= 0 ? "+" : ""}${baseSym}${Math.abs(h.pnl).toFixed(0)}`}
                   </td>
                   <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{weight.toFixed(1)}%</td>
                 </tr>
               );
             })}
-            {analyzed.length === 0 && (
+            {holdings.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-2 py-4 text-center text-muted-foreground text-[10px]">
                   No positions. Add assets above.
@@ -161,13 +161,11 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
         </table>
       </div>
 
-      {analyzed.length > 0 && (
+      {holdings.length > 0 && (
         <>
           <div className="border-t border-border px-2 py-1.5 font-mono text-[9px] flex justify-between text-muted-foreground">
             <span>TOTAL ({baseCurrency})</span>
-            <span className="text-foreground font-semibold tabular-nums">
-              {baseSym}{totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </span>
+            <span className="text-foreground font-semibold tabular-nums">{fmt(totalValue)}</span>
           </div>
         </>
       )}
