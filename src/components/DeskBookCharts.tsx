@@ -1,10 +1,11 @@
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell, ComposedChart,
 } from "recharts";
 import type {
   GrowthPoint, RollingVolPoint, RiskWeightRow, DriftRow, LadderPoint, BetaPoint, FactorBarRow,
 } from "@/lib/desk-book-charts";
+import type { FanPoint, HistogramBin } from "@/lib/quant/simulation";
 
 /**
  * The Book's chart deck — thin JSX over tested transforms in
@@ -221,6 +222,55 @@ export const BetaStabilityChart = ({ points, fullBeta }: { points: BetaPoint[]; 
         {fullBeta != null && <ReferenceLine y={fullBeta} stroke={INK.muted} strokeDasharray="4 3" />}
         <Line dataKey="beta" stroke={INK.fg} strokeWidth={2} dot={false} isAnimationActive={false} />
       </LineChart>
+    </ResponsiveContainer>
+  </div>
+);
+
+/** Simulation percentile fan — 5–95 and 25–75 bands + median line, one axis. */
+export const SimulationFanChart = ({ fan }: { fan: FanPoint[] }) => (
+  <div className="h-44">
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={fan} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke={INK.border} strokeOpacity={0.4} vertical={false} />
+        <XAxis dataKey="day" tick={TICK} axisLine={{ stroke: INK.border }} tickLine={false} tickFormatter={(v) => `${v}d`} minTickGap={30} />
+        <YAxis tick={TICK} axisLine={false} tickLine={false} width={40} tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
+        <Tooltip
+          contentStyle={TOOLTIP_STYLE} cursor={CURSOR}
+          labelFormatter={(v) => `day ${v}`}
+          formatter={(v: number | number[], name: string) => {
+            if (Array.isArray(v)) return [`${v[0].toFixed(1)}% … ${v[1].toFixed(1)}%`, name === "band90" ? "5–95 pct" : "25–75 pct"];
+            return [`${v.toFixed(1)}%`, "Median"];
+          }}
+        />
+        <ReferenceLine y={0} stroke={INK.faint} />
+        <Area name="band90" dataKey={(d: FanPoint) => [d.p5, d.p95]} stroke="none" fill={INK.muted} fillOpacity={0.12} isAnimationActive={false} />
+        <Area name="band50" dataKey={(d: FanPoint) => [d.p25, d.p75]} stroke="none" fill={INK.muted} fillOpacity={0.2} isAnimationActive={false} />
+        <Line dataKey="p50" stroke={INK.fg} strokeWidth={2} dot={false} isAnimationActive={false} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  </div>
+);
+
+/** Terminal-return histogram — polarity by zero baseline, loss bins red. */
+export const SimulationHistogram = ({ bins }: { bins: HistogramBin[] }) => (
+  <div className="h-44">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={bins.map((b) => ({ ...b, mid: (b.x0 + b.x1) / 2 }))} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap={1}>
+        <CartesianGrid stroke={INK.border} strokeOpacity={0.4} vertical={false} />
+        <XAxis dataKey="mid" tick={TICK} axisLine={{ stroke: INK.border }} tickLine={false} tickFormatter={(v: number) => `${v.toFixed(0)}%`} minTickGap={28} />
+        <YAxis tick={TICK} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
+        <Tooltip
+          contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted-foreground) / 0.06)" }}
+          labelFormatter={(v: number) => `${v.toFixed(1)}% terminal return`}
+          formatter={(v: number) => [`${(v * 100).toFixed(1)}% of paths`, "Share"]}
+        />
+        <ReferenceLine x={0} stroke={INK.faint} />
+        <Bar dataKey="share" isAnimationActive={false}>
+          {bins.map((b, i) => (
+            <Cell key={i} fill={b.x1 <= 0 ? INK.loss : b.x0 >= 0 ? INK.gain : INK.muted} fillOpacity={0.7} />
+          ))}
+        </Bar>
+      </BarChart>
     </ResponsiveContainer>
   </div>
 );
