@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/currency";
+import { formatRiskReward } from "@/lib/riskReward";
 import type { EvidenceMetric } from "./types";
 
 /** Format a metric's value for display, honoring its declared format. */
@@ -9,6 +10,10 @@ export function formatMetricValue(m: EvidenceMetric, currency: string): string {
       return `${m.value.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
     case "signed":
       return `${m.value >= 0 ? "+" : ""}${m.value.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+    case "rr":
+      // Canonical reward-first R-multiple, e.g. "2.5:1" — one representation
+      // for every risk/reward on the platform (src/lib/riskReward.ts).
+      return formatRiskReward(m.value);
     case "ratio":
       return `${m.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}×`;
     case "score":

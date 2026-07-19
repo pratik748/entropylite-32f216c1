@@ -8,6 +8,7 @@ import { buildEvidenceGraph } from "@/lib/evidence/build";
 import { workstationPath } from "@/components/workstation/registry";
 import { synthesize, logNormalHorizon } from "@/lib/evidence/synthesis";
 import { normalCdf } from "@/lib/evidence/compute";
+import { formatRiskReward } from "@/lib/riskReward";
 import type { DeskAnalysis } from "@/lib/evidence/inputs";
 import type { Action, EvidenceMetric, BreakerState, Grade } from "@/lib/evidence/types";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
@@ -94,6 +95,7 @@ const DeskSynthesis = ({ analysis }: Props) => {
     switch (m.format) {
       case "percent": return `${v > 0 ? "+" : ""}${v}%`;
       case "price": return fmtPrice(v);
+      case "rr": return formatRiskReward(v);
       case "ratio": return v.toFixed(2);
       case "score": return `${Math.round(v)}`;
       case "signed": return `${v > 0 ? "+" : ""}${v}`;

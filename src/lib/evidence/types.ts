@@ -15,7 +15,7 @@ export type Pillar = "valuation" | "quality" | "growth" | "health" | "momentum" 
 
 export type PeerScope = "history" | "sector" | "industry" | "direct" | "global" | "market";
 
-export type MetricFormat = "percent" | "ratio" | "price" | "score" | "number" | "signed";
+export type MetricFormat = "percent" | "ratio" | "price" | "score" | "number" | "signed" | "rr";
 
 export interface MetricAssessment {
   grade: Grade;
