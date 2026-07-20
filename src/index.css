@@ -905,3 +905,42 @@
     filter: invert(1);
   }
 }
+
+@layer utilities {
+  /* Institutional 2026 override: keep legacy class names, remove the AI/SaaS
+     smell from glass, glow and rounded-template primitives across every route. */
+  .glass-panel,
+  .glass-card,
+  .glass-subtle,
+  .glass-thick {
+    background: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    border-radius: 2px !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass-panel::before,
+  .glass-panel::after {
+    display: none !important;
+  }
+  .glass-glow-primary,
+  .glass-glow-loss,
+  .glass-glow-gain,
+  .glow-primary,
+  .glow-gain,
+  .glow-loss,
+  .shadow-soft,
+  .shadow-soft-lg,
+  .shadow-soft-xl {
+    box-shadow: none !important;
+  }
+  .panel-soft,
+  .surface-soft {
+    border-radius: 2px;
+    box-shadow: none;
+  }
+  .panel-soft:hover {
+    box-shadow: none;
+  }
+}

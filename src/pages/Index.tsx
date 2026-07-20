@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow, Briefcase, LineChart } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow, Briefcase, LineChart, Database } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
 import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -10,6 +10,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import Header from "@/components/Header";
 import StockInput from "@/components/StockInput";
 import LiveNewsFeed from "@/components/LiveNewsFeed";
+import OperatingTape from "@/components/OperatingTape";
 
 import LoadingState from "@/components/LoadingState";
 import DeskAnalysisStack from "@/components/DeskAnalysisStack";
@@ -636,6 +637,7 @@ const IndexContent = () => {
 
           {/* Global Ticker Strip */}
           <TickerStrip />
+          <OperatingTape stocks={stocks} portfolioValueBase={portfolioValueBase} baseCurrency={baseCurrency} priceStatus={priceStatus} analyzedCount={analyzedCount} />
 
           {/* Workspace — module rail (desktop) / module strip (mobile) + content */}
           <div className="flex flex-1 min-h-0">
@@ -732,12 +734,12 @@ const IndexContent = () => {
                             ) : (
                               <>
                                 {!effectiveLoading && !analysis && (
-                                  <div className="flex flex-col items-center justify-center rounded-xl border border-border/70 bg-card py-20 shadow-soft animate-scale-in">
-                                    <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl border border-border/70 bg-surface-2">
+                                  <div className="mx-auto flex max-w-2xl flex-col items-start justify-center border border-border bg-card px-8 py-12 shadow-none animate-fade-in">
+                                    <div className="mb-6 flex h-12 w-12 items-center justify-center border border-border bg-surface-2">
                                       <Activity className="h-6 w-6 text-muted-foreground animate-breathe" strokeWidth={1.5} />
                                     </div>
                                     <p className="data-label mb-2.5">No instrument selected</p>
-                                    <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
+                                    <h2 className="mb-2 text-title-3 text-foreground">Capital desk standing by</h2>
                                     <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
                                       Add any global asset — equities, crypto, FX or commodities — and twelve
                                       engines will run a full pass with live pricing. Every position opens into

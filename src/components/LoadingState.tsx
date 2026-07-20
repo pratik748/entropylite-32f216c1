@@ -1,50 +1,47 @@
+import { CheckCircle2, CircleDashed, Database, Gauge, Newspaper, Shield, Sigma } from "lucide-react";
 import { motion } from "framer-motion";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 
-const steps = ["Fetching live price", "Reading the news", "Weighing sentiment", "Simulating outcomes"];
+const stages = [
+  { label: "Market data acquired", detail: "quote, currency and session context", icon: Database, state: "complete" },
+  { label: "Quantitative structure evaluated", detail: "trend, dispersion and simulated outcomes", icon: Sigma, state: "active" },
+  { label: "Risk assessed", detail: "drawdown, tail and position risk", icon: Shield, state: "pending" },
+  { label: "Evidence assembled", detail: "news, sentiment and provenance checks", icon: Newspaper, state: "pending" },
+  { label: "Decision synthesized", detail: "verdict held until confidence is defensible", icon: Gauge, state: "pending" },
+];
 
 const LoadingState = () => {
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <motion.div
-        className="relative mb-7 h-12 w-12"
-        aria-hidden
-      >
-        <div className="absolute inset-0 rounded-full border-2 border-muted-foreground/15" />
-        <motion.div
-          className="absolute inset-0 rounded-full border-2 border-transparent border-t-foreground/70"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.div
-          className="absolute inset-2.5 rounded-full bg-surface-2"
-          animate={{ scale: [1, 1.08, 1], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </motion.div>
-      <p className="text-headline text-foreground">Analyzing…</p>
-      <p className="mt-1 text-footnote text-muted-foreground">This usually takes a few seconds</p>
-
-      <motion.div
-        className="mt-8 w-full max-w-sm space-y-2"
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        {steps.map((step, i) => (
-          <motion.div
-            key={step}
-            variants={staggerItem}
-            className="flex items-center gap-3 rounded-xl bg-surface-2 px-4 py-3"
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full bg-foreground/60 animate-breathe"
-              style={{ animationDelay: `${i * 0.35}s` }}
-            />
-            <span className="text-footnote text-muted-foreground">{step}</span>
-          </motion.div>
-        ))}
-      </motion.div>
+    <div className="mx-auto flex w-full max-w-2xl flex-col py-12">
+      <div className="border border-border bg-card">
+        <div className="border-b border-border px-5 py-4">
+          <p className="data-label">Analysis pass in progress</p>
+          <h2 className="mt-1 text-title-3 text-foreground">Building an evidence-weighted decision record</h2>
+          <p className="mt-2 max-w-xl text-footnote text-muted-foreground">
+            The system is exposing completed stages and holding provisional conclusions until the underlying data is available.
+          </p>
+        </div>
+        <motion.div className="divide-y divide-border/70" variants={staggerContainer} initial="hidden" animate="visible">
+          {stages.map(({ label, detail, icon: Icon, state }) => (
+            <motion.div key={label} variants={staggerItem} className="grid grid-cols-[28px_1fr_auto] items-center gap-3 px-5 py-3">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.65} />
+              <div>
+                <div className="text-[12px] font-semibold tracking-tight text-foreground">{label}</div>
+                <div className="text-[10.5px] text-muted-foreground">{detail}</div>
+              </div>
+              {state === "complete" ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-gain" strokeWidth={1.75} />
+              ) : state === "active" ? (
+                <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                  <CircleDashed className="h-3 w-3 animate-spin" /> Evaluating
+                </span>
+              ) : (
+                <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/55">Queued</span>
+              )}
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
     </div>
   );
 };
