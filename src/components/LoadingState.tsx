@@ -3,22 +3,22 @@ import { motion } from "framer-motion";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 
 const stages = [
-  { label: "Market data acquired", detail: "quote, currency and session context", icon: Database, state: "complete" },
-  { label: "Quantitative structure evaluated", detail: "trend, dispersion and simulated outcomes", icon: Sigma, state: "active" },
-  { label: "Risk assessed", detail: "drawdown, tail and position risk", icon: Shield, state: "pending" },
-  { label: "Evidence assembled", detail: "news, sentiment and provenance checks", icon: Newspaper, state: "pending" },
-  { label: "Decision synthesized", detail: "verdict held until confidence is defensible", icon: Gauge, state: "pending" },
+  { label: "Request accepted", detail: "symbol, position size and base-currency context locked", icon: Database, state: "complete" },
+  { label: "Market data acquisition", detail: "quote, history and session context are being resolved", icon: Sigma, state: "active" },
+  { label: "Risk and evidence pass", detail: "queued until source data is present", icon: Shield, state: "pending" },
+  { label: "News and provenance", detail: "recency, source coverage and conflicts checked after fetch", icon: Newspaper, state: "pending" },
+  { label: "Decision synthesis", detail: "withheld until quantitative and evidence layers reconcile", icon: Gauge, state: "pending" },
 ];
 
 const LoadingState = () => {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col py-12">
-      <div className="border border-border bg-card">
+      <div className="state-panel border border-border bg-card">
         <div className="border-b border-border px-5 py-4">
           <p className="data-label">Analysis pass in progress</p>
           <h2 className="mt-1 text-title-3 text-foreground">Building an evidence-weighted decision record</h2>
           <p className="mt-2 max-w-xl text-footnote text-muted-foreground">
-            The system is exposing completed stages and holding provisional conclusions until the underlying data is available.
+            This state reports the actual dependency order. No synthetic progress percentage is shown because the run completes only when required sources return.
           </p>
         </div>
         <motion.div className="divide-y divide-border/70" variants={staggerContainer} initial="hidden" animate="visible">
