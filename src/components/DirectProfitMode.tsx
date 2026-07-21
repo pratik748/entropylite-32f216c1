@@ -1329,15 +1329,14 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const downsideFromEngine = qe?.hedge?.cvar95PerShare != null && resultEntryMid > 0;
 
   return (
-    <div className="h-full overflow-auto p-4">
-      <div className="max-w-lg mx-auto space-y-6">
-        <div className="text-center space-y-1">
-          <div className="flex items-center justify-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-foreground tracking-tight">Direct Profit Mode</h1>
+    <div className="h-full overflow-auto p-3 sm:p-4">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
+        <div className="space-y-4 lg:sticky lg:top-3 lg:self-start">
+          <div className="border border-border bg-card p-4">
+            <p className="data-label mb-2">Direct Profit</p>
+            <h1 className="text-title-3 text-foreground">Fast trade triage with a defensible audit trail.</h1>
+            <p className="mt-2 text-footnote text-muted-foreground">Enter a symbol. The surface returns only computed structure: engine consensus, expected value, risk leg, evidence graph and invalidation.</p>
           </div>
-          <p className="text-xs text-muted-foreground">One input. One decision. Zero confusion.</p>
-        </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2">
           <SuggestWrapper ticker={ticker} setTicker={setTicker} loading={loading} listening={listening} toggleVoice={toggleVoice} />
@@ -1378,33 +1377,41 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         )}
 
         {loading && (
-          <div className="glass-panel rounded-xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
-                Quant engine running
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground/60">{activeTicker}</span>
+          <div className="state-panel border border-border bg-card">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <span className="data-label">Quant engine running</span>
+              <span className="font-mono text-[9px] text-muted-foreground/70">{activeTicker}</span>
             </div>
-            <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
-              ensemble consensus · cointegration · walk-forward · structural credit · cost-adjusted expected value
-            </div>
-            <div className="space-y-4 animate-pulse">
-              <div className="h-16 bg-muted/30 rounded-lg" />
-              <div className="h-24 bg-muted/30 rounded-lg" />
-              <div className="h-12 bg-muted/30 rounded-lg" />
-              <div className="h-20 bg-muted/30 rounded-lg" />
-            </div>
+            {[
+              ["Market data acquired", "quote, history, currency context"],
+              ["Quantitative structure evaluated", "ensemble, cointegration, walk-forward, structural credit"],
+              ["Risk assessed", "VaR/CVaR, stop leg, tail multiplier and transaction costs"],
+              ["Evidence assembled", "workstation evidence graph, sources and conflicts"],
+              ["Decision synthesized", "held until the engine or evidence fallback returns"],
+            ].map(([label, detail], i) => (
+              <div key={label} className="decision-ledger-row">
+                <div>
+                  <div className="text-[12px] font-semibold tracking-tight text-foreground">{label}</div>
+                  <div className="text-[10.5px] text-muted-foreground">{detail}</div>
+                </div>
+                <span className={`font-mono text-[9px] uppercase tracking-[0.12em] ${i === 0 ? "text-gain" : i === 1 ? "text-foreground animate-breathe" : "text-muted-foreground/55"}`}>
+                  {i === 0 ? "complete" : i === 1 ? "active" : "pending"}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
+        </div>
+
+        <div className="min-w-0">
         {result && !loading && (
-          <div className="glass-panel rounded-xl overflow-hidden animate-fade-in">
+          <div className="decision-ledger overflow-hidden animate-fade-in">
             {/* ── BIG ACTION HEADER ── */}
-            <div className={`border-b ${actionBg} p-6 text-center`}>
+            <div className={`border-b ${actionBg} p-5 sm:p-6 text-left`}>
               <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-1">{activeTicker}</div>
-              <div className={`text-6xl font-black tracking-tight leading-none ${actionColor}`}>{result.action}</div>
-              <div className="mt-3 text-base text-muted-foreground">
+              <div className={`text-5xl font-semibold tracking-tight leading-none ${actionColor}`}>{result.action}</div>
+              <div className="mt-3 text-sm text-muted-foreground">
                 {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence{" "}
                 <span className="font-bold text-foreground text-lg">{result.confidence}%</span>
               </div>
@@ -2158,6 +2165,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

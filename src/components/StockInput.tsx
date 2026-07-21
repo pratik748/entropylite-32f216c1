@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, TrendingUp } from "lucide-react";
+import { Search, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,13 +134,16 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
   }
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-soft animate-slide-up">
-      <div className="mb-3 sm:mb-4 flex items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-surface-2">
-          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+    <div className="decision-ledger motion-row-enter p-4 sm:p-5">
+      <div className="mb-3 sm:mb-4 flex items-center gap-2.5 border-b border-border pb-3">
+        <div className="flex h-7 w-7 items-center justify-center border border-border bg-surface-2">
+          <Layers3 className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
-        <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Analyze an asset</h2>
-        <span className="ml-auto text-[10px] font-medium text-muted-foreground/60">All markets</span>
+        <div>
+          <p className="data-label text-[9px]">Instrument intake</p>
+          <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Open a decision record</h2>
+        </div>
+        <span className="ml-auto hidden font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 sm:inline">All markets</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -171,7 +174,7 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
                 key={t.ticker}
                 type="button"
                 onClick={() => setTicker(t.ticker)}
-                className="pressable rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-medium tracking-tight text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+                className="pressable border border-border/60 bg-surface-2 px-2.5 py-1 text-[11px] font-medium tracking-tight text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
               >
                 {t.label}
               </button>
@@ -215,7 +218,7 @@ const StockInput = ({ onAnalyze, isLoading, compact }: StockInputProps) => {
           className="w-full h-10 text-sm"
         >
           <Search className="mr-1 h-3.5 w-3.5" />
-          {isLoading ? "Analyzing…" : "Analyze"}
+          {isLoading ? "Building record…" : "Run analysis"}
         </Button>
       </form>
     </div>

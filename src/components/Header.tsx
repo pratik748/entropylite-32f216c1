@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { Command, LogOut, Search, Zap } from "lucide-react";
+import { Command, LogOut, Search, Zap, GitBranch } from "lucide-react";
 import { emitUIEvent } from "@/foresight/uiBus";
 import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
@@ -105,6 +105,11 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           </kbd>
         </button>
 
+        <div className="hidden xl:flex items-center gap-2 border-l border-border/60 pl-3 text-[10px] text-muted-foreground/75">
+          <GitBranch className="h-3 w-3" strokeWidth={1.6} />
+          <span className="font-mono uppercase tracking-[0.12em]">Market → Opportunity → Company → Evidence → Risk → Decision</span>
+        </div>
+
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
           {/* Foresight operating surface — top launcher hidden for now.
               Foresight itself is still reachable via ⌘J and the command
@@ -121,7 +126,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
             </button>
           )}
 
-          {/* Direct Profit Mode Toggle */}
+          {/* Direct Profit Toggle */}
           {onToggleDirectProfit && (
             <button
               onClick={onToggleDirectProfit}
@@ -131,7 +136,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "border border-border/70 bg-surface-2/60 text-foreground hover:bg-surface-2"
               }`}
-              title="Direct Profit Mode"
+              title="Direct Profit"
             >
               <Zap className={`h-3 w-3 ${directProfitMode ? "" : "text-warning"}`} />
               <span className="hidden sm:inline">Direct Profit</span>

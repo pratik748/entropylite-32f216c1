@@ -30,9 +30,12 @@ const ModuleRail = ({ modules, activeId, onSelect }: ModuleRailProps) => {
       {modules.map((m) => {
         const active = m.id === activeId;
         return (
-          <button
+          <motion.button
             key={m.id}
             onClick={() => onSelect(m.id)}
+            whileHover={{ x: 2 }}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 520, damping: 40 }}
             data-tour-tab={m.id}
             aria-current={active ? "page" : undefined}
             title={m.label}
@@ -60,7 +63,7 @@ const ModuleRail = ({ modules, activeId, onSelect }: ModuleRailProps) => {
             <span className="relative z-10 text-[8.5px] font-semibold uppercase tracking-[0.08em] leading-none">
               {m.label}
             </span>
-          </button>
+          </motion.button>
         );
       })}
     </nav>
@@ -80,9 +83,12 @@ export const ModuleStrip = ({ modules, activeId, onSelect }: ModuleRailProps) =>
       {modules.map((m) => {
         const active = m.id === activeId;
         return (
-          <button
+          <motion.button
             key={m.id}
             onClick={() => onSelect(m.id)}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 520, damping: 40 }}
             data-tour-tab={m.id}
             style={{ scrollSnapAlign: "start" }}
             aria-current={active ? "page" : undefined}
@@ -99,7 +105,7 @@ export const ModuleStrip = ({ modules, activeId, onSelect }: ModuleRailProps) =>
             )}
             <span className="relative z-10 flex h-4 w-4 items-center justify-center">{m.icon}</span>
             <span className="relative z-10">{m.label}</span>
-          </button>
+          </motion.button>
         );
       })}
     </nav>

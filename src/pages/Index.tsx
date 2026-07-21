@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow, Briefcase, LineChart, Database } from "lucide-react";
+import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow, Briefcase, LineChart, Database, Sparkles } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
 import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -624,14 +624,10 @@ const IndexContent = () => {
         <>
           {/* Refresh Banner */}
           {isRefreshing && (
-            <div className="border-b border-info/15 bg-info/5 px-4 py-1.5 flex items-center gap-2 shrink-0">
-              <RefreshCw className="h-3 w-3 text-info animate-spin" />
-              <span className="text-[11px] font-medium tracking-tight text-info">
-                Updating intelligence…
-              </span>
-              <div className="ml-auto h-1 w-24 rounded-full bg-info/15 overflow-hidden">
-                <div className="h-full bg-info rounded-full animate-pulse" style={{ width: "60%" }} />
-              </div>
+            <div className="system-state-bar border-b border-border px-4 py-1.5 flex items-center gap-2 shrink-0">
+              <RefreshCw className="h-3 w-3 text-muted-foreground animate-spin" />
+              <span className="data-label !text-muted-foreground/90">Reconciling market data, portfolio context, and intelligence caches</span>
+              <span className="ml-auto hidden sm:inline font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60">live refresh requested</span>
             </div>
           )}
 
@@ -734,20 +730,23 @@ const IndexContent = () => {
                             ) : (
                               <>
                                 {!effectiveLoading && !analysis && (
-                                  <div className="mx-auto flex max-w-2xl flex-col items-start justify-center border border-border bg-card px-8 py-12 shadow-none animate-fade-in">
-                                    <div className="mb-6 flex h-12 w-12 items-center justify-center border border-border bg-surface-2">
-                                      <Activity className="h-6 w-6 text-muted-foreground animate-breathe" strokeWidth={1.5} />
+                                  <div className="mx-auto grid max-w-3xl grid-cols-1 border border-border bg-card animate-fade-in sm:grid-cols-[1.1fr_0.9fr]">
+                                    <div className="border-b border-border p-7 sm:border-b-0 sm:border-r">
+                                      <p className="data-label mb-2.5">No active decision record</p>
+                                      <h2 className="mb-3 text-title-3 text-foreground">Start with an instrument or open the book view.</h2>
+                                      <p className="text-footnote text-muted-foreground">
+                                        Add an asset to run the analysis stack, or use the portfolio rail to inspect existing holdings. The desk keeps evidence, risk, thesis and decision layers connected instead of scattering them across unrelated widgets.
+                                      </p>
                                     </div>
-                                    <p className="data-label mb-2.5">No instrument selected</p>
-                                    <h2 className="mb-2 text-title-3 text-foreground">Capital desk standing by</h2>
-                                    <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
-                                      Add any global asset — equities, crypto, FX or commodities — and twelve
-                                      engines will run a full pass with live pricing. Every position opens into
-                                      the Equity Workstation: evidence graph, thesis engine, and risk lab.
-                                    </p>
-                                    <p className="mt-5 text-caption-1 text-muted-foreground/60">
-                                      Press <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> to jump anywhere
-                                    </p>
+                                    <div className="divide-y divide-border/70">
+                                      {["Market → opportunity", "Company → evidence", "Risk → decision"].map((step) => (
+                                        <div key={step} className="flex items-center justify-between px-5 py-4">
+                                          <span className="text-[12px] font-medium tracking-tight text-foreground">{step}</span>
+                                          <Activity className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.6} />
+                                        </div>
+                                      ))}
+                                      <div className="px-5 py-4 text-caption-1 text-muted-foreground/70">Press <kbd className="border border-border bg-surface-2 px-1.5 py-0.5 font-medium">⌘K</kbd> for navigation.</div>
+                                    </div>
                                   </div>
                                 )}
                                 {effectiveLoading && <LoadingState />}
