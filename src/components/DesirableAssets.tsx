@@ -11,6 +11,109 @@ import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { normalizeRiskRewardText } from "@/lib/riskReward";
+import { fetchOpportunities } from "@/lib/opportunities/repository";
+import type { EngineResponse, ValidatedOpportunity } from "@/lib/opportunities/types";
+
+// Map the Discover time-horizon chips to the engine's evaluation horizon.
+const HORIZON_TO_DAYS: Record<string, number> = {
+  intraday: 5, short_term: 10, medium_term: 21, long_term: 63,
+};
+
+// Old-UI asset-type chip → engine assetClass.
+const ASSET_TYPE_TO_CLASS: Record<string, string> = {
+  Stocks: "equity", ETFs: "etf", Indices: "index", Bonds: "bond",
+  Commodities: "commodity", Crypto: "crypto",
+};
+
+// Adapt a ValidatedOpportunity from the shared engine into the buy-board's
+// Recommendation shape. This is the SAME validated object Direct Profit and
+// the System pipeline consume — one engine, one slate, no separate scoring.
+function opportunityToRecommendation(o: ValidatedOpportunity): any {
+  const edge = Math.abs(o.expectedEdgePct);
+  const risk = Math.max(o.downsideRiskPct, 0.001);
+  const change24h = o.sparkline && o.sparkline.length >= 2
+    ? ((o.sparkline[o.sparkline.length - 1] - o.sparkline[o.sparkline.length - 2]) / o.sparkline[o.sparkline.length - 2]) * 100
+    : 0;
+  return {
+    ticker: o.symbol,
+    name: o.name,
+    assetClass: o.assetClass,
+    exchange: o.exchange || "",
+    currency: o.currency,
+    realCurrency: o.currency,
+    realPrice: o.price,
+    currentEstPrice: o.price,
+    priceVerified: true,
+    entryZone: [o.tradePlan.entryLow, o.tradePlan.entryHigh],
+    targetPrice: o.tradePlan.objective,
+    stopLoss: o.tradePlan.invalidationLevel,
+    timeHorizon: `${o.horizonDays}D`,
+    horizonClass: o.horizonDays <= 5 ? "intraday" : o.horizonDays <= 10 ? "short_term" : o.horizonDays <= 21 ? "medium_term" : "long_term",
+    suggestedQty: Math.max(1, o.sizing?.suggestedQty ?? 1),
+    confidence: Math.round(o.confidence * 100),
+    thesis: (o.supportingEvidence || []).slice(0, 3).join(" "),
+    catalyst: o.recentChange || "",
+    hedgingStrategy: "",
+    riskReward: `1:${(edge / risk).toFixed(1)}`,
+    sector: o.sector || o.assetClass,
+    tags: [o.consensus?.bucketConsensus, `${o.consensus?.engineCount ?? 0} models`].filter(Boolean),
+    priceChange24h: change24h,
+    quantScore: Math.round((o.portfolioAdjustedScore ?? o.riskAdjustedScore) * 100),
+    closes: o.sparkline || [],
+    simulationTested: true,
+    momentum20d: Number((o.expectedEdgePct * 100).toFixed(1)),
+    evidenceSummary: o.supportingEvidence || [],
+    consensus: o.consensus ? {
+      decision: "BUY",
+      calibratedProb: o.consensus.calibratedProb,
+      agreement: o.consensus.agreement,
+      engineCount: o.consensus.engineCount,
+      consensusLabel: o.consensus.consensusLabel,
+      expectedR: o.consensus.expectedR,
+    } : undefined,
+    bucketConsensus: o.consensus?.bucketConsensus,
+    bucketDirs: o.consensus?.bucketDirs,
+  };
+}
+
+// Build the buy-board `data` payload from an engine response, applying the
+// board's client-side filters (long-only — this is a "what to buy" board;
+// shorts live in Direct Profit — plus the asset-type / sector chips).
+function engineResponseToData(
+  resp: EngineResponse,
+  filters: { assetTypes: Set<string>; sectors: Set<string> },
+) {
+  const allowedClasses = new Set(
+    Array.from(filters.assetTypes).map((t) => ASSET_TYPE_TO_CLASS[t]).filter(Boolean),
+  );
+  const sectorNeedles = Array.from(filters.sectors).map((s) => s.toLowerCase());
+
+  const longs = resp.opportunities.filter((o) => {
+    if (o.direction !== "long") return false;
+    if (allowedClasses.size > 0 && !allowedClasses.has(o.assetClass)) return false;
+    if (sectorNeedles.length > 0) {
+      const sec = (o.sector || "").toLowerCase();
+      if (!sectorNeedles.some((n) => sec.includes(n) || n.includes(sec.split(" ")[0]))) return false;
+    }
+    return true;
+  });
+
+  const rejectionSummary = resp.diagnostics?.rejectionSummary || {};
+  const topReject = Object.entries(rejectionSummary).sort((a, b) => b[1] - a[1])[0];
+
+  return {
+    recommendations: longs.map(opportunityToRecommendation),
+    marketCondition: [resp.regime?.evidence?.[0], resp.macro?.evidence?.[0]].filter(Boolean).join(" "),
+    regimeType: resp.regime?.label || "",
+    liveWebContext: "",
+    candidatesGenerated: resp.diagnostics?.universeSize || 0,
+    candidatesPassed: longs.length,
+    rejectSummary: topReject ? [`${topReject[1]} ${String(topReject[0]).replace(/_/g, " ")}`] : [],
+    rejectHeadline: resp.diagnostics && resp.diagnostics.validated === 0
+      ? "The engine ran; no candidate cleared the institutional confidence gate this cycle."
+      : "",
+  };
+}
 
 interface Recommendation {
   ticker: string;
@@ -367,15 +470,12 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       // Simulate progress through stages
       if (progressTimer.current) clearInterval(progressTimer.current);
       const stages = [
-        { at: 5, label: "Querying AI strategist..." },
-        { at: 18, label: "Generating momentum candidates..." },
-        { at: 35, label: "Fetching real-time prices..." },
-        { at: 48, label: "Running Sharpe & drawdown filters..." },
-        { at: 58, label: "Momentum & trend validation..." },
-        { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
-        { at: 78, label: "Injecting live earnings sentiment..." },
-        { at: 85, label: "Scoring & ranking assets..." },
-        { at: 90, label: "Final quality checks..." },
+        { at: 10, label: "Measuring macro environment..." },
+        { at: 25, label: "Building candidate universe..." },
+        { at: 45, label: "Collecting price evidence..." },
+        { at: 62, label: "Running independent scoring models..." },
+        { at: 78, label: "Cross-validating across info-buckets..." },
+        { at: 90, label: "Applying validation gates & ranking..." },
       ];
       let idx = 0;
       progressTimer.current = setInterval(() => {
@@ -437,108 +537,23 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         avoidSectors: Array.from(avoidSectors),
       };
 
-      // Self-Repair Department: always attempts recovery before showing an error.
-      const result = await runWithRepair<any>({
-        label: "desirable-assets",
-        maxRetries: 2,
-        baseBackoffMs: 2000,
-        // A successful response with an empty recommendations array is a VALID outcome
-        // (no setup passed the elite quant filters this cycle), not a service failure.
-        // Treat it as usable so we surface a clear empty-state instead of looping into
-        // "Unable to reach service".
-        isUsable: (d) => d != null && Array.isArray(d?.recommendations),
-        staleCache: () => {
-          const stale = getStaleCachedDA();
-          return stale && Array.isArray(stale.recommendations) && stale.recommendations.length > 0 ? stale : null;
-        },
-        run: () => governedInvoke("desirable-assets", {
-          body: {
-            portfolioTickers: Array.from(new Set([...existingTickers, ...dpTickers])),
-            portfolioWeights,
-            portfolioSectors,
-            portfolioSignals,
-            portfolioValue: totalValue || 100000,
-            baseCurrency,
-            indiaMode,
-            // On manual force-refresh, drop the recent-slate memory entirely
-            // so the engine isn't fighting two exclusion lists at once.
-            previousTickers: forceRefresh ? [] : getPreviousTickers(),
-            userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
-            preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
-            preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
-            preferredHorizon: selectedHorizon || undefined,
-            // ODGS — Outcome Density Gradient System signals. Lets the AI
-            // pick names the user's own learned profit field already favours
-            // and avoid scarred patterns. Only sent when there's enough
-            // trade history to be meaningful.
-            odgs: odgsTotalTrades >= 5 ? {
-              generation: gradient.generation,
-              totalTrades: odgsTotalTrades,
-              hotAssets: Object.entries(gradient.assetBiases || {})
-                .filter(([, b]) => Number(b) > 1.05)
-                .sort((a, b) => Number(b[1]) - Number(a[1]))
-                .slice(0, 12)
-                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
-              coldAssets: Object.entries(gradient.assetBiases || {})
-                .filter(([, b]) => Number(b) < 0.85)
-                .sort((a, b) => Number(a[1]) - Number(b[1]))
-                .slice(0, 8)
-                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
-              synergyPairs: combinationScores.slice(0, 6).map((c) => ({
-                pair: c.pair,
-                synergy: c.synergyScore,
-                jointWinRate: c.jointWinRate,
-              })),
-              hotZones: desirableZones.slice(0, 4).map((z) => ({
-                assets: z.assets.slice(0, 5),
-                regime: z.regime,
-                avgPnlPct: z.avgPnlPct,
-                density: z.density,
-              })),
-              featureWeights: gradient.featureWeights.map((f) => ({
-                feature: f.feature,
-                weight: f.weight,
-              })),
-              scarTickers: Array.from(new Set(
-                scarMemory
-                  .filter((s) => s.realized_pnl_pct < -2)
-                  .map((s) => s.ticker)
-              )).slice(0, 10),
-            } : undefined,
-          },
-          // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
-          // every poll because currentPrice ticks). Keying on structural identity only.
-          cacheKey: [
-            "v2",
-            baseCurrency,
-            indiaMode ? "in" : "gl",
-            existingTickers.slice().sort().join(","),
-            sellTickers.slice().sort().join(",") || "ns",
-            highRiskTickers.slice().sort().join(",") || "nr",
-            budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
-            selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
-            selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
-            selectedHorizon || "any-horizon",
-          ].join("|"),
-          force: forceRefresh,
-        }),
+      // Single source of truth: the shared Opportunity Engine — the exact
+      // same validated slate Direct Profit and the System pipeline consume.
+      // No AI generation, no separate scoring; the buy-board just renders the
+      // long-side opportunities that survived the institutional gate.
+      void totalValue; void dpTickers; void portfolioWeights; void portfolioSectors;
+      void portfolioSignals; void sellTickers; void highRiskTickers;
+      const horizonDays = HORIZON_TO_DAYS[selectedHorizon] ?? 21;
+      const snapshot = await fetchOpportunities({ indiaMode, force: forceRefresh, horizonDays });
+      const data = engineResponseToData(snapshot.response, {
+        assetTypes: selectedAssetTypes,
+        sectors: selectedSectors,
       });
-
-      const data = result.data;
-      setAutoRepaired(result.autoRepaired);
-      if (result.autoRepaired) {
-        setRepairNote(
-          result.servedFromStaleCache
-            ? "Served last-good intelligence while live feed recovers."
-            : "Live feed hiccupped, auto-repaired and retrying.",
-        );
-        console.log("[DesirableAssets] auto-repair trail:", result.repairTrail);
-      } else {
-        setRepairNote(null);
-      }
+      setAutoRepaired(false);
+      setRepairNote(null);
 
       if (!data || !Array.isArray(data.recommendations)) {
-        throw new Error(result.error || "Service unreachable. Please retry.");
+        throw new Error("Opportunity engine unreachable. Please retry.");
       }
 
         if (data.recommendations.length === 0) {
@@ -556,26 +571,14 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
             ? ` ${data.rejectSummary.join(". ")}.`
             : "";
-          const refillTried = Array.isArray(data.repairTrail)
-            && data.repairTrail.some((s: string) => typeof s === "string" && s.toLowerCase().includes("refill"));
-          const refillNote = refillTried
-            ? " Replacement search was attempted but didn't return enough fresh names."
-            : "";
           setError(
             gen > 0
-              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry — the next pass will start with a fresh exclusion window.`
-              : "No setups generated this cycle. Try again or adjust filters.",
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the institutional confidence gate.`}${summary} Long-side setups only appear here — shorts surface in Direct Profit. Tap Retry after the market moves.`
+              : "No validated opportunities currently meet institutional confidence thresholds.",
           );
           retryCount.current = 0;
           return;
         }
-
-      if (data.autoRepaired && Array.isArray(data.repairTrail)) {
-        const reserveRecovered = data.repairTrail.some((s: string) => /reserve universe|reserve ranking/i.test(String(s)));
-        if (reserveRecovered) {
-          setRepairNote("Live AI slate was thin, so the engine switched to a price-verified reserve ranking to keep the board populated.");
-        }
-      }
 
       const sanitizedRecommendations = data.recommendations.map(sanitizeRecommendation);
 
