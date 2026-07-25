@@ -31,7 +31,6 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
-import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { useSymbolSuggest } from "@/components/SymbolSuggest";
@@ -84,7 +83,6 @@ interface TradeResult {
   riskRewardRatio?: number;
   providersUsed?: number;
   consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
-  fallback?: boolean;
   riskMetrics?: RiskMetrics;
   clankSignals?: ClankSignal[];
   newsHeadlines?: string[];
@@ -396,7 +394,7 @@ function buildAuditTrail(opts: {
         source: "evidence synthesis",
         formula: "GBM over 21 sessions: σ = σ_ann·√(21/252) · m = tilt·σ − σ²/2 · tilt = clamp((0.5·(mom−50) + 0.25·(risk−50))/50 − 0.3·tripped − 0.1·watch, ±0.75) · P(profit) = Φ(m/σ)",
         computation: `σ_ann ${f(model.annualVolPct, 1)}% from realized returns · breakers drag the drift so the distribution carries the same downside the verdict reacts to`,
-        usedFor: "One model behind the case probabilities, the fallback EV/CVaR, and the fallback trade gate (promote at P ≥ 53% with Σ p·r ≥ +1%, reduce at P ≤ 47% with Σ p·r ≤ −1%)",
+        usedFor: "One model behind the case probabilities, evidence EV/CVaR, and the evidence gate used only for context panels.",
       });
     }
     if (synthesis.cases.length > 0) {
@@ -420,7 +418,7 @@ function buildAuditTrail(opts: {
         source: "evidence synthesis",
         formula: "Σ p·r across bull / base / bear",
         computation: synthesis.cases.map((c) => `${c.probability}%·(${c.returnPct != null ? `${c.returnPct > 0 ? "+" : ""}${c.returnPct}%` : "—"})`).join(" + ") + ` = ${evidenceEV >= 0 ? "+" : ""}${f(evidenceEV, 1)}%`,
-        usedFor: "Expected Return tile when the quant engine is unreachable · coherence gate on the fallback action",
+        usedFor: "Expected Return context when the quantitative ticket is present; unavailable values are withheld.",
       });
     }
     if (evidenceES != null) {
@@ -441,7 +439,7 @@ function buildAuditTrail(opts: {
       source: "evidence synthesis",
       formula: "35 + 55·sigmoid(−0.6 + 1.3·volume + 1.1·agreement + 0.9·tanh(|net|/4) − 1.2·estimated-share − 0.8·breaker-share)",
       computation: `${synthesis.ledger.supporting + synthesis.ledger.opposing + synthesis.ledger.neutral} nodes scored · ${synthesis.ledger.estimated} estimated-provenance`,
-      usedFor: "Displayed confidence when the fallback owns the verdict — saturates smoothly in [35, 90], never certainty",
+      usedFor: "Evidence confidence context — saturates smoothly in [35, 90], never certainty",
     });
   }
 
@@ -630,7 +628,7 @@ function savePortfolio(items: PortfolioItem[]) {
 /**
  * Auto-optimize position size using fixed-fractional risk + Kelly + confidence.
  *
- *   risk_budget_base  = 1% of portfolio value (fallback: $10k notional / ₹500k for INR)
+ *   risk_budget_base  = 1% of portfolio value (planning reference: $10k notional / ₹500k for INR when no book value exists)
  *   kelly_scale       = clamp(kelly, 0.10, 1.0)   — half-Kelly–style cap
  *   confidence_scale  = max(0.5, confidence/100)  — never under 50% of base sizing
  *   per_share_risk    = |entry − stop|
@@ -652,8 +650,8 @@ function computeOptimalQuantity(opts: {
   if (!Number.isFinite(entryPrice) || entryPrice <= 0) return 0;
 
   // Notional risk budget in *base* currency
-  const fallbackNotionalBase = baseCurrency === "INR" ? 500_000 : 10_000;
-  const portfolioBase = portfolioValueBase && portfolioValueBase > 0 ? portfolioValueBase : fallbackNotionalBase;
+  const planningNotionalBase = baseCurrency === "INR" ? 500_000 : 10_000;
+  const portfolioBase = portfolioValueBase && portfolioValueBase > 0 ? portfolioValueBase : planningNotionalBase;
   const riskPctOfPortfolio = 0.01; // 1% per trade — institutional default
   const riskBudgetBase = portfolioBase * riskPctOfPortfolio;
 
@@ -714,12 +712,12 @@ function normalizeTradeResult(value: any): TradeResult | null {
     entryHigh: normalizeNumber(value.entryHigh),
     targetPrice: normalizeNumber(value.targetPrice),
     stopLoss: normalizeNumber(value.stopLoss),
-    timeframe: cleanAIText(value.timeframe || "1-3 weeks"),
+    timeframe: typeof value.timeframe === "string" ? value.timeframe : "1-3 weeks",
     direction: value.direction,
-    directionReason: cleanAIText(value.directionReason || "Signal alignment is mixed").slice(0, 60),
-    positiveNews: cleanAIText(value.positiveNews || "No significant positive catalyst").slice(0, 120),
-    negativeNews: cleanAIText(value.negativeNews || "No significant downside catalyst").slice(0, 120),
-    protection: cleanAIText(value.protection || "Exit if price breaks the stop level.").slice(0, 120),
+    directionReason: String(value.directionReason || "Signal alignment is mixed").slice(0, 60),
+    positiveNews: String(value.positiveNews || "No significant positive catalyst").slice(0, 120),
+    negativeNews: String(value.negativeNews || "No significant downside catalyst").slice(0, 120),
+    protection: String(value.protection || "Exit if price breaks the stop level.").slice(0, 120),
     currentPrice: normalizeNumber(value.currentPrice),
     currency: typeof value.currency === "string" && value.currency.trim() ? value.currency.trim().toUpperCase() : undefined,
     quantScore: value.quantScore !== undefined ? Math.max(0, Math.min(100, Math.round(normalizeNumber(value.quantScore)))) : undefined,
@@ -727,7 +725,6 @@ function normalizeTradeResult(value: any): TradeResult | null {
     riskRewardRatio: value.riskRewardRatio !== undefined ? Math.abs(normalizeNumber(value.riskRewardRatio)) : undefined,
     providersUsed: value.providersUsed !== undefined ? Math.max(0, Math.round(normalizeNumber(value.providersUsed))) : undefined,
     consensus: ["UNANIMOUS", "MAJORITY", "SPLIT"].includes(value.consensus) ? value.consensus : undefined,
-    fallback: Boolean(value.fallback),
     riskMetrics: value.riskMetrics || undefined,
     clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
     newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
@@ -797,9 +794,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { logTrade } = useTradeLogger();
   const { refresh: refreshWorkstation, ...workstationData } = useWorkstationData(activeTicker);
   const { desirableZones } = useOutcomeGradient();
-  /** Quant-engine ticket from the direct-profit edge function; null when it failed and the evidence fallback owns the result. */
+  /** Quant-engine ticket from the direct-profit edge function. Direct Profit does not publish a trade without it. */
   const [edgeResult, setEdgeResult] = useState<TradeResult | null>(null);
-  /** Why the quant engine did not land — shown on the fallback surface so the swap is never silent. */
+  /** Why the quant engine did not land; rendered as a data-unavailable state, never as a replacement trade. */
   const [edgeError, setEdgeError] = useState<string | null>(null);
   const edgePendingRef = useRef(false);
 
@@ -891,12 +888,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setLiveCurrency(null);
     setLastPriceUpdate(0);
 
-    // Two engines race for the same ticket. The quant edge function is the
-    // primary — it runs the full ensemble (cointegration, Merton proxy,
-    // walk-forward evidence, calibrated consensus, cost-adjusted expected
-    // value). The local evidence synthesis hydrates in parallel and owns
-    // the result if the function is unreachable, so the surface can never
-    // show a transport error.
+    // Direct Profit is engine-first. The edge function runs the full
+    // ensemble (cointegration, Merton proxy, walk-forward evidence,
+    // calibrated consensus, cost-adjusted expected value). Local evidence
+    // hydrates only to annotate a landed ticket; it must never replace the
+    // quantitative decision.
     refreshWorkstation();
     edgePendingRef.current = true;
 
@@ -940,14 +936,13 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       setEdgeResult(await attemptEngine());
       recordEngineStatus("live");
     } catch (firstErr) {
-      // One retry — cold starts and transient 5xx are the common failure
-      // mode, and the evidence view renders in the meantime so a late
-      // quant ticket simply upgrades the surface in place.
+      // One retry — cold starts and transient 5xx are common failure modes.
+      // The surface remains withheld unless a valid quant ticket lands.
       try {
         setEdgeResult(await attemptEngine());
         recordEngineStatus("live");
       } catch (err: any) {
-        console.warn("direct-profit edge engine unavailable, using evidence synthesis:", firstErr, err);
+        console.warn("direct-profit edge engine unavailable:", firstErr, err);
         const reason = err?.message || err?.error?.message || String(err);
         setEdgeError(String(reason).slice(0, 140));
         recordEngineStatus("unreachable", String(reason).slice(0, 140));
@@ -960,15 +955,19 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
   useEffect(() => {
     if (!activeTicker || workstationData.bootstrapping) return;
-    // Build (or rebuild) the evidence view whenever we're waiting for a
-    // result or the quant edge ticket has arrived and needs its evidence
-    // panels merged in.
+    // Build (or rebuild) the evidence view only to annotate a landed quant
+    // ticket. If the engine is still pending we keep loading; if it failed we
+    // show a professional unavailable state instead of publishing a local
+    // substitute verdict.
+    if (!edgeResult) {
+      if (edgePendingRef.current) return;
+      if (edgeError) {
+        setErrorMessage("Direct Profit requires the quantitative engine. No trade ticket is published until live market data and the ensemble return a valid result.");
+        setLoading(false);
+      }
+      return;
+    }
     if (!loading && !edgeResult) return;
-    // Engine-first: while the quant engine attempt is in flight the surface
-    // stays in its loading state. The evidence view renders as the RESULT
-    // only after the engine has definitively failed (edgeError set) — it
-    // never flashes first and gets replaced.
-    if (!edgeResult && edgePendingRef.current) return;
     try {
       const graph = buildEvidenceGraph({
         ticker: activeTicker,
@@ -1132,8 +1131,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     }
     // NOTE: no `finally` — the empty-graph early return must keep `loading`
     // true so this effect re-fires as the workstation sources hydrate.
-    // edgeError is a dependency so the engine's definitive failure re-fires
-    // the effect and lets the labeled fallback take the surface.
+    // edgeError is a dependency so a definitive engine failure re-fires
+    // the effect and moves the UI to an unavailable state.
   }, [activeTicker, loading, workstationData, edgeResult, edgeError]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
@@ -1161,7 +1160,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         addedAt: Date.now(),
         source: result.consensus
           ? `${result.consensus} · ${result.providersUsed ?? "?"} engines · ${result.confidence}%`
-          : `AI · ${result.confidence}%`,
+          : `Quant ensemble · ${result.confidence}%`,
         catalyst: (result.action === "BUY" ? result.positiveNews : result.negativeNews)?.slice(0, 140) || result.directionReason,
         lesson: "",
       };
@@ -1387,7 +1386,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               ["Quantitative structure evaluated", "ensemble, cointegration, walk-forward, structural credit"],
               ["Risk assessed", "VaR/CVaR, stop leg, tail multiplier and transaction costs"],
               ["Evidence assembled", "workstation evidence graph, sources and conflicts"],
-              ["Decision synthesized", "held until the engine or evidence fallback returns"],
+              ["Decision synthesized", "withheld until the quantitative engine returns a valid ticket"],
             ].map(([label, detail], i) => (
               <div key={label} className="decision-ledger-row">
                 <div>
@@ -1426,11 +1425,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
               {lastPriceUpdate > 0 && (
                 <div className="mt-1 text-[10px] text-muted-foreground/60">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</div>
-              )}
-              {result.fallback && (
-                <div className="mt-2 text-[11px] text-muted-foreground">
-                  Running on resilient rules fallback while live AI consensus is unavailable.
-                </div>
               )}
               {result.ensemble && (
                 <div className="mt-3 mx-auto max-w-xs">
@@ -1646,8 +1640,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
               <div className="text-[10px] font-mono text-muted-foreground">
                 {quantOwned
-                  ? `Verdict from the quant ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
-                  : `Quant engine unreachable${edgeError ? ` (${edgeError})` : ""} — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
+                  ? `Verdict from the quantitative ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
+                  : `No trade ticket is published without the quantitative ensemble. Evidence nodes are context only.`}
               </div>
             </div>
 
@@ -2121,7 +2115,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                       <input
                         value={item.source || ""}
                         onChange={(e) => updateLog(item.ticker, { source: e.target.value })}
-                        placeholder="e.g. AI consensus · 4 engines"
+                        placeholder="e.g. Quant ensemble · 4 engines"
                         className="w-full bg-surface-2/40 border border-border rounded px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
                       />
                     </div>
@@ -2224,7 +2218,7 @@ const SuggestWrapper = ({ ticker, setTicker, loading, listening, toggleVoice }: 
     <div ref={wrapRef} className="relative flex-1">
       <Input
         {...inputProps}
-        placeholder="Enter stock name or speak"
+        placeholder="Enter symbol or company"
         className="bg-surface-2 border-border h-12 text-base font-mono pr-10 placeholder:text-muted-foreground/40"
         disabled={loading}
       />
