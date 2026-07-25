@@ -69,45 +69,7 @@ async function fetchYahooV10(symbol: string): Promise<{ price: number; currency:
   }
 }
 
-
-function stooqSymbol(symbol: string): string | null {
-  const upper = symbol.toUpperCase();
-  if (upper.includes(".NS") || upper.includes(".BO") || upper.startsWith("^") || upper.includes("=") || upper.endsWith("-USD")) return null;
-  return `${upper.replace(/[^A-Z0-9.]/g, "")}.US`.toLowerCase();
-}
-
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let quoted = false;
-  for (const ch of line) {
-    if (ch === '"') { quoted = !quoted; continue; }
-    if (ch === "," && !quoted) { out.push(cur); cur = ""; continue; }
-    cur += ch;
-  }
-  out.push(cur);
-  return out;
-}
-
-async function fetchStooqPrice(symbol: string): Promise<{ price: number; currency: string } | null> {
-  const sq = stooqSymbol(symbol);
-  if (!sq) return null;
-  try {
-    const res = await fetch(`https://stooq.com/q/l/?s=${encodeURIComponent(sq)}&f=sd2t2ohlcv&h&e=csv`, {
-      headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
-    });
-    if (!res.ok) return null;
-    const lines = (await res.text()).trim().split(/\r?\n/);
-    const row = lines[1] ? parseCsvLine(lines[1]) : [];
-    const price = Number(row[6]);
-    if (!Number.isFinite(price) || price <= 0) return null;
-    return { price, currency: "USD" };
-  } catch {
-    return null;
-  }
-}
-
-/** Combined fetch with provider failover */
+/** Combined fetch with triple fallback */
 async function fetchPrice(symbol: string): Promise<{ price: number; currency: string } | null> {
   // Try v8 first (fastest)
   const v8 = await fetchYahooV8(symbol);
@@ -120,10 +82,6 @@ async function fetchPrice(symbol: string): Promise<{ price: number; currency: st
   // Fallback to v10
   const v10 = await fetchYahooV10(symbol);
   if (v10) return v10;
-
-  // Final real-data provider for US equities when Yahoo is unavailable.
-  const stooq = await fetchStooqPrice(symbol);
-  if (stooq) return stooq;
   
   return null;
 }

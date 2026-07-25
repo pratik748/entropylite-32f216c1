@@ -38,8 +38,6 @@ export interface QuantSnapshot {
   covariance: { tickers: string[]; matrix: number[][]; sigmas: number[] };
   /** Per-asset daily log-return series (full history per ticker). */
   returnsByTicker: Record<string, number[]>;
-  /** Per-asset daily share volumes (oldest→newest) for liquidity analytics. */
-  volumesByTicker: Record<string, number[]>;
 }
 
 const EMPTY: QuantSnapshot = {
@@ -52,7 +50,6 @@ const EMPTY: QuantSnapshot = {
   correlation: { tickers: [], matrix: [] },
   covariance: { tickers: [], matrix: [], sigmas: [] },
   returnsByTicker: {},
-  volumesByTicker: {},
 };
 
 /**
@@ -76,7 +73,6 @@ export function useQuantSnapshot(stocks: PortfolioStock[]): QuantSnapshot {
     // Build per-asset stats from real history
     const assetStats: Record<string, AssetStats> = {};
     const seriesByT: Record<string, { closes: number[] }> = {};
-    const volumesByTicker: Record<string, number[]> = {};
     let minLen = Infinity;
     for (const h of holdings) {
       const series = prices[h.ticker];
@@ -85,7 +81,6 @@ export function useQuantSnapshot(stocks: PortfolioStock[]): QuantSnapshot {
       if (!stats) continue;
       assetStats[h.ticker] = stats;
       seriesByT[h.ticker] = { closes: series.closes };
-      if (Array.isArray(series.volumes)) volumesByTicker[h.ticker] = series.volumes;
       if (series.closes.length < minLen) minLen = series.closes.length;
     }
 
@@ -147,7 +142,6 @@ export function useQuantSnapshot(stocks: PortfolioStock[]): QuantSnapshot {
       correlation,
       covariance,
       returnsByTicker: retsByT,
-      volumesByTicker,
     };
   }, [holdings, prices, totalValue, loading]);
 }

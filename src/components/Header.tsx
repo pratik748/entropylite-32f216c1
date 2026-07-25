@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { Command, LogOut, Search, Zap, GitBranch } from "lucide-react";
+import { Command, LogOut, Search, Zap } from "lucide-react";
 import { emitUIEvent } from "@/foresight/uiBus";
 import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
@@ -60,7 +60,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const openCount = markets.filter((m) => isMarketOpen(m.tz, m.open, m.close)).length;
 
   return (
-    <header data-density="compact" className="border-b border-border bg-surface-1 relative shrink-0 z-40">
+    <header data-density="compact" className="glass-panel border-b border-border/60 relative shrink-0 z-40">
       <div className="px-3 sm:px-4 flex h-12 items-center gap-3 relative z-10">
         {/* Identity */}
         <div className="flex items-center gap-2.5 min-w-0 shrink-0">
@@ -93,7 +93,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
         {/* Global search — opens the command palette */}
         <button
           onClick={openPalette}
-          className="hidden md:flex flex-1 max-w-md items-center gap-2 border border-border bg-surface-2/60 px-3 h-8 text-left hover:bg-surface-2 hover:border-border transition-colors mx-2"
+          className="hidden md:flex flex-1 max-w-md items-center gap-2 rounded-lg border border-border/70 bg-surface-2/60 px-3 h-8 text-left hover:bg-surface-2 hover:border-border transition-colors mx-2"
           aria-label="Open command palette"
         >
           <Search className="h-3 w-3 text-muted-foreground/70 shrink-0" />
@@ -105,11 +105,6 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           </kbd>
         </button>
 
-        <div className="hidden xl:flex items-center gap-2 border-l border-border/60 pl-3 text-[10px] text-muted-foreground/75">
-          <GitBranch className="h-3 w-3" strokeWidth={1.6} />
-          <span className="font-mono uppercase tracking-[0.12em]">Market → Opportunity → Company → Evidence → Risk → Decision</span>
-        </div>
-
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
           {/* Foresight operating surface — top launcher hidden for now.
               Foresight itself is still reachable via ⌘J and the command
@@ -117,7 +112,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           {FORESIGHT_LAUNCHER_ENABLED && (
             <button
               onClick={() => emitUIEvent("open_surface", {})}
-              className="pressable hidden md:flex items-center gap-1.5 border border-border bg-surface-2/60 px-3 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
+              className="pressable hidden md:flex items-center gap-1.5 rounded-lg border border-border/70 bg-surface-2/60 px-3 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
               title="Foresight (⌘J)"
             >
               <Command className="h-3 w-3 text-muted-foreground" />
@@ -126,17 +121,17 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
             </button>
           )}
 
-          {/* Direct Profit Toggle */}
+          {/* Direct Profit Mode Toggle */}
           {onToggleDirectProfit && (
             <button
               onClick={onToggleDirectProfit}
               data-tour="direct-profit-btn"
-              className={`pressable flex items-center gap-1.5 px-3 h-8 text-[11.5px] font-semibold tracking-tight transition-colors ${
+              className={`pressable flex items-center gap-1.5 rounded-lg px-3 h-8 text-[11.5px] font-semibold tracking-tight transition-colors ${
                 directProfitMode
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "border border-border/70 bg-surface-2/60 text-foreground hover:bg-surface-2"
               }`}
-              title="Direct Profit"
+              title="Direct Profit Mode"
             >
               <Zap className={`h-3 w-3 ${directProfitMode ? "" : "text-warning"}`} />
               <span className="hidden sm:inline">Direct Profit</span>
@@ -148,7 +143,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
             value={baseCurrency}
             onChange={(e) => setBaseCurrency(e.target.value)}
             aria-label="Base currency"
-            className="border border-border bg-surface-2/60 px-2 h-8 text-[11px] font-semibold tracking-tight text-foreground cursor-pointer hover:bg-surface-2 transition-colors appearance-none"
+            className="rounded-lg border border-border/70 bg-surface-2/60 px-2 h-8 text-[11px] font-semibold tracking-tight text-foreground cursor-pointer hover:bg-surface-2 transition-colors appearance-none"
             style={{ minWidth: 56 }}
           >
             {SUPPORTED_CURRENCIES.map((c) => (
@@ -162,7 +157,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
 
           <button
             onClick={() => supabase.auth.signOut()}
-            className="pressable flex h-8 w-8 items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="pressable flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="Sign out"
           >
             <LogOut className="h-3.5 w-3.5" />

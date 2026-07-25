@@ -48,8 +48,6 @@ export interface InstitutionalAnalytics {
   snapshot: QuantSnapshot;
   benchmarkTicker: string;
   benchmarkReady: boolean;
-  /** Benchmark daily log-return series (tail-alignable); null before load. */
-  benchmarkReturns: number[] | null;
   performance: PerformanceMetrics | null;
   risk: RiskMetrics | null;
   exposure: ExposureAnalysis | null;
@@ -77,17 +75,7 @@ export function pickBenchmark(currencies: string[]): string {
 
 export function useInstitutionalAnalytics(
   stocks: PortfolioStock[],
-  opts?: {
-    constraints?: OptimizerConstraints;
-    recommendedId?: OptimizerId;
-    /**
-     * When true, `recommended` is EXACTLY the requested optimizer or null —
-     * no silent fallback to a different model. A surface that offers a
-     * model selector must set this, otherwise a failed selection quietly
-     * shows another model's numbers and the control appears dead.
-     */
-    strictRecommended?: boolean;
-  },
+  opts?: { constraints?: OptimizerConstraints; recommendedId?: OptimizerId },
 ): InstitutionalAnalytics {
   const norm = useNormalizedPortfolio(stocks);
   const snapshot = useQuantSnapshot(stocks);
@@ -104,13 +92,12 @@ export function useInstitutionalAnalytics(
 
   const constraints = opts?.constraints;
   const recommendedId = opts?.recommendedId ?? "hrp";
-  const strictRecommended = opts?.strictRecommended ?? false;
 
   return useMemo<InstitutionalAnalytics>(() => {
     const { holdings, totalValue, totalInvested, totalPnl, fmt, baseCurrency } = norm;
     const empty: InstitutionalAnalytics = {
       ready: false, loading: snapshot.loading || benchLoading, snapshot,
-      benchmarkTicker, benchmarkReady: false, benchmarkReturns: null,
+      benchmarkTicker, benchmarkReady: false,
       performance: null, risk: null, exposure: null, attribution: null,
       optimizers: [], betasByTicker: null, betaBasis: "unavailable",
       stresses: [], replays: [], sensitivity: [], insights: [], report: null,
@@ -226,12 +213,10 @@ export function useInstitutionalAnalytics(
       };
       optimizers = runAllOptimizers(input);
     }
-    const recommended = strictRecommended
-      ? (optimizers.find(o => o.id === recommendedId && o.diagnostics.converged) ?? null)
-      : (optimizers.find(o => o.id === recommendedId && o.diagnostics.converged)
-          ?? optimizers.find(o => o.id === "risk_parity" && o.diagnostics.converged)
-          ?? optimizers.find(o => o.diagnostics.converged)
-          ?? null);
+    const recommended = optimizers.find(o => o.id === recommendedId && o.diagnostics.converged)
+      ?? optimizers.find(o => o.id === "risk_parity" && o.diagnostics.converged)
+      ?? optimizers.find(o => o.diagnostics.converged)
+      ?? null;
 
     // ── Stress & replay ──────────────────────────────────────────
     const stressPositions = holdings.map(h => ({
@@ -286,7 +271,6 @@ export function useInstitutionalAnalytics(
       snapshot,
       benchmarkTicker,
       benchmarkReady,
-      benchmarkReturns: benchRets,
       performance,
       risk,
       exposure,
@@ -301,5 +285,5 @@ export function useInstitutionalAnalytics(
       report,
       recommended,
     };
-  }, [norm, snapshot, benchPrices, benchLoading, benchmarkTicker, constraints, recommendedId, strictRecommended]);
+  }, [norm, snapshot, benchPrices, benchLoading, benchmarkTicker, constraints, recommendedId]);
 }

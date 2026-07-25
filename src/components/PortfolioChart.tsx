@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
-import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
+import { useFX } from "@/hooks/useFX";
+import { getCurrencySymbol, inferAssetCurrency } from "@/lib/currency";
 
 interface PortfolioChartProps {
   stocks: PortfolioStock[];
@@ -19,14 +20,22 @@ const COLORS = [
 ];
 
 const PortfolioChart = ({ stocks, onAssetTap }: PortfolioChartProps) => {
-  // Values come from the shared valuation spine (base-currency, explicit
-  // analysis currency first) so this chart's weights match the blotter's.
-  const { sym, holdings } = useNormalizedPortfolio(stocks);
+  const { baseCurrency, convertToBase } = useFX();
+  const sym = getCurrencySymbol(baseCurrency);
 
+  const analyzed = stocks.filter((s) => s.analysis && !s.isLoading);
+  
   // Deduplicate by ticker name
   const seen = new Set<string>();
-  const data = holdings
-    .map((h) => ({ name: h.ticker, value: h.value }))
+  const data = analyzed
+    .map((s) => {
+      const nativeCurrency = inferAssetCurrency(s.ticker);
+      const nativeValue = (s.analysis!.currentPrice) * s.quantity;
+      return {
+        name: s.ticker.replace(".NS", "").replace(".BO", ""),
+        value: convertToBase(nativeValue, nativeCurrency),
+      };
+    })
     .filter((d) => {
       if (seen.has(d.name)) return false;
       seen.add(d.name);

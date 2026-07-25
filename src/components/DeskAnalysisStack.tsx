@@ -1,5 +1,4 @@
 import StockSummary from "@/components/StockSummary";
-import DeskSynthesis from "@/components/DeskSynthesis";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import NewsImpactTable from "@/components/NewsImpactTable";
 import SimulationTable from "@/components/SimulationTable";
@@ -54,7 +53,6 @@ const DeskAnalysisStack = ({ analysis, stocks, isMobile, onSelectTicker }: DeskA
             quantity={analysis.quantity}
             currency={analysis.currency}
           />
-          <DeskSynthesis analysis={analysis} />
           <MonteCarloChart
             currentPrice={analysis.currentPrice}
             bullRange={analysis.bullRange}

@@ -579,15 +579,13 @@ export function buildEvidenceGraph(inputs: BuildInputs): EvidenceGraph {
     const grade: Grade = rr == null ? "neutral" : rr >= 1.5 ? "good" : rr >= 1 ? "neutral" : "bad";
     push({
       id: "support_distance",
-      // Label order matches the value order: reward first, so "2.5:1" reads
-      // as 2.5 reward per 1 unit of risk (not the inverse).
-      label: "Reward-to-risk structure",
+      label: "Risk : reward structure",
       value: rr,
-      format: "rr",
+      format: "ratio",
       provenance: "computed",
       source: SRC_ENGINE,
-      definition: "Upside to resistance versus downside to support — the payoff shape of an entry at the current price. Shown reward-first as X:1 (reward per 1 of risk).",
-      calculation: `Upside to ${fmtNum(resistance)} (${fmtNum(upDist, 1)}%) ÷ downside to ${fmtNum(support)} (${fmtNum(dist, 1)}%) = ${rr == null ? "—" : `${fmtNum(rr, 1)}:1`} reward-to-risk.`,
+      definition: "Upside to resistance versus downside to support — the payoff shape of an entry at the current price.",
+      calculation: `Upside to ${fmtNum(resistance)} (${fmtNum(upDist, 1)}%) ÷ downside to ${fmtNum(support)} (${fmtNum(dist, 1)}%) = ${rr == null ? "—" : `${fmtNum(rr, 1)}:1`}.`,
       whyItMatters: "Position entries live or die on payoff asymmetry; below 1.5:1 the desk's own discipline says pass.",
       grade,
       reason:

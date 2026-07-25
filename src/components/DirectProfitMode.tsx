@@ -31,6 +31,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { useFX } from "@/hooks/useFX";
 import { formatCurrency, getCurrencySymbol, resolveAssetCurrency } from "@/lib/currency";
+import { cleanAIText } from "@/lib/utils";
 import { useHistoricalPrices } from "@/hooks/useHistoricalPrices";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { useSymbolSuggest } from "@/components/SymbolSuggest";
@@ -42,7 +43,6 @@ import { buildEvidenceGraph } from "@/lib/evidence/build";
 import { synthesize, logNormalHorizon, type HorizonModel } from "@/lib/evidence/synthesis";
 import { lognormalEs, normalCdf } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
-import { formatRiskReward, RR_ENTRY_BAR } from "@/lib/riskReward";
 
 interface RiskMetrics {
   var95: number;
@@ -83,6 +83,7 @@ interface TradeResult {
   riskRewardRatio?: number;
   providersUsed?: number;
   consensus?: "UNANIMOUS" | "MAJORITY" | "SPLIT";
+  fallback?: boolean;
   riskMetrics?: RiskMetrics;
   clankSignals?: ClankSignal[];
   newsHeadlines?: string[];
@@ -320,7 +321,7 @@ function buildAuditTrail(opts: {
       value: `entry ${f(edge.entryLow)}–${f(edge.entryHigh)} · stop ${f(edge.stopLoss)} · target ${f(edge.targetPrice)}`,
       source: "quant engine",
       formula: "entry = S·(1 ± σ_d) · stop = 1.2σ_d vs support · target = stop-width × R implied by the after-cost edge, vs resistance",
-      computation: `risk/reward ${formatRiskReward(edge.riskRewardRatio)}${ens ? ` · E[R] after costs ${f(ens.expectedR)}` : ""}`,
+      computation: `risk/reward ${edge.riskRewardRatio != null ? `${f(edge.riskRewardRatio, 1)}:1` : "—"}${ens ? ` · E[R] after costs ${f(ens.expectedR)}` : ""}`,
       usedFor: "Trade Plan panel · risk per share drives position sizing",
     });
   }
@@ -394,7 +395,7 @@ function buildAuditTrail(opts: {
         source: "evidence synthesis",
         formula: "GBM over 21 sessions: σ = σ_ann·√(21/252) · m = tilt·σ − σ²/2 · tilt = clamp((0.5·(mom−50) + 0.25·(risk−50))/50 − 0.3·tripped − 0.1·watch, ±0.75) · P(profit) = Φ(m/σ)",
         computation: `σ_ann ${f(model.annualVolPct, 1)}% from realized returns · breakers drag the drift so the distribution carries the same downside the verdict reacts to`,
-        usedFor: "One model behind the case probabilities, evidence EV/CVaR, and the evidence gate used only for context panels.",
+        usedFor: "One model behind the case probabilities, the fallback EV/CVaR, and the fallback trade gate (promote at P ≥ 53% with Σ p·r ≥ +1%, reduce at P ≤ 47% with Σ p·r ≤ −1%)",
       });
     }
     if (synthesis.cases.length > 0) {
@@ -418,7 +419,7 @@ function buildAuditTrail(opts: {
         source: "evidence synthesis",
         formula: "Σ p·r across bull / base / bear",
         computation: synthesis.cases.map((c) => `${c.probability}%·(${c.returnPct != null ? `${c.returnPct > 0 ? "+" : ""}${c.returnPct}%` : "—"})`).join(" + ") + ` = ${evidenceEV >= 0 ? "+" : ""}${f(evidenceEV, 1)}%`,
-        usedFor: "Expected Return context when the quantitative ticket is present; unavailable values are withheld.",
+        usedFor: "Expected Return tile when the quant engine is unreachable · coherence gate on the fallback action",
       });
     }
     if (evidenceES != null) {
@@ -439,7 +440,7 @@ function buildAuditTrail(opts: {
       source: "evidence synthesis",
       formula: "35 + 55·sigmoid(−0.6 + 1.3·volume + 1.1·agreement + 0.9·tanh(|net|/4) − 1.2·estimated-share − 0.8·breaker-share)",
       computation: `${synthesis.ledger.supporting + synthesis.ledger.opposing + synthesis.ledger.neutral} nodes scored · ${synthesis.ledger.estimated} estimated-provenance`,
-      usedFor: "Evidence confidence context — saturates smoothly in [35, 90], never certainty",
+      usedFor: "Displayed confidence when the fallback owns the verdict — saturates smoothly in [35, 90], never certainty",
     });
   }
 
@@ -628,7 +629,7 @@ function savePortfolio(items: PortfolioItem[]) {
 /**
  * Auto-optimize position size using fixed-fractional risk + Kelly + confidence.
  *
- *   risk_budget_base  = 1% of portfolio value (planning reference: $10k notional / ₹500k for INR when no book value exists)
+ *   risk_budget_base  = 1% of portfolio value (fallback: $10k notional / ₹500k for INR)
  *   kelly_scale       = clamp(kelly, 0.10, 1.0)   — half-Kelly–style cap
  *   confidence_scale  = max(0.5, confidence/100)  — never under 50% of base sizing
  *   per_share_risk    = |entry − stop|
@@ -650,8 +651,8 @@ function computeOptimalQuantity(opts: {
   if (!Number.isFinite(entryPrice) || entryPrice <= 0) return 0;
 
   // Notional risk budget in *base* currency
-  const planningNotionalBase = baseCurrency === "INR" ? 500_000 : 10_000;
-  const portfolioBase = portfolioValueBase && portfolioValueBase > 0 ? portfolioValueBase : planningNotionalBase;
+  const fallbackNotionalBase = baseCurrency === "INR" ? 500_000 : 10_000;
+  const portfolioBase = portfolioValueBase && portfolioValueBase > 0 ? portfolioValueBase : fallbackNotionalBase;
   const riskPctOfPortfolio = 0.01; // 1% per trade — institutional default
   const riskBudgetBase = portfolioBase * riskPctOfPortfolio;
 
@@ -712,12 +713,12 @@ function normalizeTradeResult(value: any): TradeResult | null {
     entryHigh: normalizeNumber(value.entryHigh),
     targetPrice: normalizeNumber(value.targetPrice),
     stopLoss: normalizeNumber(value.stopLoss),
-    timeframe: typeof value.timeframe === "string" ? value.timeframe : "1-3 weeks",
+    timeframe: cleanAIText(value.timeframe || "1-3 weeks"),
     direction: value.direction,
-    directionReason: String(value.directionReason || "Signal alignment is mixed").slice(0, 60),
-    positiveNews: String(value.positiveNews || "No significant positive catalyst").slice(0, 120),
-    negativeNews: String(value.negativeNews || "No significant downside catalyst").slice(0, 120),
-    protection: String(value.protection || "Exit if price breaks the stop level.").slice(0, 120),
+    directionReason: cleanAIText(value.directionReason || "Signal alignment is mixed").slice(0, 60),
+    positiveNews: cleanAIText(value.positiveNews || "No significant positive catalyst").slice(0, 120),
+    negativeNews: cleanAIText(value.negativeNews || "No significant downside catalyst").slice(0, 120),
+    protection: cleanAIText(value.protection || "Exit if price breaks the stop level.").slice(0, 120),
     currentPrice: normalizeNumber(value.currentPrice),
     currency: typeof value.currency === "string" && value.currency.trim() ? value.currency.trim().toUpperCase() : undefined,
     quantScore: value.quantScore !== undefined ? Math.max(0, Math.min(100, Math.round(normalizeNumber(value.quantScore)))) : undefined,
@@ -725,6 +726,7 @@ function normalizeTradeResult(value: any): TradeResult | null {
     riskRewardRatio: value.riskRewardRatio !== undefined ? Math.abs(normalizeNumber(value.riskRewardRatio)) : undefined,
     providersUsed: value.providersUsed !== undefined ? Math.max(0, Math.round(normalizeNumber(value.providersUsed))) : undefined,
     consensus: ["UNANIMOUS", "MAJORITY", "SPLIT"].includes(value.consensus) ? value.consensus : undefined,
+    fallback: Boolean(value.fallback),
     riskMetrics: value.riskMetrics || undefined,
     clankSignals: Array.isArray(value.clankSignals) ? value.clankSignals : undefined,
     newsHeadlines: Array.isArray(value.newsHeadlines) ? value.newsHeadlines : undefined,
@@ -794,9 +796,9 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const { logTrade } = useTradeLogger();
   const { refresh: refreshWorkstation, ...workstationData } = useWorkstationData(activeTicker);
   const { desirableZones } = useOutcomeGradient();
-  /** Quant-engine ticket from the direct-profit edge function. Direct Profit does not publish a trade without it. */
+  /** Quant-engine ticket from the direct-profit edge function; null when it failed and the evidence fallback owns the result. */
   const [edgeResult, setEdgeResult] = useState<TradeResult | null>(null);
-  /** Why the quant engine did not land; rendered as a data-unavailable state, never as a replacement trade. */
+  /** Why the quant engine did not land — shown on the fallback surface so the swap is never silent. */
   const [edgeError, setEdgeError] = useState<string | null>(null);
   const edgePendingRef = useRef(false);
 
@@ -888,11 +890,12 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     setLiveCurrency(null);
     setLastPriceUpdate(0);
 
-    // Direct Profit is engine-first. The edge function runs the full
-    // ensemble (cointegration, Merton proxy, walk-forward evidence,
-    // calibrated consensus, cost-adjusted expected value). Local evidence
-    // hydrates only to annotate a landed ticket; it must never replace the
-    // quantitative decision.
+    // Two engines race for the same ticket. The quant edge function is the
+    // primary — it runs the full ensemble (cointegration, Merton proxy,
+    // walk-forward evidence, calibrated consensus, cost-adjusted expected
+    // value). The local evidence synthesis hydrates in parallel and owns
+    // the result if the function is unreachable, so the surface can never
+    // show a transport error.
     refreshWorkstation();
     edgePendingRef.current = true;
 
@@ -936,13 +939,14 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
       setEdgeResult(await attemptEngine());
       recordEngineStatus("live");
     } catch (firstErr) {
-      // One retry — cold starts and transient 5xx are common failure modes.
-      // The surface remains withheld unless a valid quant ticket lands.
+      // One retry — cold starts and transient 5xx are the common failure
+      // mode, and the evidence view renders in the meantime so a late
+      // quant ticket simply upgrades the surface in place.
       try {
         setEdgeResult(await attemptEngine());
         recordEngineStatus("live");
       } catch (err: any) {
-        console.warn("direct-profit edge engine unavailable:", firstErr, err);
+        console.warn("direct-profit edge engine unavailable, using evidence synthesis:", firstErr, err);
         const reason = err?.message || err?.error?.message || String(err);
         setEdgeError(String(reason).slice(0, 140));
         recordEngineStatus("unreachable", String(reason).slice(0, 140));
@@ -955,19 +959,15 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
 
   useEffect(() => {
     if (!activeTicker || workstationData.bootstrapping) return;
-    // Build (or rebuild) the evidence view only to annotate a landed quant
-    // ticket. If the engine is still pending we keep loading; if it failed we
-    // show a professional unavailable state instead of publishing a local
-    // substitute verdict.
-    if (!edgeResult) {
-      if (edgePendingRef.current) return;
-      if (edgeError) {
-        setErrorMessage("Direct Profit requires the quantitative engine. No trade ticket is published until live market data and the ensemble return a valid result.");
-        setLoading(false);
-      }
-      return;
-    }
+    // Build (or rebuild) the evidence view whenever we're waiting for a
+    // result or the quant edge ticket has arrived and needs its evidence
+    // panels merged in.
     if (!loading && !edgeResult) return;
+    // Engine-first: while the quant engine attempt is in flight the surface
+    // stays in its loading state. The evidence view renders as the RESULT
+    // only after the engine has definitively failed (edgeError set) — it
+    // never flashes first and gets replaced.
+    if (!edgeResult && edgePendingRef.current) return;
     try {
       const graph = buildEvidenceGraph({
         ticker: activeTicker,
@@ -1131,8 +1131,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
     }
     // NOTE: no `finally` — the empty-graph early return must keep `loading`
     // true so this effect re-fires as the workstation sources hydrate.
-    // edgeError is a dependency so a definitive engine failure re-fires
-    // the effect and moves the UI to an unavailable state.
+    // edgeError is a dependency so the engine's definitive failure re-fires
+    // the effect and lets the labeled fallback take the surface.
   }, [activeTicker, loading, workstationData, edgeResult, edgeError]);
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); analyze(ticker); };
@@ -1160,7 +1160,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         addedAt: Date.now(),
         source: result.consensus
           ? `${result.consensus} · ${result.providersUsed ?? "?"} engines · ${result.confidence}%`
-          : `Quant ensemble · ${result.confidence}%`,
+          : `AI · ${result.confidence}%`,
         catalyst: (result.action === "BUY" ? result.positiveNews : result.negativeNews)?.slice(0, 140) || result.directionReason,
         lesson: "",
       };
@@ -1328,14 +1328,15 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
   const downsideFromEngine = qe?.hedge?.cvar95PerShare != null && resultEntryMid > 0;
 
   return (
-    <div className="h-full overflow-auto p-3 sm:p-4">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
-        <div className="space-y-4 lg:sticky lg:top-3 lg:self-start">
-          <div className="border border-border bg-card p-4">
-            <p className="data-label mb-2">Direct Profit</p>
-            <h1 className="text-title-3 text-foreground">Fast trade triage with a defensible audit trail.</h1>
-            <p className="mt-2 text-footnote text-muted-foreground">Enter a symbol. The surface returns only computed structure: engine consensus, expected value, risk leg, evidence graph and invalidation.</p>
+    <div className="h-full overflow-auto p-4">
+      <div className="max-w-lg mx-auto space-y-6">
+        <div className="text-center space-y-1">
+          <div className="flex items-center justify-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-bold text-foreground tracking-tight">Direct Profit Mode</h1>
           </div>
+          <p className="text-xs text-muted-foreground">One input. One decision. Zero confusion.</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2">
           <SuggestWrapper ticker={ticker} setTicker={setTicker} loading={loading} listening={listening} toggleVoice={toggleVoice} />
@@ -1376,41 +1377,33 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
         )}
 
         {loading && (
-          <div className="state-panel border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <span className="data-label">Quant engine running</span>
-              <span className="font-mono text-[9px] text-muted-foreground/70">{activeTicker}</span>
+          <div className="glass-panel rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-gain animate-pulse" />
+                Quant engine running
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground/60">{activeTicker}</span>
             </div>
-            {[
-              ["Market data acquired", "quote, history, currency context"],
-              ["Quantitative structure evaluated", "ensemble, cointegration, walk-forward, structural credit"],
-              ["Risk assessed", "VaR/CVaR, stop leg, tail multiplier and transaction costs"],
-              ["Evidence assembled", "workstation evidence graph, sources and conflicts"],
-              ["Decision synthesized", "withheld until the quantitative engine returns a valid ticket"],
-            ].map(([label, detail], i) => (
-              <div key={label} className="decision-ledger-row">
-                <div>
-                  <div className="text-[12px] font-semibold tracking-tight text-foreground">{label}</div>
-                  <div className="text-[10.5px] text-muted-foreground">{detail}</div>
-                </div>
-                <span className={`font-mono text-[9px] uppercase tracking-[0.12em] ${i === 0 ? "text-gain" : i === 1 ? "text-foreground animate-breathe" : "text-muted-foreground/55"}`}>
-                  {i === 0 ? "complete" : i === 1 ? "active" : "pending"}
-                </span>
-              </div>
-            ))}
+            <div className="text-[10px] font-mono text-muted-foreground/70 leading-relaxed">
+              ensemble consensus · cointegration · walk-forward · structural credit · cost-adjusted expected value
+            </div>
+            <div className="space-y-4 animate-pulse">
+              <div className="h-16 bg-muted/30 rounded-lg" />
+              <div className="h-24 bg-muted/30 rounded-lg" />
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-20 bg-muted/30 rounded-lg" />
+            </div>
           </div>
         )}
 
-        </div>
-
-        <div className="min-w-0">
         {result && !loading && (
-          <div className="decision-ledger overflow-hidden animate-fade-in">
+          <div className="glass-panel rounded-xl overflow-hidden animate-fade-in">
             {/* ── BIG ACTION HEADER ── */}
-            <div className={`border-b ${actionBg} p-5 sm:p-6 text-left`}>
+            <div className={`border-b ${actionBg} p-6 text-center`}>
               <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-1">{activeTicker}</div>
-              <div className={`text-5xl font-semibold tracking-tight leading-none ${actionColor}`}>{result.action}</div>
-              <div className="mt-3 text-sm text-muted-foreground">
+              <div className={`text-6xl font-black tracking-tight leading-none ${actionColor}`}>{result.action}</div>
+              <div className="mt-3 text-base text-muted-foreground">
                 {result.confidence >= 75 ? "High" : result.confidence >= 50 ? "Medium" : "Low"} Confidence{" "}
                 <span className="font-bold text-foreground text-lg">{result.confidence}%</span>
               </div>
@@ -1425,6 +1418,11 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
               {lastPriceUpdate > 0 && (
                 <div className="mt-1 text-[10px] text-muted-foreground/60">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</div>
+              )}
+              {result.fallback && (
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Running on resilient rules fallback while live AI consensus is unavailable.
+                </div>
               )}
               {result.ensemble && (
                 <div className="mt-3 mx-auto max-w-xs">
@@ -1640,8 +1638,8 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               </div>
               <div className="text-[10px] font-mono text-muted-foreground">
                 {quantOwned
-                  ? `Verdict from the quantitative ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
-                  : `No trade ticket is published without the quantitative ensemble. Evidence nodes are context only.`}
+                  ? `Verdict from the quant ensemble — ${result.providersUsed ?? 0} engines (${(result.consensus || "consensus").toLowerCase()}): cost-adjusted expected value, cointegration, walk-forward, structural credit. Evidence panels from ${result.evidenceCount ?? 0} nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}.`
+                  : `Quant engine unreachable${edgeError ? ` (${edgeError})` : ""} — verdict synthesized locally from ${result.evidenceCount ?? 0} evidence nodes across ${result.engineSources?.join(", ") || "the shared evidence graph"}. LLM explanation is disabled for verdict generation.`}
               </div>
             </div>
 
@@ -1781,7 +1779,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                       )}
                       {result.riskRewardRatio !== undefined && result.riskRewardRatio > 0 && (
                         <div className="text-center">
-                          <div className={`text-lg font-bold ${result.riskRewardRatio >= RR_ENTRY_BAR ? "text-gain" : "text-loss"}`}>{formatRiskReward(result.riskRewardRatio)}</div>
+                          <div className={`text-lg font-bold ${result.riskRewardRatio >= 2 ? "text-gain" : "text-loss"}`}>{result.riskRewardRatio.toFixed(1)}:1</div>
                           <div className="text-[10px] text-muted-foreground">Risk/Reward</div>
                         </div>
                       )}
@@ -2115,7 +2113,7 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                       <input
                         value={item.source || ""}
                         onChange={(e) => updateLog(item.ticker, { source: e.target.value })}
-                        placeholder="e.g. Quant ensemble · 4 engines"
+                        placeholder="e.g. AI consensus · 4 engines"
                         className="w-full bg-surface-2/40 border border-border rounded px-2 py-1 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/40"
                       />
                     </div>
@@ -2159,7 +2157,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
             </div>
           </div>
         )}
-        </div>
       </div>
     </div>
   );
@@ -2218,7 +2215,7 @@ const SuggestWrapper = ({ ticker, setTicker, loading, listening, toggleVoice }: 
     <div ref={wrapRef} className="relative flex-1">
       <Input
         {...inputProps}
-        placeholder="Enter symbol or company"
+        placeholder="Enter stock name or speak"
         className="bg-surface-2 border-border h-12 text-base font-mono pr-10 placeholder:text-muted-foreground/40"
         disabled={loading}
       />
