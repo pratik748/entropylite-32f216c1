@@ -4,6 +4,71 @@ import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { modelInfo } from "../_shared/modelRegistry.ts";
 
+
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+function extractTickers(portfolio: unknown): string[] {
+  if (typeof portfolio !== "string") return [];
+  return Array.from(new Set((portfolio.match(/\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b/g) || [])
+    .filter((t) => !["BUY", "SELL", "HOLD", "USD", "INR", "NYSE", "NSE", "BSE"].includes(t))
+    .slice(0, 8)));
+}
+
+async function fetchYahooQuote(symbol: string): Promise<{ symbol: string; price: number; prevClose: number; changePct: number; currency: string } | null> {
+  try {
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&_t=${Date.now()}`, {
+      headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    const price = Number(meta?.regularMarketPrice);
+    const prevClose = Number(meta?.chartPreviousClose || meta?.previousClose || 0);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    return { symbol, price, prevClose, changePct: prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0, currency: meta?.currency || "USD" };
+  } catch {
+    return null;
+  }
+}
+
+function deterministicCascade(event: string, quotes: Array<{ symbol: string; price: number; changePct: number; currency: string }>, vix: number) {
+  const avgMove = quotes.length ? quotes.reduce((s, q) => s + q.changePct, 0) / quotes.length : 0;
+  const stress = Math.max(0, Math.min(100, (vix > 0 ? (vix - 14) * 3 : 15) + Math.abs(avgMove) * 8));
+  const direction = avgMove >= 0 ? "up" : "down";
+  const names = quotes.length ? quotes : [{ symbol: "SPY", price: 0, changePct: avgMove, currency: "USD" }];
+  const first = names.slice(0, 4).map((q) => ({
+    order: 1,
+    effect: `${q.symbol} reprices through observed tape (${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}% day move)`,
+    asset_class: "equities",
+    direction: q.changePct >= 0 ? "up" : "down",
+    magnitude: `${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}% observed` ,
+    confidence: 0.8,
+    time_horizon: "intraday",
+  }));
+  return {
+    event,
+    first_order: first,
+    second_order: [
+      { order: 2, effect: `Portfolio beta channel follows the average observed move (${avgMove >= 0 ? "+" : ""}${avgMove.toFixed(2)}%)`, asset_class: "equities", direction, magnitude: `${(avgMove * 0.7).toFixed(2)}% measured-beta channel`, confidence: 0.62, time_horizon: "1-2 weeks" },
+      { order: 2, effect: `Volatility channel ${vix > 0 ? `uses VIX ${vix.toFixed(1)}` : "uses unavailable VIX, lower confidence"}`, asset_class: "bonds", direction: stress > 35 ? "volatile" : direction, magnitude: `${Math.round(stress)} stress score`, confidence: vix > 0 ? 0.65 : 0.35, time_horizon: "1-2 weeks" },
+    ],
+    third_order: [
+      { order: 3, effect: "Risk-budget feedback can force de-risking if volatility and drawdown rise together", asset_class: "equities", direction: stress > 45 ? "down" : "volatile", magnitude: `${Math.round(stress)} stress score`, confidence: 0.52, time_horizon: "1-3 months" },
+    ],
+    scenario_tree: [
+      { label: "Bull", probability: 0.2, capital_impact_pct: Number(Math.max(0.5, avgMove * 0.8).toFixed(2)), key_moves: names.slice(0, 2).map((q) => `${q.symbol} stabilizes above ${q.currency} ${q.price}`) },
+      { label: "Base", probability: 0.45, capital_impact_pct: Number((avgMove * 0.35).toFixed(2)), key_moves: names.slice(0, 2).map((q) => `${q.symbol} tracks observed tape`) },
+      { label: "Bear", probability: 0.25, capital_impact_pct: Number((-Math.max(1, Math.abs(avgMove) * 0.9)).toFixed(2)), key_moves: names.slice(0, 2).map((q) => `${q.symbol} extends risk-off`) },
+      { label: "Tail Risk", probability: 0.1, capital_impact_pct: Number((-Math.max(3, stress / 10)).toFixed(2)), key_moves: ["Volatility shock forces cross-asset de-risking"] },
+    ],
+    reflexivity_score: Math.round(stress),
+    scar_tag: stress > 50 ? "vol shock" : "tape transmission",
+    model: modelInfo("causal-effects"),
+    data_provenance: { quotes, vix, generated_from: "measured market data" },
+    disclaimer: "Deterministic cascade from measured market data. Effects are transmission hypotheses, not established causes or forecasts.",
+  };
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -16,8 +81,16 @@ serve(async (req) => {
   try {
     await requireAuth(req, corsHeaders);
     const { event, portfolio, provider } = await req.json();
+    const tickers = extractTickers(portfolio);
+    const [quotes, vixQuote] = await Promise.all([
+      Promise.all(tickers.map((t) => fetchYahooQuote(t))),
+      fetchYahooQuote("^VIX"),
+    ]);
+    const measuredQuotes = quotes.filter(Boolean) as Array<{ symbol: string; price: number; prevClose: number; changePct: number; currency: string }>;
 
-    const result = await callAI({
+    let result;
+    try {
+      result = await callAI({
       provider,
       systemPrompt: `You are a senior macro strategist at a sovereign wealth fund (think GIC / Norges Bank). You model how a single shock propagates across asset classes through 1st, 2nd, and 3rd-order channels — and you ground every effect in a real transmission mechanism, not vibes.
 
@@ -41,6 +114,8 @@ SCENARIO TREE RULES:
 VOICE: tight, sell-side, numerate. Strings ≤ 220 chars. Return ONLY valid JSON.`,
       userPrompt: `Event: "${event}"
 Portfolio: ${portfolio || "No portfolio loaded"}
+Measured quotes: ${measuredQuotes.map((q) => `${q.symbol} ${q.currency} ${q.price} (${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}%)`).join(", ") || "none"}
+VIX: ${vixQuote?.price ? vixQuote.price.toFixed(2) : "unavailable"}
 Date: ${new Date().toISOString().split("T")[0]}
 
 Walk the cascade end-to-end:
@@ -70,7 +145,11 @@ Return JSON:
 }`,
       maxTokens: 4096,
       temperature: 0.3,
-    });
+      });
+    } catch (e) {
+      if (measuredQuotes.length === 0) throw e;
+      return new Response(JSON.stringify(deterministicCascade(event, measuredQuotes, vixQuote?.price || 0)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     console.log(`causal-effects used provider: ${result.provider}`);
     const parsed = safeParseJSON(result.text) ?? {};
@@ -78,6 +157,7 @@ Return JSON:
     // Ship the honest semantics with the payload: this is a model-authored
     // hypothesis tree with uncalibrated confidence, never established causality.
     (parsed as Record<string, unknown>).model = modelInfo("causal-effects");
+    (parsed as Record<string, unknown>).data_provenance = { quotes: measuredQuotes, vix: vixQuote?.price || null };
     (parsed as Record<string, unknown>).disclaimer =
       "Model-generated hypothetical cascade. Effects are proposed transmission mechanisms, not established causes; confidence and branch probabilities are uncalibrated model estimates, not forecasts.";
 

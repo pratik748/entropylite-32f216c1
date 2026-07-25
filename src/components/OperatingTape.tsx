@@ -1,4 +1,4 @@
-import { AlertTriangle, Briefcase, Clock, Compass, Crown, Database, Shield } from "lucide-react";
+import { AlertTriangle, Briefcase, Clock, Compass, Database, Shield, Workflow } from "lucide-react";
 import { motion } from "framer-motion";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 import type { PriceStatusMap } from "@/pages/Index";
@@ -45,7 +45,7 @@ const OperatingTape = ({ stocks, portfolioValueBase, baseCurrency, priceStatus, 
         ? "RISK WATCH"
         : analyzed.length > 0
           ? "BOOK SYNCHRONIZED"
-          : "CROWN STANDBY";
+          : "AWAITING POSITIONS";
 
   const cells = [
     { label: "Book value", value: portfolioValueBase > 0 ? formatCurrency(portfolioValueBase, baseCurrency) : "No capital allocated", icon: Briefcase },
@@ -56,7 +56,7 @@ const OperatingTape = ({ stocks, portfolioValueBase, baseCurrency, priceStatus, 
   ];
 
   return (
-    <section className="crown-plane" aria-label="Capital operating context">
+    <section className="crown-plane" aria-label="Portfolio operating context">
       <div className="grid grid-cols-1 border-b border-border/70 lg:grid-cols-[220px_1fr]">
         <div className="flex items-center gap-2 px-3 py-2.5">
           <motion.div
@@ -65,10 +65,10 @@ const OperatingTape = ({ stocks, portfolioValueBase, baseCurrency, priceStatus, 
             transition={{ type: "spring", stiffness: 360, damping: 30 }}
             className="flex h-7 w-7 items-center justify-center border border-border bg-surface-2"
           >
-            <Crown className="h-3.5 w-3.5 text-foreground" strokeWidth={1.55} />
+            <Workflow className="h-3.5 w-3.5 text-foreground" strokeWidth={1.55} />
           </motion.div>
           <div className="min-w-0">
-            <div className="data-label text-[9px]">Crown layer</div>
+            <div className="data-label text-[9px]">Operating context</div>
             <div className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-foreground">{systemState}</div>
           </div>
         </div>

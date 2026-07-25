@@ -3,7 +3,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
@@ -56,6 +55,92 @@ interface MarketSnapshot {
   currency: string;
   closes: number[];
   volumes: number[];
+}
+
+
+function stooqSymbol(symbol: string): string | null {
+  const upper = symbol.toUpperCase();
+  if (upper.includes(".NS") || upper.includes(".BO") || upper.startsWith("^") || upper.includes("=")) return null;
+  if (upper.endsWith("-USD")) return null;
+  return `${upper.replace(/[^A-Z0-9.]/g, "")}.US`.toLowerCase();
+}
+
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let quoted = false;
+  for (const ch of line) {
+    if (ch === '"') { quoted = !quoted; continue; }
+    if (ch === "," && !quoted) { out.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+async function fetchStooqSnapshot(symbol: string): Promise<MarketSnapshot | null> {
+  const sq = stooqSymbol(symbol);
+  if (!sq) return null;
+  try {
+    const [quoteRes, histRes] = await Promise.all([
+      fetch(`https://stooq.com/q/l/?s=${encodeURIComponent(sq)}&f=sd2t2ohlcv&h&e=csv`, { headers: { "User-Agent": UA } }),
+      fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sq)}&i=d`, { headers: { "User-Agent": UA } }),
+    ]);
+    if (!quoteRes.ok || !histRes.ok) return null;
+    const quoteText = await quoteRes.text();
+    const qLines = quoteText.trim().split(/\r?\n/);
+    const q = qLines[1] ? parseCsvLine(qLines[1]) : [];
+    const close = Number(q[6]);
+    if (!Number.isFinite(close) || close <= 0) return null;
+    const high = Number(q[4]) || close;
+    const low = Number(q[5]) || close;
+    const volume = Number(q[7]) || 0;
+
+    const histText = await histRes.text();
+    const rows = histText.trim().split(/\r?\n/).slice(1).map(parseCsvLine);
+    const closes = rows.map((r) => Number(r[4])).filter((v) => Number.isFinite(v) && v > 0).slice(-260);
+    const volumes = rows.map((r) => Number(r[5])).filter((v) => Number.isFinite(v) && v >= 0).slice(-260);
+    const prevClose = closes.length >= 2 ? closes[closes.length - 2] : close;
+    const highLowWindow = closes.length ? closes : [close];
+    return {
+      currentPrice: close,
+      prevClose,
+      dayHigh: high,
+      dayLow: low,
+      volume,
+      fiftyTwoWeekHigh: Math.max(...highLowWindow),
+      fiftyTwoWeekLow: Math.min(...highLowWindow),
+      currency: "USD",
+      closes: closes.length ? closes : [close],
+      volumes,
+    };
+  } catch {
+    return null;
+  }
+}
+
+interface CausalStress {
+  score: number;
+  direction: -1 | 0 | 1;
+  regime: "calm" | "fragile" | "stressed";
+  mechanisms: string[];
+}
+
+function computeCausalStress(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: number, clankSignals: ClankSignal[]): CausalStress {
+  const mechanisms: string[] = [];
+  let score = 0;
+  if (vix >= 25) { score += 25; mechanisms.push(`Volatility transmission: VIX ${vix.toFixed(1)} raises equity risk premia`); }
+  if (Math.abs(tech.changePct) >= 2) { score += Math.min(20, Math.abs(tech.changePct) * 4); mechanisms.push(`Price shock: ${tech.changePct}% day move changes momentum and stop-loss pressure`); }
+  if (tech.volumeRatio >= 1.5) { score += Math.min(20, (tech.volumeRatio - 1) * 10); mechanisms.push(`Liquidity channel: ${tech.volumeRatio}x volume confirms active repricing`); }
+  if (Math.abs(tech.zScore) >= 1.5) { score += 15; mechanisms.push(`Mean-reversion channel: z-score ${tech.zScore} indicates stretched positioning`); }
+  if (clankSignals.some((s) => s.severity === "CRITICAL" || s.severity === "HIGH")) { score += 20; mechanisms.push("Structural flow channel: active CLANK constraints can amplify the move"); }
+  const direction: -1 | 0 | 1 = tech.momentumScore >= 1 && tech.changePct >= 0 ? 1 : tech.momentumScore <= -1 && tech.changePct <= 0 ? -1 : 0;
+  return {
+    score: Math.round(Math.min(100, score)),
+    direction,
+    regime: score >= 55 ? "stressed" : score >= 25 ? "fragile" : "calm",
+    mechanisms,
+  };
 }
 
 interface TechnicalSnapshot {
@@ -201,6 +286,14 @@ async function fetchFullSnapshot(ticker: string, isIndian: boolean): Promise<Mar
         }
       } else { await res.text(); }
     } catch { /* next */ }
+  }
+
+  if (!result) {
+    for (const symbol of symbolsToTry) {
+      result = await fetchStooqSnapshot(symbol);
+      if (result && passesSanityCheck(symbol, result.currentPrice)) break;
+      result = null;
+    }
   }
 
   if (!result) {
@@ -805,6 +898,7 @@ Deno.serve(async (req) => {
     const tech = computeTechnicals(snap);
     const riskMetrics = computeRiskMetrics(snap, tech, vix);
     const clankSignals = detectClankSignals(snap, tech, vix);
+    const causalStress = computeCausalStress(snap, tech, vix, clankSignals);
 
     // ── INTELLIGENCE CONSENSUS ──────────────────────────────────────────
     // Call the dashboard's analyze-stock function FIRST so Direct Profit's
@@ -895,96 +989,8 @@ Deno.serve(async (req) => {
 
     const riskContext = `\n\nQUANTITATIVE RISK METRICS (computed from real returns):\n- 1-Day VaR (95%): ${currencySymbol}${riskMetrics.var95} per share\n- 1-Day CVaR (95%): ${currencySymbol}${riskMetrics.cvar95} per share\n- 1-Day VaR (99%): ${currencySymbol}${riskMetrics.var99} per share\n- Sharpe Ratio (annualized): ${riskMetrics.sharpeRatio}\n- Sortino Ratio: ${riskMetrics.sortinoRatio}\n- Max Drawdown (30D): ${riskMetrics.maxDrawdown}%\n- Beta Estimate: ${riskMetrics.betaEstimate}\n- Kelly Fraction: ${riskMetrics.kellyFraction}\nUse these to calibrate your confidence level — low Sharpe + high VaR = lower confidence, etc.`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode — output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment — high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality — negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints — active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n11. Intelligence consensus (analyze-stock suggestion) — your action should respect it, but use context rather than defaulting blindly to WAIT.\n12. Desirable-asset context — treat it as a supporting bullish prior when the technicals agree.\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\nPROTECTION FIELD (CRITICAL):\n- MUST be specific to the ticker being analyzed — use the STOCK's OWN options (e.g., "${resolvedTicker} 780 PE" not "Nifty Put")\n- Include a specific strike price derived from the stop-loss or support level\n- Include risk per share in currency terms\n- For BUY: suggest a PUT at/near stop-loss strike as downside hedge\n- For SELL: suggest covering with a CALL at/near stop-loss strike\n- For WAIT: state "no position, no hedge needed"\n- NEVER suggest generic index hedges unless the ticker itself is an index\n\n${quantContext}${clankContext}${newsContext}${riskContext}${intelContext}${desirableContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string (MUST be stock-specific with strike price and risk per share),\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
-
-    const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nRISK METRICS:\n- VaR 95%: ${currencySymbol}${riskMetrics.var95}/share | CVaR 95%: ${currencySymbol}${riskMetrics.cvar95}/share\n- VaR 99%: ${currencySymbol}${riskMetrics.var99}/share\n- Sharpe: ${riskMetrics.sharpeRatio} | Sortino: ${riskMetrics.sortinoRatio}\n- Max DD: ${riskMetrics.maxDrawdown}% | Beta: ${riskMetrics.betaEstimate}\n- Kelly: ${riskMetrics.kellyFraction}\n\n${clankSignals.length > 0 ? "STRUCTURAL CONSTRAINTS:\n" + clankSignals.map(s => `[${s.severity}] ${s.label}`).join("\n") : "No active structural constraints."}\n\n${newsHeadlines.length > 0 ? "RECENT NEWS:\n" + newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n") : "No recent headlines available."}\n\nProduce a complete, executable trade decision grounded in ALL the data above.`;
-
     const deterministic = buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol, desirableHint);
-
-    const results = await callAIParallel({
-      systemPrompt,
-      userPrompt,
-      maxTokens: 1800,
-      temperature: 0.25,
-      jsonMode: true,
-    });
-
-    const parsed: any[] = [];
-    for (const result of results) {
-      try {
-        let obj: any;
-        try { obj = JSON.parse(result.text); } catch {
-          const match = result.text.match(/\{[\s\S]*\}/);
-          if (match) obj = JSON.parse(match[0]);
-        }
-        if (obj && obj.action) {
-          obj._provider = result.provider;
-          obj.currency = currency;
-          obj.currentPrice = snap.currentPrice;
-          parsed.push(obj);
-        }
-      } catch {
-        console.warn(`direct-profit parse failed for ${result.provider}`);
-      }
-    }
-
-    let output: Record<string, unknown>;
-
-    if (parsed.length === 0) {
-      console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
-        output = { ...deterministic, fallback: true };
-    } else {
-      const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
-      for (const item of parsed) {
-        if (actionVotes[item.action] !== undefined) actionVotes[item.action]++;
-      }
-
-      const scored = parsed.map((item) => {
-        const confidence = Number(item.confidence) || 0;
-        const quantScore = Number(item.quantScore) || 0;
-        const rr = Number(item.riskRewardRatio) || 0;
-        const directionalBonus = item.action === "WAIT" ? 0 : 8;
-        return {
-          ...item,
-          _score: confidence + quantScore * 0.35 + Math.min(rr, 4) * 6 + directionalBonus,
-        };
-      });
-
-      const [consensusAction, consensusCount] = Object.entries(actionVotes).sort((a, b) => b[1] - a[1])[0];
-      const majorityExists = consensusCount > parsed.length / 2;
-      const best = majorityExists
-        ? scored
-            .filter((item) => item.action === consensusAction)
-            .sort((a, b) => b._score - a._score)[0]
-        : scored.sort((a, b) => b._score - a._score)[0];
-
-      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines, deterministic);
-
-      // ── DETERMINISTIC OVERRIDE OF AI-WAIT ─────────────────────────────
-      // AI models default to WAIT under uncertainty even when the
-      // deterministic engine sees a clean technical edge. If the
-      // deterministic side has a non-WAIT action AND momentum is strong
-      // (|momentum|≥2), prefer it so the user gets actionable tickets
-      // instead of perpetual WAITs.
-      if (
-        output.action === "WAIT" &&
-        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint)
-      ) {
-        console.log(`direct-profit deterministic override: AI=WAIT → ${deterministic.action} (momentum=${tech.momentumScore})`);
-        output.action = deterministic.action;
-        output.direction = deterministic.direction;
-        output.directionReason = `Deterministic edge: ${deterministic.directionReason}`;
-        output.entryLow = deterministic.entryLow;
-        output.entryHigh = deterministic.entryHigh;
-        output.targetPrice = deterministic.targetPrice;
-        output.stopLoss = deterministic.stopLoss;
-        output.protection = deterministic.protection;
-        output.riskRewardRatio = deterministic.riskRewardRatio;
-        output.confidence = Math.max(Number(output.confidence) || 50, 55);
-        (output as any).waitReasons = undefined;
-        (output as any).consensus = "DETERMINISTIC_OVERRIDE";
-      }
-    }
+    let output: Record<string, unknown> = { ...deterministic };
 
     // ── MASTER ARBITER ──────────────────────────────────────────────────
     // The dashboard intelligence (analyze-stock) is the single source of
@@ -993,14 +999,14 @@ Deno.serve(async (req) => {
     // → action deterministically, then rebuild prices for the forced side.
     if (intelSummary?.suggestion) {
       const sug = String(intelSummary.suggestion);
-      const aiAct = String(output.action);
+      const priorAct = String(output.action);
       // Arbiter rules:
       //  • "Add"  → force BUY  (intel is bullish enough to act)
           //  • "Exit" → force SELL (intel says get out)
           //  • "Skip" → force WAIT (intel explicitly says avoid)
           //  • "Hold" → DO NOT force WAIT. Hold means "no fresh conviction
           //             from the dashboard", but Direct Profit is a tactical
-          //             engine — if the deterministic/AI side has a clean
+          //             engine — if the measured-data side has a clean
           //             technical edge (momentum + R:R), let it fire.
       const allowDirectionalAgainstSkip =
         sug === "Skip" &&
@@ -1013,8 +1019,8 @@ Deno.serve(async (req) => {
         : sug === "Skip" ? (allowDirectionalAgainstSkip ? null : "WAIT")
         : null; // Hold → no override
 
-      if (forcedAction && forcedAction !== aiAct) {
-        console.log(`direct-profit arbiter: AI=${aiAct} → ${forcedAction} (intel=${sug})`);
+      if (forcedAction && forcedAction !== priorAct) {
+        console.log(`direct-profit arbiter: prior=${priorAct} → ${forcedAction} (intel=${sug})`);
         // Rebuild a deterministic plan for the FORCED side so the entry,
         // target, stop and R:R all line up with the new action.
         const sideDet = buildDeterministicFallback(
@@ -1122,8 +1128,8 @@ Deno.serve(async (req) => {
         reliability: 0.62,
       },
       {
-        id: "ai_verdict",
-        label: "AI verdict",
+        id: "preliminary_plan",
+        label: "Preliminary market-data plan",
         direction: dirOf(String(output.action)),
         confidence: pctToConf(Number(output.confidence)),
         reliability: 0.60,
@@ -1167,6 +1173,14 @@ Deno.serve(async (req) => {
         confidence: clankSignals.some((s) => s.severity === "CRITICAL") ? 0.75 : 0,
         reliability: 0.65,
         hasSignal: clankSignals.some((s) => s.severity === "CRITICAL" || s.severity === "HIGH"),
+      },
+      {
+        id: "causal_stress",
+        label: `Causal market stress (${causalStress.regime}, score=${causalStress.score})`,
+        direction: causalStress.direction,
+        confidence: Math.min(1, Math.max(0.25, causalStress.score / 100)),
+        reliability: 0.61,
+        hasSignal: causalStress.score >= 25 || causalStress.direction !== 0,
       },
       {
         id: "intelligence",
@@ -1484,6 +1498,7 @@ Deno.serve(async (req) => {
             ? "Left tail heavier than normal — downside penalised in expected value"
             : "Tail risk near-normal",
         },
+        causalStress,
         // Risk hedge — structured from the protection logic + risk metrics.
         hedge: act === "WAIT"
           ? { needed: false, instruction: "No position — no hedge required." }

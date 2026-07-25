@@ -28,7 +28,6 @@ import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import SystemPipeline from "@/components/system/SystemPipeline";
-import TickerStrip from "@/components/terminal/TickerStrip";
 import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
 import PanelWrapper from "@/components/terminal/PanelWrapper";
@@ -631,8 +630,6 @@ const IndexContent = () => {
             </div>
           )}
 
-          {/* Global Ticker Strip */}
-          <TickerStrip />
           <OperatingTape stocks={stocks} portfolioValueBase={portfolioValueBase} baseCurrency={baseCurrency} priceStatus={priceStatus} analyzedCount={analyzedCount} />
 
           {/* Workspace — module rail (desktop) / module strip (mobile) + content */}
