@@ -1419,11 +1419,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               {lastPriceUpdate > 0 && (
                 <div className="mt-1 text-[10px] text-muted-foreground/60">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</div>
               )}
-              {result.fallback && (
-                <div className="mt-2 text-[11px] text-muted-foreground">
-                  Running on resilient rules fallback while live AI consensus is unavailable.
-                </div>
-              )}
               {result.ensemble && (
                 <div className="mt-3 mx-auto max-w-xs">
                   <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
@@ -1575,10 +1570,10 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     title={
                       quantOwned
                         ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
-                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. Verdict synthesized locally from the workstation evidence graph.`
+                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. No ticket is being issued — re-run the engine.`
                     }
                   >
-                    {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
+                    {quantOwned ? "Quant engine" : "Engine offline"}
                   </span>
                   {!quantOwned && (
                     <button

@@ -931,8 +931,13 @@ Deno.serve(async (req) => {
     let output: Record<string, unknown>;
 
     if (parsed.length === 0) {
-      console.warn(`direct-profit fallback engaged for ${resolvedTicker}`);
-        output = { ...deterministic, fallback: true };
+      // No fallback surface: an unavailable model lane is an outage, not a
+      // verdict. Fail loudly so the desk never reads placeholder math as a ticket.
+      console.error(`direct-profit: no model lane returned a parsable ticket for ${resolvedTicker}`);
+      return new Response(
+        JSON.stringify({ error: `Model lanes unavailable for ${resolvedTicker}. No ticket issued.` }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     } else {
       const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
       for (const item of parsed) {
