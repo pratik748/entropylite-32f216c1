@@ -1570,10 +1570,10 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                     title={
                       quantOwned
                         ? "Verdict computed by the direct-profit quant ensemble (cost-adjusted EV, cointegration, walk-forward, structural credit)."
-                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. Verdict synthesized locally from the workstation evidence graph.`
+                        : `Quant engine unreachable${edgeError ? ` — ${edgeError}` : ""}. No ticket is being issued — re-run the engine.`
                     }
                   >
-                    {quantOwned ? "Quant engine" : "Fallback · evidence synthesis"}
+                    {quantOwned ? "Quant engine" : "Engine offline"}
                   </span>
                   {!quantOwned && (
                     <button
