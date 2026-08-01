@@ -394,7 +394,10 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
   const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
+  const gw = Deno.env.get("LOVABLE_API_KEY");
 
+  // Lovable AI Gateway first — managed quota, no third-party throttling.
+  if (gw) primary.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
   if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
   // Reserve Mistral key — kept out of the round-robin so it stays under its
