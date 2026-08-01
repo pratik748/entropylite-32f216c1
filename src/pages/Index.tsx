@@ -26,7 +26,6 @@ import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
 import AugmentDashboard from "@/components/augment/AugmentDashboard";
 import SystemPipeline from "@/components/system/SystemPipeline";
-import TickerStrip from "@/components/terminal/TickerStrip";
 import ThemeToggle from "@/components/ThemeToggle";
 import PageTransition from "@/components/PageTransition";
 import PortfolioBlotter from "@/components/terminal/PortfolioBlotter";
@@ -580,7 +579,7 @@ const IndexContent = () => {
           )}
 
           {/* Global Ticker Strip */}
-          <TickerStrip />
+
 
           {/* Workspace — module rail (desktop) / module strip (mobile) + content */}
           <div className="flex flex-1 min-h-0">
