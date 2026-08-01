@@ -215,6 +215,42 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 }
 
 /**
+ * Lovable AI Gateway lane — OpenAI-compatible, no user-supplied key required.
+ * This is the primary lane: it keeps every engine on real model output instead
+ * of degrading to deterministic placeholder math when third-party keys throttle.
+ */
+const GATEWAY_DEFAULT_MODEL = Deno.env.get("GATEWAY_DEFAULT_MODEL") || "google/gemini-3-flash-preview";
+
+async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const body: Record<string, any> = {
+    model: GATEWAY_DEFAULT_MODEL,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty gateway response");
+  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+}
+
+/**
  * Mistral caller with automatic key 1 → key 2 fallback.
  * Falls back on any error from key 1 (rate limit, auth, network, empty body).
  */
