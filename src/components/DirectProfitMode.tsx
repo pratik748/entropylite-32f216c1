@@ -1419,11 +1419,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
               {lastPriceUpdate > 0 && (
                 <div className="mt-1 text-[10px] text-muted-foreground/60">updated {Math.round((Date.now() - lastPriceUpdate) / 1000)}s ago</div>
               )}
-              {result.fallback && (
-                <div className="mt-2 text-[11px] text-muted-foreground">
-                  Running on resilient rules fallback while live AI consensus is unavailable.
-                </div>
-              )}
               {result.ensemble && (
                 <div className="mt-3 mx-auto max-w-xs">
                   <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
