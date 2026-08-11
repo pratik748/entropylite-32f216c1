@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   clearStoredDemo,
   hasStoredDemo,
@@ -39,10 +40,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const exit = useCallback(() => {
     clearStoredDemo();
+    supabase.functions.setAuth(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
     setSession(null);
   }, []);
 
   const adopt = useCallback((next: DemoSession) => {
+    // Engines authenticate with the signed demo token (read-only, synthetic subject).
+    supabase.functions.setAuth(next.token);
     setSession(next);
     setResolving(false);
   }, []);
@@ -52,6 +56,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
     resumeDemoSession().then((s) => {
       if (!alive) return;
+      if (s) supabase.functions.setAuth(s.token);
       setSession(s);
       setResolving(false);
     });
