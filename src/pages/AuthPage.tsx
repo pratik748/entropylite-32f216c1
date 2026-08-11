@@ -3,6 +3,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
 import Wordmark from "@/components/marketing/Wordmark";
+import DemoAccess from "@/components/auth/DemoAccess";
 
 const CAPABILITY_ROWS = [
   { k: "Monte Carlo engine", v: "10,000 paths / asset" },
@@ -117,7 +118,9 @@ export default function AuthPage() {
             </button>
           </div>
 
-          <div className="mt-10 flex items-center gap-2.5 border-t border-hairline pt-6">
+          <DemoAccess disabled={!!loading} />
+
+          <div className="mt-8 flex items-center gap-2.5 border-t border-hairline pt-6">
             <Lock className="h-3 w-3 text-white/30" />
             <p className="mkt-label text-[8px] text-white/30">
               Encrypted session · No card required · Founding access
