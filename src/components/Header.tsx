@@ -106,6 +106,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
         </button>
 
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
+          <DemoIndicator />
           {/* Foresight operating surface — top launcher hidden for now.
               Foresight itself is still reachable via ⌘J and the command
               palette ("Ask Foresight"); restore this button to bring it back. */}
@@ -156,9 +157,9 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           </span>
 
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => (isDemo ? exitDemo() : supabase.auth.signOut())}
             className="pressable flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="Sign out"
+            title={isDemo ? "Leave demo" : "Sign out"}
           >
             <LogOut className="h-3.5 w-3.5" />
           </button>
