@@ -52,7 +52,8 @@ describe("DemoAccess", () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "That access code isn't valid." }, 401)));
     setup();
     await userEvent.click(screen.getByText("Explore Demo"));
-    await userEvent.paste(screen.getByTestId("demo-code-0"), "1111" as any);
+    await userEvent.click(screen.getByTestId("demo-code-0"));
+    await userEvent.paste("1111");
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/isn't valid/));
     expect((screen.getByTestId("demo-code-0") as HTMLInputElement).value).toBe("");
