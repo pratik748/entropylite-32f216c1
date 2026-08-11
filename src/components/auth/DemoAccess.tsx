@@ -103,8 +103,10 @@ export default function DemoAccess({ disabled }: { disabled?: boolean }) {
               }
             }}
             onPaste={(e) => {
+              const pasted = e.clipboardData?.getData?.("text") ?? "";
+              if (!pasted) return;
               e.preventDefault();
-              write(e.clipboardData.getData("text"), 0);
+              write(pasted, 0);
             }}
             inputMode="numeric"
             type="tel"
