@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { DEMO_PREFIX } from "../_shared/demoAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,11 +49,12 @@ async function sign(payload: Record<string, unknown>) {
   const body = b64url(enc.encode(JSON.stringify(payload)));
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", await key(), enc.encode(body)));
   const hex = [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${body}.${hex}`;
+  return `${DEMO_PREFIX}${body}.${hex}`;
 }
 
 async function verify(token: string): Promise<Record<string, any> | null> {
-  const parts = token.split(".");
+  if (!token.startsWith(DEMO_PREFIX)) return null;
+  const parts = token.slice(DEMO_PREFIX.length).split(".");
   if (parts.length !== 2) return null;
   const [body, hex] = parts;
   if (!/^[0-9a-f]{64}$/.test(hex)) return null;
