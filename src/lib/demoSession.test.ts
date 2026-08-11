@@ -71,10 +71,10 @@ describe("demo session lifecycle", () => {
   });
 
   it("never sends a non-numeric or over-length code to the server", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ error: "nope" }, 401));
+    const fetchMock = vi.fn(async (_url: any, _init: any) => jsonResponse({ error: "nope" }, 401));
     vi.stubGlobal("fetch", fetchMock);
     await expect(createDemoSession("97-401x")).rejects.toBeTruthy();
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as any).body);
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as any).body);
     expect(body.code).toBe("9740");
   });
 
