@@ -4,6 +4,7 @@
  * and updates user preferences (email toggle, drawdown thresholds).
  */
 import { supabase } from "@/integrations/supabase/client";
+import { isReadOnlyMode } from "@/lib/readOnlyMode";
 
 export type RiskAlert = {
   id: string;
