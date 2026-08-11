@@ -4,6 +4,8 @@ import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { Command, LogOut, Search, Zap } from "lucide-react";
 import { emitUIEvent } from "@/foresight/uiBus";
+import DemoIndicator from "@/components/DemoIndicator";
+import { useDemo } from "@/demo/DemoProvider";
 import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
 interface HeaderProps {
@@ -28,6 +30,7 @@ const TerminalMark = () => (
 const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, setIndiaMode } = useFX();
+  const { isDemo, exit: exitDemo } = useDemo();
 
   // Auto-toggle India mode based on currency selection
   useEffect(() => {
