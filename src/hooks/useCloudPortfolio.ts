@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 import type { HistoryEntry } from "@/components/AnalysisHistory";
+import { useDemo } from "@/demo/DemoProvider";
 
 /**
  * Syncs portfolio stocks and analysis history to Lovable Cloud,
@@ -13,14 +14,38 @@ import type { HistoryEntry } from "@/components/AnalysisHistory";
  * - Debounced cloud sync with optimistic rollback on error
  */
 export function useCloudPortfolio() {
+  const demo = useDemo();
   const [stocks, setStocksState] = useState<PortfolioStock[]>([]);
   const [history, setHistoryState] = useState<HistoryEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const savingRef = useRef(false);
   const userIdRef = useRef<string | null>(null);
+  const isDemo = demo.isDemo;
+  const demoRef = useRef(isDemo);
+  demoRef.current = isDemo;
+
+  // ─── Demo workspace: server-resolved, read-only context ───
+  useEffect(() => {
+    if (!isDemo) return;
+    userIdRef.current = null;
+    setStocksState(
+      demo.portfolio.map((p) => ({
+        id: p.id,
+        ticker: p.ticker,
+        buyPrice: p.buyPrice,
+        quantity: p.quantity,
+        analysis: p.analysis ?? undefined,
+        isLoading: false,
+        createdAt: p.createdAt,
+      })) as PortfolioStock[]
+    );
+    setHistoryState(demo.history as HistoryEntry[]);
+    setLoaded(true);
+  }, [isDemo, demo.portfolio, demo.history]);
 
   // ─── Wait for auth, then load from cloud ───
   useEffect(() => {
+    if (isDemo) return;
     let alive = true;
 
     const loadForUser = async (userId: string) => {
@@ -81,10 +106,11 @@ export function useCloudPortfolio() {
     });
 
     return () => { alive = false; subscription.unsubscribe(); };
-  }, []);
+  }, [isDemo]);
 
   // ─── Save stocks to cloud (structural changes only) ───
   const syncStocks = useCallback(async (updated: PortfolioStock[]) => {
+    if (demoRef.current) return; // demo workspace never mutates cloud state
     const userId = userIdRef.current;
     if (!userId || savingRef.current) return;
     savingRef.current = true;
@@ -151,6 +177,7 @@ export function useCloudPortfolio() {
   // ─── Add history entry ───
   const addHistoryEntry = useCallback(async (entry: HistoryEntry) => {
     setHistoryState(prev => [entry, ...prev.slice(0, 49)]);
+    if (demoRef.current) return;
     const userId = userIdRef.current;
     if (!userId) return;
     await supabase.from("user_analysis_history").insert({
@@ -166,6 +193,7 @@ export function useCloudPortfolio() {
   }, []);
 
   const clearHistory = useCallback(async () => {
+    if (demoRef.current) return;
     setHistoryState([]);
     const userId = userIdRef.current;
     if (!userId) return;

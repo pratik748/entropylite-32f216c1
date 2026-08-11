@@ -1,7 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { DEMO_SUBJECT, isDemoToken, verifyDemoToken } from "./demoAuth.ts";
 
 export interface AuthResult {
   user: { id: string; email?: string };
+  /** True for read-only demo sessions. Never write real user rows for these. */
+  demo?: boolean;
 }
 
 /**
@@ -18,6 +21,20 @@ export async function requireAuth(
       JSON.stringify({ error: "Unauthorized" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  }
+
+  const bearer = authHeader.slice(7).trim();
+
+  // Read-only demo session: signed short-lived token, synthetic subject.
+  if (isDemoToken(bearer)) {
+    const demo = await verifyDemoToken(bearer);
+    if (!demo) {
+      throw new Response(
+        JSON.stringify({ error: "Demo session expired" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    return { user: { id: DEMO_SUBJECT }, demo: true };
   }
 
   const supabase = createClient(

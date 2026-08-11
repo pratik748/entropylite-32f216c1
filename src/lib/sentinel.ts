@@ -4,6 +4,7 @@
  * and updates user preferences (email toggle, drawdown thresholds).
  */
 import { supabase } from "@/integrations/supabase/client";
+import { isReadOnlyMode } from "@/lib/readOnlyMode";
 
 export type RiskAlert = {
   id: string;
@@ -27,6 +28,7 @@ export type AlertPrefs = {
 };
 
 export async function registerWatch(ticker: string, entryPrice: number, quantity: number) {
+  if (isReadOnlyMode()) return;
   try {
     await supabase.functions.invoke("portfolio-sentinel", {
       body: { action: "register", ticker, entry_price: entryPrice, quantity },
@@ -35,6 +37,7 @@ export async function registerWatch(ticker: string, entryPrice: number, quantity
 }
 
 export async function unregisterWatch(ticker: string) {
+  if (isReadOnlyMode()) return;
   try {
     await supabase.functions.invoke("portfolio-sentinel", {
       body: { action: "unregister", ticker },
@@ -43,6 +46,7 @@ export async function unregisterWatch(ticker: string) {
 }
 
 export async function fetchAlerts(limit = 50): Promise<RiskAlert[]> {
+  if (isReadOnlyMode()) return [];
   const { data } = await (supabase as any)
     .from("risk_alerts")
     .select("*")
@@ -52,21 +56,25 @@ export async function fetchAlerts(limit = 50): Promise<RiskAlert[]> {
 }
 
 export async function dismissAlert(id: string) {
+  if (isReadOnlyMode()) return;
   await (supabase as any).from("risk_alerts").update({ dismissed: true }).eq("id", id);
 }
 
 export async function fetchPrefs(): Promise<AlertPrefs | null> {
+  if (isReadOnlyMode()) return null;
   const { data } = await (supabase as any).from("alert_preferences").select("*").maybeSingle();
   return (data as AlertPrefs) || null;
 }
 
 export async function upsertPrefs(prefs: Partial<AlertPrefs>) {
+  if (isReadOnlyMode()) return;
   const { data: u } = await supabase.auth.getUser();
   if (!u?.user) return;
   await (supabase as any).from("alert_preferences").upsert({ user_id: u.user.id, ...prefs }, { onConflict: "user_id" });
 }
 
 export async function scanNow() {
+  if (isReadOnlyMode()) return;
   try {
     await supabase.functions.invoke("portfolio-sentinel", { body: { action: "scan" } });
   } catch (e) { console.warn("[sentinel] scan failed", e); }

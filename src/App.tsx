@@ -20,6 +20,7 @@ import BackbonePage from "./pages/BackbonePage";
 import CadencePage from "./pages/CadencePage";
 import CadenceEntryPage from "./pages/CadenceEntryPage";
 import CompanyWorkstationPage from "./pages/CompanyWorkstationPage";
+import { DemoProvider, useDemo } from "./demo/DemoProvider";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ function isOAuthReturn(): boolean {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
+  const demo = useDemo();
   const cachedHasSession = readCachedSession();
   const oauthReturn = isOAuthReturn();
   const [session, setSession] = useState<Session | null>(cachedHasSession ? ({} as Session) : null);
@@ -73,7 +75,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) {
+  if (loading || demo.resolving) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground text-sm tracking-tight animate-breathe">Signing you in…</p>
@@ -81,7 +83,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session) return <AuthPage />;
+  if (!session && !demo.isDemo) return <AuthPage />;
 
   return <>{children}</>;
 }
@@ -89,9 +91,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+      <DemoProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
@@ -121,7 +124,8 @@ const App = () => (
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </DemoProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
