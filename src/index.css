@@ -811,7 +811,7 @@
 /* Leaflet dark theme overrides */
 .leaflet-container {
   background: hsl(0, 0%, 4%) !important;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
 }
 .leaflet-control-zoom a {
   background: hsl(0, 0%, 9%) !important;
@@ -826,7 +826,7 @@
   background: hsl(0, 0%, 7%) !important;
   border: 1px solid hsl(0, 0%, 17%) !important;
   color: hsl(0, 0%, 85%) !important;
-  font-family: 'IBM Plex Mono', monospace !important;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace !important;
   font-size: 9px !important;
   padding: 2px 6px !important;
   border-radius: 6px !important;
@@ -844,7 +844,7 @@
   color: hsl(0, 0%, 85%) !important;
   border: 1px solid hsl(0, 0%, 17%) !important;
   border-radius: 10px !important;
-  font-family: 'IBM Plex Mono', monospace !important;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace !important;
   font-size: 10px !important;
 }
 .leaflet-popup-content-wrapper {

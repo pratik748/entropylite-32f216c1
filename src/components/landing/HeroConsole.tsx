@@ -100,7 +100,7 @@ function MonteCarloFan() {
       x={W - padR + 5}
       y={y(arr[arr.length - 1]) + 3}
       fontSize="8"
-      fontFamily="IBM Plex Mono, ui-monospace, monospace"
+      fontFamily="ui-monospace, SF Mono, SFMono-Regular, Menlo, monospace"
       fill="rgba(255,255,255,0.38)"
     >
       {t}
