@@ -9,8 +9,6 @@ import {
 import PublicNav from "@/components/PublicNav";
 import SiteFooter from "@/components/marketing/SiteFooter";
 import { SectionIntro, InkButton, LineButton } from "@/components/marketing/Section";
-import HeroConsole from "@/components/landing/HeroConsole";
-import MarketMatrix from "@/components/landing/MarketMatrix";
 import FeatureGallery from "@/components/landing/FeatureGallery";
 import MathResearch from "@/components/landing/MathResearch";
 
@@ -153,10 +151,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* The operating picture — in flow, no overlap */}
-          <div className="pb-16 sm:pb-24 border-t border-hairline pt-10 sm:pt-14">
-            <HeroConsole />
-          </div>
+          <div className="pb-16 sm:pb-24" />
         </div>
       </header>
 
@@ -228,9 +223,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* ── 03 · MARKET INTELLIGENCE MATRIX ── */}
-      <MarketMatrix />
 
       {/* ── 04 · MODULES (screenshots gallery) ── */}
       <FeatureGallery />
