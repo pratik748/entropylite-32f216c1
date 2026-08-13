@@ -123,7 +123,7 @@ export default function AuthPage() {
           <div className="mt-8 flex items-center gap-2.5 border-t border-hairline pt-6">
             <Lock className="h-3 w-3 text-white/30" />
             <p className="mkt-label text-[8px] text-white/30">
-              Encrypted session · No card required · Founding access
+              Encrypted session
             </p>
           </div>
         </div>

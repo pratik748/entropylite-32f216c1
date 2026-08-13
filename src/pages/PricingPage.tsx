@@ -61,9 +61,6 @@ export default function PricingPage() {
                 Get founding access <ArrowRight className="h-4 w-4" />
               </InkButton>
             </div>
-            <p className="mkt-label text-[9px] text-white/25 mt-5">
-              No credit card · Google or email sign-in · 30-second setup
-            </p>
           </div>
 
           {/* Inclusions */}
