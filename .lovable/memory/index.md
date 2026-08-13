@@ -8,6 +8,7 @@ Entropy Lite — institutional terminal. Classy, never compare to Bloomberg in u
 Landing page uses real screenshots only (no fabricated UI). WebP previews in src/assets/preview-*.webp.
 Dashboard header has Brief button → EntropyBrief modal → shareable PNG to X/WhatsApp.
 All quant modules MUST consume `useQuantSnapshot` for real σ/μ/VaR — never invent risk proxies.
+UI direction: Apple HIG. System SF type stack only (no webfonts — IBM Plex/Source Serif banned). Apple system colours (systemBlue/Green/Red/Orange + teal/indigo/purple tokens). Radius 0.875rem. No fabricated market data or fallbacks anywhere in UI.
 UI direction: modern-minimal. Softer radius (0.5rem), calmer borders, breathing-room spacing. Density stays inside panels, chrome stays soft.
 
 ## Memories

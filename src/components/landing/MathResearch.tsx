@@ -24,7 +24,7 @@ const MONO_FAINT = "rgba(255,255,255,0.16)";
 const GRID = "rgba(255,255,255,0.06)";
 const POS = "rgba(78,158,114,";
 const NEG = "rgba(196,86,79,";
-const FONT = "IBM Plex Mono, ui-monospace, monospace";
+const FONT = "ui-monospace, SF Mono, SFMono-Regular, Menlo, monospace";
 
 function PanelHeader({ eyebrow, title, right }: { eyebrow: string; title: string; right?: React.ReactNode }) {
   return (
