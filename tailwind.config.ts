@@ -19,14 +19,23 @@ export default {
     extend: {
       fontFamily: {
         sans: [
-          "IBM Plex Sans",
           "-apple-system",
           "BlinkMacSystemFont",
+          "SF Pro Text",
+          "SF Pro Display",
+          "system-ui",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
+        mono: ["ui-monospace", "SF Mono", "SFMono-Regular", "Menlo", "monospace"],
+        display: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "SF Pro Display",
           "system-ui",
           "sans-serif",
         ],
-        mono: ["IBM Plex Mono", "ui-monospace", "SF Mono", "monospace"],
-        display: ["Source Serif 4", "Georgia", "Times New Roman", "serif"],
       },
       letterSpacing: {
         tightest: "-0.04em",
@@ -127,6 +136,10 @@ export default {
         loss: "hsl(var(--loss))",
         warning: "hsl(var(--warning))",
         info: "hsl(var(--info))",
+        teal: "hsl(var(--accent-teal))",
+        indigo: "hsl(var(--accent-indigo))",
+        purple: "hsl(var(--accent-purple))",
+        pinkish: "hsl(var(--accent-pink))",
         surface: {
           1: "hsl(var(--surface-1))",
           2: "hsl(var(--surface-2))",
