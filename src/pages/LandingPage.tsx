@@ -75,7 +75,6 @@ const PIPELINE = [
 ];
 
 const FAQS = [
-  { q: "Do I need a credit card to start?", a: "No. Sign in with Google or email and the full terminal opens. No card, no trial timer, no upsell wall." },
   { q: "Is this investment advice?", a: "No. Entropy is a research and scenario-modelling instrument. Every output is an observation or a probability. Every decision is yours." },
   { q: "What markets does it cover?", a: "US equities and ETFs, NSE and BSE Indian equities, FX, crypto and commodities. India-only mode locks the entire stack to NSE and BSE." },
   { q: "How is this different from a broker app?", a: "Brokers show the price and the order ticket. Entropy shows the distribution behind the price, the structural constraints shaping it, and the cascade that follows an event." },
@@ -133,9 +132,6 @@ export default function LandingPage() {
               </LineButton>
             </div>
 
-            <p className="mkt-label text-[9px] text-white/25 mt-6">
-              Google sign-in · 30-second setup · Free during the founding period
-            </p>
           </div>
 
           {/* Stats band */}
@@ -364,8 +360,8 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 mt-14 border-t border-l border-hairline bg-carbon-950 max-w-4xl mx-auto">
             {[
-              { t: "No credit card", d: "Sign in with Google or email and the full terminal opens. Nothing is withheld." },
-              { t: "Thirty-second setup", d: "Add your tickers, set a base currency, and the engines begin their first pass." },
+              { t: "Full stack, no tiering", d: "Every engine — probabilistic, structural, causal — is available from the first session." },
+              { t: "Portfolio-resident", d: "Add your tickers and a base currency; the engines begin their first pass immediately." },
               { t: "Founding pricing, for life", d: "Founding members keep founding terms permanently once paid tiers launch." },
             ].map((c, i) => (
               <div key={c.t} className="border-b border-r border-hairline p-8">
