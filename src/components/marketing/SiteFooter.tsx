@@ -71,9 +71,6 @@ export default function SiteFooter() {
             >
               Open the Terminal
             </button>
-            <p className="mt-4 text-[11.5px] leading-relaxed text-white/30">
-              No card required. Full access during the founding period.
-            </p>
           </div>
         </div>
 
