@@ -17,6 +17,8 @@ export function cleanAIText(text: string | null | undefined): string {
     .replace(/^[-*+]\s+/gm, "• ")         // markdown bullets → clean bullet
     .replace(/`([^`]+)`/g, "$1")          // `code` → code
     .replace(/~~([^~]+)~~/g, "$1")        // ~~strike~~ → plain
+    .replace(/\s*[—–]\s+/g, ", ")         // em/en dash flourish → comma
+    .replace(/[—–]/g, "-")                // any remaining long dash → hyphen
     .replace(/\n{3,}/g, "\n\n")           // collapse excess newlines
     .trim();
 }
