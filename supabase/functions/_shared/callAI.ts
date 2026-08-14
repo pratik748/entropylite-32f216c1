@@ -75,6 +75,11 @@ function hardenSystemPrompt(original: string, skip?: boolean): string {
   return `${HARDENING_PREAMBLE}\n\n[CALLER CONTEXT]\n${original}`;
 }
 
+/** Remove em/en dashes from model prose (banned house style). Safe for JSON. */
+function stripLongDashes(text: string): string {
+  return text.replace(/\s*[\u2014\u2013]\s+/g, ", ").replace(/[\u2014\u2013]/g, "-");
+}
+
 function stripThinkingBlocks(text: string): string {
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
@@ -211,7 +216,7 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
-  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
 /**
@@ -247,7 +252,7 @@ async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) throw new Error("Empty gateway response");
-  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
 /**
@@ -326,7 +331,7 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
   const raw = data?.aiRecord?.aiRecordDetail?.resultObject;
   const text = Array.isArray(raw) ? raw.join("") : (typeof raw === "string" ? raw : "");
   if (!text || !text.trim()) throw new Error("Empty 1minAI response");
-  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +375,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
   const parts = data?.candidates?.[0]?.content?.parts;
   const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
   if (!text || !text.trim()) throw new Error("Empty Gemini response");
-  return { text: stripThinkingBlocks(text), provider: reported || "mistral" };
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
 // ---------------------------------------------------------------------------
