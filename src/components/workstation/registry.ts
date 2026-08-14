@@ -1,5 +1,5 @@
 /**
- * Equity Workstation registry — the single source of truth for the
+ * Equity Workstation registry, the single source of truth for the
  * workstation's information architecture: 9 workspaces in 4 semantic
  * groups, each holding one-screen sections. Every section is URL-addressable
  * as /company/:ticker/:workspaceId/:sectionId.
@@ -38,7 +38,7 @@ export const WORKSPACES: WorkspaceDef[] = [
         summary: "The call and why, on one screen: verdict, pillar scores, the strongest evidence on each side, and what changed since the last session.",
         contents: [
           "Institutional thesis paragraph with inline evidence citations",
-          "Six pillar scores — valuation, quality, growth, health, momentum, risk",
+          "Six pillar scores, valuation, quality, growth, health, momentum, risk",
           "Strongest evidence for and against, ranked by thesis weight",
           "Change feed since last synthesis run",
         ],
@@ -61,42 +61,42 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "balance-sheet",
         label: "Balance Sheet",
-        summary: "Asset, liability and equity structure — what the company owns, owes, and how that mix is trending.",
+        summary: "Asset, liability and equity structure, what the company owns, owes, and how that mix is trending.",
         contents: ["Statement table with deltas and reads", "Working-capital decomposition", "Debt maturity and structure"],
         phase: 3,
       },
       {
         id: "cash-flow",
         label: "Cash Flow",
-        summary: "Where cash actually comes from and goes — operations, investment, financing — versus reported earnings.",
+        summary: "Where cash actually comes from and goes, operations, investment, financing, versus reported earnings.",
         contents: ["Statement table with deltas and reads", "FCF derivation with operands", "Capex and SBC trends"],
         phase: 3,
       },
       {
         id: "ratios",
         label: "Financial Ratios",
-        summary: "The full ratio sheet — liquidity, leverage, efficiency, returns — each ratio an evidence node with history and peer context.",
+        summary: "The full ratio sheet, liquidity, leverage, efficiency, returns, each ratio an evidence node with history and peer context.",
         contents: ["Ratio matrix grouped by family", "Historical trend per ratio", "Five-rung peer percentile ladder"],
         phase: 3,
       },
       {
         id: "health",
         label: "Financial Health",
-        summary: "Can the balance sheet survive stress — solvency, liquidity, refinancing risk, and distress scoring.",
+        summary: "Can the balance sheet survive stress, solvency, liquidity, refinancing risk, and distress scoring.",
         contents: ["Solvency and liquidity evidence", "Interest coverage and maturity wall", "Distress scores (Altman / Piotroski class)"],
         phase: 3,
       },
       {
         id: "cash-generation",
         label: "Cash Generation",
-        summary: "Quality and durability of cash conversion — FCF yield, conversion of earnings to cash, reinvestment needs.",
+        summary: "Quality and durability of cash conversion, FCF yield, conversion of earnings to cash, reinvestment needs.",
         contents: ["FCF conversion vs net income", "Cash conversion cycle", "FCF yield vs peers"],
         phase: 3,
       },
       {
         id: "earnings-quality",
         label: "Quality of Earnings",
-        summary: "How much of reported profit is real — accruals, one-offs, revenue recognition, and red-flag screens.",
+        summary: "How much of reported profit is real, accruals, one-offs, revenue recognition, and red-flag screens.",
         contents: ["Accruals ratio and trend", "One-off / adjusted-line ledger", "Red-flag screen results"],
         phase: 3,
       },
@@ -110,35 +110,35 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "valuation",
         label: "Valuation",
-        summary: "What the market is paying versus what the business earns — multiples against own history and every peer scope.",
+        summary: "What the market is paying versus what the business earns, multiples against own history and every peer scope.",
         contents: ["Multiple set (P/E, EV/EBITDA, EV/FCF, P/B…) with operands", "10-year own-history bands", "Peer percentile ladders", "Implied expectations read"],
         phase: 3,
       },
       {
         id: "growth",
         label: "Growth",
-        summary: "How fast the business compounds — revenue, earnings and FCF growth, durability, and what is driving it.",
+        summary: "How fast the business compounds, revenue, earnings and FCF growth, durability, and what is driving it.",
         contents: ["Multi-horizon CAGRs", "Growth decomposition (volume / price / mix)", "Peer-relative growth ranking"],
         phase: 3,
       },
       {
         id: "profitability",
         label: "Profitability",
-        summary: "Margin structure and returns on capital — level, trend, and how they compare to everyone who matters.",
+        summary: "Margin structure and returns on capital, level, trend, and how they compare to everyone who matters.",
         contents: ["Margin waterfall (gross → operating → net)", "ROIC / ROE / ROA with DuPont decomposition", "Peer percentile ladders"],
         phase: 3,
       },
       {
         id: "capital-allocation",
         label: "Capital Allocation",
-        summary: "What management does with the cash — buybacks, dividends, capex, M&A — and whether it creates value.",
+        summary: "What management does with the cash, buybacks, dividends, capex, M&A, and whether it creates value.",
         contents: ["Capital deployment mix over time", "Buyback yield and timing quality", "Dividend record and coverage", "ROIC on incremental capital"],
         phase: 3,
       },
       {
         id: "historical-performance",
         label: "Historical Performance",
-        summary: "Total shareholder return across horizons versus sector, index and peers — and what drove it.",
+        summary: "Total shareholder return across horizons versus sector, index and peers, and what drove it.",
         contents: ["TSR across 1y/3y/5y/10y", "Return decomposition (earnings vs multiple)", "Drawdown history"],
         phase: 3,
       },
@@ -152,7 +152,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "technical",
         label: "Technical Structure",
-        summary: "Where price sits in its structure — trend, support/resistance, volatility regime, and positioning.",
+        summary: "Where price sits in its structure, trend, support/resistance, volatility regime, and positioning.",
         contents: ["Trend and moving-average structure", "Support / resistance with volume", "Volatility regime read"],
         phase: 3,
       },
@@ -173,14 +173,14 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "options",
         label: "Options & Derivatives",
-        summary: "What the derivatives market is pricing — implied vol, skew, notable positioning and dealer exposure.",
+        summary: "What the derivatives market is pricing, implied vol, skew, notable positioning and dealer exposure.",
         contents: ["IV level and term structure vs realized", "Skew and put/call positioning", "Notable open-interest concentrations"],
         phase: 4,
       },
       {
         id: "microstructure",
         label: "Market Microstructure",
-        summary: "How the stock actually trades — liquidity, spreads, volume profile, and short interest.",
+        summary: "How the stock actually trades, liquidity, spreads, volume profile, and short interest.",
         contents: ["Liquidity and average spread evidence", "Volume profile and abnormal prints", "Short interest and borrow trend"],
         phase: 4,
       },
@@ -194,14 +194,14 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "landscape",
         label: "Competitive Landscape",
-        summary: "The shape of the market the company fights in — share, moat sources, and threat vectors.",
+        summary: "The shape of the market the company fights in, share, moat sources, and threat vectors.",
         contents: ["Market share map", "Moat evidence (switching costs, IP, scale)", "Threat register with severity"],
         phase: 4,
       },
       {
         id: "peer-matrix",
         label: "Peer Matrix",
-        summary: "One comparison matrix, four scopes — sector, industry, direct peers, global leaders — with an interpretation on every row.",
+        summary: "One comparison matrix, four scopes, sector, industry, direct peers, global leaders, with an interpretation on every row.",
         contents: ["Metric × peer matrix with percentile shading", "Scope switcher (sector / industry / direct / global)", "Row-level institutional reads"],
         phase: 4,
       },
@@ -257,7 +257,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "macro",
         label: "Macro Exposure",
-        summary: "Which macro variables move this business — rates, FX, commodities, cycles — and by how much.",
+        summary: "Which macro variables move this business, rates, FX, commodities, cycles, and by how much.",
         contents: ["Macro factor sensitivities", "Regime dependence evidence", "Upcoming macro-calendar exposure"],
         phase: 4,
       },
@@ -271,7 +271,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "second-order",
         label: "Second-Order Effects",
-        summary: "What happens after what happens — knock-on effects the first-order view misses.",
+        summary: "What happens after what happens, knock-on effects the first-order view misses.",
         contents: ["Second-order effect register", "Ecosystem propagation paths", "Positioning implications"],
         phase: 4,
       },
@@ -299,21 +299,21 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "filings",
         label: "SEC / Exchange Filings",
-        summary: "The primary documents — what was filed, what changed, and what matters in it.",
+        summary: "The primary documents, what was filed, what changed, and what matters in it.",
         contents: ["Filing feed (10-K/Q, 8-K, Form 4, exchange disclosures)", "Material-change highlights", "Links into evidence nodes they support"],
         phase: 4,
       },
       {
         id: "news",
         label: "News Intelligence",
-        summary: "The headline flow, scored for real impact on this name — not just sentiment.",
+        summary: "The headline flow, scored for real impact on this name, not just sentiment.",
         contents: ["Impact-scored news ledger", "Narrative shift detection", "Source reliability weighting"],
         phase: 4,
       },
       {
         id: "alternative-data",
         label: "Alternative Data",
-        summary: "Signals outside the filings — hiring, web traffic, app data, prediction markets — where available.",
+        summary: "Signals outside the filings, hiring, web traffic, app data, prediction markets, where available.",
         contents: ["Alternative signal panel with provenance", "Divergence vs reported trends", "Signal reliability grading"],
         phase: 4,
       },
@@ -327,7 +327,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "risk-analysis",
         label: "Risk Analysis",
-        summary: "The full risk picture — market, business, financial, and idiosyncratic — quantified where possible.",
+        summary: "The full risk picture, market, business, financial, and idiosyncratic, quantified where possible.",
         contents: ["Risk decomposition with evidence", "Volatility and beta structure", "Tail risk measures"],
         phase: 4,
       },
@@ -348,7 +348,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "monte-carlo",
         label: "Monte Carlo",
-        summary: "The simulated distribution of outcomes — paths, percentiles, and what drives the spread.",
+        summary: "The simulated distribution of outcomes, paths, percentiles, and what drives the spread.",
         contents: ["Path simulation with percentile cone", "Terminal distribution and key quantiles", "Driver sensitivity of the spread"],
         phase: 4,
       },
@@ -362,14 +362,14 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "sensitivity",
         label: "Sensitivity Analysis",
-        summary: "Which inputs move the valuation most — one-way and two-way sensitivity on the drivers.",
+        summary: "Which inputs move the valuation most, one-way and two-way sensitivity on the drivers.",
         contents: ["Tornado chart of value drivers", "Two-way sensitivity grids", "Break-even input levels"],
         phase: 4,
       },
       {
         id: "portfolio-impact",
         label: "Portfolio Impact",
-        summary: "What this position does to the book — correlation, concentration, marginal risk contribution.",
+        summary: "What this position does to the book, correlation, concentration, marginal risk contribution.",
         contents: ["Marginal VaR / risk contribution", "Correlation with existing holdings", "Sizing guidance under risk budget"],
         phase: 4,
       },
@@ -383,7 +383,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "investment-thesis",
         label: "Investment Thesis",
-        summary: "The complete argument — what you must believe, supported by cited evidence, to own or avoid this name.",
+        summary: "The complete argument, what you must believe, supported by cited evidence, to own or avoid this name.",
         contents: ["Thesis statement with evidence citations", "Key beliefs and their support strength", "Time horizon and catalysts"],
         phase: 5,
       },
@@ -404,7 +404,7 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "validation",
         label: "Thesis Validation",
-        summary: "Is the thesis tracking — each key belief scored against what the data has done since.",
+        summary: "Is the thesis tracking, each key belief scored against what the data has done since.",
         contents: ["Belief-vs-actual scorecard", "Validation trend over time", "Divergences requiring attention"],
         phase: 5,
       },
@@ -418,14 +418,14 @@ export const WORKSPACES: WorkspaceDef[] = [
       {
         id: "confidence",
         label: "Confidence & Evidence",
-        summary: "The auditable ledger behind the recommendation — every node, its weight, and the confidence math.",
+        summary: "The auditable ledger behind the recommendation, every node, its weight, and the confidence math.",
         contents: ["Full evidence ledger (supporting / opposing / estimated)", "Confidence derivation", "Largest positive and negative movers"],
         phase: 5,
       },
       {
         id: "recommendation",
         label: "Final Recommendation",
-        summary: "The institutional call — action, sizing, horizon, entry discipline — with its full evidence trail.",
+        summary: "The institutional call, action, sizing, horizon, entry discipline, with its full evidence trail.",
         contents: ["Recommendation with confidence and horizon", "Sizing and entry guidance", "Review triggers and next catalysts"],
         phase: 5,
       },

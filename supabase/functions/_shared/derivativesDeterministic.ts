@@ -305,7 +305,7 @@ export function generateDerivativesIntelligence(body: DerivativesRequestBody) {
       signal_type: premiumRich ? "vol_expansion" : "vol_compression",
       opportunity: premiumRich
         ? `${context.bias === "risk_off" ? "Sell defined-risk put spreads" : "Harvest elevated premium with call spreads"} while implied vol remains above realized vol.`
-        : "Own optionality selectively — implied vol is near realized and convexity is inexpensive.",
+        : "Own optionality selectively, implied vol is near realized and convexity is inexpensive.",
       confidence: round(clamp(0.58 + Math.abs(iv - hv) * 0.8, 0.52, 0.88)),
     };
   });

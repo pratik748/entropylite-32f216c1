@@ -127,7 +127,7 @@ serve(async (req) => {
   })).filter((s) => Number.isFinite(s.score) && Number.isFinite(s.agreement));
 
   const fit = fitPlatt(samples);
-  // Observability only. The engine no longer consumes stored fits — a
+  // Observability only. The engine no longer consumes stored fits, a
   // degenerate fit (α=0.97, β=0, γ=−2.67 ⇒ p_max=15%, clamped to the 0.50
   // floor) once mapped every ticket to a coin flip and silently killed
   // every verdict in the product. The fit stays in the report so drift is
@@ -175,14 +175,14 @@ serve(async (req) => {
     bins: bins.filter((b) => b.n > 0),
     refit_params: { alpha: fit.alpha, beta: fit.beta, gamma: fit.gamma, pMax: Number(pMax.toFixed(4)), consumed: false },
     notes: displayed.length < 30
-      ? "insufficient settled sample — reliability not yet meaningful"
+      ? "insufficient settled sample, reliability not yet meaningful"
       : null,
   });
   report.reliability_report_written = !reportErr;
   if (reportErr) console.warn("calibration_reports insert failed:", reportErr.message);
 
   // Delete any previously stored row so no stale deployment can keep
-  // reading poison — older engine builds fall back to the priors the
+  // reading poison, older engine builds fall back to the priors the
   // moment the row is gone.
   const { error: delErr } = await sb.from("calibration_params").delete().eq("id", 1);
   report.calibrationRowDeleted = !delErr;

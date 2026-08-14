@@ -27,8 +27,8 @@ serve(async (req) => {
 REASONING FRAMEWORK:
 1. Command Center per asset
    • weight = positionValue / totalValue (must sum to ~100).
-   • flowPressure (0–100): institutional crowding proxy — high beta + high weight + concentrated sector → higher pressure.
-   • reflexivity (0–100): self-reinforcing risk — tighter when float-light, momentum-heavy, or narrative-driven.
+   • flowPressure (0–100): institutional crowding proxy, high beta + high weight + concentrated sector → higher pressure.
+   • reflexivity (0–100): self-reinforcing risk, tighter when float-light, momentum-heavy, or narrative-driven.
    • structural (0–100): mechanical risk (index reweight, options pin, ETF flow). Liquid mega-caps score lower.
    • worstCase (negative $): 21-day 95% downside ≈ -1.65 × σ_21d × positionValue.
    • suggestion: Add (under-weight high-conviction), Hold (in-balance), Trim (overweight + flow risk), Exit (structural break).
@@ -49,7 +49,7 @@ REASONING FRAMEWORK:
 
 4. liquidityRadar must rank EVERY holding (not just a sample). daysToExit ties to the aftermath model.
 
-5. rebalancingSuggestions + concentrationWarnings: each must name a TICKER or sector and the % action ("Trim NVDA from 32% to 18% — single-name concentration above factor-risk limit").
+5. rebalancingSuggestions + concentrationWarnings: each must name a TICKER or sector and the % action ("Trim NVDA from 32% to 18%, single-name concentration above factor-risk limit").
 
 CALIBRATION GUARDS: no round numbers, no generic advice, every string ≤ 240 chars, every percentage realistic.
 
@@ -86,12 +86,12 @@ Return ONLY valid JSON (no markdown, no prose):
 ${JSON.stringify(portfolio, null, 1)}
 
 Walk the framework end-to-end:
-(1) Compute weights and flag any single-name > 20% — these dominate the risk picture.
+(1) Compute weights and flag any single-name > 20%, these dominate the risk picture.
 (2) For each holding produce flow / reflexivity / structural / worstCase / suggestion grounded in its sector + size + likely ADV.
-(3) Build the Aftermath block — slippage and unwind days must be position-size-aware, not constants.
+(3) Build the Aftermath block, slippage and unwind days must be position-size-aware, not constants.
 (4) Pick ONE recommended execution algo and justify it against the most illiquid position in the book.
 (5) liquidityRadar covers every ticker. Sort by daysToExit descending so the front-end shows worst-first.
-(6) Rebalancing + concentration warnings name tickers and target weights — no platitudes.`,
+(6) Rebalancing + concentration warnings name tickers and target weights, no platitudes.`,
       temperature: 0.4,
       maxTokens: 4096,
     });

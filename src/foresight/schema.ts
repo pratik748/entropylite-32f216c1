@@ -6,7 +6,7 @@
  * reads, and human-readable parameter docs for the registry inspector.
  *
  * Deliberately not zod: the planner manifest must be small (it rides in every
- * planning prompt), deterministic, and serializable — a ~120-line spec walker
+ * planning prompt), deterministic, and serializable, a ~120-line spec walker
  * in application code beats a schema-library bridge for that job.
  */
 

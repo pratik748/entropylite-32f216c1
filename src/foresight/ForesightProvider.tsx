@@ -1,5 +1,5 @@
 /**
- * ForesightProvider — mounts the runtime once, bridges it to React state,
+ * ForesightProvider, mounts the runtime once, bridges it to React state,
  * and exposes the conversational API to the surface. The host adapter reads
  * live application state through a ref so the runtime always sees current
  * holdings without being re-instantiated.
@@ -69,12 +69,12 @@ export function ForesightProvider({ host, children }: { host: HostAdapter; child
   const [prefill, setPrefill] = useState("");
 
   const applyEvent = useCallback((event: RuntimeEvent) => {
-    // Voice channel — speaks conversational beats only (never the raw ledger).
+    // Voice channel, speaks conversational beats only (never the raw ledger).
     // speak() is a no-op unless the user has toggled voice on.
     if (event.type === "ack") speak(event.text);
     else if (event.type === "answer") speak(event.text);
     else if (event.type === "clarify") speak(event.question);
-    else if (event.type === "error") speak("That run hit a problem — details are on screen.");
+    else if (event.type === "error") speak("That run hit a problem, details are on screen.");
 
     setTranscript((prev) => {
       const next = [...prev];

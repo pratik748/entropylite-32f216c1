@@ -1,10 +1,10 @@
-// Opportunity Score — multiplicative gated ranking statistic, computed in
+// Opportunity Score, multiplicative gated ranking statistic, computed in
 // log space. OS = E_net · R · C · Y · τ · L · N · Q. Each factor is a gate:
 // zero robustness or zero liquidity kills the candidate regardless of edge.
-// OS is a RANKING statistic, not a return forecast — the UI must label it so.
+// OS is a RANKING statistic, not a return forecast, the UI must label it so.
 //
 // Edge estimation: precision-weighted (inverse-variance) blend of engine
-// forecasts — the Bayesian normal–normal posterior mean — followed by
+// forecasts, the Bayesian normal–normal posterior mean, followed by
 // James–Stein-style shrinkage toward zero. The shrinkage prior is "the
 // market is efficient"; evidence must overcome it.
 
@@ -100,7 +100,7 @@ const FACTOR_FLOOR = 1e-6;
 /**
  * log OS = log E_net + Σ log(factor). Gate: eNet ≤ 0 ⇒ os = 0.
  * `bottleneck` names the multiplicative factor (excluding eNet) costing the
- * most score — the reduced form of TRUTH's cascade-vulnerability /
+ * most score, the reduced form of TRUTH's cascade-vulnerability /
  * load-bearing-claim report.
  */
 export function opportunityScore(factors: OpportunityFactors): OpportunityScoreResult {
@@ -152,7 +152,7 @@ export const DEFAULT_PUBLISH_THRESHOLDS: PublishThresholds = {
 
 /**
  * Aggressive rejection: publish only when every gate passes. All failing
- * reasons are reported — rejected candidates are shown WITH reasons in the
+ * reasons are reported, rejected candidates are shown WITH reasons in the
  * debug view, never silently dropped.
  */
 export function publishGate(

@@ -70,7 +70,7 @@ export function useTradeLogger() {
     (input: LogInput): LogEntry | null => {
       const ticker = input.ticker?.trim().toUpperCase();
       if (!ticker) return null;
-      // Dedupe — same ticker+action+price within 60s
+      // Dedupe, same ticker+action+price within 60s
       const now = Date.now();
       const dup = entries.find(
         (e) => e.ticker === ticker && e.action === input.action && Math.abs(e.price - input.price) < 1e-6 && now - e.ts < 60_000,

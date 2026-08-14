@@ -92,7 +92,7 @@ describe("minVarianceWeights", () => {
     expect(approx(w[1], 0.8, 1e-9)).toBe(true);
   });
   it("long-only projection: no negative weights", () => {
-    // Strongly correlated assets — unconstrained min-var would short one.
+    // Strongly correlated assets, unconstrained min-var would short one.
     const sigma = covFromCorr([0.2, 0.25], [[1, 0.95], [0.95, 1]]);
     const w = minVarianceWeights(sigma)!;
     expect(sumsTo1(w)).toBe(true);
@@ -120,7 +120,7 @@ describe("meanVarianceWeights", () => {
   });
 });
 
-describe("riskParityWeights — true ERC", () => {
+describe("riskParityWeights, true ERC", () => {
   it("equal weights when Σ = I", () => {
     const I = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
     const w = riskParityWeights(I)!;
@@ -130,7 +130,7 @@ describe("riskParityWeights — true ERC", () => {
   it("risk contributions are equal across assets", () => {
     const sigma = covFromCorr([0.1, 0.2, 0.3], [[1, 0.2, 0.1], [0.2, 1, 0.3], [0.1, 0.3, 1]]);
     const w = riskParityWeights(sigma)!;
-    // RCᵢ = wᵢ·(Σw)ᵢ — all equal
+    // RCᵢ = wᵢ·(Σw)ᵢ, all equal
     const Sw = sigma.map(row => row.reduce((s, v, j) => s + v * w[j], 0));
     const rc = w.map((wi, i) => wi * Sw[i]);
     const mean = rc.reduce((s, v) => s + v, 0) / rc.length;

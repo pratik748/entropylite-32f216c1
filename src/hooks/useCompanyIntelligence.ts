@@ -56,7 +56,7 @@ function getCachedIntel(ticker: string, allowStale = false): CompanyIntelligence
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
     if (!allowStale && Date.now() - ts > CACHE_TTL_MS) {
-      // Keep the stale entry in storage — it is the fallback when the live
+      // Keep the stale entry in storage, it is the fallback when the live
       // fetch fails. It is only replaced by a successful refresh.
       return null;
     }
@@ -111,7 +111,7 @@ export function useCompanyIntelligence(ticker: string | null) {
     })();
 
     // On any failure, fall back to the last good dossier (however old)
-    // before surfacing an error — a stale dossier beats an error card.
+    // before surfacing an error, a stale dossier beats an error card.
     const failWithFallback = () => {
       if (!alive) return;
       const stale = getCachedIntel(ticker, true);
@@ -119,7 +119,7 @@ export function useCompanyIntelligence(ticker: string | null) {
         setData(stale);
         setError(null);
       } else {
-        setError("Intelligence is re-syncing — this fills in automatically on the next pass.");
+        setError("Intelligence is re-syncing, this fills in automatically on the next pass.");
       }
       setLoading(false);
     };

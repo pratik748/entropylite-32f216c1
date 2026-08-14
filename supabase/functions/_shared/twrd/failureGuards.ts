@@ -1,4 +1,4 @@
-// TWRD failure-mode guards — false consensus, adversarial spikes, stale facts, overfit drift.
+// TWRD failure-mode guards, false consensus, adversarial spikes, stale facts, overfit drift.
 
 import type { VeracityMeta, TwrdDomain } from "./types.ts";
 import { decay } from "./truth.ts";

@@ -111,7 +111,7 @@ const TradeLogger = () => {
                           <Loader2 className="h-2.5 w-2.5 animate-spin" /> generating…
                         </span>
                       ) : (
-                        <span className="text-foreground/90 italic flex-1">{e.lesson || "—"}</span>
+                        <span className="text-foreground/90 italic flex-1">{e.lesson || "--"}</span>
                       )}
                       <button
                         onClick={() => regenerateLesson(e.id)}

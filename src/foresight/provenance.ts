@@ -1,5 +1,5 @@
 /**
- * Confidence provenance — the trust boundary of Foresight.
+ * Confidence provenance, the trust boundary of Foresight.
  *
  * Every number a user reads must trace to a deterministic engine or a cited
  * data source. Tools record FactRecords as they execute; the explainer is
@@ -40,7 +40,7 @@ export class FactLedger {
 /** Extract numeric literals from prose, ignoring years, list indices, ordinals. */
 export function extractNumbers(text: string): number[] {
   const out: number[] = [];
-  // Strip markdown links/urls first — they contain incidental digits.
+  // Strip markdown links/urls first, they contain incidental digits.
   const cleaned = text.replace(/https?:\/\/\S+/g, "");
   const re = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
   for (const m of cleaned.match(re) || []) {
@@ -56,8 +56,7 @@ export function extractNumbers(text: string): number[] {
 
 /**
  * Deterministic verification: every number in the answer must match a ledger
- * fact within rounding tolerance (numbers are routinely rounded for prose —
- * 0.5% relative or 0.051 absolute covers 1-2 decimal display rounding).
+ * fact within rounding tolerance (numbers are routinely rounded for prose, * 0.5% relative or 0.051 absolute covers 1-2 decimal display rounding).
  */
 export function verifyNumericProvenance(answer: string, facts: FactRecord[]): VerificationReport["numericCheck"] {
   const ledgerValues: number[] = [];

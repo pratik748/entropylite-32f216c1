@@ -86,7 +86,7 @@ async function fetchPrice(symbol: string): Promise<{ price: number; currency: st
   return null;
 }
 
-/** Sanity check for known assets — reject obviously wrong prices */
+/** Sanity check for known assets, reject obviously wrong prices */
 function sanityCheck(ticker: string, price: number): boolean {
   const checks: Record<string, { min: number; max: number }> = {
     "BTC-USD": { min: 10000, max: 500000 },

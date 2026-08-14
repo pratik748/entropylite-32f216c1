@@ -1,5 +1,5 @@
 /**
- * Market data tools — quotes, history, news, sentiment, symbol resolution.
+ * Market data tools, quotes, history, news, sentiment, symbol resolution.
  * Pure pass-throughs to existing edge functions via the governed cache.
  */
 

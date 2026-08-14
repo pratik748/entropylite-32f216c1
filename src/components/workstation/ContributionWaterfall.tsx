@@ -2,7 +2,7 @@ import { useEvidence } from "./EvidenceContext";
 import { formatMetricValue } from "@/lib/evidence/format";
 
 /**
- * How the call adds up — the recommendation's causal contributions as a
+ * How the call adds up, the recommendation's causal contributions as a
  * signed bar ledger around a zero axis. This is the decision made visible:
  * every bar is a named evidence node, its length the scored pull on the
  * call, clickable into its investigation. Bars grow once on mount; nothing
@@ -35,7 +35,7 @@ const ContributionWaterfall = ({ limit = 8 }: { limit?: number }) => {
               key={c.id}
               onClick={() => select(c.id)}
               aria-pressed={active}
-              title={`${m.label}: ${formatMetricValue(m, graph.currency)} — ${m.assessment.reason}`}
+              title={`${m.label}: ${formatMetricValue(m, graph.currency)}, ${m.assessment.reason}`}
               className={`group flex w-full items-center gap-2.5 rounded-sm px-1.5 py-[3px] text-left transition-colors duration-300 ${
                 active ? "bg-surface-3" : related ? "bg-surface-2" : "hover:bg-surface-2"
               }`}

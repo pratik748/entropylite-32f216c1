@@ -1,5 +1,5 @@
 /**
- * Portfolio analytics tools — thin wrappers over the deterministic engines
+ * Portfolio analytics tools, thin wrappers over the deterministic engines
  * in src/lib/analytics and src/lib/quant. No calculation happens here; these
  * tools assemble inputs (holdings + governed history fetches), invoke the
  * engines, and record provenance facts from the engines' MetricValues.
@@ -18,7 +18,7 @@ import {
 } from "./dataHub";
 
 function requirePositions(positions: PortfolioPosition[]): PortfolioPosition[] {
-  if (positions.length === 0) throw new Error("The portfolio is empty — nothing to analyze.");
+  if (positions.length === 0) throw new Error("The portfolio is empty, nothing to analyze.");
   return positions;
 }
 
@@ -43,7 +43,7 @@ async function holdingsReturns(positions: PortfolioPosition[], range: string) {
 
 registerTool({
   name: "portfolio.snapshot",
-  description: "Current holdings: tickers, quantities, cost basis, live P&L, value weights. Always cheap — reads application state.",
+  description: "Current holdings: tickers, quantities, cost basis, live P&L, value weights. Always cheap, reads application state.",
   category: "portfolio",
   permission: "read",
   keywords: ["holdings", "positions", "pnl", "portfolio", "weights", "conviction"],
@@ -96,7 +96,7 @@ registerTool({
         const bRets = logReturns(b.data[key]?.closes || []);
         benchmarkReturns = bRets.slice(-h.portRets.length);
       } catch {
-        caveats.push(`benchmark ${benchmark} history unavailable — benchmark stats omitted`);
+        caveats.push(`benchmark ${benchmark} history unavailable, benchmark stats omitted`);
       }
     }
     const perf = computePerformanceMetrics({
@@ -145,7 +145,7 @@ registerTool({
     if (risk.tail.evtVar99) ctx.recordFact(metricToFact("EVT VaR 99", risk.tail.evtVar99, "portfolio.risk"));
     ctx.recordFact(metricToFact("max drawdown", risk.drawdown.maxDrawdown, "portfolio.risk"));
     ctx.recordFact(metricToFact("concentration HHI", risk.concentration.hhi, "portfolio.risk"));
-    const caveats = ["sector concentration unclassified — position-level only"];
+    const caveats = ["sector concentration unclassified, position-level only"];
     if (h.missing.length) caveats.push(`excluded (no history): ${h.missing.join(", ")}`);
     if (lw) caveats.push(`Ledoit–Wolf shrinkage δ=${round(lw.delta, 3)}`);
     return { data: risk, cached: h.cached, source: `historical-prices ${params.range}`, caveats };
@@ -154,7 +154,7 @@ registerTool({
 
 registerTool({
   name: "portfolio.stress_test",
-  description: "Stress the portfolio through per-asset betas. Named historical scenarios (gfc, covid, vol2018, rate150, mild, melt) or a CUSTOM market shock — e.g. 'oil at $120' → estimate the equity-index impact and pass it as customShockPct with a describing basis.",
+  description: "Stress the portfolio through per-asset betas. Named historical scenarios (gfc, covid, vol2018, rate150, mild, melt) or a CUSTOM market shock, e.g. 'oil at $120' → estimate the equity-index impact and pass it as customShockPct with a describing basis.",
   category: "risk",
   permission: "read",
   keywords: ["stress", "scenario", "shock", "crash", "what if", "drawdown"],
@@ -192,11 +192,11 @@ registerTool({
       market = logReturns(b.data[key]?.closes || []);
     } catch { /* fall through to proxy */ }
     if (!market || market.length < 20) {
-      // Equal-weight basket proxy — disclosed, never silent.
+      // Equal-weight basket proxy, disclosed, never silent.
       const T = h.series[0].length;
       market = new Array(T).fill(0).map((_, t) => h.series.reduce((s, r) => s + r[t], 0) / h.series.length);
       betaBasis = "OLS vs equal-weight holdings basket (benchmark history unavailable)";
-      caveats.push("benchmark unavailable — betas estimated against the holdings basket itself");
+      caveats.push("benchmark unavailable, betas estimated against the holdings basket itself");
     }
     const T = Math.min(market.length, h.series[0].length);
     const betas = estimateBetas(h.series.map((s) => s.slice(-T)), market.slice(-T));
@@ -208,8 +208,8 @@ registerTool({
       betaSampleSize: T,
       betaBasis,
     });
-    ctx.recordFact(metricToFact(`stress impact — ${scenario.name}`, result.portfolioImpact, "portfolio.stress_test"));
-    ctx.recordFact({ label: `stress loss value — ${scenario.name}`, value: round(result.lossValue, 2), tool: "portfolio.stress_test" });
+    ctx.recordFact(metricToFact(`stress impact, ${scenario.name}`, result.portfolioImpact, "portfolio.stress_test"));
+    ctx.recordFact({ label: `stress loss value, ${scenario.name}`, value: round(result.lossValue, 2), tool: "portfolio.stress_test" });
     for (const p of result.positionImpacts.slice(0, 5)) {
       ctx.recordFact({ label: `${p.ticker} stress impact (β=${round(p.beta, 2)})`, value: round(p.impact * 100, 2), unit: "%", tool: "portfolio.stress_test" });
     }
@@ -245,7 +245,7 @@ registerTool({
     if (positions.length < 2) throw new Error("Optimization needs at least 2 positions.");
     const h = await holdingsReturns(positions, params.range as string);
     const lw = ledoitWolfShrinkage(h.series);
-    if (!lw) throw new Error("Covariance estimation failed — insufficient aligned history.");
+    if (!lw) throw new Error("Covariance estimation failed, insufficient aligned history.");
     const mu = h.series.map((s) => s.reduce((a, b) => a + b, 0) / s.length);
 
     const views = ((params.views as Array<{ ticker: string; expectedReturnAnnual: number; confidence: number }>) || [])
@@ -270,11 +270,11 @@ registerTool({
       constraints: params.maxWeight ? { maxWeight: params.maxWeight as number } : undefined,
       views,
     });
-    if (!result) throw new Error(`${OPTIMIZER_LABELS[params.optimizer as OptimizerId]} did not converge on this covariance — no allocation asserted.`);
+    if (!result) throw new Error(`${OPTIMIZER_LABELS[params.optimizer as OptimizerId]} did not converge on this covariance, no allocation asserted.`);
 
     result.tickers.forEach((t, i) => {
       ctx.recordFact({
-        label: `${result.label} weight — ${t}`, value: round(result.weights[i] * 100, 2), unit: "%",
+        label: `${result.label} weight, ${t}`, value: round(result.weights[i] * 100, 2), unit: "%",
         tool: "portfolio.optimize", confidence: result.diagnostics.confidence,
       });
     });

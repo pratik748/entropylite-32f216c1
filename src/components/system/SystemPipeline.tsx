@@ -10,7 +10,7 @@ import { DP_ENGINE_STATUS_KEY } from "@/components/DirectProfitMode";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 /**
- * System — the platform's data-flow architecture as a live status board.
+ * System, the platform's data-flow architecture as a live status board.
  *
  *   Market Data Layer
  *     → Quantitative Core Engine (risk · factor · MC · volatility · sentiment)
@@ -22,7 +22,7 @@ import type { PortfolioStock } from "@/components/PortfolioPanel";
  * Every figure on this board is read from the same stores the modules
  * themselves use (governor metrics, quant snapshot, opportunity repository,
  * engine breadcrumbs, trade log). Layers with no data show their designed
- * pending state — the board never invents a status.
+ * pending state, the board never invents a status.
  */
 
 interface SystemPipelineProps {
@@ -141,7 +141,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
   const navigate = useNavigate();
   const snapshot = useQuantSnapshot(stocks);
   const inst = useInstitutionalAnalytics(stocks);
-  // auto: false — the board reports the opportunity repository as it stands;
+  // auto: false, the board reports the opportunity repository as it stands;
   // it never fires the heavy engine just to render a status.
   const { opportunities, fetchedAt } = useOpportunities({}, { auto: false });
   const { entries } = useTradeLogger();
@@ -175,7 +175,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
   const wins = entries.filter((e) => e.pnl > 0).length;
 
   const pct = (n: number | null | undefined, d = 1) =>
-    n == null || !Number.isFinite(n) ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
+    n == null || !Number.isFinite(n) ? "--" : `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`;
 
   return (
     <div className="max-w-3xl mx-auto space-y-0">
@@ -183,11 +183,11 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">System</div>
         <h1 className="text-title-3 text-foreground mt-0.5">Signal path</h1>
         <p className="text-footnote text-muted-foreground mt-1 max-w-xl">
-          The platform's data flow, live. Each layer reports the same stores the modules read — nothing on this board is asserted without data behind it.
+          The platform's data flow, live. Each layer reports the same stores the modules read, nothing on this board is asserted without data behind it.
         </p>
       </div>
 
-      {/* 1 — Market Data Layer */}
+      {/* 1, Market Data Layer */}
       <LayerCard
         icon={<Database className="h-3.5 w-3.5" strokeWidth={1.75} />}
         title="Market Data Layer"
@@ -204,7 +204,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
       />
       <Connector />
 
-      {/* 2 — Quantitative Core Engine */}
+      {/* 2, Quantitative Core Engine */}
       <LayerCard
         icon={<Sigma className="h-3.5 w-3.5" strokeWidth={1.75} />}
         title="Quantitative Core Engine"
@@ -212,27 +212,27 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
         tone={snapshot.ready ? "live" : "pending"}
         statusLabel={snapshot.ready ? `σ from ${snapshot.lookbackDays}d history` : stocks.length === 0 ? "awaiting positions" : "hydrating"}
         metrics={[
-          { label: "σ annual", value: snapshot.ready ? `${(snapshot.portfolio.sigmaAnnual * 100).toFixed(1)}%` : "—" },
+          { label: "σ annual", value: snapshot.ready ? `${(snapshot.portfolio.sigmaAnnual * 100).toFixed(1)}%` : "--" },
           {
             label: "VaR 95 (1d)",
-            value: snapshot.ready && snapshot.totalValue > 0 ? `${((snapshot.portfolio.var95 / snapshot.totalValue) * 100).toFixed(1)}% of book` : "—",
+            value: snapshot.ready && snapshot.totalValue > 0 ? `${((snapshot.portfolio.var95 / snapshot.totalValue) * 100).toFixed(1)}% of book` : "--",
           },
           {
             label: "CVaR 95 (1d)",
-            value: snapshot.ready && snapshot.totalValue > 0 ? `${((snapshot.portfolio.cvar95 / snapshot.totalValue) * 100).toFixed(1)}% of book` : "—",
+            value: snapshot.ready && snapshot.totalValue > 0 ? `${((snapshot.portfolio.cvar95 / snapshot.totalValue) * 100).toFixed(1)}% of book` : "--",
           },
-          { label: "Sharpe", value: snapshot.ready ? snapshot.portfolio.sharpe.toFixed(2) : "—" },
+          { label: "Sharpe", value: snapshot.ready ? snapshot.portfolio.sharpe.toFixed(2) : "--" },
         ]}
         note={
           snapshot.ready
-            ? "Historical σ/μ/VaR/CVaR from real returns via the shared quant snapshot — the single risk source every module must consume. Monte Carlo is seeded and deterministic."
-            : "Activates when the book has positions with price history — the core never substitutes assumed volatility."
+            ? "Historical σ/μ/VaR/CVaR from real returns via the shared quant snapshot, the single risk source every module must consume. Monte Carlo is seeded and deterministic."
+            : "Activates when the book has positions with price history, the core never substitutes assumed volatility."
         }
         action={{ label: "Risk", onClick: () => onNavigate("risk") }}
       />
       <Connector />
 
-      {/* 3 — the two decision engines, side by side as in the architecture */}
+      {/* 3, the two decision engines, side by side as in the architecture */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <LayerCard
           icon={<Target className="h-3.5 w-3.5" strokeWidth={1.75} />}
@@ -244,7 +244,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
             { label: "Validated", value: String(opportunities.length) },
             {
               label: "Top conviction",
-              value: opportunities.length > 0 ? `${opportunities[0].symbol} ${(opportunities[0].confidence * 100).toFixed(0)}%` : "—",
+              value: opportunities.length > 0 ? `${opportunities[0].symbol} ${(opportunities[0].confidence * 100).toFixed(0)}%` : "--",
             },
           ]}
           note="Ranked by |edge| × model win-prob / risk. The probability is a prior map (capped at 95%), audited nightly against realized outcomes."
@@ -275,7 +275,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
       </div>
       <Connector />
 
-      {/* 4 — Institutional Workstation */}
+      {/* 4, Institutional Workstation */}
       <LayerCard
         icon={<Monitor className="h-3.5 w-3.5" strokeWidth={1.75} />}
         title="Institutional Workstation"
@@ -286,7 +286,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           { label: "Positions", value: String(stocks.length) },
           { label: "Analyzed", value: String(stocks.filter((s) => s.analysis).length) },
         ]}
-        note="Every position opens into the workstation: evidence graph, thesis breakers, statements, risk lab — the research surface both engines feed."
+        note="Every position opens into the workstation: evidence graph, thesis breakers, statements, risk lab, the research surface both engines feed."
         action={
           stocks.length > 0
             ? { label: "Workstation", onClick: () => navigate(`/company/${encodeURIComponent(stocks[0].ticker)}`) }
@@ -295,7 +295,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
       />
       <Connector />
 
-      {/* 5 — Performance Attribution */}
+      {/* 5, Performance Attribution */}
       <LayerCard
         icon={<PieChart className="h-3.5 w-3.5" strokeWidth={1.75} />}
         title="Performance Attribution"
@@ -304,16 +304,16 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
         statusLabel={attribution && attribution.positions.length > 0 ? "decomposed" : "awaiting book"}
         metrics={[
           { label: "Portfolio return", value: pct(portReturn) },
-          { label: "Top contributor", value: topContributor ? `${topContributor.ticker} ${pct(topContributor.contributionPct)}` : "—" },
-          { label: "Top detractor", value: topDetractor ? `${topDetractor.ticker} ${pct(topDetractor.contributionPct)}` : "—" },
-          { label: "Risk shares", value: attribution?.positions.some((p) => p.riskContributionPct != null) ? "Euler ∂σ" : "—" },
+          { label: "Top contributor", value: topContributor ? `${topContributor.ticker} ${pct(topContributor.contributionPct)}` : "--" },
+          { label: "Top detractor", value: topDetractor ? `${topDetractor.ticker} ${pct(topDetractor.contributionPct)}` : "--" },
+          { label: "Risk shares", value: attribution?.positions.some((p) => p.riskContributionPct != null) ? "Euler ∂σ" : "--" },
         ]}
         note="Contribution = weight × return, exactly additive to the portfolio return. Risk shares are the Euler decomposition of portfolio σ from the real covariance matrix."
         action={{ label: "Augment", onClick: () => onNavigate("augment") }}
       />
       <Connector />
 
-      {/* 6 — Continuous Feedback */}
+      {/* 6, Continuous Feedback */}
       <LayerCard
         icon={<RefreshCw className="h-3.5 w-3.5" strokeWidth={1.75} />}
         title="Continuous Feedback"
@@ -322,7 +322,7 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
         statusLabel={entries.length > 0 ? `${entries.length} logged trade${entries.length === 1 ? "" : "s"}` : "no closed loops yet"}
         metrics={[
           { label: "Trades logged", value: String(entries.length) },
-          { label: "Wins", value: entries.length > 0 ? `${wins}/${entries.length}` : "—" },
+          { label: "Wins", value: entries.length > 0 ? `${wins}/${entries.length}` : "--" },
           { label: "Lessons", value: String(lessons.length) },
         ]}
         note="Every directional signal is logged and marked to market T+5 by the nightly walk-forward job; the fitted calibration feeds back into the ensemble's win-probabilities. Trade lessons close the human loop."

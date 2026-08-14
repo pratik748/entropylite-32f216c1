@@ -1,13 +1,12 @@
 /**
- * Foresight voice — speech output (Web Speech synthesis) and dictation input
+ * Foresight voice, speech output (Web Speech synthesis) and dictation input
  * (Web Speech recognition). Zero dependencies, degrades silently where the
  * platform lacks support (feature flags are exported so the UI can hide the
  * controls instead of showing dead buttons).
  *
  * Output voice selection prefers the most natural voice the device ships:
  * Siri / "Natural" / Google voices first, then any local en-* voice. The
- * spoken register matches Foresight's written one — measured and compact —
- * via a slightly lowered rate and pitch.
+ * spoken register matches Foresight's written one, measured and compact, * via a slightly lowered rate and pitch.
  */
 
 const VOICE_PREF_KEY = "foresight.voice.enabled";
@@ -64,12 +63,12 @@ export function setVoiceEnabled(on: boolean): void {
   try {
     localStorage.setItem(VOICE_PREF_KEY, on ? "1" : "0");
   } catch {
-    // Private mode — preference just won't persist.
+    // Private mode, preference just won't persist.
   }
   if (!on) stopSpeaking();
 }
 
-/** Ranked substrings — first match wins. Covers iOS/macOS, Chrome, Edge, Android. */
+/** Ranked substrings, first match wins. Covers iOS/macOS, Chrome, Edge, Android. */
 const PREFERRED_VOICES = [
   "siri",
   "natural",
@@ -102,7 +101,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
   return cachedVoice;
 }
 
-// Voice list loads asynchronously on some browsers — refresh the cache once ready.
+// Voice list loads asynchronously on some browsers, refresh the cache once ready.
 if (speechSupported) {
   window.speechSynthesis.onvoiceschanged = () => {
     cachedVoice = null;
@@ -123,7 +122,7 @@ export function toSpeakable(text: string): string {
 }
 
 /**
- * Speak a line, cancelling anything already queued — Foresight speaks its
+ * Speak a line, cancelling anything already queued, Foresight speaks its
  * latest state, it does not backlog. No-op when voice is off/unsupported.
  */
 export function speak(text: string): void {
@@ -153,7 +152,7 @@ export interface Recognizer {
 }
 
 export interface RecognizerCallbacks {
-  /** Streaming partial transcript — update the input draft live. */
+  /** Streaming partial transcript, update the input draft live. */
   onInterim: (text: string) => void;
   /** Final transcript for the utterance. */
   onFinal: (text: string) => void;
@@ -190,7 +189,7 @@ export function createRecognizer(cb: RecognizerCallbacks): Recognizer | null {
       try {
         rec.start();
       } catch {
-        // start() throws if already running — harmless.
+        // start() throws if already running, harmless.
       }
     },
     stop: () => {

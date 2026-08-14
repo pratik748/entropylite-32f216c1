@@ -117,7 +117,7 @@ serve(async (req) => {
     const categories = body.categories || ["macro", "geopolitical", "crypto", "elections", "tech"];
     const limit = body.limit || 50;
 
-    // Use Gamma API directly — it has question/slug fields
+    // Use Gamma API directly, it has question/slug fields
     const gammaUrl = `https://gamma-api.polymarket.com/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
     const gammaRes = await fetch(gammaUrl);
     let markets: any[] = [];

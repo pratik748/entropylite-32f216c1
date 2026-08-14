@@ -1,4 +1,4 @@
-// TWRD ingest — cleaners → TRUTH → Reality store. Accepts raw claims or
+// TWRD ingest, cleaners → TRUTH → Reality store. Accepts raw claims or
 // engine-shaped payloads (news/flows/sentiment) and persists scored claims.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";

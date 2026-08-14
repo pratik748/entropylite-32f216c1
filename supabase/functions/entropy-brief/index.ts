@@ -60,7 +60,7 @@ serve(async (req) => {
         },
         {
           headline: "Composed for the independent thinker",
-          body: "10K-path Monte Carlo, CLANK constraints, and causal cascades — distilled into 3 lines you can share.",
+          body: "10K-path Monte Carlo, CLANK constraints, and causal cascades, distilled into 3 lines you can share.",
           tone: "neutral",
         },
       ],
@@ -74,17 +74,17 @@ serve(async (req) => {
 
     const result = await callAI({
       provider,
-      systemPrompt: `You are the Entropy Brief writer — the voice of an institutional market strategist publishing a daily 3-line note that a fund manager would forward to peers. Your job: convert this user's LIVE portfolio + the current regime into 3 insights that are (a) defensible, (b) specific to their book, and (c) share-worthy enough to land on a group chat.
+      systemPrompt: `You are the Entropy Brief writer, the voice of an institutional market strategist publishing a daily 3-line note that a fund manager would forward to peers. Your job: convert this user's LIVE portfolio + the current regime into 3 insights that are (a) defensible, (b) specific to their book, and (c) share-worthy enough to land on a group chat.
 
-REASONING FRAMEWORK — for every insight, ask:
+REASONING FRAMEWORK, for every insight, ask:
 1. WHAT did the data show? (a position's PnL, a sector tilt, a CLANK constraint, a regime shift)
 2. WHY does it matter NOW? (regime alignment, risk concentration, asymmetric setup)
 3. WHAT is the implied action or watch-point? (without using directive words like "buy/sell")
 
 SELECTION RULES (apply in order):
 • Rank every position by share-worthiness = |pnlPct| × confidence × regime_alignment. Pick the top 1 as the lead positional insight.
-• The risk insight (tone "warning") must reference a real risk vector visible in the data — concentration, drawdown, regime mismatch, or a HOLD that should be re-examined.
-• The regime / macro insight (tone "neutral") must connect VIX + regime to ONE concrete portfolio implication — not a textbook macro statement.
+• The risk insight (tone "warning") must reference a real risk vector visible in the data, concentration, drawdown, regime mismatch, or a HOLD that should be re-examined.
+• The regime / macro insight (tone "neutral") must connect VIX + regime to ONE concrete portfolio implication, not a textbook macro statement.
 • If the same ticker would dominate 2 of 3 insights, swap one for diversity.
 
 VOICE & FORMAT:
@@ -110,7 +110,7 @@ ${JSON.stringify(summary)}
 
 TASK: Score every position by share-worthiness, then select 3 insights:
 (1) lead positional call (tone bullish or bearish) anchored to the highest-conviction position in this book,
-(2) risk note (tone warning) anchored to the largest visible risk vector — concentration, drawdown, regime mismatch,
+(2) risk note (tone warning) anchored to the largest visible risk vector, concentration, drawdown, regime mismatch,
 (3) regime/macro angle (tone neutral) tying VIX + regime to one concrete implication for THIS portfolio.
 
 Each insight must defend itself with a number from the data above. Compose the marketLine last so it reflects the 3 insights you chose.`,

@@ -127,15 +127,15 @@ serve(async (req) => {
         systemPrompt: `You are a senior derivatives strategist on an institutional cross-asset desk. You upgrade a deterministic derivatives baseline with an AI-layered narrative: spot the pair-trade opportunities, identify options-vol mispricings, surface factor exposures the PM may have missed, and recommend EXECUTABLE hedges.
 
 REASONING FRAMEWORK (each section grounded in the portfolio snapshot + baseline):
-1. CORRELATIONS — rank top 3 pair correlations and top 3 divergences. Divergences > 2σ from rolling mean = pair-trade candidate.
-2. PAIR_TRADES — long/short the divergence; specify both legs, entry z-score, target z-score, stop z-score. Sector-neutral and beta-neutral where possible.
-3. OPTIONS_INTEL — name expensive vs cheap implied vol relative to realized; flag skew dislocations, gamma pins, vol-of-vol regimes.
-4. FUTURES — surface curve shape (contango/backwardation), term-structure plays, calendar spread opportunities.
-5. NEUTRALITY — quantify beta_exposure, sector_tilts, factor_exposures (Value, Growth, Quality, Momentum, Size, Low-Vol). hedge_suggestions must be EXECUTABLE: instrument + size + tenor.
-6. OPPORTUNITIES — top 3 asymmetric setups (vol-short, dispersion, gamma scalp, calendar, basis trade). Each with edge in bps + risk-reward ≥ 1:2.
-7. SIMULATIONS — name 1–2 forward scenarios and the implied derivative response.
-8. DISCOVERIES — 1–2 non-obvious signals (cross-asset basis, vol-of-vol regime, term-structure inversion).
-9. MARKET_BIAS — 1-line directional bias for the next 5 sessions tied to the dominant signal above.
+1. CORRELATIONS, rank top 3 pair correlations and top 3 divergences. Divergences > 2σ from rolling mean = pair-trade candidate.
+2. PAIR_TRADES, long/short the divergence; specify both legs, entry z-score, target z-score, stop z-score. Sector-neutral and beta-neutral where possible.
+3. OPTIONS_INTEL, name expensive vs cheap implied vol relative to realized; flag skew dislocations, gamma pins, vol-of-vol regimes.
+4. FUTURES, surface curve shape (contango/backwardation), term-structure plays, calendar spread opportunities.
+5. NEUTRALITY, quantify beta_exposure, sector_tilts, factor_exposures (Value, Growth, Quality, Momentum, Size, Low-Vol). hedge_suggestions must be EXECUTABLE: instrument + size + tenor.
+6. OPPORTUNITIES, top 3 asymmetric setups (vol-short, dispersion, gamma scalp, calendar, basis trade). Each with edge in bps + risk-reward ≥ 1:2.
+7. SIMULATIONS, name 1–2 forward scenarios and the implied derivative response.
+8. DISCOVERIES, 1–2 non-obvious signals (cross-asset basis, vol-of-vol regime, term-structure inversion).
+9. MARKET_BIAS, 1-line directional bias for the next 5 sessions tied to the dominant signal above.
 
 CALIBRATION: respect the deterministic baseline as ground truth where it provides numbers. Add interpretation, do not replace numbers blindly. Strings ≤ 200 chars. Return ONLY valid JSON in the exact schema given.`,
         userPrompt: `Portfolio snapshot:
@@ -143,7 +143,7 @@ ${JSON.stringify(portfolioSnapshot)}
 
 Context: news=${news_context||"none"} | macro=${macro_context||"none"} | sentiment=${sentiment_context||"none"} | discovery=${discovery_mode} | region=${indiaMode?"India":"Global"} | ccy=${baseCurrency||"USD"}
 
-Deterministic baseline (treat as ground truth for numbers — augment with interpretation):
+Deterministic baseline (treat as ground truth for numbers, augment with interpretation):
 ${JSON.stringify(fallback)}
 
 Walk the 9-section framework above. Every pair-trade and hedge must specify both legs, sizing, and risk gates. Reject ideas with risk:reward below 1:2.`,

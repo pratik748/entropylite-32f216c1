@@ -19,7 +19,7 @@ import { WORKSPACES, type SectionDef, type WorkspaceDef } from "./registry";
  * gap); once every relevant input has settled and nothing can populate
  * the module, the section is withdrawn from navigation rather than shown
  * as an empty shell. Sections with deterministic fallbacks keep their
- * place as long as the fallback is computable — the balance sheet, for
+ * place as long as the fallback is computable, the balance sheet, for
  * example, survives a missing statement feed because capital structure
  * derives from market cap ÷ P/B and D/E in the analysis feed.
  */

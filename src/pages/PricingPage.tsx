@@ -7,7 +7,7 @@ import { PageHeader, InkButton } from "@/components/marketing/Section";
 
 const FEATURES = [
   "Full market-intelligence terminal",
-  "Quantitative risk engine — VaR, CVaR, Monte Carlo",
+  "Quantitative risk engine, VaR, CVaR, Monte Carlo",
   "CLANK structural constraint detection",
   "Geopolitical monitoring with market-impact scoring",
   "Statistical arbitrage and cointegration analysis",
@@ -22,7 +22,7 @@ export default function PricingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Pricing | Entropy — Founding access";
+    document.title = "Pricing | Entropy, Founding access";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Founding access to Entropy. Full institutional-grade market intelligence, quantitative risk analytics, and probabilistic scenario systems.");
   }, []);
@@ -53,8 +53,7 @@ export default function PricingPage() {
               <span className="mkt-label text-[9px] text-white/35">USD / month · founding period</span>
             </div>
             <p className="text-[13.5px] text-white/50 leading-relaxed mt-6 max-w-sm">
-              Early-access terms. Pricing increases at general availability —
-              founding members are grandfathered for life.
+              Early-access terms. Pricing increases at general availability, founding members are grandfathered for life.
             </p>
             <div className="mt-10">
               <InkButton onClick={() => navigate("/dashboard")} className="w-full sm:w-auto">

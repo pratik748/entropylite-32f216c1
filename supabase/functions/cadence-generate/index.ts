@@ -1,4 +1,4 @@
-// Cadence — daily research stream generator.
+// Cadence, daily research stream generator.
 // Pipeline: pick topic → parallel multi-provider research → critic/synthesis pass
 // → AI-generated conceptual diagram (nano-banana) → persist row.
 // No auth required: invoked by pg_cron and (optionally) by an admin key.
@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Curated quant/finance concept bank — system picks the next unused one daily.
+// Curated quant/finance concept bank, system picks the next unused one daily.
 // When fewer than 5 remain, AI proposes new ones from broader domain.
 const TOPIC_BANK: Array<{ topic: string; discipline: string }> = [
   { topic: "Kelly Criterion", discipline: "Information Theory · Capital Allocation" },
@@ -97,14 +97,14 @@ async function pickNextTopic(supabase: ReturnType<typeof createClient>): Promise
   } catch (e) {
     console.warn("AI topic proposal failed:", e);
   }
-  // Hard fallback — recycle oldest
+  // Hard fallback, recycle oldest
   return { ...TOPIC_BANK[0], isFromBank: true };
 }
 
 // ---------------- research pipeline ----------------
 
 const RESEARCH_SYSTEM = `You are a senior quantitative researcher at a top hedge fund (Renaissance / Citadel / Two Sigma caliber).
-You are writing a research note for serious practitioners — quants, portfolio managers, risk officers.
+You are writing a research note for serious practitioners, quants, portfolio managers, risk officers.
 
 Tone:
 - Precise, dense, intellectually honest. Like a Marcos López de Prado paper or a Hull chapter.
@@ -114,9 +114,9 @@ Tone:
 You will be told a single concept. Produce the deepest possible note covering:
 - Why it matters in real money management (concrete trading consequence)
 - Mathematical core with rigorous formulas (use unicode math: μ σ² ρ Σ ∂ ∫ ∇ ≤ ≥ ≈)
-- Failure modes and limits — the things practitioners actually get burned by
+- Failure modes and limits, the things practitioners actually get burned by
 
-Output STRICT JSON only — no preamble, no markdown fences.`;
+Output STRICT JSON only, no preamble, no markdown fences.`;
 
 function researchPrompt(topic: string, discipline: string): string {
   return `CONCEPT: ${topic}
@@ -129,7 +129,7 @@ Write a deep research note. Output STRICT JSON matching this schema EXACTLY:
 
   "read_minutes": 7,
 
-  "why_it_matters": "180-260 words. Why a serious practitioner cares. Open with the concrete trading consequence — what blows up if you ignore this, what edge it unlocks. Then the historical context (who developed it, what problem it solved). End with how it lands inside Entropy Lite (a quant intelligence platform with VaR/CVaR/HMM regimes/strategy lab). Single paragraph, no bullets.",
+  "why_it_matters": "180-260 words. Why a serious practitioner cares. Open with the concrete trading consequence, what blows up if you ignore this, what edge it unlocks. Then the historical context (who developed it, what problem it solved). End with how it lands inside Entropy Lite (a quant intelligence platform with VaR/CVaR/HMM regimes/strategy lab). Single paragraph, no bullets.",
 
   "inside_caption": "Short caption (max 12 words) for the conceptual diagram, e.g. 'Forward-backward smoothing over a 3-state regime model'.",
 
@@ -139,7 +139,7 @@ Write a deep research note. Output STRICT JSON matching this schema EXACTLY:
     {
       "heading": "First sub-section heading (e.g. 'The classical formulation')",
       "body": "120-180 words explaining this slice of the math. Define all symbols. Single paragraph.",
-      "equation": "The actual equation in unicode math. Multi-line allowed with \\n. Be RIGOROUS — no hand-waving."
+      "equation": "The actual equation in unicode math. Multi-line allowed with \\n. Be RIGOROUS, no hand-waving."
     },
     {
       "heading": "Second sub-section heading",
@@ -148,22 +148,22 @@ Write a deep research note. Output STRICT JSON matching this schema EXACTLY:
     },
     {
       "heading": "Third sub-section heading (estimation, computation, or generalization)",
-      "body": "120-180 words. Address how it's actually computed in production — gotchas, numerical issues.",
+      "body": "120-180 words. Address how it's actually computed in production, gotchas, numerical issues.",
       "equation": "Optional. May be omitted if the section is purely descriptive."
     }
   ],
 
   "failure_modes": [
-    "Failure mode 1 — 1-2 sentences, intellectually honest. Name the assumption that breaks and the consequence.",
-    "Failure mode 2 — same.",
-    "Failure mode 3 — same.",
-    "Failure mode 4 — same."
+    "Failure mode 1, 1-2 sentences, intellectually honest. Name the assumption that breaks and the consequence.",
+    "Failure mode 2, same.",
+    "Failure mode 3, same.",
+    "Failure mode 4, same."
   ]
 }
 
 CRITICAL RULES:
 - Equations must be REAL math, not pseudo-prose. Use proper symbols.
-- "why_it_matters" must contain a concrete consequence — never vague claims like 'helps with risk'.
+- "why_it_matters" must contain a concrete consequence, never vague claims like 'helps with risk'.
 - "inside_annotation" must reference Entropy Lite specifically.
 - 3 mathematical_core sections. 4 failure_modes.
 - Output ONLY the JSON object. No markdown, no commentary.`;
@@ -173,10 +173,10 @@ const CRITIC_SYSTEM = `You are a brutally honest senior reviewer (think: Andrew 
 You receive 2-3 candidate research notes on the same concept from different AI authors. Your job:
 
 1. Cross-check the math. If two drafts disagree on a formula, identify the correct one.
-2. Pick the strongest framing for "why_it_matters" — the one with the sharpest concrete consequence.
-3. Pick the most rigorous "mathematical_core" — fewer hand-waves, cleaner derivations.
+2. Pick the strongest framing for "why_it_matters", the one with the sharpest concrete consequence.
+3. Pick the most rigorous "mathematical_core", fewer hand-waves, cleaner derivations.
 4. Merge the best "failure_modes" across drafts (de-duplicate, keep the most precise).
-5. Tighten the prose — remove hedging, generic phrasing, marketing language.
+5. Tighten the prose, remove hedging, generic phrasing, marketing language.
 6. Verify the "inside_annotation" reads like a real product trace, not a brochure.
 
 You output a SINGLE final note in the same JSON schema. This is the version that will be published. Be ruthless.`;
@@ -283,7 +283,7 @@ async function generateResearch(topic: string, discipline: string): Promise<{ en
         finalEntry = merged;
         console.log(`[research] Critic synthesis succeeded via ${criticRes.provider}`);
       } else {
-        console.warn("[research] Critic returned malformed JSON — falling back to best raw draft");
+        console.warn("[research] Critic returned malformed JSON, falling back to best raw draft");
       }
     } catch (e) {
       console.warn("[research] Critic pass failed, using best draft:", (e as Error).message);
@@ -308,7 +308,7 @@ async function generateResearch(topic: string, discipline: string): Promise<{ en
 // ---------------- diagram generation (nano-banana) ----------------
 
 async function generateDiagram(_topic: string, _caption: string): Promise<string | null> {
-  // Image generation removed — Mistral has no image-generation endpoint.
+  // Image generation removed, Mistral has no image-generation endpoint.
   // Cadence entries render without a diagram (UI handles null gracefully).
   return null;
 }
@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
 
     const startedAt = Date.now();
     const { topic, discipline, isFromBank } = await pickNextTopic(supabase);
-    console.log(`[cadence] Picked topic: ${topic} (${discipline}) — fromBank=${isFromBank}`);
+    console.log(`[cadence] Picked topic: ${topic} (${discipline}), fromBank=${isFromBank}`);
 
     const { entry, providersUsed } = await generateResearch(topic, discipline);
     console.log(`[cadence] Research complete (${providersUsed.join(", ")}) in ${Date.now() - startedAt}ms`);
@@ -372,9 +372,9 @@ Deno.serve(async (req) => {
     let diagram: string | null = null;
     try {
       diagram = await generateDiagram(topic, entry.inside_caption ?? topic);
-      console.log(`[cadence] Diagram step done — image=${diagram ? "yes" : "null"}`);
+      console.log(`[cadence] Diagram step done, image=${diagram ? "yes" : "null"}`);
     } catch (e) {
-      console.warn("[cadence] Diagram threw — continuing without image:", (e as Error).message);
+      console.warn("[cadence] Diagram threw, continuing without image:", (e as Error).message);
       diagram = null;
     }
 

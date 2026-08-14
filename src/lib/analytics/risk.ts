@@ -1,5 +1,5 @@
 /**
- * Risk analytics — drawdown structure, concentration, correlation, tails,
+ * Risk analytics, drawdown structure, concentration, correlation, tails,
  * and a stress engine with NO hardcoded portfolio impacts.
  * ─────────────────────────────────────────────────────────────────────────
  * Stress scenarios are defined as market-factor shocks (the shock sizes are
@@ -9,7 +9,7 @@
  *     ΔP/P = Σᵢ wᵢ · βᵢ · shock_mkt
  *
  * Historical replay finds the worst realized h-day window in the portfolio's
- * actual return series — the portfolio's own history, not an assumption.
+ * actual return series, the portfolio's own history, not an assumption.
  * Recovery estimates come from the portfolio's realized drawdown episodes.
  */
 
@@ -205,7 +205,7 @@ export function computeRiskMetrics(opts: {
 
 /**
  * Scenario library. `marketShock` is the documented market-index move of the
- * episode (a historical fact, cited in `basis`) — the PORTFOLIO impact is
+ * episode (a historical fact, cited in `basis`), the PORTFOLIO impact is
  * always computed from real per-asset betas, never stored.
  */
 export const STRESS_SCENARIOS: StressScenario[] = [

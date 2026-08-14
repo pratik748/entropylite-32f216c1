@@ -1,4 +1,4 @@
-// Discovery v2 — shared types.
+// Discovery v2, shared types.
 // Pure data shapes; no runtime code. See docs/DISCOVERY_V2_IMPLEMENTATION.md.
 
 /** One engine's return forecast over a common horizon. */
@@ -17,7 +17,7 @@ export interface OpportunityFactors {
   eNet: number;
   /** P(real) × FSS ∈ [0,1] */
   robustness: number;
-  /** model P(direction correct) ∈ [0,1] — prior Platt map, audited nightly, not an empirical frequency */
+  /** model P(direction correct) ∈ [0,1], prior Platt map, audited nightly, not an empirical frequency */
   conviction: number;
   /** payoff asymmetry 2Ω/(1+Ω) ∈ [0,2]; 1 = symmetric */
   asymmetry: number;

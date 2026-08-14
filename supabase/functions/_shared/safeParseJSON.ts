@@ -77,7 +77,7 @@ export function safeParseJSON(raw: string): any {
     .replace(/:\s*approximately\s+(\d)/gi, ": $1")
     .replace(/[\x00-\x1F\x7F]/g, " ")
     // Fix unquoted property names: { key: → { "key":
-    // (Do NOT blindly replace single quotes — that breaks apostrophes in text)
+    // (Do NOT blindly replace single quotes, that breaks apostrophes in text)
     .replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":');
 
   // 6. Try parse after cleanup

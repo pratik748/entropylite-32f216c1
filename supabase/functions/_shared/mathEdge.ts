@@ -1,4 +1,4 @@
-// Real-Math Edge module — institutional quant primitives ported from
+// Real-Math Edge module, institutional quant primitives ported from
 // `src/lib/quant/institutional.ts` for use inside edge functions.
 // All functions are pure, deterministic, dependency-free.
 //
@@ -80,7 +80,7 @@ export function cfExpectedR(opts: {
   return { expectedR, rDownAdj, tailMultiplier };
 }
 
-// ── §1 Cointegration — Engle-Granger lite ──────────────────────────────────
+// ── §1 Cointegration, Engle-Granger lite ──────────────────────────────────
 
 /** ADF-style stationarity test (no lags), MacKinnon critical values. */
 function adfNoLag(residuals: number[]): { tStat: number; stationary: boolean } {

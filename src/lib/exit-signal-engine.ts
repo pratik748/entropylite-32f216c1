@@ -5,11 +5,11 @@
  * (or cut a loss) using REAL historical statistics from the quant engine.
  *
  * Triggers (first one wins):
- *   1. chandelier  — price < peak − k·ATR(14)
- *   2. drawdown    — (peak − price)/peak ≥ max(0.5·σ_daily·√5, 1.5%)
- *   3. momentum    — last log-return z-score < −1.0 AND 5-day slope < 0
- *   4. risk        — analysis.riskScore ≥ 75 AND in profit
- *   5. ai          — analysis.suggestion contains "sell" or "exit"
+ *   1. chandelier, price < peak − k·ATR(14)
+ *   2. drawdown, (peak − price)/peak ≥ max(0.5·σ_daily·√5, 1.5%)
+ *   3. momentum, last log-return z-score < −1.0 AND 5-day slope < 0
+ *   4. risk, analysis.riskScore ≥ 75 AND in profit
+ *   5. ai, analysis.suggestion contains "sell" or "exit"
  *
  * The function is pure: peak tracking is owned by the caller.
  */
@@ -34,7 +34,7 @@ export interface ExitInputs {
   riskScore?: number;
   suggestion?: string;
   aggressiveness?: "conservative" | "balanced" | "aggressive";
-  minProfitPct?: number;       // default 0.5 — lock only fires after profit cushion
+  minProfitPct?: number;       // default 0.5, lock only fires after profit cushion
 }
 
 function atr(highs: number[], lows: number[], closes: number[], period = 14): number {
@@ -76,7 +76,7 @@ export function evaluateExit(input: ExitInputs): ExitDecision | null {
   const pnlPct = ((currentPrice - buyPrice) / buyPrice) * 100;
   const peakPnlPct = ((peakPrice - buyPrice) / buyPrice) * 100;
 
-  // Need a profit cushion to lock — but allow risk/ai signals to trigger even at small loss.
+  // Need a profit cushion to lock, but allow risk/ai signals to trigger even at small loss.
   const inProfit = pnlPct >= minProfitPct;
 
   // 5. AI sell suggestion

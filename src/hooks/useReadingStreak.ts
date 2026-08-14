@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Reading streak — the habit primitive behind the Daily Briefing.
+ * Reading streak, the habit primitive behind the Daily Briefing.
  *
  * The streak rewards *reviewing intelligence*, never trading (Doctrine P1).
  * It advances at most once per local calendar day, the first time the user

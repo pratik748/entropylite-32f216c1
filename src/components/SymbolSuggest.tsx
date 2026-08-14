@@ -51,7 +51,7 @@ export function useSymbolSuggest(
 
   useEffect(() => setActiveIdx(0), [value]);
 
-  // Debounced remote search — Yahoo Finance via edge function. Lets the user
+  // Debounced remote search, Yahoo Finance via edge function. Lets the user
   // pick ANY listed symbol globally (small-cap Indian, ADRs, foreign exchanges)
   // not just the curated directory.
   useEffect(() => {

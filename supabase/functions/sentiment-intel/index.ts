@@ -312,7 +312,7 @@ serve(async (req) => {
       totalWeight += 0.15;
     }
     if (wikiAttention) {
-      // Attention itself is neutral — high attention with positive market = bullish, with negative = amplifier
+      // Attention itself is neutral, high attention with positive market = bullish, with negative = amplifier
       const attentionBias = (compositeScore > 0 ? 1 : compositeScore < 0 ? -1 : 0) * Math.min(30, wikiAttention.attentionScore);
       compositeScore += attentionBias * 0.10; // 10%
       totalWeight += 0.10;

@@ -21,7 +21,7 @@ registerTool({
     quantity: { type: "number", required: true, min: 0.000001 },
   },
   confirmationPreview: (p) =>
-    `Add ${p.ticker} to the portfolio — ${p.quantity} @ ${p.buyPrice}`,
+    `Add ${p.ticker} to the portfolio, ${p.quantity} @ ${p.buyPrice}`,
   execute: async (params, ctx) => {
     const ticker = normalizeUserTicker(params.ticker as string);
     if (!ticker) throw new Error(`unrecognized ticker: ${params.ticker}`);

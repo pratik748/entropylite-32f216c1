@@ -1,5 +1,5 @@
 /**
- * Insight synthesis — deterministic rules over computed metrics only.
+ * Insight synthesis, deterministic rules over computed metrics only.
  * ───────────────────────────────────────────────────────────────────
  * Every insight is generated from a MetricValue that already carries its
  * provenance; the rule threshold is stated in the insight text. There is no
@@ -40,7 +40,7 @@ export function synthesizeInsights(opts: {
     const sharpe = perf.sharpe;
     if (sharpe.value < 0) {
       out.push(fromMetric("perf-sharpe-neg", "action", "Negative risk-adjusted return",
-        `Sharpe ratio is ${sharpe.value.toFixed(2)} over ${sharpe.provenance.sampleSize} trading days — the portfolio has not compensated for the risk taken relative to the risk-free rate.`,
+        `Sharpe ratio is ${sharpe.value.toFixed(2)} over ${sharpe.provenance.sampleSize} trading days, the portfolio has not compensated for the risk taken relative to the risk-free rate.`,
         "Review the loss drivers in the attribution section before adding risk.", sharpe));
     } else if (sharpe.value >= 1) {
       out.push(fromMetric("perf-sharpe-strong", "info", "Strong risk-adjusted performance",
@@ -60,7 +60,7 @@ export function synthesizeInsights(opts: {
       }
       if (b.downCapture.value > 1.1 && b.upCapture.value < b.downCapture.value) {
         out.push(fromMetric("perf-capture-asym", "watch", "Unfavorable capture asymmetry",
-          `Down-capture of ${(b.downCapture.value * 100).toFixed(0)}% exceeds up-capture of ${(b.upCapture.value * 100).toFixed(0)}% vs ${b.benchmarkTicker} — the portfolio amplifies benchmark losses more than gains.`,
+          `Down-capture of ${(b.downCapture.value * 100).toFixed(0)}% exceeds up-capture of ${(b.upCapture.value * 100).toFixed(0)}% vs ${b.benchmarkTicker}, the portfolio amplifies benchmark losses more than gains.`,
           "Consider reducing high-beta positions or adding defensive weight.", b.downCapture));
       }
     }
@@ -81,7 +81,7 @@ export function synthesizeInsights(opts: {
 
     if (risk.correlation.pc1Share && risk.correlation.pc1Share.value > 0.55) {
       out.push(fromMetric("risk-pc1", "action", "Systemic factor dominance",
-        `${pct(risk.correlation.pc1Share.value, 0)} of portfolio variance sits in the first principal component — holdings move together and diversification is largely illusory.`,
+        `${pct(risk.correlation.pc1Share.value, 0)} of portfolio variance sits in the first principal component, holdings move together and diversification is largely illusory.`,
         "Add assets with low correlation to the existing cluster, or reduce gross exposure.", risk.correlation.pc1Share));
     }
 
@@ -104,12 +104,12 @@ export function synthesizeInsights(opts: {
     const t = risk.tail;
     if (t.evtVar99 && t.var99.value > 0 && t.evtVar99.value > t.var99.value * 1.3) {
       out.push(fromMetric("risk-evt", "watch", "Fat tail beyond the sample",
-        `EVT-extrapolated 99% VaR (${pct(t.evtVar99.value)}) is ${(t.evtVar99.value / t.var99.value).toFixed(1)}× the empirical 99% VaR (${pct(t.var99.value)}) — the historical sample understates tail risk.`,
+        `EVT-extrapolated 99% VaR (${pct(t.evtVar99.value)}) is ${(t.evtVar99.value / t.var99.value).toFixed(1)}× the empirical 99% VaR (${pct(t.var99.value)}), the historical sample understates tail risk.`,
         "Size positions against the EVT number, not the empirical percentile.", t.evtVar99));
     }
     if (t.skewness.value < -0.5) {
       out.push(fromMetric("risk-skew", "info", "Negatively skewed returns",
-        `Return skewness of ${t.skewness.value.toFixed(2)} with excess kurtosis ${t.excessKurtosis.value.toFixed(1)} — losses cluster larger than gains.`,
+        `Return skewness of ${t.skewness.value.toFixed(2)} with excess kurtosis ${t.excessKurtosis.value.toFixed(1)}, losses cluster larger than gains.`,
         null, t.skewness));
     }
   }
@@ -138,7 +138,7 @@ export function synthesizeInsights(opts: {
     }
     if (exposure.marketBeta && exposure.marketBeta.value > 1.3) {
       out.push(fromMetric("exp-beta", "watch", "High market beta",
-        `Value-weighted portfolio beta of ${exposure.marketBeta.value.toFixed(2)} — expect ~${exposure.marketBeta.value.toFixed(1)}× market moves in both directions.`,
+        `Value-weighted portfolio beta of ${exposure.marketBeta.value.toFixed(2)}, expect ~${exposure.marketBeta.value.toFixed(1)}× market moves in both directions.`,
         "Stress results scale with this beta; see scenario analysis.", exposure.marketBeta));
     }
   }
@@ -160,7 +160,7 @@ export function synthesizeInsights(opts: {
         id: "attr-worst", severity: "watch", title: "Largest detractor",
         statement: `${worst.ticker} cost ${Math.abs(worst.contributionPct).toFixed(1)}pp of portfolio return (weight ${pct(worst.weight)}, position return ${worst.returnPct.toFixed(1)}%).`,
         recommendation: worst.riskContributionPct != null && worst.riskContributionPct > worst.weight * 1.5
-          ? `It also consumes ${pct(worst.riskContributionPct)} of portfolio risk — outsized on both dimensions.`
+          ? `It also consumes ${pct(worst.riskContributionPct)} of portfolio risk, outsized on both dimensions.`
           : null,
         provenance: { source: "portfolio-state", calculation: "weight × position return vs cost basis", sampleSize: attribution.positions.length, confidence: "high" },
       });

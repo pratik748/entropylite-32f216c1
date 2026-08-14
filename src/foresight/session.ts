@@ -2,7 +2,7 @@
  * Conversational session state.
  *
  * Keeps what the planner needs to resolve "run that again", "compare it
- * with yesterday", "explain the second point" — entity slots, a compacted
+ * with yesterday", "explain the second point", entity slots, a compacted
  * turn ledger, and the last full reasoning graph (kept client-side so
  * follow-ups never re-fetch what is already known).
  */

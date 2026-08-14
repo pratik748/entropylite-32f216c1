@@ -22,7 +22,7 @@ const CASE_EDGE: Record<ScenarioCase["id"], string> = {
 
 const caseCard = "rounded-sm border border-border/80 bg-card p-3.5";
 
-/** Thesis workspace — where all evidence converges. One view per section. */
+/** Thesis workspace, where all evidence converges. One view per section. */
 const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { graph, synthesis, data } = useEvidence();
 
@@ -31,7 +31,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
       <SectionShell workspace={workspace} section={section}>
         <Block title="Synthesis pending">
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            The thesis is computed from the evidence graph, and the graph is still assembling — the
+            The thesis is computed from the evidence graph, and the graph is still assembling, the
             feeds retry automatically and this page populates the moment evidence lands.
           </p>
         </Block>
@@ -87,7 +87,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             ))}
           </div>
           <p className="mt-2.5 text-[11px] leading-relaxed text-muted-foreground/70">
-            Each line is a live evidence node — select it for the definition, trend and its exact pull
+            Each line is a live evidence node, select it for the definition, trend and its exact pull
             on the call. When one flips grade, the thesis re-synthesizes automatically.
           </p>
         </Block>
@@ -156,7 +156,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
             {ev.toFixed(1)}%
           </span>{" "}
           <span className="text-muted-foreground">
-            across the three cases at current probabilities — the single number the sizing decision hangs on.
+            across the three cases at current probabilities, the single number the sizing decision hangs on.
           </span>
         </p>
       </Block>
@@ -238,7 +238,7 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
           <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground">
             Derived mechanically from the ledger: {supporting} supporting, {opposing} opposing and{" "}
             {neutral} neutral nodes, penalized for the {estimated} estimated/model-graded inputs and
-            any breaker off intact. Nothing is asserted — remove evidence and the number falls.
+            any breaker off intact. Nothing is asserted, remove evidence and the number falls.
           </p>
         </Block>
         <Block title="How the call adds up">
@@ -272,18 +272,18 @@ const ThesisView = ({ workspace, section }: { workspace: WorkspaceDef; section: 
           <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
             {vol?.value != null && (
               <li>
-                Size against {vol.value}% realized volatility — conviction does not override the vol
+                Size against {vol.value}% realized volatility, conviction does not override the vol
                 budget.
               </li>
             )}
             {support?.value != null && (
               <li>
                 Entry structure is {support.value}:1 risk-reward
-                {support.value < 1.5 ? " — below the 1.5:1 bar, so scale in on structure, not at market" : " — clears the 1.5:1 entry bar"}.
+                {support.value < 1.5 ? ", below the 1.5:1 bar, so scale in on structure, not at market" : ", clears the 1.5:1 entry bar"}.
               </li>
             )}
             <li>
-              Review triggers live on the Breakers panel — a tripped breaker overrides this call until
+              Review triggers live on the Breakers panel, a tripped breaker overrides this call until
               re-synthesis.
             </li>
           </ul>

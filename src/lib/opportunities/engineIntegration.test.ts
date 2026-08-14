@@ -1,4 +1,4 @@
-// Integration test — drives the REAL evaluateCandidate flow (the point where
+// Integration test, drives the REAL evaluateCandidate flow (the point where
 // the Evidence Layer, Market Context and diagnostics all converge) end-to-end
 // with a synthetic-but-realistic bundle. No network. Verifies that:
 //   • a validated opportunity carries the structured `evidence` layer,
@@ -67,7 +67,7 @@ function bullishBundle(): EvidenceBundle {
 const RISK_ON: MarketRegime = { label: "risk-on", benchmarkRet21d: 0.03, benchmarkVolAnnual: 0.14, benchmarkAboveSma200: true, evidence: [] };
 const NEUTRAL: MarketRegime = { label: "neutral", benchmarkRet21d: 0.0, benchmarkVolAnnual: 0.18, benchmarkAboveSma200: true, evidence: [] };
 
-describe("evaluateCandidate — Evidence Layer + diagnostics integration", () => {
+describe("evaluateCandidate, Evidence Layer + diagnostics integration", () => {
   const bundle = bullishBundle();
   const models = runAllModels(bundle, RISK_ON, 21, MACRO);
   const marketContext = classifyMarketContext(MACRO, RISK_ON);
@@ -129,7 +129,7 @@ describe("evaluateCandidate — Evidence Layer + diagnostics integration", () =>
     expect(usSymbols.has("NVDA")).toBe(true);
     expect(usSymbols.has("AAPL")).toBe(true);
     expect(us.length).toBeGreaterThan(20);
-    // They are candidates, not pre-baked opportunities — sourced, not hardcoded.
+    // They are candidates, not pre-baked opportunities, sourced, not hardcoded.
     for (const c of us) expect(c.origin.source).toBe("coverage:liquid_leaders");
     // None of the leaders duplicate the coverage grid (deduped by the venues).
     const coverage = new Set(coverageCandidates(false).map((c) => c.symbol));
@@ -150,7 +150,7 @@ describe("evaluateCandidate — Evidence Layer + diagnostics integration", () =>
     if (!result.ok || !neutral.ok) throw new Error("expected both ok");
     // Same base case; risk-on/low-vol context should not reduce a long's confidence.
     expect(result.opportunity.confidence).toBeGreaterThanOrEqual(neutral.opportunity.confidence);
-    // And the context multiplier is bounded — it never manufactures certainty.
+    // And the context multiplier is bounded, it never manufactures certainty.
     expect(result.opportunity.confidence).toBeLessThanOrEqual(0.95);
   });
 });

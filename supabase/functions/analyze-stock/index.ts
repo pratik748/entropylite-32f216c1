@@ -243,7 +243,7 @@ function mapNews(bundle: TickerLiveBundle) {
     const baseImpact = Math.max(0.8, Math.abs(sentiment) / 18);
     const sourceBoost = /bse|sec/i.test(item.source) ? 1.35 : /moneycontrol/i.test(item.source) ? 1.1 : 1;
     // These are SENTIMENT-PRESSURE scores (sign and magnitude of headline
-    // tone, source-weighted) — NOT measured or predicted price moves. There
+    // tone, source-weighted), NOT measured or predicted price moves. There
     // is no event study behind them. Field names kept for API compatibility;
     // the UI and explanation label them honestly as pressure, not % returns.
     const shortTermImpact = round(Math.sign(sentiment) * baseImpact * sourceBoost, 1);
@@ -259,7 +259,7 @@ function mapNews(bundle: TickerLiveBundle) {
       shortTermImpact,
       longTermImpact,
       confidence,
-      explanation: `${item.source} item. Pressure score reflects headline tone and source weight only — it is not a measured or predicted price move, and no causal link to price is claimed.`,
+      explanation: `${item.source} item. Pressure score reflects headline tone and source weight only, it is not a measured or predicted price move, and no causal link to price is claimed.`,
     };
   });
   const overallSentiment = news.length > 0 ? round(mean(news.map((item) => item.sentiment)), 0) : 0;
@@ -336,7 +336,7 @@ serve(async (req) => {
 
     // Optional Desirable Assets (ODGS) hint. When the ticker shows up in one
     // or more high-edge desirable zones we treat that as a confirming bullish
-    // prior — boosts the signal and prevents the "Skip / NO EDGE" verdict
+    // prior, boosts the signal and prevents the "Skip / NO EDGE" verdict
     // from firing on assets the gradient explicitly recommends.
     const desirableHint: {
       listed?: boolean;
@@ -414,8 +414,7 @@ serve(async (req) => {
     }
 
     // Run historical bars, the live data bundle, AND the real-time Google
-    // Search grounded web context in parallel. Web context is best-effort —
-    // if it fails we still produce a full analysis from the deterministic
+    // Search grounded web context in parallel. Web context is best-effort, // if it fails we still produce a full analysis from the deterministic
     // pipeline.
     const [bars, bundle, webContext] = await Promise.all([
       fetchHistoricalBars(ticker),
@@ -544,7 +543,7 @@ serve(async (req) => {
     // σ provenance is part of the payload: when price history is missing the
     // ranges degrade to an ASSUMED 4% monthly σ, which produces the same
     // ±4.6% band on every stock. That must never masquerade as a computed
-    // number — rangeModel below lets every consumer (desk simulation table,
+    // number, rangeModel below lets every consumer (desk simulation table,
     // Monte Carlo bands, evidence graph) label the basis honestly.
     const sigmaSource: "realized" | "assumed" = returns.length >= 20 && sigmaDaily > 0 ? "realized" : "assumed";
     const monthlySigma = sigmaSource === "realized" ? sigmaDaily * Math.sqrt(21) : Math.max(Math.abs(changePct) / 100, 0.04);
@@ -590,7 +589,7 @@ serve(async (req) => {
     if (pnlPct > 25 && trend === "bearish") signal -= 1;
     // Mean-reversion penalty: chasing 52w highs without a fresh breakout
     if (posIn52w > 85 && rsi14 > 70) signal -= 2;
-    // Distance from support vs resistance — must have asymmetric upside to "Add"
+    // Distance from support vs resistance, must have asymmetric upside to "Add"
     const upsideToResistance = ((resistance - currentPrice) / currentPrice) * 100;
     const downsideToSupport = ((currentPrice - support) / currentPrice) * 100;
     const rrRatio = downsideToSupport > 0.5 ? upsideToResistance / downsideToSupport : 0;
@@ -645,7 +644,7 @@ serve(async (req) => {
     // ── CONSISTENCY GUARD: reconcile with Direct Profit verdict ──
     // The Direct Profit module already produced an actionable trade plan when
     // this position was opened from there. Dashboard analysis is a deeper view
-    // — it should never directly contradict the entry decision. We allow it
+    //, it should never directly contradict the entry decision. We allow it
     // to refine (BUY → Add/Hold) but not flip (BUY → Exit) unless the data
     // coverage is solid AND the structural signal is overwhelmingly negative.
     if (dpCtx?.action) {
@@ -682,10 +681,10 @@ serve(async (req) => {
       : suggestion === "Exit"
         ? `${ticker} fails the edge test: ${pnlPct < -15 ? `position is ${round(pnlPct, 1)}% underwater, ` : ""}structure is ${trend}, and downside path opens to ${currency} ${bearRange[0]}. Defend the book.`
         : suggestion === "Skip"
-          ? `${ticker} shows NO ACTIONABLE EDGE right now — R:R ${rrRatio.toFixed(1)}:1 (need ≥1.5), signal score ${signal}, drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%. Sitting out is the trade.`
+          ? `${ticker} shows NO ACTIONABLE EDGE right now, R:R ${rrRatio.toFixed(1)}:1 (need ≥1.5), signal score ${signal}, drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%. Sitting out is the trade.`
           : `${ticker} is range-bound between ${currency} ${neutralRange[0]} and ${currency} ${neutralRange[1]}. Hold existing exposure but do not add until R:R or trend improves.`;
 
-    const confidenceReasoning = `Confidence is ${confidence}% — data coverage ${dataCoverage}/5, trend ${trend}, R:R ${rrRatio.toFixed(1)}:1, 21d drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%, position ${round(pnlPct, 1)}% from entry, composite risk ${riskScore}/100.`;
+    const confidenceReasoning = `Confidence is ${confidence}%, data coverage ${dataCoverage}/5, trend ${trend}, R:R ${rrRatio.toFixed(1)}:1, 21d drift ${expReturn21d >= 0 ? "+" : ""}${round(expReturn21d, 1)}%, position ${round(pnlPct, 1)}% from entry, composite risk ${riskScore}/100.`;
 
     const summary = [
       `${ticker} is trading at ${currency} ${round(currentPrice)} versus your entry at ${currency} ${round(buyPrice)}, with ${round(changePct, 2)}% day change and ${round(annualizedVol, 1)}% annualized realized volatility from the last ${returns.length} sessions.` ,
@@ -726,7 +725,7 @@ serve(async (req) => {
         formula: "bull = S·(1 + σₘ·[0.45, 1.15]), neutral = S·(1 ± σₘ·0.3), bear = S·(1 − σₘ·[1.15, 0.45])",
         note: sigmaSource === "realized"
           ? `σₘ = σ_daily·√21 from ${returns.length} daily returns`
-          : `price history unavailable (${closes.length} bar${closes.length === 1 ? "" : "s"}) — σₘ assumed at ${round(monthlySigma * 100, 1)}%; ranges are placeholders, not computed`,
+          : `price history unavailable (${closes.length} bar${closes.length === 1 ? "" : "s"}), σₘ assumed at ${round(monthlySigma * 100, 1)}%; ranges are placeholders, not computed`,
       },
       suggestion,
       confidence,
@@ -782,7 +781,7 @@ serve(async (req) => {
       },
       // Material disagreements between data sources for the same fact.
       // Empty array = sources agreed (or only one source spoke). Preserved
-      // rather than silently resolved — disagreement is information.
+      // rather than silently resolved, disagreement is information.
       sourceConflicts,
       // Which model/version produced this payload, with validation status
       // and known limitations (institutional memory).

@@ -1,12 +1,11 @@
-// Change-point & regime detection — pure, deterministic, browser-cheap.
+// Change-point & regime detection, pure, deterministic, browser-cheap.
 //
 //   cusum(xs)       two-sided CUSUM (Page 1954) on robust z-scores. O(T).
 //   gaussianHMM(xs) K-state Gaussian HMM via scaled forward–backward EM
 //                   (Baum–Welch). O(T·K²·iters). K=3 default extends the
 //                   2-state `hmmRegimeDetect` in statarb-math.ts.
 //
-// Both are standard, mathematically settled methods; no invented constants —
-// CUSUM defaults (k=0.5, h=5 in σ units) are the textbook ARL≈370 design.
+// Both are standard, mathematically settled methods; no invented constants, // CUSUM defaults (k=0.5, h=5 in σ units) are the textbook ARL≈370 design.
 
 // ─── robust standardisation ──────────────────────────────────────
 
@@ -37,7 +36,7 @@ export interface CusumResult {
   alarms: number[];
   sPos: number[];
   sNeg: number[];
-  /** last value of max(S⁺, S⁻) — proximity to alarm */
+  /** last value of max(S⁺, S⁻), proximity to alarm */
   lastStat: number;
 }
 

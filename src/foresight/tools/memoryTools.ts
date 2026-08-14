@@ -1,5 +1,5 @@
 /**
- * Research memory tools — recall what Foresight previously concluded.
+ * Research memory tools, recall what Foresight previously concluded.
  * Findings are written automatically by the runtime after substantive runs;
  * these tools let the planner read them back ("what did we conclude about
  * Tata Motors last week?") and let the analyst save explicit notes.

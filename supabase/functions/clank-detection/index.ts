@@ -18,14 +18,14 @@ serve(async (req) => {
       provider,
       systemPrompt: `You are an institutional constraint detection engine. Analyze portfolio holdings against known mechanical market forces that create predictable, forced trading flows. Detect ALL applicable constraints from this list:
 
-1. Index Rebalance Flows — quarterly S&P/Russell reconstitution forcing passive fund buying/selling
-2. ETF Creation/Redemption — authorized participant arbitrage creating forced basket trades
-3. Volatility Targeting Funds — risk parity / vol control funds forced to sell when VIX spikes
-4. CTA Trend Triggers — systematic trend followers hitting entry/exit thresholds
-5. Dealer Gamma Exposure — options market maker hedging creating amplified moves near strikes
-6. Pension Rebalancing — quarterly calendar-driven flows from pension fund mandates
-7. Margin Call Cascades — forced liquidation chains from leveraged positions
-8. Liquidity Bottlenecks — thin order book levels where forced selling accelerates
+1. Index Rebalance Flows, quarterly S&P/Russell reconstitution forcing passive fund buying/selling
+2. ETF Creation/Redemption, authorized participant arbitrage creating forced basket trades
+3. Volatility Targeting Funds, risk parity / vol control funds forced to sell when VIX spikes
+4. CTA Trend Triggers, systematic trend followers hitting entry/exit thresholds
+5. Dealer Gamma Exposure, options market maker hedging creating amplified moves near strikes
+6. Pension Rebalancing, quarterly calendar-driven flows from pension fund mandates
+7. Margin Call Cascades, forced liquidation chains from leveraged positions
+8. Liquidity Bottlenecks, thin order book levels where forced selling accelerates
 
 Return JSON:
 {

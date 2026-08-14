@@ -1,4 +1,4 @@
-// OpportunityRepository — the single client-side gateway to the shared
+// OpportunityRepository, the single client-side gateway to the shared
 // Opportunity Engine. Every module (Discover, Direct Profit, Desirable
 // Assets, alerts, future portfolio modules) queries THIS repository; none
 // of them call the backend directly or maintain their own opportunity
@@ -65,7 +65,7 @@ function loadPersisted(): Snapshot | null {
 function persist(snapshot: Snapshot) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(snapshot));
-  } catch { /* storage full — in-memory cache still works */ }
+  } catch { /* storage full, in-memory cache still works */ }
 }
 
 function notify() {
@@ -94,7 +94,7 @@ function isFresh(snapshot: Snapshot | null, indiaMode: boolean, horizonDays: num
 // ── Engine transport ────────────────────────────────────────────────
 // The engine is a single Supabase edge function (opportunity-engine),
 // deployed by Lovable Cloud from this repo. The whole app reaches it
-// through the Supabase client — the same backend entropylite.in already
+// through the Supabase client, the same backend entropylite.in already
 // talks to for every other function. No other venue, no plumbing.
 
 /** Turn a transport error into something the user can act on. */
@@ -104,7 +104,7 @@ function engineError(error: unknown): Error {
   if (status === 404 || /not.?found|failed to send a request/i.test(message)) {
     return new Error(
       "The Discover engine isn't live on the backend yet. On Lovable Cloud the opportunity-engine " +
-      "function deploys automatically when the project syncs the latest changes — open the Lovable " +
+      "function deploys automatically when the project syncs the latest changes, open the Lovable " +
       "project once to trigger the sync if this persists.",
     );
   }
@@ -129,7 +129,7 @@ async function callEngine(
 
 /**
  * Fetch (or reuse) the engine's validated opportunity set. All consumers
- * share one inflight request and one cache entry — server-side filters are
+ * share one inflight request and one cache entry, server-side filters are
  * intentionally NOT passed here so every module sees the identical slate;
  * use `filterOpportunities` for per-module views.
  */
@@ -175,7 +175,7 @@ export async function fetchOpportunities(opts: {
 /**
  * Evaluate specific tickers through the exact same pipeline (used by
  * Direct Profit for on-demand names). Same models, same validator, same
- * ranking math — mode:"single" only changes the candidate source.
+ * ranking math, mode:"single" only changes the candidate source.
  */
 export async function evaluateTickers(opts: {
   tickers: string[];

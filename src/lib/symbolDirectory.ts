@@ -1,5 +1,5 @@
 // Curated symbol directory used for ticker auto-suggest in StockInput.
-// Not exhaustive — covers the most-searched global names plus the Indian
+// Not exhaustive, covers the most-searched global names plus the Indian
 // universe already supported by normalizeUserTicker. Matching is done on
 // ticker, company name, and informal aliases (e.g. "Adani" -> ADANIENT.NS,
 // "Netflix" -> NFLX).
@@ -65,7 +65,7 @@ export const SYMBOL_DIRECTORY: SymbolEntry[] = [
   { ticker: "RBLX", name: "Roblox Corp.", exchange: "NYSE", kind: "equity", aliases: ["roblox"] },
   { ticker: "SNAP", name: "Snap Inc.", exchange: "NYSE", kind: "equity", aliases: ["snapchat", "snap"] },
   { ticker: "PINS", name: "Pinterest Inc.", exchange: "NYSE", kind: "equity", aliases: ["pinterest"] },
-  { ticker: "X", name: "X (Twitter, private)", exchange: "—", kind: "equity", aliases: ["twitter"] },
+  { ticker: "X", name: "X (Twitter, private)", exchange: "--", kind: "equity", aliases: ["twitter"] },
 
   // ---- ETFs / indices ----
   { ticker: "SPY", name: "SPDR S&P 500 ETF", exchange: "NYSE", kind: "etf", aliases: ["sp500", "s&p 500"] },

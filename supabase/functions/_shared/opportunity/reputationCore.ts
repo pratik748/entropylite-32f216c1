@@ -1,4 +1,4 @@
-// Reputation core — pure, runtime-agnostic. Both execution venues use
+// Reputation core, pure, runtime-agnostic. Both execution venues use
 // these builders: the edge function loads rows with its Deno Supabase
 // client (reputation.ts), the browser fallback loads the same tables with
 // the app's Supabase client. One shrinkage rule, one drift rule.
@@ -79,7 +79,7 @@ export interface LearningHealth {
   };
   reputationCells: number;
   /** Brier ≥ 0.28 on a real sample means the calibrated probabilities have
-   *  drifted from realized hit rates — surfaced so users see degradation. */
+   *  drifted from realized hit rates, surfaced so users see degradation. */
   drift: "healthy" | "degrading" | "unfit";
 }
 

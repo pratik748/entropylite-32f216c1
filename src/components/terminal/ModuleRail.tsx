@@ -15,7 +15,7 @@ interface ModuleRailProps {
 }
 
 /**
- * Workspace module rail — the terminal's primary navigation.
+ * Workspace module rail, the terminal's primary navigation.
  * A quiet vertical column of monochrome instruments; the active module
  * carries a sliding highlight and a capital-blue index line.
  */
@@ -67,7 +67,7 @@ const ModuleRail = ({ modules, activeId, onSelect }: ModuleRailProps) => {
   );
 };
 
-/** Horizontal module strip for compact widths — same grammar, one row. */
+/** Horizontal module strip for compact widths, same grammar, one row. */
 export const ModuleStrip = ({ modules, activeId, onSelect }: ModuleRailProps) => {
   return (
     <nav

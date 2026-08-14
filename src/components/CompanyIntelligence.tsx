@@ -59,8 +59,7 @@ export default function CompanyIntelligence({ ticker }: Props) {
           <div>
             <p className="text-xs font-medium text-foreground">Corporate intelligence is assembling</p>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              The dossier for {ticker} is being generated in the background and fills in automatically —
-              no action needed. The Equity Workstation view of this name stays live meanwhile.
+              The dossier for {ticker} is being generated in the background and fills in automatically, no action needed. The Equity Workstation view of this name stays live meanwhile.
             </p>
           </div>
           <Link
@@ -154,7 +153,7 @@ export default function CompanyIntelligence({ ticker }: Props) {
           <Badge variant="outline" className="text-[9px] hidden sm:inline-flex">{data.employees} employees</Badge>
           <Link
             to={workstationPath(ticker)}
-            title="Open the full Equity Workstation — evidence graph, thesis, risk lab"
+            title="Open the full Equity Workstation, evidence graph, thesis, risk lab"
             className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-2"
           >
             <FileSearch className="h-3.5 w-3.5" strokeWidth={1.75} />

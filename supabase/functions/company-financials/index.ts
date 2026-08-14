@@ -2,7 +2,7 @@ import { requireAuth } from "../_shared/auth.ts";
 import { buildTickerCandidates, normalizeTickerInput } from "../_shared/ticker.ts";
 
 /**
- * company-financials — deterministic statement pipeline.
+ * company-financials, deterministic statement pipeline.
  *
  * Fetches real income statement, balance sheet and cash-flow history plus
  * the ratio/margin block from Yahoo's quoteSummary endpoint and normalizes
@@ -40,7 +40,7 @@ const raw = (v: unknown): number | null => {
 
 function periodLabel(endDate: unknown): string {
   const ts = raw(endDate);
-  if (!ts) return "—";
+  if (!ts) return "--";
   const d = new Date(ts * 1000);
   return `FY${d.getUTCFullYear()}${d.getUTCMonth() < 6 ? "" : ""}`;
 }

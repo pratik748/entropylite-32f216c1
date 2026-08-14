@@ -139,7 +139,7 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
       items.forEach((item, i) => {
         const angle = (i / Math.max(items.length, 1)) * Math.PI * 2 - Math.PI / 2;
         // Deterministic radial jitter (seeded by node index) so the graph
-        // renders identically across re-renders — no Math.random.
+        // renders identically across re-renders, no Math.random.
         const jitter = (((i * 73 + order * 131) % 60) - 30);
         const id = `${order}-${i}`;
         const tx = Math.cos(angle) * (radius + jitter);
@@ -155,7 +155,7 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
         if (order === 1) {
           edges.push({ from: "event", to: id, weight: item.confidence });
         } else {
-          // Connect to the nearest-angle parent in the previous order — a
+          // Connect to the nearest-angle parent in the previous order, a
           // deterministic geometric choice (no Math.random) that also makes
           // the propagation graph topologically sensible.
           const prevNodes = nodes.filter(n => n.order === order - 1);

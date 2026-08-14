@@ -43,7 +43,11 @@ Deno.serve(async (req) => {
 
     const j = await r.json();
     let lesson: string = j?.choices?.[0]?.message?.content?.trim() || "";
-    lesson = lesson.replace(/^["'`]+|["'`]+$/g, "").slice(0, 160);
+    lesson = lesson
+      .replace(/^["'`]+|["'`]+$/g, "")
+      .replace(/\s*[\u2014\u2013]\s+/g, ", ")
+      .replace(/[\u2014\u2013]/g, "-")
+      .slice(0, 160);
 
     return new Response(JSON.stringify({ lesson }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -11,7 +11,7 @@ import {
 } from "@/lib/demoSession";
 
 interface DemoContextValue {
-  /** True while a demo session is active — the whole app is read-only. */
+  /** True while a demo session is active, the whole app is read-only. */
   isDemo: boolean;
   /** Still resolving a stored token on first paint. */
   resolving: boolean;

@@ -68,9 +68,9 @@ const StressTestModule = ({ stocks }: Props) => {
           title="Stress Testing Methodology"
           methods={[
             { label: "Scenario propagation", formula: "ΔP/P = Σ wᵢ·βᵢ·shock_mkt", source: "Per-asset OLS betas on real benchmark returns", notes: "Shock sizes are documented historical episodes; portfolio impacts are computed, never stored." },
-            { label: "Historical replay", formula: "min over t of Π(1+rₜ) across h-day windows", source: "The portfolio's own realized return series", notes: "No assumption — the worst window that actually happened to this book." },
+            { label: "Historical replay", formula: "min over t of Π(1+rₜ) across h-day windows", source: "The portfolio's own realized return series", notes: "No assumption, the worst window that actually happened to this book." },
             { label: "σ sensitivity", formula: "±kσ daily moves at σ_p = √(wᵀΣw)", source: "Realized covariance matrix" },
-            { label: "Recovery estimate", formula: "mean trough→peak days over realized drawdowns ≥ 5%", source: "Portfolio equity curve", notes: "Omitted when no completed drawdowns exist — never guessed." },
+            { label: "Recovery estimate", formula: "mean trough→peak days over realized drawdowns ≥ 5%", source: "Portfolio equity curve", notes: "Omitted when no completed drawdowns exist, never guessed." },
           ]}
         />
       </div>
@@ -78,7 +78,7 @@ const StressTestModule = ({ stocks }: Props) => {
       {/* Scenario impacts */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
-          Scenario Impact — Computed From Your Betas
+          Scenario Impact, Computed From Your Betas
         </h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
@@ -132,7 +132,7 @@ const StressTestModule = ({ stocks }: Props) => {
         <div className="space-y-6">
           <div className="rounded-xl border border-border bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-              <History className="h-4 w-4" /> Historical Replay — Your Worst Realized Windows
+              <History className="h-4 w-4" /> Historical Replay, Your Worst Realized Windows
             </h3>
             {ia.replays.length === 0 ? (
               <p className="text-xs text-muted-foreground">Insufficient history for replay windows.</p>
@@ -196,7 +196,7 @@ const StressTestModule = ({ stocks }: Props) => {
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-warning" /> Position Decomposition — {worst.scenario.name}
+                <AlertTriangle className="h-4 w-4 text-warning" /> Position Decomposition, {worst.scenario.name}
               </h3>
               <span className="text-[10px] text-muted-foreground font-mono">
                 β sample: {worst.portfolioImpact.provenance.sampleSize} obs

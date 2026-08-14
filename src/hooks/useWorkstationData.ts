@@ -4,12 +4,12 @@ import type { Bars } from "@/lib/evidence/build";
 import type { DeskAnalysis, Dossier, Financials, Quote } from "@/lib/evidence/inputs";
 
 /**
- * Workstation data layer — resilient by contract.
+ * Workstation data layer, resilient by contract.
  *
  * Every source resolves to { data, state, fetchedAt } and can only be in
  * one of four states: loading / live / cached / unavailable. Failures fall
  * back to the last good payload (however old) before they fall back to
- * "unavailable", and no raw error string ever leaves this hook — the UI
+ * "unavailable", and no raw error string ever leaves this hook, the UI
  * renders designed states, not transport errors.
  */
 
@@ -41,8 +41,8 @@ const VERSION = "v1";
 const TTL = {
   analysis: 6 * 60 * 60 * 1000, // 6h
   bars: 12 * 60 * 60 * 1000, // 12h
-  dossier: 24 * 60 * 60 * 1000, // 24h — shared with the desk dossier cache
-  financials: 24 * 60 * 60 * 1000, // 24h — statements move quarterly
+  dossier: 24 * 60 * 60 * 1000, // 24h, shared with the desk dossier cache
+  financials: 24 * 60 * 60 * 1000, // 24h, statements move quarterly
 } as const;
 
 /* ── localStorage cache (versioned, never throws) ─────────────── */
@@ -74,7 +74,7 @@ function cacheSet<T>(source: string, ticker: string, data: T) {
   try {
     localStorage.setItem(cacheKey(source, ticker), JSON.stringify({ data, ts: Date.now() }));
   } catch {
-    /* storage full — cache is an optimization, never a requirement */
+    /* storage full, cache is an optimization, never a requirement */
   }
 }
 
@@ -148,7 +148,7 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       financials: { state: "loading", fetchedAt: null },
     });
 
-    /* quote — poll every 15s; keep last good value on failures */
+    /* quote, poll every 15s; keep last good value on failures */
     const lastGoodQuote = { current: null as { price: number; currency: string } | null };
     const fetchQuote = async (): Promise<{ price: number; currency: string } | null> => {
       try {
@@ -177,7 +177,7 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       return lastGoodQuote.current;
     };
 
-    /* bars — cached 12h, stale-on-error */
+    /* bars, cached 12h, stale-on-error */
     const loadBars = async () => {
       const cached = cacheGet<Bars>("bars", ticker);
       if (cached && Date.now() - cached.ts < TTL.bars) {
@@ -211,7 +211,7 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       }
     };
 
-    /* analysis — cached 6h; needs a price anchor for a clean neutral run.
+    /* analysis, cached 6h; needs a price anchor for a clean neutral run.
        The cache check runs before awaiting the quote so a slow price feed
        never delays cached hydration. */
     const loadAnalysis = async (quotePromise: Promise<{ price: number } | null>) => {
@@ -250,7 +250,7 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       }
     };
 
-    /* dossier — cached 24h (shared with desk), stale-on-error */
+    /* dossier, cached 24h (shared with desk), stale-on-error */
     const loadDossier = async () => {
       const cached = cacheGet<Dossier>("dossier", ticker);
       if (cached && Date.now() - cached.ts < TTL.dossier) {
@@ -290,9 +290,9 @@ export function useWorkstationData(ticker: string): WorkstationData & { refresh:
       }
     };
 
-    /* financials — real statements; cached 24h, stale-on-error. Until the
+    /* financials, real statements; cached 24h, stale-on-error. Until the
        function is deployed a 404 resolves to "unavailable" and the sections
-       keep their designed pending state — never an error. */
+       keep their designed pending state, never an error. */
     const loadFinancials = async () => {
       const cached = cacheGet<Financials>("financials", ticker);
       if (cached && Date.now() - cached.ts < TTL.financials) {

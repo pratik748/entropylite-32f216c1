@@ -71,7 +71,7 @@ function bootstrapAnnualReturns(rets: number[], iters = 2000, seed = 42): number
   const wins = winsorize(rets);
   const muSample = wins.reduce((s, r) => s + r, 0) / n;
   const muShrunk = shrinkMean(wins);
-  // Re-center sample around the shrunken mean — keeps the empirical covariance/
+  // Re-center sample around the shrunken mean, keeps the empirical covariance/
   // autocorrelation structure intact while taming μ instability.
   const adj = wins.map(r => r - muSample + muShrunk);
   const rng = mulberry32(seed);
@@ -151,7 +151,7 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
           methods={[{
             label: "Block Bootstrap Annual Return",
             formula: "r_year = exp(Σ blocks(r_daily)) − 1, resampled 2,000× with block ≈ √n",
-            source: "Politis & Romano (1994) — Stationary Bootstrap",
+            source: "Politis & Romano (1994), Stationary Bootstrap",
             lookback: `${snap.lookbackDays} trading days`,
             notes: "Preserves serial correlation. Assumes stationary return process; no alpha, costs, or regime shifts modeled.",
           }]}
@@ -166,7 +166,7 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
         <>
           {result.insufficient && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-[11px] text-amber-700 dark:text-amber-400">
-              <div className="font-semibold uppercase tracking-wider text-[10px] mb-1">Insufficient evidence — interpret with care</div>
+              <div className="font-semibold uppercase tracking-wider text-[10px] mb-1">Insufficient evidence, interpret with care</div>
               Confidence band is {(result.ciWidth * 100).toFixed(0)}pp wide on {result.sampleN} days of data. The point estimate is shown for reference, but the bootstrap cannot pin a reliable forward return until the sample grows or volatility cools.
             </div>
           )}
@@ -206,7 +206,7 @@ const ReturnsEstimateModule = ({ stocks }: Props) => {
           {/* Honest disclosure */}
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] leading-relaxed text-muted-foreground">
             <div className="mb-1 flex items-center gap-1.5 font-medium text-amber-500">
-              <Info className="h-3 w-3" /> What this is — and isn't
+              <Info className="h-3 w-3" /> What this is, and isn't
             </div>
             This is the forward-12m return distribution implied by resampling your portfolio's last {snap.lookbackDays} days
             of returns. It assumes the return-generating process is stationary. It does not include alpha from signals,

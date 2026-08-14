@@ -37,7 +37,7 @@ export interface DemoSession {
 
 const STORAGE_KEY = "entropy.demo.session";
 
-/** Only the token and its expiry are persisted — never the access code. */
+/** Only the token and its expiry are persisted, never the access code. */
 interface StoredDemo {
   token: string;
   expiresAt: number;
@@ -63,7 +63,7 @@ export function storeDemo(session: { token: string; expiresAt: number }) {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token: session.token, expiresAt: session.expiresAt }));
   } catch {
-    /* private mode — session stays in memory only */
+    /* private mode, session stays in memory only */
   }
 }
 
@@ -82,7 +82,7 @@ export function hasStoredDemo(): boolean {
 
 /* ── code input helpers (pure, unit-tested) ── */
 
-/** Keeps digits only and caps at four — used for typing and pasting alike. */
+/** Keeps digits only and caps at four, used for typing and pasting alike. */
 export function normalizeCodeInput(value: string): string {
   return (value || "").replace(/\D/g, "").slice(0, 4);
 }

@@ -220,7 +220,7 @@ const GeopoliticalGlobe = ({ stocks, geoData: data, geoLoading: loading, exposed
             />
           </div>
 
-          {/* Live news under the map — tap any item to open causal cascade */}
+          {/* Live news under the map, tap any item to open causal cascade */}
           <div className="grid gap-2 grid-cols-1 lg:grid-cols-[1fr_320px]">
             <div style={{ height: 420 }}>
               <EventFeed

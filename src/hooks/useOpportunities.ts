@@ -1,4 +1,4 @@
-// useOpportunities — React binding for the shared OpportunityRepository.
+// useOpportunities, React binding for the shared OpportunityRepository.
 // Every module that shows opportunities uses this hook, so they all render
 // the same validated objects in the same canonical order.
 

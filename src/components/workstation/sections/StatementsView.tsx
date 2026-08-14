@@ -8,20 +8,20 @@ import { Block, PendingEvidence } from "./blocks";
 import type { Financials } from "@/lib/evidence/inputs";
 
 /**
- * Financial statements — real multi-year tables from the deterministic
+ * Financial statements, real multi-year tables from the deterministic
  * statement pipeline with YoY deltas, an institutional read per line, and
  * a gradient-filled chart of the statement's defining series. W2 delivered.
  */
 
 const fmtB = (v: number | null | undefined): string =>
-  v == null ? "—" : `${(v / 1e9).toLocaleString(undefined, { maximumFractionDigits: 1 })}B`;
+  v == null ? "--" : `${(v / 1e9).toLocaleString(undefined, { maximumFractionDigits: 1 })}B`;
 
 const yoy = (curr: number | null | undefined, prev: number | null | undefined): number | null =>
   curr != null && prev != null && prev !== 0 ? ((curr - prev) / Math.abs(prev)) * 100 : null;
 
 const DeltaCell = ({ v }: { v: number | null }) =>
   v == null ? (
-    <span className="text-muted-foreground/50">—</span>
+    <span className="text-muted-foreground/50">-</span>
   ) : (
     <span className={`font-mono tabular-nums ${v >= 0 ? "text-gain" : "text-loss"}`}>
       {v >= 0 ? "+" : ""}
@@ -184,8 +184,7 @@ const StatementsView = ({ workspace, section }: { workspace: WorkspaceDef; secti
         ) : (
           <Block title="Statement pipeline">
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-              Reported statements for this name are still syncing from the exchange-data pipeline —
-              the table and chart render automatically when they land. The derived evidence below
+              Reported statements for this name are still syncing from the exchange-data pipeline, the table and chart render automatically when they land. The derived evidence below
               stays live meanwhile.
             </p>
           </Block>
@@ -232,7 +231,7 @@ function renderStatement(sectionId: string, f: Financials) {
                 label: "Revenue",
                 value: (i) => rows[i]?.revenue,
                 read: (_, d) =>
-                  d == null ? "Top line — the claim everything else is priced on." : d >= 8 ? "Genuine top-line compounding." : d >= 0 ? "Roughly flat — margins must carry the story." : "Contracting — every line below fights gravity.",
+                  d == null ? "Top line, the claim everything else is priced on." : d >= 8 ? "Genuine top-line compounding." : d >= 0 ? "Roughly flat, margins must carry the story." : "Contracting, every line below fights gravity.",
               },
               {
                 label: "Gross profit",
@@ -283,11 +282,11 @@ function renderStatement(sectionId: string, f: Financials) {
             count={rows.length}
             lines={[
               { label: "Total assets", value: (i) => rows[i]?.totalAssets, read: () => "The full base the business earns on." },
-              { label: "Cash & equivalents", value: (i) => rows[i]?.cash, read: (_, d) => (d == null ? "Optionality in a downturn." : d >= 0 ? "War chest building." : "Cash being deployed or consumed — see the cash-flow statement for which.") },
+              { label: "Cash & equivalents", value: (i) => rows[i]?.cash, read: (_, d) => (d == null ? "Optionality in a downturn." : d >= 0 ? "War chest building." : "Cash being deployed or consumed, see the cash-flow statement for which.") },
               { label: "Current assets", value: (i) => rows[i]?.currentAssets, read: () => "What converts to cash within the year." },
-              { label: "Current liabilities", value: (i) => rows[i]?.currentLiabilities, read: () => "What falls due within the year — read against current assets." },
-              { label: "Long-term debt", value: (i) => rows[i]?.longTermDebt, read: (_, d) => (d == null ? "The structural obligation." : d <= 0 ? "Deleveraging — equity claims strengthening." : "Leverage building — fine while returns exceed its cost.") },
-              { label: "Shareholder equity", value: (i) => rows[i]?.equity, read: (_, d) => (d == null ? "The residual owners hold." : d >= 0 ? "Book value compounding." : "Equity shrinking — buybacks or losses; check which.") },
+              { label: "Current liabilities", value: (i) => rows[i]?.currentLiabilities, read: () => "What falls due within the year, read against current assets." },
+              { label: "Long-term debt", value: (i) => rows[i]?.longTermDebt, read: (_, d) => (d == null ? "The structural obligation." : d <= 0 ? "Deleveraging, equity claims strengthening." : "Leverage building, fine while returns exceed its cost.") },
+              { label: "Shareholder equity", value: (i) => rows[i]?.equity, read: (_, d) => (d == null ? "The residual owners hold." : d >= 0 ? "Book value compounding." : "Equity shrinking, buybacks or losses; check which.") },
             ]}
           />
         </Block>
@@ -321,11 +320,11 @@ function renderStatement(sectionId: string, f: Financials) {
             periods={periods}
             count={rows.length}
             lines={[
-              { label: "Operating cash flow", value: (i) => rows[i]?.operatingCF, read: (_, d) => (d == null ? "Cash the operations actually produce." : d >= 0 ? "The cash engine is strengthening." : "Operating cash weakening ahead of earnings — the early warning.") },
+              { label: "Operating cash flow", value: (i) => rows[i]?.operatingCF, read: (_, d) => (d == null ? "Cash the operations actually produce." : d >= 0 ? "The cash engine is strengthening." : "Operating cash weakening ahead of earnings, the early warning.") },
               { label: "Capital expenditure", value: (i) => (rows[i]?.capex != null ? Math.abs(rows[i]!.capex!) : null), read: () => "Reinvestment required to sustain and grow the machine." },
-              { label: "Free cash flow", value: (i) => rows[i]?.freeCF, read: (_, d) => (d == null ? "What's left for holders after reinvestment." : d >= 0 ? "Deployable cash growing." : "Free cash compressing — capex or working capital is absorbing it.") },
-              { label: "Dividends paid", value: (i) => (rows[i]?.dividendsPaid != null ? Math.abs(rows[i]!.dividendsPaid!) : null), read: () => "The contractual-feeling commitment — cut only in distress." },
-              { label: "Buybacks", value: (i) => (rows[i]?.buybacks != null ? Math.abs(rows[i]!.buybacks!) : null), read: () => "The flexible return lever — and a read on management's own valuation view." },
+              { label: "Free cash flow", value: (i) => rows[i]?.freeCF, read: (_, d) => (d == null ? "What's left for holders after reinvestment." : d >= 0 ? "Deployable cash growing." : "Free cash compressing, capex or working capital is absorbing it.") },
+              { label: "Dividends paid", value: (i) => (rows[i]?.dividendsPaid != null ? Math.abs(rows[i]!.dividendsPaid!) : null), read: () => "The contractual-feeling commitment, cut only in distress." },
+              { label: "Buybacks", value: (i) => (rows[i]?.buybacks != null ? Math.abs(rows[i]!.buybacks!) : null), read: () => "The flexible return lever, and a read on management's own valuation view." },
             ]}
           />
         </Block>

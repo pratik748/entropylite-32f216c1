@@ -1,5 +1,5 @@
 /**
- * Foresight UI bus — the operating layer's control plane.
+ * Foresight UI bus, the operating layer's control plane.
  *
  * A typed event emitter that lets tools drive the interface (navigate,
  * open modules, focus positions, highlight evidence, pin workbench cards)
@@ -56,7 +56,7 @@ export function emitUIEvent<K extends keyof UIBusEvents>(event: K, payload: UIBu
   return true;
 }
 
-/** React helper — subscribe for the lifetime of the component. */
+/** React helper, subscribe for the lifetime of the component. */
 export function useUIEvent<K extends keyof UIBusEvents>(event: K, handler: Handler<K>): void {
   useEffect(() => onUIEvent(event, handler), [event, handler]);
 }

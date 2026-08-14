@@ -1,6 +1,6 @@
 // Tests for the architectural refinements: the Evidence Layer and the
 // Market Context classifier. Both are pure and deterministic, so we assert
-// structure, determinism, and — critically — that the market context tilts
+// structure, determinism, and, critically, that the market context tilts
 // confidence WITHIN bounds and is exactly neutral (multiplier 1.0) when the
 // environment is uninformative (behaviour-preservation guarantee).
 
@@ -106,7 +106,7 @@ describe("deriveEvidence (Evidence Layer)", () => {
     expect(ids).toContain("tail_risk");
   });
 
-  it("is deterministic — identical inputs yield identical evidence", () => {
+  it("is deterministic, identical inputs yield identical evidence", () => {
     const a = deriveEvidence(bundle(priceFeatures()), EMPTY_MACRO, regime(), 21);
     const b = deriveEvidence(bundle(priceFeatures()), EMPTY_MACRO, regime(), 21);
     expect(JSON.stringify(a)).toEqual(JSON.stringify(b));

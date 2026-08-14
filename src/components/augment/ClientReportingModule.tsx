@@ -214,7 +214,7 @@ const ClientReportingModule = ({ stocks }: Props) => {
       {!report ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            The report is generated only from computed analytics — it becomes available once
+            The report is generated only from computed analytics, it becomes available once
             ≥30 days of real price history load for the holdings.
           </p>
         </div>

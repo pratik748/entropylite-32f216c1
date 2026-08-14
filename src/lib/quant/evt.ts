@@ -1,8 +1,8 @@
 /**
- * Extreme Value Theory — tail risk beyond historical/parametric VaR.
+ * Extreme Value Theory, tail risk beyond historical/parametric VaR.
  * ──────────────────────────────────────────────────────────────────
  * Peaks-over-threshold (POT) with a Generalised Pareto Distribution fitted by
- * probability-weighted moments (Hosking & Wallis 1987) — closed-form,
+ * probability-weighted moments (Hosking & Wallis 1987), closed-form,
  * deterministic, no numerical optimisation, robust for the ξ < ½ regime that
  * covers equity/FX tails.
  *
@@ -78,7 +78,7 @@ export interface EVTRisk {
  * @param returns  raw return series (losses are the negative tail)
  * @param p        confidence level, e.g. 0.99 (must exceed thresholdQuantile)
  * @param thresholdQuantile  POT threshold quantile of the loss distribution
- *                           (default 0.90 — ~10% of the sample as exceedances)
+ *                           (default 0.90, ~10% of the sample as exceedances)
  */
 export function evtVaR(returns: number[], p = 0.99, thresholdQuantile = 0.9): EVTRisk | null {
   const n = returns.length;

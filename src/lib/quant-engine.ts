@@ -282,8 +282,7 @@ export function rollingHistoricalVaR(
 /**
  * @deprecated Prefer `betaRegression`, which returns null on insufficient
  * data (instead of a false-neutral 1.0) and reports SE, R² and a CI.
- * Returns null when the sample is too small or the benchmark has no variance —
- * an unknown beta is null, never a silent 1.0 that reads as "market-like".
+ * Returns null when the sample is too small or the benchmark has no variance, * an unknown beta is null, never a silent 1.0 that reads as "market-like".
  */
 export function beta(assetRets: number[], benchRets: number[]): number | null {
   const reg = betaRegression(assetRets, benchRets);
@@ -319,7 +318,7 @@ export function sortino(rets: number[], rfDaily = ANNUAL_RISK_FREE / TRADING_DAY
 /**
  * Annualized Sharpe with its asymptotic standard error (Lo, 2002, iid case):
  *   SE(SR_daily) = sqrt((1 + SR_daily²/2) / n),  annualized by √252.
- * Understated under autocorrelation/fat tails — the caveat ships in `method`.
+ * Understated under autocorrelation/fat tails, the caveat ships in `method`.
  */
 export function sharpeWithSE(
   rets: number[],
@@ -358,8 +357,7 @@ export function volWithSE(
 
 /**
  * OLS beta of asset on benchmark daily returns, with SE, R² and 95% CI.
- * Returns null (never a fabricated 1.0) when the sample is insufficient —
- * unlike the legacy `beta()` below, which is kept only for callers that
+ * Returns null (never a fabricated 1.0) when the sample is insufficient, * unlike the legacy `beta()` below, which is kept only for callers that
  * have not yet grown a null-path and is deprecated.
  */
 export function betaRegression(

@@ -1,8 +1,8 @@
 /**
- * Evidence spotlight — when Foresight highlights an interface region, a
+ * Evidence spotlight, when Foresight highlights an interface region, a
  * hairline focus frame draws around the target with an optional caption.
  * Restrained by design: one frame at a time, auto-dismissing, no dimming
- * theatrics — attention direction, not decoration.
+ * theatrics, attention direction, not decoration.
  */
 
 import { useEffect, useState } from "react";

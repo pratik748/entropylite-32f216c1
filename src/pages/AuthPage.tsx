@@ -30,7 +30,7 @@ export default function AuthPage() {
       const result = await lovable.auth.signInWithOAuth(provider, {
         redirect_uri: window.location.origin + "/dashboard",
       });
-      // If the browser is about to redirect, keep the spinner — don't clear loading.
+      // If the browser is about to redirect, keep the spinner, don't clear loading.
       if ((result as any)?.redirected) return;
       if ((result as any)?.error) {
         toast.error((result as any).error.message || "Sign in failed");

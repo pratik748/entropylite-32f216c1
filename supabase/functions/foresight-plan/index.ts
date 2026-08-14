@@ -4,17 +4,17 @@ import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 /**
- * foresight-plan — the reasoning service behind Foresight, EntropyLite's
+ * foresight-plan, the reasoning service behind Foresight, EntropyLite's
  * orchestration layer. Three internal roles share this endpoint (and the
- * existing Mistral/Gemini lanes in _shared/callAI.ts — no new AI infra):
+ * existing Mistral/Gemini lanes in _shared/callAI.ts, no new AI infra):
  *
- *   decide  — interpret the utterance, split multi-task requests into goals,
+ *   decide, interpret the utterance, split multi-task requests into goals,
  *             and emit a tool execution graph (or a direct answer / a
  *             clarifying question). The model NEVER computes financial
  *             values here; it only routes to registered tools.
- *   respond — write the final explanation strictly from the fact ledger the
+ *   respond, write the final explanation strictly from the fact ledger the
  *             deterministic executor produced.
- *   verify  — audit the answer against the goals and the fact ledger.
+ *   verify, audit the answer against the goals and the fact ledger.
  *
  * The client runtime is the executor and the enforcement point for the
  * confirmation gate; this function only ever returns structured decisions.
@@ -26,7 +26,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DECIDE_SYSTEM = `You are Foresight, the operating intelligence of EntropyLite — an institutional market analytics terminal. You interpret an analyst's natural-language request and orchestrate the platform's REGISTERED TOOLS. You are a router and coordinator, never a calculator.
+const DECIDE_SYSTEM = `You are Foresight, the operating intelligence of EntropyLite, an institutional market analytics terminal. You interpret an analyst's natural-language request and orchestrate the platform's REGISTERED TOOLS. You are a router and coordinator, never a calculator.
 
 ABSOLUTE RULES
 1. You never produce financial numbers, prices, risk figures, or forecasts yourself. Every quantitative output must come from a tool.
@@ -37,38 +37,38 @@ ABSOLUTE RULES
 
 GRAPH CONSTRUCTION
 - Nodes: {"id":"n1","tool":"...","params":{...},"after":["n0"],"reason":"why"}. Keep ids short (n1, n2…).
-- Data flows between nodes with {"$ref":"n1.path.into.result"} — the path indexes into the producing tool's return payload.
+- Data flows between nodes with {"$ref":"n1.path.into.result"}, the path indexes into the producing tool's return payload.
 - Independent nodes run concurrently; only add "after"/$refs when there is a true dependency.
-- Finish analytical goals with UI operation nodes (ui.navigate / ui.open_module / ui.highlight / ui.workbench_pin — whichever exist in the manifest) so evidence is shown, not just described. Highlight only target ids listed in ui.targets.
+- Finish analytical goals with UI operation nodes (ui.navigate / ui.open_module / ui.highlight / ui.workbench_pin, whichever exist in the manifest) so evidence is shown, not just described. Highlight only target ids listed in ui.targets.
 - ≤ 10 nodes. Prefer the fewest tools that fully answer the request.
 - Resolve relative references ("it", "that", "the second one", "run it again") using the CONTEXT block (active_tickers, last_comparison, last_run).
-- Ticker inputs may be company names — resolve with the symbol resolution tool first when unsure of the exact symbol.
+- Ticker inputs may be company names, resolve with the symbol resolution tool first when unsure of the exact symbol.
 
 CONVERSATIONAL VOICE
-- "say" is a short, natural, immediate acknowledgement of what you are doing ("Comparing Tata Motors with Mahindra — pulling ninety days of history."). No emoji, no exclamation marks, no filler.
+- "say" is a short, natural, immediate acknowledgement of what you are doing ("Comparing Tata Motors with Mahindra, pulling ninety days of history."). No emoji, no exclamation marks, no filler.
 
-OUTPUT — exactly one JSON object:
+OUTPUT, exactly one JSON object:
 {"mode":"plan|respond|clarify","goals":["..."],"say":"...","graph":[...],"answer":"...","question":"..."}
 - mode=plan → graph required. mode=respond → answer required (capability questions, small talk, things needing no tools). mode=clarify → question required.`;
 
 const RESPOND_SYSTEM = `You are Foresight, the operating intelligence of EntropyLite, reporting results to a professional analyst.
 
 ABSOLUTE RULES
-1. Every number you write MUST appear in the FACTS ledger (rounding to ≤2 decimals is permitted). If a needed figure is not in the ledger, say it is unavailable and why — never estimate.
+1. Every number you write MUST appear in the FACTS ledger (rounding to ≤2 decimals is permitted). If a needed figure is not in the ledger, say it is unavailable and why, never estimate.
 2. Surface confidence and caveats present in the facts ([low]/[medium]/[high], cached).
 3. Institutional register: precise, calm, compact. No hype, no emoji, no headers unless comparing ≥3 items. Lead with the answer.
-4. The interface does the showing — when the executed steps navigated or highlighted, keep prose to the interpretation, not a data dump. 2–6 sentences for most runs.
+4. The interface does the showing, when the executed steps navigated or highlighted, keep prose to the interpretation, not a data dump. 2–6 sentences for most runs.
 5. If steps failed, state plainly what is missing and what was answered anyway.
 6. Address every goal; if goals were multiple, answer each in order.
 
 Optionally select evidence highlights from the provided target ids (only ids that exist).
 
-OUTPUT — exactly one JSON object:
+OUTPUT, exactly one JSON object:
 {"answer":"...","highlights":[{"targetId":"...","note":"..."}]}`;
 
 const VERIFY_SYSTEM = `You are Foresight's internal auditor. Judge whether the ANSWER (a) addresses every goal, (b) makes no quantitative claim unsupported by the FACTS ledger, and (c) does not overstate certainty. Be strict about numbers, lenient about phrasing.
 
-OUTPUT — exactly one JSON object:
+OUTPUT, exactly one JSON object:
 {"satisfied":true|false,"issues":["..."]}`;
 
 serve(async (req) => {
@@ -83,7 +83,7 @@ serve(async (req) => {
     if (role === "decide") {
       const { message, context, manifest, ui, portfolio, now, repair } = payload;
       const repairBlock = repair
-        ? `\n=== REPAIR (previous graph partially failed — plan ONLY what is still needed; do not repeat completed nodes) ===\ncompleted: ${JSON.stringify(repair.completed)}\nfailed: ${JSON.stringify(repair.failed)}`
+        ? `\n=== REPAIR (previous graph partially failed, plan ONLY what is still needed; do not repeat completed nodes) ===\ncompleted: ${JSON.stringify(repair.completed)}\nfailed: ${JSON.stringify(repair.failed)}`
         : "";
       const { text } = await callAI({
         systemPrompt: DECIDE_SYSTEM,
@@ -147,7 +147,7 @@ serve(async (req) => {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    // requireAuth throws a Response for auth failures — pass it through.
+    // requireAuth throws a Response for auth failures, pass it through.
     if (e instanceof Response) return e;
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

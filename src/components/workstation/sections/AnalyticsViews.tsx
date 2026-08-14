@@ -15,7 +15,7 @@ import {
 /* ── shared institutional primitives ───────────────────────────── */
 
 const B = (v: number | null | undefined): string =>
-  v == null ? "—" : `${(v / 1e9).toLocaleString(undefined, { maximumFractionDigits: 1 })}B`;
+  v == null ? "--" : `${(v / 1e9).toLocaleString(undefined, { maximumFractionDigits: 1 })}B`;
 
 /** A factor in a multiplicative decomposition (DuPont), joined by ×. */
 const FactorChain = ({
@@ -78,7 +78,7 @@ const MagnitudeBar = ({
   );
 };
 
-/* ── Profitability — DuPont decomposition ──────────────────────── */
+/* ── Profitability, DuPont decomposition ──────────────────────── */
 
 export const ProfitabilityView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { sectionMetrics, data } = useEvidence();
@@ -102,7 +102,7 @@ export const ProfitabilityView = ({ workspace, section }: { workspace: Workspace
             {dupont.identity} · {dupont.source}
           </p>
           <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
-            The decomposition separates <span className="text-foreground">operating quality</span> (margin), <span className="text-foreground">capital efficiency</span> (turnover) and <span className="text-foreground">financial leverage</span> — a headline ROE flatters when the last term is carrying it.
+            The decomposition separates <span className="text-foreground">operating quality</span> (margin), <span className="text-foreground">capital efficiency</span> (turnover) and <span className="text-foreground">financial leverage</span>, a headline ROE flatters when the last term is carrying it.
           </p>
         </Block>
       ) : (
@@ -119,7 +119,7 @@ export const ProfitabilityView = ({ workspace, section }: { workspace: Workspace
   );
 };
 
-/* ── Financial Health — computed distress scorecard ────────────── */
+/* ── Financial Health, computed distress scorecard ────────────── */
 
 export const HealthView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { sectionMetrics, data } = useEvidence();
@@ -179,7 +179,7 @@ export const HealthView = ({ workspace, section }: { workspace: WorkspaceDef; se
   );
 };
 
-/* ── Cash Generation — conversion cascade ──────────────────────── */
+/* ── Cash Generation, conversion cascade ──────────────────────── */
 
 export const CashGenerationView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { sectionMetrics, data } = useEvidence();
@@ -203,7 +203,7 @@ export const CashGenerationView = ({ workspace, section }: { workspace: Workspac
                 </span>
                 <span className="w-16 shrink-0 text-right font-mono text-[11.5px] font-semibold tabular-nums text-foreground">{B(s.value)}</span>
                 <span className={`w-14 shrink-0 text-right font-mono text-[10.5px] tabular-nums ${s.conversionPct == null ? "text-muted-foreground/50" : s.conversionPct >= 80 ? "text-gain" : s.conversionPct >= 50 ? "text-muted-foreground" : "text-loss"}`}>
-                  {s.conversionPct == null ? "—" : `${s.conversionPct}%`}
+                  {s.conversionPct == null ? "--" : `${s.conversionPct}%`}
                 </span>
               </div>
             ))}
@@ -213,7 +213,7 @@ export const CashGenerationView = ({ workspace, section }: { workspace: Workspac
           </p>
           <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
             The cascade traces every dollar of revenue down to cash returned to holders. The step where conversion
-            collapses is where the business model's real cost lives — and everything returned is paid from the bottom line, not the top.
+            collapses is where the business model's real cost lives, and everything returned is paid from the bottom line, not the top.
           </p>
         </Block>
       ) : (
@@ -230,7 +230,7 @@ export const CashGenerationView = ({ workspace, section }: { workspace: Workspac
   );
 };
 
-/* ── Risk Analysis — factor decomposition ──────────────────────── */
+/* ── Risk Analysis, factor decomposition ──────────────────────── */
 
 export const RiskAnalysisView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { sectionMetrics, data } = useEvidence();
@@ -282,7 +282,7 @@ export const RiskAnalysisView = ({ workspace, section }: { workspace: WorkspaceD
   );
 };
 
-/* ── Balance Sheet — computed capital structure (never blank) ───── */
+/* ── Balance Sheet, computed capital structure (never blank) ───── */
 
 const StructureBar = ({ s }: { s: CapitalStructure }) => {
   const equity = s.bookEquity ?? 0;
@@ -326,9 +326,9 @@ export const CapitalStructureView = ({ workspace, section }: { workspace: Worksp
               { l: "Market equity", v: B(s.marketEquity) },
               { l: "Book equity", v: B(s.bookEquity) },
               { l: "Total debt", v: B(s.totalDebt) },
-              { l: "Cash", v: s.cash != null ? B(s.cash) : "—" },
+              { l: "Cash", v: s.cash != null ? B(s.cash) : "--" },
               { l: "Net debt", v: B(s.netDebt) },
-              { l: "Net debt / EBITDA", v: s.netDebtToEbitda != null ? `${s.netDebtToEbitda}×` : "—" },
+              { l: "Net debt / EBITDA", v: s.netDebtToEbitda != null ? `${s.netDebtToEbitda}×` : "--" },
             ].map((x) => (
               <div key={x.l} className="flex items-baseline justify-between gap-2 border-b border-border/40 pb-1">
                 <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-muted-foreground/70">{x.l}</span>

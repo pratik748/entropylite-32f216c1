@@ -168,7 +168,7 @@ const REGION_LABELS: Record<string, string> = {
 
 function sanitizeRecommendation(rec: any): Recommendation {
   return {
-    ticker: typeof rec?.ticker === "string" ? rec.ticker : "—",
+    ticker: typeof rec?.ticker === "string" ? rec.ticker : "--",
     name: typeof rec?.name === "string" ? rec.name : "Unnamed asset",
     assetClass: typeof rec?.assetClass === "string" ? rec.assetClass : "asset",
     exchange: typeof rec?.exchange === "string" ? rec.exchange : "",
@@ -185,7 +185,7 @@ function sanitizeRecommendation(rec: any): Recommendation {
     thesis: typeof rec?.thesis === "string" ? rec.thesis : "",
     catalyst: typeof rec?.catalyst === "string" ? rec.catalyst : "No catalyst provided.",
     hedgingStrategy: typeof rec?.hedgingStrategy === "string" ? rec.hedgingStrategy : "No hedge specified.",
-    riskReward: typeof rec?.riskReward === "string" ? rec.riskReward : "—",
+    riskReward: typeof rec?.riskReward === "string" ? rec.riskReward : "--",
     sector: typeof rec?.sector === "string" ? rec.sector : "Unclassified",
     tags: Array.isArray(rec?.tags) ? rec.tags.filter((t: unknown) => typeof t === "string") : [],
     riskProfile: Array.isArray(rec?.riskProfile) ? rec.riskProfile.filter((t: unknown) => typeof t === "string") : [],
@@ -354,8 +354,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) {
       setLoading(true);
       setError(null);
-      // Clear stale results immediately so the loading screen is unambiguous —
-      // user explicitly asked old assets to disappear when "Find Assets" is tapped.
+      // Clear stale results immediately so the loading screen is unambiguous, // user explicitly asked old assets to disappear when "Find Assets" is tapped.
       setRecommendations([]);
       setMarketCondition("");
       setLiveWebContext("");
@@ -466,7 +465,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
             preferredHorizon: selectedHorizon || undefined,
-            // ODGS — Outcome Density Gradient System signals. Lets the AI
+            // ODGS, Outcome Density Gradient System signals. Lets the AI
             // pick names the user's own learned profit field already favours
             // and avoid scarred patterns. Only sent when there's enough
             // trade history to be meaningful.
@@ -548,7 +547,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
           setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
           setRecommendations([]);
           setLastFetch(Date.now());
-          // Clear stale exclusion memory — it's almost certainly part of why
+          // Clear stale exclusion memory, it's almost certainly part of why
           // we got an empty set. Next refresh starts from a clean slate.
           try { localStorage.removeItem(DA_PREV_TICKERS_KEY); } catch { /* ignore */ }
           const gen = data.candidatesGenerated || 0;
@@ -562,7 +561,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             : "";
           setError(
             gen > 0
-              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry — the next pass will start with a fresh exclusion window.`
+              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry, the next pass will start with a fresh exclusion window.`
               : "No setups generated this cycle. Try again or adjust filters.",
           );
           retryCount.current = 0;
@@ -589,7 +588,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       
       // Save tickers for anti-repeat on next refresh
       const newTickers = sanitizedRecommendations.map((r) => r.ticker);
-      // Replace, don't append — the recent-slate memory is a single window.
+      // Replace, don't append, the recent-slate memory is a single window.
       savePreviousTickers(newTickers);
       
       setMarketCondition(data.marketCondition || "");
@@ -762,7 +761,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="h-3 w-3" /> Time Horizon
-                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">— filters picks to match how long you'll hold</span>
+                <span className="text-[9px] font-normal normal-case text-muted-foreground/70">, filters picks to match how long you'll hold</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {HORIZONS.map((h) => (
@@ -840,7 +839,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         <div className="rounded-xl border border-warning/20 bg-warning/5 p-3 flex items-center gap-3">
           <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-foreground">Live refresh failed — showing last good results.</p>
+            <p className="text-xs font-semibold text-foreground">Live refresh failed, showing last good results.</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">{error}</p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => { retryCount.current = 0; fetchRecommendations(true, true); }}>
@@ -915,7 +914,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
         </div>
       )}
 
-      {/* Live Web Pulse — Real-time Google Search grounding */}
+      {/* Live Web Pulse, Real-time Google Search grounding */}
       {liveWebContext && liveWebContext.trim().length > 30 && (
         <div className="rounded-xl border border-gain/20 bg-gain/5 p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -1001,7 +1000,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                             ? "bg-primary/15 text-primary"
                             : "bg-loss/10 text-loss"
                       }`}
-                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "—"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "—"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "—"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% model win-prob (prior map, not an empirical frequency) · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
+                      title={`Buckets: A(price)=${rec.bucketDirs?.A === 1 ? "↑" : rec.bucketDirs?.A === -1 ? "↓" : "--"} B(intel)=${rec.bucketDirs?.B === 1 ? "↑" : rec.bucketDirs?.B === -1 ? "↓" : "--"} C(regime)=${rec.bucketDirs?.C === 1 ? "↑" : rec.bucketDirs?.C === -1 ? "↓" : "--"} · ${rec.consensus.engineCount} engines · ${Math.round(rec.consensus.calibratedProb * 100)}% model win-prob (prior map, not an empirical frequency) · R≈${rec.consensus.expectedR.toFixed(2)} (after ${rec.costHaircutPct ?? 0}% cost)`}
                     >
                       {rec.bucketConsensus === "ALL_3" ? "3/3" : rec.bucketConsensus === "TWO_OF_3" ? "2/3" : rec.bucketConsensus === "SPLIT" ? "SPLIT" : "1/3"} · {Math.round(rec.consensus.calibratedProb * 100)}%
                     </span>
@@ -1009,7 +1008,7 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                   {typeof rec.costHaircutPct === "number" && rec.costHaircutPct >= 1 && (
                     <span
                       className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-mono text-amber-400"
-                      title={`Round-trip cost ≈ ${rec.costHaircutPct}% (${rec.liquidityTier}) — eats into edge`}
+                      title={`Round-trip cost ≈ ${rec.costHaircutPct}% (${rec.liquidityTier}), eats into edge`}
                     >
                       ⚠ COST {rec.costHaircutPct}%
                     </span>

@@ -1,14 +1,14 @@
 import type { Transition, Variants } from "framer-motion";
 
 /**
- * Entropy motion system — Apple-calibre springs.
+ * Entropy motion system, Apple-calibre springs.
  *
  * Physics, not durations. Every interactive element shares these presets so
  * the whole product moves with one voice. All springs animate transform and
  * opacity only (GPU-composited, 120fps-capable).
  */
 
-/** Standard UI response — buttons, toggles, selection. Crisp, no overshoot. */
+/** Standard UI response, buttons, toggles, selection. Crisp, no overshoot. */
 export const springSnappy: Transition = {
   type: "spring",
   stiffness: 500,
@@ -16,7 +16,7 @@ export const springSnappy: Transition = {
   mass: 0.8,
 };
 
-/** Content arrival — cards, panels, sheets. Settles softly. */
+/** Content arrival, cards, panels, sheets. Settles softly. */
 export const springGentle: Transition = {
   type: "spring",
   stiffness: 260,
@@ -24,7 +24,7 @@ export const springGentle: Transition = {
   mass: 1,
 };
 
-/** Playful accents — badges, confirmations. A whisper of overshoot. */
+/** Playful accents, badges, confirmations. A whisper of overshoot. */
 export const springBouncy: Transition = {
   type: "spring",
   stiffness: 420,
@@ -32,7 +32,7 @@ export const springBouncy: Transition = {
   mass: 0.9,
 };
 
-/** Layout morphs — segmented-control pills, shared-element moves. */
+/** Layout morphs, segmented-control pills, shared-element moves. */
 export const springLayout: Transition = {
   type: "spring",
   stiffness: 550,

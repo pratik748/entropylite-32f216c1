@@ -2,7 +2,7 @@
  * Shared data plumbing for Foresight tools.
  *
  * Everything routes through governedInvoke, so the apiGovernor's TTL cache,
- * inflight dedup, and rate limiting apply — repeated tool calls inside one
+ * inflight dedup, and rate limiting apply, repeated tool calls inside one
  * plan (or across turns) never re-hit the network.
  */
 

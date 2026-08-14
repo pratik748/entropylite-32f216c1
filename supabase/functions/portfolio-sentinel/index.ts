@@ -103,8 +103,8 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     alerts.push({
       type: "split",
       severity: "info",
-      title: `${w.ticker} — Corporate action detected`,
-      message: `Yahoo reports a ${q.recentSplit.ratio} split. Price drop is mechanical, not a loss — verify quantity & basis.`,
+      title: `${w.ticker}, Corporate action detected`,
+      message: `Yahoo reports a ${q.recentSplit.ratio} split. Price drop is mechanical, not a loss, verify quantity & basis.`,
     });
     state.split = new Date().toISOString();
   }
@@ -114,7 +114,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     alerts.push({
       type: "drawdown_entry",
       severity: "critical",
-      title: `${w.ticker} — Drawdown breach`,
+      title: `${w.ticker}, Drawdown breach`,
       message: `Down ${pnlPct.toFixed(1)}% from your entry ($${w.entry_price.toFixed(2)} → $${price.toFixed(2)}). Threshold: -${w.drawdown_pct}%.`,
     });
     state.drawdown_entry = new Date().toISOString();
@@ -125,7 +125,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     alerts.push({
       type: "drawdown_peak",
       severity: "critical",
-      title: `${w.ticker} — Trailing stop breached`,
+      title: `${w.ticker}, Trailing stop breached`,
       message: `Down ${drawFromPeak.toFixed(1)}% from peak $${peak.toFixed(2)} → $${price.toFixed(2)}. Consider taking remaining profit.`,
     });
     state.drawdown_peak = new Date().toISOString();
@@ -136,7 +136,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     alerts.push({
       type: "max_profit",
       severity: "warning",
-      title: `${w.ticker} — Max profit zone`,
+      title: `${w.ticker}, Max profit zone`,
       message: `Price $${price.toFixed(2)} reached computed ceiling $${w.last_max_profit_target.toFixed(2)} (+${pnlPct.toFixed(1)}%). Beyond this, risk/reward deteriorates.`,
     });
     state.max_profit = new Date().toISOString();
@@ -163,7 +163,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
         alerts.push({
           type: "verdict_flip",
           severity: "critical",
-          title: `${w.ticker} — Consensus flipped to ${v}`,
+          title: `${w.ticker}, Consensus flipped to ${v}`,
           message: `Previous verdict: ${w.last_verdict}. New verdict: ${v} (conviction ${(conv * 100).toFixed(0)}%). Re-evaluate the position.`,
         });
         state.verdict_flip = new Date().toISOString();
@@ -177,7 +177,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
     alerts.push({
       type: "stale",
       severity: "info",
-      title: `${w.ticker} — Analysis is stale`,
+      title: `${w.ticker}, Analysis is stale`,
       message: `Last refreshed ${Math.round((Date.now() - lastAnalysis) / 3600_000)}h ago. Auto-refresh queued.`,
     });
     state.stale = new Date().toISOString();
@@ -208,7 +208,7 @@ async function scanWatch(supabase: any, w: Watch, prefs: any, userEmail: string 
       });
     }
     if (prefs?.email_enabled !== false && userEmail) {
-      const status = await enqueueEmail(supabase, userEmail, `${w.ticker} — ${alerts.length} risk alert${alerts.length > 1 ? "s" : ""}`, w.ticker, alerts);
+      const status = await enqueueEmail(supabase, userEmail, `${w.ticker}, ${alerts.length} risk alert${alerts.length > 1 ? "s" : ""}`, w.ticker, alerts);
       await supabase.from("risk_alerts")
         .update({ email_status: status })
         .eq("user_id", w.user_id)

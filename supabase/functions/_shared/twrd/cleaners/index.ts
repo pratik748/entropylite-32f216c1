@@ -1,4 +1,4 @@
-// Domain cleaners — assign π̂ caps and bias hints. Lightweight, deterministic.
+// Domain cleaners, assign π̂ caps and bias hints. Lightweight, deterministic.
 
 import type { RawClaim, TwrdDomain } from "../types.ts";
 
@@ -31,7 +31,7 @@ function biasScore(text: string): number {
   return Math.min(1, hits * 0.4);
 }
 
-/** Run cleaner for a single claim — assigns π̂_cap and biasHat in-place. */
+/** Run cleaner for a single claim, assigns π̂_cap and biasHat in-place. */
 export function clean(claim: RawClaim): RawClaim {
   const cap = PI_CAP_BY_DOMAIN[claim.domain] ?? PI_CAP_BY_DOMAIN.financial;
   const text = (claim.evidence?.[0]?.raw_text ?? "").toString();

@@ -1,12 +1,12 @@
 // Claim novelty + sybil-resistant deduplication (TRUTH v2 §6.2 Factor 2).
 //
-// Both operate on token sets of canonical claim content — never on
+// Both operate on token sets of canonical claim content, never on
 // embeddings, never via an LLM. Purpose:
 //   • novelty:   1 − max Jaccard vs the recent claim base → "is this new
 //                information?" (feeds the News Intelligence engine and the
 //                Novelty factor of the Opportunity Score).
 //   • sybilDedup: near-identical content from "different" sources counts as
-//                ONE source in Noisy-OR agreement — syndicated/churned news
+//                ONE source in Noisy-OR agreement, syndicated/churned news
 //                must not manufacture independent corroboration.
 //
 // Browser + edge safe (no imports). Deno twin: _shared/twrd/admission.ts.
@@ -65,8 +65,7 @@ export interface EvidenceLike {
 /**
  * Sybil-resistant dedup: evidence items whose text content overlaps with an
  * already-kept item at Jaccard > threshold are collapsed (first kept wins).
- * Evidence without text dedups on source_id only. Returns the deduped list —
- * feed THIS to noisy-OR `agreement()`, never the raw list.
+ * Evidence without text dedups on source_id only. Returns the deduped list, * feed THIS to noisy-OR `agreement()`, never the raw list.
  */
 export function sybilDedup<E extends EvidenceLike>(evidence: E[], threshold = 0.9): E[] {
   const kept: E[] = [];

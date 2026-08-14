@@ -17,7 +17,7 @@ const ACTION_STYLE: Record<Action, string> = {
 };
 
 /**
- * Workstation context bar — identity, live price, the evidence-weighted
+ * Workstation context bar, identity, live price, the evidence-weighted
  * verdict, and the decision-relevant status that replaced the old bottom
  * strip: per-feed freshness and evidence provenance counts.
  */
@@ -92,7 +92,7 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
           </span>
         )}
         <span className="hidden font-mono text-[10px] tabular-nums text-muted-foreground lg:inline" title="Last successful price update (UTC)">
-          {priceFreshness ? `prices ${priceFreshness} UTC` : status.quote.state === "cached" ? "prices · last known" : "prices —"}
+          {priceFreshness ? `prices ${priceFreshness} UTC` : status.quote.state === "cached" ? "prices · last known" : "prices -"}
         </span>
         <button
           onClick={onToggleInspector}
@@ -109,13 +109,13 @@ const ContextBar = ({ inspectorOpen, onToggleInspector }: ContextBarProps) => {
         </button>
       </div>
 
-      {/* Indeterminate load bar — engines still assembling evidence */}
+      {/* Indeterminate load bar, engines still assembling evidence */}
       {loadingSources.length > 0 && (
         <div
           className="absolute inset-x-0 -bottom-px h-[2px] overflow-hidden"
           role="progressbar"
           aria-label={`Loading ${loadingSources.join(", ")}`}
-          title={`Assembling evidence — ${loadingSources.join(", ")}`}
+          title={`Assembling evidence, ${loadingSources.join(", ")}`}
         >
           <div className="ws-loadbar h-full w-1/4 rounded-full bg-foreground/50" />
         </div>

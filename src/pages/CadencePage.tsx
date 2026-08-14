@@ -15,7 +15,7 @@ export default function CadencePage() {
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    document.title = "Cadence | Entropy — daily research on the math behind the system";
+    document.title = "Cadence | Entropy, daily research on the math behind the system";
     const meta = document.querySelector('meta[name="description"]');
     if (meta)
       meta.setAttribute(
@@ -71,7 +71,7 @@ export default function CadencePage() {
             <span className="text-white/40">Unpacked every 24 hours.</span>
           </>
         }
-        lede="A research note from inside Entropy. Each entry takes a single idea that powers the system — a model, a measure, a structural assumption — and unpacks it the way a quant team briefs a new hire: intuition first, math second, and a diagram showing exactly where the idea lands in production."
+        lede="A research note from inside Entropy. Each entry takes a single idea that powers the system, a model, a measure, a structural assumption, and unpacks it the way a quant team briefs a new hire: intuition first, math second, and a diagram showing exactly where the idea lands in production."
       />
 
       <main className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
@@ -96,12 +96,12 @@ export default function CadencePage() {
               {generating ? (
                 <div className="flex items-center gap-2 text-white/55 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Multi-provider research in progress. This usually takes 30–60 seconds — refresh in a moment.
+                  Multi-provider research in progress. This usually takes 30–60 seconds, refresh in a moment.
                 </div>
               ) : (
                 <p className="text-[14.5px] text-white/55 leading-relaxed">
                   The daily research generator is warming up. The first Cadence entry will publish
-                  within 24 hours, and a new one every day after that — automatically curated,
+                  within 24 hours, and a new one every day after that, automatically curated,
                   multi-provider researched, peer-critiqued, and illustrated.
                 </p>
               )}
@@ -174,7 +174,7 @@ export default function CadencePage() {
             <p className="text-[12px] text-white/40 leading-relaxed">
               Cadence is generated daily by Entropy. Each entry is researched in parallel by multiple
               AI providers, synthesized through a critic pass, and illustrated with a custom diagram.
-              Free to read, free to share — no login required.
+              Free to read, free to share, no login required.
             </p>
             {entries.length > 0 && (
               <p className="mkt-label text-[8px] text-white/25 mt-4">

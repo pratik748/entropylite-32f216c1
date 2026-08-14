@@ -1,5 +1,5 @@
 /**
- * Shared scraping utility — native HTML fetch first, ScrapeGraph AI fallback.
+ * Shared scraping utility, native HTML fetch first, ScrapeGraph AI fallback.
  * Saves ScrapeGraph credits by trying free HTML scraping first.
  */
 
@@ -99,7 +99,7 @@ export async function scrapeHTML(url: string, timeoutMs = 10000): Promise<Scrape
   }
 }
 
-/** ScrapeGraph AI smartscraper — structured extraction with credits */
+/** ScrapeGraph AI smartscraper, structured extraction with credits */
 export async function scrapeWithScrapeGraph(
   url: string,
   prompt: string,
@@ -237,7 +237,7 @@ export async function scrapePremiumNews(ticker: string): Promise<{
         }
       }
     } catch {
-      // Treat as raw text — extract headlines heuristically
+      // Treat as raw text, extract headlines heuristically
       const lines = result.content.split(/[.\n]/).filter((l: string) => l.trim().length > 20 && l.trim().length < 200);
       for (const line of lines.slice(0, 5)) {
         articles.push({

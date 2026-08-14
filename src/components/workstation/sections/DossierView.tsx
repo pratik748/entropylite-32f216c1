@@ -6,7 +6,7 @@ import { Block, PendingEvidence, ShareBar } from "./blocks";
 import type { DeskAnalysis, Dossier, NewsItem } from "@/lib/evidence/inputs";
 
 /**
- * Dossier-backed sections — competitors, supply chain, segments, geography,
+ * Dossier-backed sections, competitors, supply chain, segments, geography,
  * leadership, ownership registers, insider trades, filings and news. Renders
  * the section's evidence nodes first, then the underlying dossier detail in
  * institutional form. Estimated data is labeled as such once, quietly.
@@ -34,7 +34,7 @@ const DossierView = ({ workspace, section }: { workspace: WorkspaceDef; section:
       {d && detail && (
         <p className="text-[10.5px] leading-relaxed text-muted-foreground/60">
           Register detail is assembled by the dossier model from scraped filings, ownership and news
-          data — treat names and structure as reliable, exact figures as estimates.
+          data, treat names and structure as reliable, exact figures as estimates.
         </p>
       )}
     </SectionShell>
@@ -42,7 +42,7 @@ const DossierView = ({ workspace, section }: { workspace: WorkspaceDef; section:
 };
 
 /**
- * Premium attribution — answers the peer questions directly instead of
+ * Premium attribution, answers the peer questions directly instead of
  * leaving ratios beside competitors: why is this name priced where it is,
  * which evidence carries the premium, which competitors are converging,
  * and where the register says capital is flowing. Deterministic: every
@@ -74,7 +74,7 @@ const PremiumAttribution = () => {
     <Block title="Premium attribution">
       <p className="text-[12.5px] leading-relaxed text-foreground">
         Trades at <button onClick={() => select("pe")} className="font-mono font-semibold underline decoration-border underline-offset-2 hover:decoration-foreground">{pe.value}×</button>{" "}
-        trailing earnings — {premiumPct >= 0 ? `a ${premiumPct}% premium to` : `a ${Math.abs(premiumPct)}% discount to`} the
+        trailing earnings, {premiumPct >= 0 ? `a ${premiumPct}% premium to` : `a ${Math.abs(premiumPct)}% discount to`} the
         long-run broad-market norm of ~18×.
       </p>
       {lead && (
@@ -82,8 +82,7 @@ const PremiumAttribution = () => {
           The single metric doing the most to justify it:{" "}
           <button onClick={() => select(lead.id)} className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">
             {lead.label}
-          </button>{" "}
-          — {lead.assessment.reason.charAt(0).toLowerCase() + lead.assessment.reason.slice(1)}
+          </button>{" "}, {lead.assessment.reason.charAt(0).toLowerCase() + lead.assessment.reason.slice(1)}
         </p>
       )}
       {carriers.length > 1 && (
@@ -111,7 +110,7 @@ const PremiumAttribution = () => {
               </button>
             </span>
           ))}
-          {" — if these deteriorate faster than the carriers, the reversion rows in the P/E investigation are the price path."}
+          {", if these deteriorate faster than the carriers, the reversion rows in the P/E investigation are the price path."}
         </p>
       )}
       {(converging.length > 0 || accumulating.length > 0 || distributing.length > 0) && (
@@ -171,9 +170,9 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
                       </span>
                     </td>
                     <td className="py-1.5 pr-3 text-right tabular-nums text-foreground">
-                      {c.marketShare != null ? `${c.marketShare}%` : "—"}
+                      {c.marketShare != null ? `${c.marketShare}%` : "--"}
                     </td>
-                    <td className="hidden max-w-[280px] truncate py-1.5 text-muted-foreground sm:table-cell">{c.strengths || "—"}</td>
+                    <td className="hidden max-w-[280px] truncate py-1.5 text-muted-foreground sm:table-cell">{c.strengths || "--"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -347,9 +346,9 @@ function renderDetail(key: string, d: Dossier, analysis: DeskAnalysis | null) {
         <Block title="Management communication read">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <ToneTile label="Earnings tone" value={n.earningsTone} good={n.earningsTone === "positive"} bad={n.earningsTone === "negative"} />
-            <ToneTile label="Analyst consensus" value={(n.analystConsensus || "—").replace(/_/g, " ")} good={/buy/.test(n.analystConsensus || "")} bad={/sell/.test(n.analystConsensus || "")} />
-            <ToneTile label="News sentiment" value={n.newsSentiment != null ? `${n.newsSentiment > 0 ? "+" : ""}${n.newsSentiment}` : "—"} good={n.newsSentiment > 10} bad={n.newsSentiment < -10} />
-            <ToneTile label="Social tone" value={n.socialSentiment != null ? `${n.socialSentiment > 0 ? "+" : ""}${n.socialSentiment}` : "—"} good={n.socialSentiment > 10} bad={n.socialSentiment < -10} />
+            <ToneTile label="Analyst consensus" value={(n.analystConsensus || "--").replace(/_/g, " ")} good={/buy/.test(n.analystConsensus || "")} bad={/sell/.test(n.analystConsensus || "")} />
+            <ToneTile label="News sentiment" value={n.newsSentiment != null ? `${n.newsSentiment > 0 ? "+" : ""}${n.newsSentiment}` : "--"} good={n.newsSentiment > 10} bad={n.newsSentiment < -10} />
+            <ToneTile label="Social tone" value={n.socialSentiment != null ? `${n.socialSentiment > 0 ? "+" : ""}${n.socialSentiment}` : "--"} good={n.socialSentiment > 10} bad={n.socialSentiment < -10} />
           </div>
           {Array.isArray(n.narrativeShifts) && n.narrativeShifts.length > 0 && (
             <div className="mt-3">
@@ -514,7 +513,7 @@ const ToneTile = ({ label, value, good, bad }: { label: string; value: string; g
   <div className="rounded-sm border border-border/60 px-3 py-2">
     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">{label}</p>
     <p className={`mt-1 text-[13px] font-semibold capitalize ${good ? "text-gain" : bad ? "text-loss" : "text-foreground"}`}>
-      {value || "—"}
+      {value || "--"}
     </p>
   </div>
 );

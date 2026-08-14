@@ -15,7 +15,7 @@ const COLUMNS: { title: string; links: { label: string; path: string }[] }[] = [
     title: "Research",
     links: [
       { label: "Backbone", path: "/backbone" },
-      { label: "Cadence — daily notes", path: "/cadence" },
+      { label: "Cadence, daily notes", path: "/cadence" },
       { label: "Data & veracity", path: "/data" },
     ],
   },
@@ -34,13 +34,13 @@ export default function SiteFooter() {
   return (
     <footer className="bg-carbon-950 text-white border-t border-hairline">
       <div className="max-w-7xl mx-auto px-5 sm:px-8">
-        {/* Upper — brand + link columns */}
+        {/* Upper, brand + link columns */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 md:gap-6 pt-16 pb-12">
           <div className="md:col-span-5">
             <Wordmark light />
             <p className="mt-6 max-w-sm text-[13px] leading-relaxed text-white/40">
               A probabilistic market-intelligence terminal. Twelve analytical
-              engines — risk, constraint detection, simulation, flow — composed
+              engines, risk, constraint detection, simulation, flow, composed
               into one operational surface.
             </p>
           </div>

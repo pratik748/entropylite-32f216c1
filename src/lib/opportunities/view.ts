@@ -1,8 +1,8 @@
 // Pure view helpers over validated opportunities. Kept free of any
 // network/client imports so every consumer (and the test suite) can use
 // them directly. The canonical ordering everywhere is expected
-// risk-adjusted edge — diversification-adjusted when the engine had
-// portfolio context — descending.
+// risk-adjusted edge, diversification-adjusted when the engine had
+// portfolio context, descending.
 
 import type { OpportunityFilters, ValidatedOpportunity } from "./types";
 
@@ -36,7 +36,7 @@ export function filterOpportunities(
 
 /**
  * Diff two slates and return opportunities that are new since the previous
- * one — the alert primitive. Purely derived from validated objects; no
+ * one, the alert primitive. Purely derived from validated objects; no
  * alert is ever fabricated.
  */
 export function newOpportunities(

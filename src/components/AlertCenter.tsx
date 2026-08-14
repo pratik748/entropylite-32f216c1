@@ -31,7 +31,7 @@ export default function AlertCenter() {
 
   useEffect(() => { refresh(); }, []);
 
-  // realtime subscription — new alerts appear instantly
+  // realtime subscription, new alerts appear instantly
   useEffect(() => {
     const ch = (supabase as any).channel("risk_alerts_live")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "risk_alerts" }, () => refresh())
@@ -39,7 +39,7 @@ export default function AlertCenter() {
     return () => { (supabase as any).removeChannel(ch); };
   }, []);
 
-  // New validated opportunities from the shared Opportunity Engine — the
+  // New validated opportunities from the shared Opportunity Engine, the
   // same objects Discover and Direct Profit render, surfaced as alerts.
   const { fresh: freshOpportunities, acknowledge: acknowledgeOpportunities } = useOpportunityAlerts();
 
@@ -59,7 +59,7 @@ export default function AlertCenter() {
       <PopoverTrigger asChild>
         <button
           className="relative p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="Portfolio Sentinel — Risk Alerts"
+          title="Portfolio Sentinel, Risk Alerts"
           aria-label="Alerts"
         >
           <Bell className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${critical ? "text-loss" : ""}`} />

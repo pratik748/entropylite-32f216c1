@@ -1,4 +1,4 @@
-// Robustness layer — the aggressive rejection stack.
+// Robustness layer, the aggressive rejection stack.
 //
 //   bhQValues / pRealFromScan   the daily discovery scan tests many
 //       hypotheses at once; convert raw p-values into BH-adjusted q-values
@@ -10,7 +10,7 @@
 //       reduced to its correct cheap form: fraction of *constraint-feasible*
 //       Monte Carlo paths in which the trade thesis survives (target hit
 //       before stop within horizon). Paths come from the existing simulators
-//       (gbmPath / ouSimPaths / runFGM) — this module only evaluates them.
+//       (gbmPath / ouSimPaths / runFGM), this module only evaluates them.
 //
 //   regimeStability   1 − hit-rate dispersion across regimes.
 

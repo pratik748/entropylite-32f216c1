@@ -31,7 +31,7 @@ const BG = "hsl(0,0%,3%)";
 const tipStyle = { background: CARD_BG, border: `1px solid ${GRID}`, borderRadius: 8, fontSize: 11 };
 
 const strategies: { id: OptimizerId; label: string; icon: typeof Scale; desc: string }[] = [
-  { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "wᵢ = 1/N — no estimation risk" },
+  { id: "equal_weight", label: "Equal Weight", icon: Scale, desc: "wᵢ = 1/N, no estimation risk" },
   { id: "min_variance", label: "Min Variance", icon: Target, desc: "Σ⁻¹·1 active-set long-only (Markowitz)" },
   { id: "mean_variance", label: "Mean–Variance", icon: TrendingUp, desc: "max μᵀw − λwᵀΣw (Markowitz 1952)" },
   { id: "robust_mean_variance", label: "Robust MVO", icon: Sigma, desc: "Ledoit–Wolf Σ + μ shrunk to grand mean" },
@@ -201,9 +201,9 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
     const regimeName = regime?.regime || "Range-Bound";
     const regimeAdvice = (() => {
       switch (regimeName) {
-        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt — overweight high-μ names within the Σ risk budget", recommended: "mean_variance" as OptimizerId };
+        case "Trending Bull": return { color: "text-gain", suggestion: "Markowitz utility tilt, overweight high-μ names within the Σ risk budget", recommended: "mean_variance" as OptimizerId };
         case "Trending Bear": return { color: "text-loss", suggestion: "Shift to minimum variance, reduce beta exposure aggressively", recommended: "min_variance" as OptimizerId };
-        case "Crisis": return { color: "text-loss", suggestion: "HRP — clustering stays stable exactly where Σ⁻¹ breaks in stress", recommended: "hrp" as OptimizerId };
+        case "Crisis": return { color: "text-loss", suggestion: "HRP, clustering stays stable exactly where Σ⁻¹ breaks in stress", recommended: "hrp" as OptimizerId };
         case "High Volatility": return { color: "text-warning", suggestion: "Risk parity rebalance, normalize contribution per position", recommended: "risk_parity" as OptimizerId };
         case "Rotation": return { color: "text-info", suggestion: "Equal weight rebalance, capture sector rotation evenly", recommended: "equal_weight" as OptimizerId };
         default: return { color: "text-muted-foreground", suggestion: "Maintain current allocation, no regime trigger detected", recommended: "hrp" as OptimizerId };
@@ -255,7 +255,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* KPI Strip — real time-series metrics */}
+      {/* KPI Strip, real time-series metrics */}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         {[
           { label: "Portfolio Value", value: fmt(totalValue), color: "text-foreground", sub: `${holdings.length} positions` },
@@ -290,7 +290,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
         </div>
         {strategyError && (
           <p className="mb-2 text-[10px] text-warning flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> {strategyError} — no fallback allocation is shown
+            <AlertTriangle className="h-3 w-3" /> {strategyError}, no fallback allocation is shown
           </p>
         )}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -343,7 +343,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
       {diag && (
         <div className="rounded-xl border border-border bg-card p-4">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Solver Diagnostics — {active?.label}
+            Solver Diagnostics, {active?.label}
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div>
@@ -355,12 +355,12 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">κ(Σ) Condition</p>
               <p className={`font-mono text-sm font-bold ${diag.conditionNumber != null && diag.conditionNumber > 1000 ? "text-warning" : "text-foreground"}`}>
-                {diag.conditionNumber == null ? "—" : diag.conditionNumber === Infinity ? "singular" : diag.conditionNumber.toFixed(0)}
+                {diag.conditionNumber == null ? "--" : diag.conditionNumber === Infinity ? "singular" : diag.conditionNumber.toFixed(0)}
               </p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">LW Shrinkage δ</p>
-              <p className="font-mono text-sm font-bold text-foreground">{diag.shrinkageDelta != null ? diag.shrinkageDelta.toFixed(3) : "—"}</p>
+              <p className="font-mono text-sm font-bold text-foreground">{diag.shrinkageDelta != null ? diag.shrinkageDelta.toFixed(3) : "--"}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</p>
@@ -369,7 +369,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Target σₐ / Cash</p>
               <p className="font-mono text-sm font-bold text-foreground">
-                {active ? `${(active.volAnnual * 100).toFixed(1)}%` : "—"}
+                {active ? `${(active.volAnnual * 100).toFixed(1)}%` : "--"}
                 {active && active.cashWeight > 0.005 ? ` · ${(active.cashWeight * 100).toFixed(0)}% cash` : ""}
               </p>
             </div>
@@ -394,22 +394,22 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
             title="Random Matrix Theory"
             methods={[
               { label: "MP upper edge", formula: "λ₊ = (1 + √(N/T))²", source: "Marchenko & Pastur (1967)", notes: "Eigenvalues > λ₊ on the realised correlation matrix carry genuine signal; the rest are sampling noise." },
-              { label: "PC1 concentration", formula: "λ₁ / Σλᵢ", source: "Bouchaud & Potters; Laloux et al. (1999)", notes: ">40% of variance in PC1 indicates a dominant systemic factor — diversification is illusory." },
+              { label: "PC1 concentration", formula: "λ₁ / Σλᵢ", source: "Bouchaud & Potters; Laloux et al. (1999)", notes: ">40% of variance in PC1 indicates a dominant systemic factor, diversification is illusory." },
             ]}
           />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Assets (N)</p>
-            <p className="font-mono text-lg font-bold text-foreground">{rmt.eigCount || "—"}</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.eigCount || "--"}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lookback (T)</p>
-            <p className="font-mono text-lg font-bold text-foreground">{rmt.T ? `${rmt.T}d` : "—"}</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.T ? `${rmt.T}d` : "--"}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">λ₊ Edge</p>
-            <p className="font-mono text-lg font-bold text-foreground">{rmt.lambdaPlus ?? "—"}</p>
+            <p className="font-mono text-lg font-bold text-foreground">{rmt.lambdaPlus ?? "--"}</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">PC1 Share</p>
@@ -418,12 +418,12 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
               : rmt.pc1Share > 0.4 ? "text-loss"
               : rmt.pc1Share > 0.25 ? "text-warning"
               : "text-gain"
-            }`}>{rmt.pc1Share == null ? "—" : `${(rmt.pc1Share * 100).toFixed(1)}%`}</p>
+            }`}>{rmt.pc1Share == null ? "--" : `${(rmt.pc1Share * 100).toFixed(1)}%`}</p>
           </div>
         </div>
         {rmt.pc1Share != null && rmt.pc1Share > 0.4 && (
           <p className="mt-2 text-[11px] text-loss flex items-center gap-1.5">
-            <AlertTriangle className="h-3 w-3" /> Systemic concentration: {(rmt.pc1Share * 100).toFixed(0)}% of variance in PC1 — diversification illusory.
+            <AlertTriangle className="h-3 w-3" /> Systemic concentration: {(rmt.pc1Share * 100).toFixed(0)}% of variance in PC1, diversification illusory.
           </p>
         )}
         {rmt.signalCount != null && (
@@ -610,7 +610,7 @@ const PortfolioConstructionModule = ({ stocks }: Props) => {
                   <td className="py-2.5 px-2 text-center">
                     <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${d.action === "TRIM" ? "bg-loss/10 text-loss" : d.action === "ADD" ? "bg-gain/10 text-gain" : "bg-surface-3 text-muted-foreground"}`}>{d.action}</span>
                   </td>
-                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : "—"}</td>
+                  <td className="py-2.5 px-2 text-right font-mono text-muted-foreground">{d.action !== "HOLD" ? fmt(d.tradeValue) : "--"}</td>
                 </tr>
               ))}
               {active && active.cashWeight > 0.005 && (

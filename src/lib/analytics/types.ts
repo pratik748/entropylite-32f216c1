@@ -1,10 +1,10 @@
 /**
- * Institutional Analytics — shared typed models.
+ * Institutional Analytics, shared typed models.
  * ───────────────────────────────────────────────
  * Every number the reporting layer shows is a `MetricValue`: the value plus
  * its provenance (data source, calculation, sample size) and a confidence
  * grade derived from the sample, never asserted. Insights and reports are
- * composed exclusively from these — there is no path for an uncited figure
+ * composed exclusively from these, there is no path for an uncited figure
  * to reach the UI.
  */
 
@@ -162,7 +162,7 @@ export interface RiskMetrics {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Stress testing — scenarios are DEFINED as market-factor shocks and
+// Stress testing, scenarios are DEFINED as market-factor shocks and
 // PROPAGATED through each asset's real regression beta. No per-scenario
 // portfolio multipliers exist anywhere.
 // ─────────────────────────────────────────────────────────────────

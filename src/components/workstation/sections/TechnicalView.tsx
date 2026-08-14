@@ -8,7 +8,7 @@ import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 
 /**
- * Technical structure — the 2y price path with its trend anchors and the
+ * Technical structure, the 2y price path with its trend anchors and the
  * engine's support/resistance, plus the structure evidence nodes. Chart
  * colors come from CSS tokens so both themes render correctly.
  */
@@ -102,7 +102,7 @@ const TechnicalView = ({ workspace, section }: { workspace: WorkspaceDef; sectio
           </div>
           <p className="mt-1.5 text-[10.5px] text-muted-foreground/70">
             Solid line: daily closes. Dashed: 50-session average. Bands: the engine's support and
-            resistance — the levels the risk:reward evidence is computed against.
+            resistance, the levels the risk:reward evidence is computed against.
           </p>
         </Block>
       ) : data.status.bars.state === "loading" ? (
@@ -110,7 +110,7 @@ const TechnicalView = ({ workspace, section }: { workspace: WorkspaceDef; sectio
       ) : (
         <Block title="Price structure">
           <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-            The price-history feed is re-syncing — the chart appears automatically when it lands. The
+            The price-history feed is re-syncing, the chart appears automatically when it lands. The
             structure evidence below is computed from the analysis engine and remains live.
           </p>
         </Block>

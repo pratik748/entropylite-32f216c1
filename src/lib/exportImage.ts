@@ -14,7 +14,7 @@ export async function exportNodeToPng(
 ): Promise<string> {
   const { backgroundColor = "#0a0a0a", pixelRatio = 2, filter } = opts;
 
-  // 1. Wait for web fonts to be ready — biggest cause of silent failures
+  // 1. Wait for web fonts to be ready, biggest cause of silent failures
   try {
     if ((document as any).fonts?.ready) {
       await (document as any).fonts.ready;
@@ -42,7 +42,7 @@ export async function exportNodeToPng(
 
   let lastErr: any = null;
 
-  // 3. Try toPng up to 3 times — first call often warms up the renderer
+  // 3. Try toPng up to 3 times, first call often warms up the renderer
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const url = await toPng(node, baseOptions);

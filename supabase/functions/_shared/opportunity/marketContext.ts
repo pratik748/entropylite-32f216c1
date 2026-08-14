@@ -1,4 +1,4 @@
-// Market Context — a lightweight, knowledge-based macro classifier.
+// Market Context, a lightweight, knowledge-based macro classifier.
 //
 // It does NOT re-fetch anything and does NOT score securities. It reads the
 // already-measured MacroContext and the benchmark-derived MarketRegime and
@@ -10,13 +10,13 @@
 //
 // Every classification is backed by a measured number (VIX percentile,
 // benchmark 21-day drift, above/below 200-day, credit spreads, curve, the
-// dollar) — the "signature quant edge" expressed as economic knowledge, not
+// dollar), the "signature quant edge" expressed as economic knowledge, not
 // an LLM opinion.
 //
 // The context INFLUENCES CONFIDENCE, it never overrides model outputs. It is
 // applied as a bounded, direction-aware multiplier on a *validated*
 // opportunity's confidence (centred on 1.0, so a neutral environment leaves
-// conviction — and therefore ranking — unchanged). It cannot change a model's
+// conviction, and therefore ranking, unchanged). It cannot change a model's
 // direction, cannot change the consensus decision, and cannot move a
 // candidate across the accept/reject line (the consensus gate has already
 // run on the raw calibrated probability before this multiplier is applied).
@@ -49,13 +49,13 @@ export interface MarketContext {
 // Confidence nudge is deliberately small and bounded: context tilts
 // conviction at the margin, it does not dominate the models. In a neutral /
 // normal / range-bound environment every term is zero and both multipliers
-// are exactly 1.0 — behaviour is then identical to the pre-context engine.
+// are exactly 1.0, behaviour is then identical to the pre-context engine.
 const MULT_FLOOR = 0.90;
 const MULT_CEIL = 1.06;
 
 /**
  * Classify the environment from already-measured macro + regime evidence.
- * Pure and deterministic — same inputs always yield the same context.
+ * Pure and deterministic, same inputs always yield the same context.
  */
 export function classifyMarketContext(macro: MacroContext, regime: MarketRegime): MarketContext {
   const evidence: string[] = [];
@@ -67,12 +67,12 @@ export function classifyMarketContext(macro: MacroContext, regime: MarketRegime)
   const vix = macro.volatility.vix;
   let volatility: VolState = "normal_vol";
   if (vixPctile != null) {
-    if (vixPctile >= 0.70) { volatility = "high_vol"; evidence.push(`Volatility elevated — VIX ${vix != null ? vix.toFixed(1) : ""} in the ${Math.round(vixPctile * 100)}th percentile of its 1-year range.`); }
-    else if (vixPctile <= 0.30) { volatility = "low_vol"; evidence.push(`Volatility subdued — VIX ${vix != null ? vix.toFixed(1) : ""} in the ${Math.round(vixPctile * 100)}th percentile of its 1-year range.`); }
-    else evidence.push(`Volatility mid-range — VIX in the ${Math.round(vixPctile * 100)}th percentile.`);
+    if (vixPctile >= 0.70) { volatility = "high_vol"; evidence.push(`Volatility elevated, VIX ${vix != null ? vix.toFixed(1) : ""} in the ${Math.round(vixPctile * 100)}th percentile of its 1-year range.`); }
+    else if (vixPctile <= 0.30) { volatility = "low_vol"; evidence.push(`Volatility subdued, VIX ${vix != null ? vix.toFixed(1) : ""} in the ${Math.round(vixPctile * 100)}th percentile of its 1-year range.`); }
+    else evidence.push(`Volatility mid-range, VIX in the ${Math.round(vixPctile * 100)}th percentile.`);
   } else if (regime.benchmarkVolAnnual > 0) {
-    if (regime.benchmarkVolAnnual > 0.25) { volatility = "high_vol"; evidence.push(`Benchmark realized volatility ${pct(regime.benchmarkVolAnnual)} annualized — elevated.`); }
-    else if (regime.benchmarkVolAnnual < 0.13) { volatility = "low_vol"; evidence.push(`Benchmark realized volatility ${pct(regime.benchmarkVolAnnual)} annualized — subdued.`); }
+    if (regime.benchmarkVolAnnual > 0.25) { volatility = "high_vol"; evidence.push(`Benchmark realized volatility ${pct(regime.benchmarkVolAnnual)} annualized, elevated.`); }
+    else if (regime.benchmarkVolAnnual < 0.13) { volatility = "low_vol"; evidence.push(`Benchmark realized volatility ${pct(regime.benchmarkVolAnnual)} annualized, subdued.`); }
   }
 
   // ── Trend axis ───────────────────────────────────────────────────
@@ -83,10 +83,10 @@ export function classifyMarketContext(macro: MacroContext, regime: MarketRegime)
   let trend: TrendState = "unknown";
   if (above200 != null && Math.abs(ret21) >= 0.02 && ((ret21 > 0) === above200)) {
     trend = "trending";
-    evidence.push(`Benchmark ${above200 ? "above" : "below"} its 200-day average with a ${ret21 >= 0 ? "+" : ""}${pct(ret21)} 21-day drift — a ${ret21 >= 0 ? "up" : "down"}trend.`);
+    evidence.push(`Benchmark ${above200 ? "above" : "below"} its 200-day average with a ${ret21 >= 0 ? "+" : ""}${pct(ret21)} 21-day drift, a ${ret21 >= 0 ? "up" : "down"}trend.`);
   } else if (Math.abs(ret21) < 0.015 && volatility !== "high_vol") {
     trend = "range_bound";
-    evidence.push(`Benchmark 21-day drift only ${ret21 >= 0 ? "+" : ""}${pct(ret21)} with contained volatility — range-bound.`);
+    evidence.push(`Benchmark 21-day drift only ${ret21 >= 0 ? "+" : ""}${pct(ret21)} with contained volatility, range-bound.`);
   }
 
   // ── Risk axis ────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ export function classifyMarketContext(macro: MacroContext, regime: MarketRegime)
   else if (risk === "risk_off") bias -= 0.03;
   if (trend === "trending") bias += above200 ? 0.02 : -0.02;
 
-  let damp = 0;   // applies to BOTH sides — uncertainty shrinks conviction
+  let damp = 0;   // applies to BOTH sides, uncertainty shrinks conviction
   if (volatility === "high_vol") damp -= 0.03;
   else if (volatility === "low_vol") damp += 0.01;
 

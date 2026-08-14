@@ -1,10 +1,10 @@
-// Causal chain evaluator — reasons through the transmission mechanism
+// Causal chain evaluator, reasons through the transmission mechanism
 // instead of observing isolated correlations.
 //
 // The EDGES of each chain are structural economic priors (documented and
 // fixed: rate discounting, dollar invoicing, credit risk appetite, vol
 // regime, sector rotation, curve → bank margins). The ACTIVATION of every
-// node is measured from live market data in the MacroContext — nothing in
+// node is measured from live market data in the MacroContext, nothing in
 // a chain narrative is asserted without a number behind it.
 //
 // A chain only contributes to a candidate when its terminal node actually
@@ -22,7 +22,7 @@ interface ChainHit {
   narrative: string;    // traced path with measured values
 }
 
-/** Activation thresholds — each is the point where the measured move is
+/** Activation thresholds, each is the point where the measured move is
  *  large enough to plausibly transmit (≈ one quarter of typical annual
  *  variation for that instrument), not a tuning knob. */
 const RATE_MOVE_PT = 0.25;     // 10y move over 63d, percentage points
@@ -142,7 +142,7 @@ export function causalModel(bundle: EvidenceBundle, macro: MacroContext): ModelS
   if (macro.missing.length >= 6) {
     return {
       id: "causal", label: "Causal chains", direction: 0, confidence: 0, score: 0,
-      rationale: ["Macro instruments unavailable — causal transmission cannot be measured, so the model abstains."],
+      rationale: ["Macro instruments unavailable, causal transmission cannot be measured, so the model abstains."],
       hasSignal: false,
     };
   }
@@ -150,7 +150,7 @@ export function causalModel(bundle: EvidenceBundle, macro: MacroContext): ModelS
   if (hits.length === 0) {
     return {
       id: "causal", label: "Causal chains", direction: 0, confidence: 0, score: 0,
-      rationale: ["No macro transmission chain currently reaches this instrument with a measured activation — abstaining."],
+      rationale: ["No macro transmission chain currently reaches this instrument with a measured activation, abstaining."],
       hasSignal: true,
     };
   }

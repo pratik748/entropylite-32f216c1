@@ -9,14 +9,14 @@ import { evaluateConstraints, computeClankScore, clankLevel } from "@/lib/clank-
 import { computePortfolioHealth } from "@/lib/portfolio-health";
 
 /**
- * SCR-01 · Daily Briefing — the anchor ritual of the Behavioral OS.
+ * SCR-01 · Daily Briefing, the anchor ritual of the Behavioral OS.
  *
  * A one-screen, 90-second synthesis composed entirely from data the platform
  * already computes: market regime (HMM), CLANK structural pressure, the real
  * quant snapshot (Portfolio Health), your holdings' moves, and scar memory.
  * The reading streak rewards *reviewing intelligence*, never trading.
  *
- * Visual language: institutional white/black/green/red — green = signal /
+ * Visual language: institutional white/black/green/red, green = signal /
  * competence, red = risk. Reuses the app's existing card/border/mono tokens.
  */
 
@@ -62,7 +62,7 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
     });
   }, [snapshot, regime?.regime]);
 
-  // ── "For you" — holdings that crossed a line ──
+  // ── "For you", holdings that crossed a line ──
   const movers = useMemo(() => {
     return analyzed
       .map((s) => {
@@ -100,7 +100,7 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
             Ahead of the open
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            A 90-second read on what changed — no trade required to win the day.
+            A 90-second read on what changed, no trade required to win the day.
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card px-4 py-2.5">
@@ -245,8 +245,7 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
         {clank.top && clank.top.activationProbability > 0.1 && (
           <p className="mt-2 text-xs text-muted-foreground">
             Leading constraint:{" "}
-            <span className="text-foreground">{clank.top.constraint.name}</span>{" "}
-            — {(clank.top.activationProbability * 100).toFixed(0)}% activation, forced{" "}
+            <span className="text-foreground">{clank.top.constraint.name}</span>{" "}, {(clank.top.activationProbability * 100).toFixed(0)}% activation, forced{" "}
             {clank.top.constraint.forcedAction.toLowerCase()} pressure.
           </p>
         )}
@@ -259,7 +258,7 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
           <div className="mb-3 flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-gain" />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              For You — Holdings That Crossed a Line
+              For You, Holdings That Crossed a Line
             </span>
           </div>
           {movers.length > 0 ? (
@@ -287,7 +286,7 @@ export default function DailyBriefing({ stocks, refreshKey = 0 }: Props) {
             </ul>
           ) : (
             <p className="py-4 text-center text-xs text-muted-foreground">
-              {analyzed.length > 0 ? "Nothing crossed a threshold — a calm book today." : "Analyze a holding to populate this."}
+              {analyzed.length > 0 ? "Nothing crossed a threshold, a calm book today." : "Analyze a holding to populate this."}
             </p>
           )}
         </div>

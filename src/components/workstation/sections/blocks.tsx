@@ -43,8 +43,8 @@ export const ShareBar = ({ label, pct, detail }: { label: string; pct: number; d
 
 /**
  * Designed pending state for evidence a future pipeline delivers. Shows the
- * planned contents from the registry and — when the cause is a source still
- * loading or offline — says so quietly. Never a raw error, never blank.
+ * planned contents from the registry and, when the cause is a source still
+ * loading or offline, says so quietly. Never a raw error, never blank.
  */
 export const PendingEvidence = ({ section, note }: { section: SectionDef; note?: string }) => {
   const { data } = useEvidence();
@@ -62,7 +62,7 @@ export const PendingEvidence = ({ section, note }: { section: SectionDef; note?:
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
         {note ??
           (dossierDown
-            ? "The dossier feed is re-syncing in the background — this view fills in automatically when it lands. The related evidence elsewhere in this workspace remains live."
+            ? "The dossier feed is re-syncing in the background, this view fills in automatically when it lands. The related evidence elsewhere in this workspace remains live."
             : "This slice of the evidence graph is fed by the next data pipeline phase. Everything already computable is shown across this workspace now.")}
       </p>
     </Block>

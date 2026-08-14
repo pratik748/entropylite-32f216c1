@@ -1,4 +1,4 @@
-// Macro context layer — the engine understands the environment before it
+// Macro context layer, the engine understands the environment before it
 // scores securities. Every field is measured from a market instrument;
 // nothing is asserted from opinion:
 //
@@ -61,13 +61,12 @@ export interface MacroContext {
     bySector: Record<string, number>; // canonical sector name → rel strength
   };
   evidence: string[];
-  /** Instruments that could not be fetched — reported, never faked. */
+  /** Instruments that could not be fetched, reported, never faked. */
   missing: string[];
 }
 
 // Sector ETF grids ↔ Yahoo `assetProfile.sector` names, per region.
-// US: S&P sector SPDRs vs SPY. India: NSE BeES sector ETFs vs NIFTYBEES —
-// the liquid on-exchange proxies for institutional sector rotation there.
+// US: S&P sector SPDRs vs SPY. India: NSE BeES sector ETFs vs NIFTYBEES, // the liquid on-exchange proxies for institutional sector rotation there.
 const US_SECTOR_ETFS: Array<{ symbol: string; sector: string }> = [
   { symbol: "XLK", sector: "Technology" },
   { symbol: "XLF", sector: "Financial Services" },
@@ -94,7 +93,7 @@ function sectorGrid(indiaMode: boolean): Array<{ symbol: string; sector: string 
 }
 
 /**
- * Every instrument the macro layer measures for a region — both execution
+ * Every instrument the macro layer measures for a region, both execution
  * venues fetch this list. US rates / dollar / credit are kept in India mode
  * too: they are the global drivers of FII flows into Indian equities. India
  * adds its own vol index (^INDIAVIX), the USD/INR rate, and NSE sector ETFs.
@@ -124,7 +123,7 @@ export function buildMacroContext(
   const evidence: string[] = [];
 
   // ── Rates & curve (Yahoo's ^TNX/^IRX chart closes are the yield in %,
-  //    e.g. 4.28 — verified against live data) ───────────────────
+  //    e.g. 4.28, verified against live data) ───────────────────
   const tnx = charts.get("^TNX") ?? null;
   const irx = charts.get("^IRX") ?? null;
   const tenYearPct = last(tnx) != null ? Number(last(tnx)!.toFixed(2)) : null;
@@ -143,17 +142,17 @@ export function buildMacroContext(
     );
   }
 
-  // ── Dollar (plus USD/INR in India mode — the FII-flow channel) ─
+  // ── Dollar (plus USD/INR in India mode, the FII-flow channel) ─
   const uup = charts.get("UUP") ?? null;
   const dollarRet63d = uup ? ret(uup.closes, 63) : null;
   if (dollarRet63d != null) {
-    evidence.push(`Dollar (UUP) ${dollarRet63d >= 0 ? "+" : ""}${pct(dollarRet63d)} over 63 days — ${dollarRet63d > 0.02 ? "strengthening" : dollarRet63d < -0.02 ? "weakening" : "stable"}.`);
+    evidence.push(`Dollar (UUP) ${dollarRet63d >= 0 ? "+" : ""}${pct(dollarRet63d)} over 63 days, ${dollarRet63d > 0.02 ? "strengthening" : dollarRet63d < -0.02 ? "weakening" : "stable"}.`);
   }
   const usdinr = indiaMode ? charts.get("USDINR=X") ?? null : null;
   const usdinrRet63d = usdinr ? ret(usdinr.closes, 63) : null;
   if (usdinrRet63d != null) {
     evidence.push(
-      `USD/INR ${usdinrRet63d >= 0 ? "+" : ""}${pct(usdinrRet63d)} over 63 days — rupee ${usdinrRet63d > 0.01 ? "weakening (FII outflow pressure)" : usdinrRet63d < -0.01 ? "strengthening (FII inflow support)" : "stable"}.`,
+      `USD/INR ${usdinrRet63d >= 0 ? "+" : ""}${pct(usdinrRet63d)} over 63 days, rupee ${usdinrRet63d > 0.01 ? "weakening (FII outflow pressure)" : usdinrRet63d < -0.01 ? "strengthening (FII inflow support)" : "stable"}.`,
     );
   }
 
@@ -166,7 +165,7 @@ export function buildMacroContext(
   const vixPercentile1y = vixSeries ? percentileOfLast(vixSeries.closes) : null;
   if (vix != null) {
     evidence.push(
-      `${vixName} ${vix.toFixed(1)}${vixPercentile1y != null ? ` — ${Math.round(vixPercentile1y * 100)}th percentile of its 1-year range` : ""} (${vixPercentile1y != null && vixPercentile1y > 0.7 ? "stressed" : vixPercentile1y != null && vixPercentile1y < 0.3 ? "calm" : "mid-range"}).`,
+      `${vixName} ${vix.toFixed(1)}${vixPercentile1y != null ? `, ${Math.round(vixPercentile1y * 100)}th percentile of its 1-year range` : ""} (${vixPercentile1y != null && vixPercentile1y > 0.7 ? "stressed" : vixPercentile1y != null && vixPercentile1y < 0.3 ? "calm" : "mid-range"}).`,
     );
   }
 
@@ -178,7 +177,7 @@ export function buildMacroContext(
   const highYieldRelStrength63d = hygRet != null && lqdRet != null ? Number((hygRet - lqdRet).toFixed(4)) : null;
   if (highYieldRelStrength63d != null) {
     evidence.push(
-      `High-yield vs investment-grade credit (HYG−LQD) ${highYieldRelStrength63d >= 0 ? "+" : ""}${pct(highYieldRelStrength63d)} over 63d — spreads ${highYieldRelStrength63d < -0.01 ? "widening (risk aversion)" : highYieldRelStrength63d > 0.01 ? "tightening (risk appetite)" : "steady"}.`,
+      `High-yield vs investment-grade credit (HYG−LQD) ${highYieldRelStrength63d >= 0 ? "+" : ""}${pct(highYieldRelStrength63d)} over 63d, spreads ${highYieldRelStrength63d < -0.01 ? "widening (risk aversion)" : highYieldRelStrength63d > 0.01 ? "tightening (risk appetite)" : "steady"}.`,
     );
   }
 
@@ -223,7 +222,7 @@ export async function collectMacroContext(benchmark: ChartSeries | null, indiaMo
 
 /**
  * Sector relative strength for a candidate, from its Yahoo sector name.
- * Returns null when the sector is unknown — the models must abstain on
+ * Returns null when the sector is unknown, the models must abstain on
  * that dimension rather than assume.
  */
 export function sectorRelStrength(macro: MacroContext, sector: string | null | undefined): number | null {
