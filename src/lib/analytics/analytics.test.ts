@@ -16,7 +16,7 @@ import { generateInstitutionalReport } from "./reports";
 import { metric, gradeSample } from "./types";
 import { pickBenchmark } from "@/hooks/useInstitutionalAnalytics";
 
-// ─── Deterministic pseudo-random series (LCG — no Math.random in tests) ───
+// ─── Deterministic pseudo-random series (LCG, no Math.random in tests) ───
 function lcgSeries(n: number, seed: number, vol = 0.01, drift = 0.0004): number[] {
   let s = seed >>> 0;
   const out: number[] = [];
@@ -294,7 +294,7 @@ describe("optimizers", () => {
     const r = runOptimizer("min_variance", {
       tickers: ["A", "B", "C"], sigma: singular, sampleSize: 252,
     })!;
-    // Either PSD-projection made it solvable, or it refused — both are
+    // Either PSD-projection made it solvable, or it refused, both are
     // acceptable; what is NOT acceptable is a silent heuristic answer.
     if (!r.diagnostics.converged) {
       expect(r.weights.length).toBe(0);

@@ -1,6 +1,6 @@
 /**
  * Deterministic computation helpers for the evidence engine.
- * Pure functions over numeric series — no I/O, no models.
+ * Pure functions over numeric series, no I/O, no models.
  */
 
 import type { HistoryPoint } from "./types";
@@ -20,7 +20,7 @@ export function mean(xs: number[]): number {
 
 /**
  * Standard normal CDF Φ(x) via the Zelen–Severo polynomial
- * (Abramowitz & Stegun 26.2.17), |error| < 7.5e-8 — plenty for
+ * (Abramowitz & Stegun 26.2.17), |error| < 7.5e-8, plenty for
  * scenario probabilities.
  */
 export function normalCdf(x: number): number {
@@ -85,7 +85,7 @@ export function dailyReturns(closes: number[]): number[] {
 
 /**
  * Annualized volatility (%) from daily closes over the trailing window.
- * Sample stdev (ddof = 1) — the one system-wide volatility convention.
+ * Sample stdev (ddof = 1), the one system-wide volatility convention.
  */
 export function annualizedVol(closes: number[], window = 60): number | null {
   const rets = dailyReturns(closes.slice(-(window + 1)));
@@ -145,7 +145,7 @@ export function rollingVolSeries(closes: number[], window = 20): number[] {
 
 /**
  * Realized Sharpe over the series, annualized. Sample stdev, excess over the
- * system-wide ANNUAL_RISK_FREE — the same convention as the analysis engine,
+ * system-wide ANNUAL_RISK_FREE, the same convention as the analysis engine,
  * so this fallback can never silently disagree with the primary source.
  */
 export function realizedSharpe(closes: number[]): number | null {

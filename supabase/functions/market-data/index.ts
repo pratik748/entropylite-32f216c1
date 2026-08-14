@@ -85,7 +85,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Market data is public (used on landing page) — no auth required.
+    // Market data is public (used on landing page), no auth required.
     const body = await req.json().catch(() => ({}));
     const provider = body.provider || "mistral";
     const indiaMode = body.indiaMode === true;
@@ -231,7 +231,7 @@ serve(async (req) => {
         : indexData.filter((i: any) => i?.region === region || region === "All");
       const indexSummary = relevantIndices.slice(0, 5).map((i: any) => `${i?.name}: ${i?.changePct?.toFixed(2)}%`).join(", ");
 
-      // Resolve a CONCRETE label for the prompt — never literally pass "All" into
+      // Resolve a CONCRETE label for the prompt, never literally pass "All" into
       // the JSON template (the model treats "All" as ambiguous and often returns
       // empty keyEvents/outlook).
       const focusLabel = region === "All" ? "global" : region;
@@ -246,15 +246,15 @@ serve(async (req) => {
       const moversLine = topMovers.map((m) => `${m.name} ${m.change > 0 ? "+" : ""}${m.change}%`).join(", ");
       const result = await callAI({
         provider,
-        systemPrompt: `You are a sell-side global macro strategist writing morning commentary. You are given LIVE measured prices, the measured top movers, and a mood score COMPUTED from that data. Your job is ONLY interpretation — you translate the given numbers into a regional read.
+        systemPrompt: `You are a sell-side global macro strategist writing morning commentary. You are given LIVE measured prices, the measured top movers, and a mood score COMPUTED from that data. Your job is ONLY interpretation, you translate the given numbers into a regional read.
 
-HARD RULES — the desk audits every claim:
+HARD RULES, the desk audits every claim:
 1. NEVER invent a number. Do not state fund-flow amounts, price levels, or percentage moves that are not in the data provided. If you don't have a figure, describe direction qualitatively or omit it.
 2. NEVER present an event as scheduled fact unless you are confident it is a recurring, well-known fixture (e.g. monthly CPI, FOMC cycle). watchItems are things to CHECK, phrased as watch items ("Watch for RBI MPC commentary"), not as confirmed calendar entries with dates.
-3. outlook: EXACTLY 3 sentences — (i) regime read from the given data, (ii) what to watch next, (iii) the asymmetric risk. Ground every claim in the numbers provided.
+3. outlook: EXACTLY 3 sentences, (i) regime read from the given data, (ii) what to watch next, (iii) the asymmetric risk. Ground every claim in the numbers provided.
 4. sectorRotation: describe rotation ONLY if the given sector moves support it; otherwise say what the sector tape shows.
 5. riskAppetite: 1 sentence, defended by the given VIX/breadth/mover data.
-6. It is acceptable — preferred — to say a signal is unclear when the data is mixed.
+6. It is acceptable, preferred, to say a signal is unclear when the data is mixed.
 
 VOICE: trading-desk concise, no hedging filler, no marketing language. Strings ≤ 220 chars. Return ONLY valid JSON.`,
         userPrompt: `Today is ${new Date().toISOString().split("T")[0]}. Regional focus: ${regionCtx.focus} (label: ${focusLabel}).
@@ -282,12 +282,12 @@ Focus on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
       aiProviderUsed = result.provider;
       aiMacro = safeParseJSON(result.text);
       if (!aiMacro?.watchItems?.length || !aiMacro?.outlook) {
-        console.warn(`market-data: AI returned incomplete commentary (watchItems=${aiMacro?.watchItems?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}) — provider=${result.provider}`);
+        console.warn(`market-data: AI returned incomplete commentary (watchItems=${aiMacro?.watchItems?.length || 0}, outlook=${aiMacro?.outlook ? "yes" : "no"}), provider=${result.provider}`);
       }
     } catch (e) { console.error("AI macro error:", e); }
 
     const macro = {
-      // Computed from measured quotes — formula documented above; never AI-invented.
+      // Computed from measured quotes, formula documented above; never AI-invented.
       marketMood: computedMood,
       moodScore: computedMoodScore,
       moodBasis: "computed: VIX 40% + index breadth 30% + avg index move 30%",
@@ -299,9 +299,9 @@ Focus on ${regionCtx.indices} and ${regionCtx.centralBank} policy. Provide:
       breadthPct,
       vix: realVix, usdInr: realUsdInr, crudeBrent: realCrude, goldPrice: realGold,
       silverPrice: realSilver, eurUsd: realEurUsd, gbpUsd: realGbpUsd, btcUsd: realBtc, ethUsd: realEth,
-      // Measured moves from the quotes fetched above — not model output.
+      // Measured moves from the quotes fetched above, not model output.
       topMovers,
-      // Model-suggested things to check — NOT confirmed calendar entries.
+      // Model-suggested things to check, NOT confirmed calendar entries.
       keyEvents: aiMacro?.watchItems || [],
       outlook: aiMacro?.outlook || "",
       sectorRotation: aiMacro?.sectorRotation || "",

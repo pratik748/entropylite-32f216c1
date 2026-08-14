@@ -1,4 +1,4 @@
-// TWRD store — Supabase reads/writes for sources, claims, contradictions, weights.
+// TWRD store, Supabase reads/writes for sources, claims, contradictions, weights.
 // Decay is applied on READ so stored truth_score is the value at write time.
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -46,7 +46,7 @@ export async function loadSources(ids: string[]): Promise<Map<string, SourcePost
       alpha: Number(r.alpha), beta: Number(r.beta),
     });
   }
-  // Synthesise tiered priors for unseen sources — NO whitelist; any crawled
+  // Synthesise tiered priors for unseen sources, NO whitelist; any crawled
   // source is accepted and weighted by heuristic priors that improve over time
   // via Bayesian feedback (twrd-feedback updates α/β from trade outcomes).
   const unseen: { id: string; domain: TwrdDomain; alpha: number; beta: number }[] = [];
@@ -59,7 +59,7 @@ export async function loadSources(ids: string[]): Promise<Map<string, SourcePost
   // Persist unseen sources so future weight updates have a row to learn against.
   if (unseen.length) {
     try { await client().from("twrd_sources").upsert(unseen, { onConflict: "id" }); }
-    catch { /* non-fatal — in-memory prior still applies */ }
+    catch { /* non-fatal, in-memory prior still applies */ }
   }
   return out;
 }
@@ -82,7 +82,7 @@ function inferPrior(rawId: string): { domain: TwrdDomain; alpha: number; beta: n
   else if (/(cnbc|nytimes|bbc|guardian|forbes|barrons|seekingalpha|moneycontrol|economictimes|livemint)/.test(id)) { alpha = 12; beta = 6; }
   else if (/(twitter|x\.com|reddit|stocktwits|tiktok|telegram|discord)/.test(id)) { alpha = 4; beta = 8; }
   else if (/\.org(\.|$)/.test(id)) { alpha = 8; beta = 6; }
-  // else keep neutral 5/5 — any new source is ACCEPTED, not rejected.
+  // else keep neutral 5/5, any new source is ACCEPTED, not rejected.
 
   return { domain, alpha, beta };
 }

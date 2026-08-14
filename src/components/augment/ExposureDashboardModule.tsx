@@ -62,7 +62,7 @@ const ExposureDashboardModule = ({ stocks }: Props) => {
 
   const sectorPie = (exposure?.sector ?? []).map(s => ({ name: s.label, value: +(s.weight * 100).toFixed(1) }));
 
-  // Realized per-asset volatility vs weight — the honest "risk factor" view
+  // Realized per-asset volatility vs weight, the honest "risk factor" view
   const volBars = holdings
     .map(h => {
       const stats = ia.snapshot.assetStats[h.ticker];
@@ -81,10 +81,10 @@ const ExposureDashboardModule = ({ stocks }: Props) => {
       <div className="grid gap-3 md:grid-cols-5">
         {[
           { label: "Portfolio Value", value: fmt(totalValue), sub: `${holdings.length} holdings` },
-          { label: "Effective N", value: conc ? conc.effectiveN.value.toFixed(1) : "—", sub: conc ? `HHI ${(conc.hhi.value * 10000).toFixed(0)}` : "needs history" },
-          { label: "Top Position", value: conc ? `${(conc.topPositionWeight.value * 100).toFixed(1)}%` : "—", sub: "single-name weight" },
-          { label: "Portfolio β", value: exposure?.marketBeta ? exposure.marketBeta.value.toFixed(2) : "—", sub: exposure?.marketBeta ? `vs ${ia.benchmarkTicker}` : "no benchmark" },
-          { label: "Avg Pairwise ρ", value: corr ? corr.avgPairwise.value.toFixed(2) : "—", sub: corr?.diversificationRatio ? `DR ${corr.diversificationRatio.value.toFixed(2)}` : "correlation" },
+          { label: "Effective N", value: conc ? conc.effectiveN.value.toFixed(1) : "--", sub: conc ? `HHI ${(conc.hhi.value * 10000).toFixed(0)}` : "needs history" },
+          { label: "Top Position", value: conc ? `${(conc.topPositionWeight.value * 100).toFixed(1)}%` : "--", sub: "single-name weight" },
+          { label: "Portfolio β", value: exposure?.marketBeta ? exposure.marketBeta.value.toFixed(2) : "--", sub: exposure?.marketBeta ? `vs ${ia.benchmarkTicker}` : "no benchmark" },
+          { label: "Avg Pairwise ρ", value: corr ? corr.avgPairwise.value.toFixed(2) : "--", sub: corr?.diversificationRatio ? `DR ${corr.diversificationRatio.value.toFixed(2)}` : "correlation" },
         ].map(s => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>

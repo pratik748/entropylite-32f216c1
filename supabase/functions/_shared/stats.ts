@@ -3,7 +3,7 @@
  *
  * One truth spine: every edge function that needs a return series, a
  * volatility, a Sharpe/Sortino ratio, or a drawdown imports it from here.
- * Local redefinitions are forbidden — they are how the same ticker ended up
+ * Local redefinitions are forbidden, they are how the same ticker ended up
  * with three different "Sharpe ratios" across surfaces.
  *
  * Conventions (fixed, documented, and matching src/lib/quant-engine.ts):
@@ -16,8 +16,7 @@
  *   - Max drawdown is returned as a POSITIVE decimal (0.23 = −23% peak-to-trough);
  *     display layers choose sign and percent scaling explicitly.
  *
- * If a surface needs a different convention it must say so at the call site —
- * never by shadowing these names.
+ * If a surface needs a different convention it must say so at the call site, * never by shadowing these names.
  */
 
 import { riskFreeFor } from "./riskFree.ts";
@@ -100,7 +99,7 @@ export function sortinoRatio(dailyReturns: number[], annualRiskFree = ANNUAL_RIS
 /**
  * Annualized Sharpe with its asymptotic standard error (Lo, 2002, iid case):
  *   SE(SR_daily) = sqrt((1 + SR_daily²/2) / n),  annualized by √252.
- * The SE understates uncertainty under autocorrelation/fat tails — that
+ * The SE understates uncertainty under autocorrelation/fat tails, that
  * caveat ships in `method`. Returns null when the sample is too small for
  * the ratio to mean anything.
  */

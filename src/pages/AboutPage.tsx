@@ -18,7 +18,7 @@ const SECTIONS = [
     n: "02",
     title: "The system",
     body: [
-      "Entropy delivers institutional-grade research capability without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and produces probabilistic intelligence — all in real time.",
+      "Entropy delivers institutional-grade research capability without institutional complexity. The platform ingests real-time market data from multiple sources, runs Monte Carlo simulations across 10,000 paths, detects structural constraints through the CLANK engine, and produces probabilistic intelligence, all in real time.",
       "The system is organized into interconnected intelligence modules, each responsible for a specific analytical domain: risk quantification, statistical arbitrage, geopolitical monitoring, regime classification, causal-chain modelling, and autonomous strategy generation.",
     ],
   },
@@ -26,7 +26,7 @@ const SECTIONS = [
     n: "03",
     title: "Market structure analysis",
     body: [
-      "Every asset exists inside a web of structural forces — liquidity constraints, positioning patterns, regime shifts, geopolitical pressure. Entropy maps these forces continuously, providing a probabilistic intelligence layer that adapts as market structure evolves.",
+      "Every asset exists inside a web of structural forces, liquidity constraints, positioning patterns, regime shifts, geopolitical pressure. Entropy maps these forces continuously, providing a probabilistic intelligence layer that adapts as market structure evolves.",
       "The CLANK engine (Constraint, Liquidity, Accumulation, Narrative, Kinetic) monitors five structural dimensions simultaneously and raises alerts when any dimension approaches a critical threshold.",
     ],
   },
@@ -55,7 +55,7 @@ const SECTIONS = [
     n: "07",
     title: "Continuous learning",
     body: [
-      "Scar Memory records every market outcome and scenario accuracy. The Outcome Gradient engine uses this record to continuously improve confidence calibration and model selection — for your account alone.",
+      "Scar Memory records every market outcome and scenario accuracy. The Outcome Gradient engine uses this record to continuously improve confidence calibration and model selection, for your account alone.",
     ],
   },
 ];
@@ -64,7 +64,7 @@ export default function AboutPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Platform | Entropy — Institutional market intelligence";
+    document.title = "Platform | Entropy, Institutional market intelligence";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Entropy is an institutional-grade market intelligence system: structural market analysis, liquidity flow detection, and probabilistic decision modelling in one terminal.");
   }, []);
@@ -130,7 +130,7 @@ export default function AboutPage() {
               </div>
               <p className="text-[14.5px] text-white/55 leading-relaxed">
                 Entropy is designed and engineered as a research-grade intelligence system. Every
-                module — from the statistical-arbitrage engine to the causal-effects simulator — is
+                module, from the statistical-arbitrage engine to the causal-effects simulator, is
                 grounded in quantitative methodology and real market data. The platform provides
                 intelligence, not advice. All investment decisions remain with the user.
               </p>

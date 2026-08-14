@@ -6,20 +6,20 @@
 // costs. We classify the ticker into a liquidity tier and return the
 // expected round-trip cost as a decimal (e.g. 0.015 = 1.5%).
 //
-// This is a deliberately conservative static table — it errs on the side
+// This is a deliberately conservative static table, it errs on the side
 // of marking unknown tickers as expensive (default 0.7%) so we don't
 // pretend small-caps are free to trade.
 
 export type LiquidityTier =
-  | "us_megacap"        // SPY, AAPL, MSFT, NVDA, GOOGL, AMZN, META, TSLA — 5 bps
-  | "us_largecap"       // S&P 500 names — 10 bps
-  | "us_smallcap"       // sub-$2B US — 25 bps
-  | "in_nifty50"        // RELIANCE, TCS, INFY, HDFCBANK, … — 12 bps
-  | "in_nifty500"       // mid-cap NSE — 25 bps
-  | "in_smallcap"       // small/micro-cap India (GTL INFRA etc.) — 150 bps
-  | "etf_majors"        // SPY/QQQ/NIFTYBEES — 6 bps
-  | "crypto_majors"     // BTC/ETH — 15 bps
-  | "unknown";          // default fallback — 70 bps
+  | "us_megacap"        // SPY, AAPL, MSFT, NVDA, GOOGL, AMZN, META, TSLA, 5 bps
+  | "us_largecap"       // S&P 500 names, 10 bps
+  | "us_smallcap"       // sub-$2B US, 25 bps
+  | "in_nifty50"        // RELIANCE, TCS, INFY, HDFCBANK, …, 12 bps
+  | "in_nifty500"       // mid-cap NSE, 25 bps
+  | "in_smallcap"       // small/micro-cap India (GTL INFRA etc.), 150 bps
+  | "etf_majors"        // SPY/QQQ/NIFTYBEES, 6 bps
+  | "crypto_majors"     // BTC/ETH, 15 bps
+  | "unknown";          // default fallback, 70 bps
 
 const COST_BY_TIER: Record<LiquidityTier, number> = {
   us_megacap: 0.0005,

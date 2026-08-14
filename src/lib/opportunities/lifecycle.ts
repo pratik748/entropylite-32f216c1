@@ -1,4 +1,4 @@
-// Opportunity lifecycle — conviction has a history, not just a snapshot.
+// Opportunity lifecycle, conviction has a history, not just a snapshot.
 //
 //   validated → high_conviction → active → weakening → invalidated → archived
 //
@@ -69,7 +69,7 @@ function load(): LifecycleMap {
 function save(map: LifecycleMap) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(map));
-  } catch { /* storage full — lifecycle is a convenience layer */ }
+  } catch { /* storage full, lifecycle is a convenience layer */ }
 }
 
 function scoreOf(o: ValidatedOpportunity): number {
@@ -127,7 +127,7 @@ export function updateLifecycle(response: EngineResponse): LifecycleMap {
   }
 
   // Anything previously live that vanished from the validated slate is
-  // invalidated — the consensus gate failed on re-evaluation.
+  // invalidated, the consensus gate failed on re-evaluation.
   for (const [key, entry] of Object.entries(map)) {
     if (present.has(key)) continue;
     if (entry.state === "archived") continue;

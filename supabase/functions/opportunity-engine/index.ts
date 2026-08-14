@@ -1,4 +1,4 @@
-// Opportunity Engine — Supabase edge function.
+// Opportunity Engine, Supabase edge function.
 //
 // This is the ONE backend venue. entropylite.in (Lovable Cloud) already
 // talks to this Supabase project for every other function; Lovable deploys
@@ -8,7 +8,7 @@
 // service-role signal logging, chart loading, and the performance profile.
 //
 // Calibration/reputation come from the maturity-gated REST loaders (the
-// nightly learned fit — trained on the legacy engines' outcomes — is only
+// nightly learned fit, trained on the legacy engines' outcomes, is only
 // adopted once ≥30 of THIS engine's own signals have settled; until then
 // the documented default priors apply, which is what makes the board
 // populate on day one instead of collapsing every score to p≈0.5).
@@ -17,7 +17,7 @@
 // the caller's holdings; stage-2 fundamentals/news skipped and recorded as
 // missing so the completeness discount applies). This is the profile
 // empirically verified to complete in ~2s and validate 30-40 real names
-// per run against live data in both US and India modes — chosen so the
+// per run against live data in both US and India modes, chosen so the
 // board "just works" on first deploy. The heavier whole-market EDGE_PROFILE
 // remains available in handler.ts to switch on once deploy timing is
 // confirmed on the live project.

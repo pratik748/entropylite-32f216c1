@@ -4,7 +4,7 @@
 // No amount of source credibility can override a hard constraint.
 //
 // Browser + edge safe (no imports). The Deno twin used by twrd-ingest lives
-// at supabase/functions/_shared/twrd/admission.ts — keep the two in sync.
+// at supabase/functions/_shared/twrd/admission.ts, keep the two in sync.
 
 import type { AdmissionResult, OHLCVBar } from "./types";
 
@@ -54,7 +54,7 @@ export interface RelationBound {
 
 /**
  * Hard physical/logical ranges for numeric claim objects, by relation
- * pattern. Deliberately loose — these reject the impossible, not the
+ * pattern. Deliberately loose, these reject the impossible, not the
  * unlikely (that is TWRD's job).
  */
 export const DEFAULT_RELATION_BOUNDS: RelationBound[] = [

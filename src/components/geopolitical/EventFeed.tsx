@@ -84,7 +84,7 @@ export default function EventFeed({ events, loading, lastTick, error, selectedId
           </span>
         </div>
         <span className="font-mono text-[9px] text-muted-foreground tabular-nums">
-          {lastTick ? `↻ ${Math.max(0, Math.round((Date.now() - lastTick) / 1000))}s` : "—"}
+          {lastTick ? `↻ ${Math.max(0, Math.round((Date.now() - lastTick) / 1000))}s` : "--"}
           {" · "}{events.length}
         </span>
       </div>

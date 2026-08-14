@@ -1,5 +1,5 @@
 /**
- * Institutional analytics — deterministic, purpose-built computations that
+ * Institutional analytics, deterministic, purpose-built computations that
  * give each workstation section its own analytical identity instead of a
  * repeated tile grid. Every figure here is arithmetic over reported or
  * scraped inputs; nothing is model-generated. When the statement pipeline
@@ -13,7 +13,7 @@ import { round } from "./compute";
 
 export type Provenance = "reported" | "computed" | "derived";
 
-/* ── Capital structure (balance sheet — never blank) ───────────── */
+/* ── Capital structure (balance sheet, never blank) ───────────── */
 
 export interface CapitalStructure {
   marketEquity: number | null;
@@ -68,7 +68,7 @@ export function computeCapitalStructure(
     };
   }
 
-  // Derived path — from market cap, P/B and D/E (all in analyze-stock).
+  // Derived path, from market cap, P/B and D/E (all in analyze-stock).
   const marketCap = a?.marketCapValue ?? f?.marketCap ?? null;
   const pbv = a?.pbv ?? null;
   const de = a?.debtToEquity ?? null;
@@ -89,7 +89,7 @@ export function computeCapitalStructure(
         : null,
     netDebtToEbitda: null,
     source: "derived",
-    note: "Structure derived from market cap, price-to-book and debt-to-equity — reported statements refine it on load.",
+    note: "Structure derived from market cap, price-to-book and debt-to-equity, reported statements refine it on load.",
   };
 }
 
@@ -144,7 +144,7 @@ export function computeDuPont(f: Financials | null, a: DeskAnalysis | null): DuP
           label: "Equity multiplier",
           value: round(equityMultiplier, 2),
           unit: "x",
-          read: equityMultiplier <= 2 ? "Lightly levered — ROE is earned, not borrowed" : equityMultiplier <= 4 ? "Moderate leverage lifts ROE" : "High leverage: much of ROE is borrowed",
+          read: equityMultiplier <= 2 ? "Lightly levered, ROE is earned, not borrowed" : equityMultiplier <= 4 ? "Moderate leverage lifts ROE" : "High leverage: much of ROE is borrowed",
         },
       ],
     };
@@ -239,7 +239,7 @@ export interface HealthScore {
 }
 
 /**
- * A Piotroski-style solvency scorecard — computed binary checks over the
+ * A Piotroski-style solvency scorecard, computed binary checks over the
  * statement and analysis feeds. Deterministic, auditable, no model input.
  */
 export function computeHealthScore(f: Financials | null, a: DeskAnalysis | null): HealthScore | null {

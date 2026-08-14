@@ -16,7 +16,7 @@ interface EvidenceContextValue {
   selectedId: string | null;
   select: (id: string | null) => void;
   selected: EvidenceMetric | null;
-  /** Ids connected to the selection through the relationship web — for soft cross-page highlighting. */
+  /** Ids connected to the selection through the relationship web, for soft cross-page highlighting. */
   relatedIds: Set<string>;
   /** Material evidence changes since the last stored session. */
   changes: EvidenceChange[];

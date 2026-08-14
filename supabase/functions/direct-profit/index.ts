@@ -324,7 +324,7 @@ function computeRiskMetrics(snap: MarketSnapshot, tech: TechnicalSnapshot, vix: 
   const returns = logReturns(closes);
 
   if (returns.length < 20) {
-    // Not enough data for historical VaR — parametric estimate from annualized vol
+    // Not enough data for historical VaR, parametric estimate from annualized vol
     // (labeled an estimate; a 3-day sample must never masquerade as historical VaR)
     const dailyVol = tech.annualizedVol / (Math.sqrt(252) * 100) || 0.015;
     const notional = snap.currentPrice;
@@ -548,13 +548,13 @@ function buildDeterministicFallback(
   const direction = action === "BUY" ? "UP" : action === "SELL" ? "DOWN" : "SIDEWAYS";
   const volatilityRegime = deriveVolatilityRegime(tech.annualizedVol);
 
-  // WAIT explanation — only emitted when the tape is genuinely flat.
+  // WAIT explanation, only emitted when the tape is genuinely flat.
   const waitReasons: string[] = [];
   if (action === "WAIT") {
-    waitReasons.push(`Tape is flat — composite bias ${bias.toFixed(2)} (|bias|<0.6)`);
+    waitReasons.push(`Tape is flat, composite bias ${bias.toFixed(2)} (|bias|<0.6)`);
     waitReasons.push(`Momentum ${tech.momentumScore}/3, z-score ${tech.zScore}, day change ${tech.changePct}%`);
-    waitReasons.push(`Bull ${bullScore} vs Bear ${bearScore} — no decisive lean either way`);
-    if (vix >= 28) waitReasons.push(`VIX ${vix.toFixed(1)} elevated — caution on directional entries`);
+    waitReasons.push(`Bull ${bullScore} vs Bear ${bearScore}, no decisive lean either way`);
+    if (vix >= 28) waitReasons.push(`VIX ${vix.toFixed(1)} elevated, caution on directional entries`);
   }
 
   const entryWidth = clamp(Math.max(0.006, tech.dailyVol / 100), 0.006, 0.02);
@@ -853,7 +853,7 @@ Deno.serve(async (req) => {
     }
 
     const intelContext = intelSummary
-      ? `\n\nINTELLIGENCE CONSENSUS (dashboard analyze-stock — MUST anchor your action):\n` +
+      ? `\n\nINTELLIGENCE CONSENSUS (dashboard analyze-stock, MUST anchor your action):\n` +
         `- Suggestion: ${intelSummary.suggestion} (${intelSummary.confidence}% conf)\n` +
         `- Verdict: ${intelSummary.verdict}\n` +
         `- Trend: ${intelSummary.technicals?.trend} | RSI: ${intelSummary.technicals?.rsi} | Regime: ${intelSummary.regime}\n` +
@@ -882,8 +882,8 @@ Deno.serve(async (req) => {
     console.log(`direct-profit snapshot: ${resolvedTicker} ${snap.currentPrice} ${currency} | momentum=${tech.momentumScore} | z=${tech.zScore} | vol=${tech.annualizedVol} | vix=${vix} | VaR95=${riskMetrics.var95} | Sharpe=${riskMetrics.sharpeRatio} | CLANK=${clankSignals.length}`);
 
     const quantContext = isIndian
-      ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- CRITICAL: Protection MUST be specific to ${resolvedTicker} — use ${resolvedTicker} PUT options at specific strikes derived from support/stop-loss levels, or tight trailing stops. NEVER suggest generic "Nifty puts" unless the ticker IS Nifty. Include strike price, expiry guidance, and position size context.`
-      : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- CRITICAL: Protection MUST be specific to ${resolvedTicker} — use ${resolvedTicker} PUT options at specific strikes near stop-loss, or collar strategies with the stock's own options. Include strike price and expiry guidance. NEVER give vague advice.`;
+      ? `Indian market context:\n- NSE/BSE listed, all prices in ${currency}\n- Reference NIFTY 50 and SENSEX as benchmarks\n- Consider FII/DII flow patterns, RBI policy stance, INR strength\n- Weekly NIFTY options expiry on Thursday\n- CRITICAL: Protection MUST be specific to ${resolvedTicker}, use ${resolvedTicker} PUT options at specific strikes derived from support/stop-loss levels, or tight trailing stops. NEVER suggest generic "Nifty puts" unless the ticker IS Nifty. Include strike price, expiry guidance, and position size context.`
+      : `Global market context:\n- Asset prices are quoted in ${currency}\n- Reference major regional benchmarks and volatility context\n- Consider institutional flow, macro regime, and index leadership\n- CRITICAL: Protection MUST be specific to ${resolvedTicker}, use ${resolvedTicker} PUT options at specific strikes near stop-loss, or collar strategies with the stock's own options. Include strike price and expiry guidance. NEVER give vague advice.`;
 
     const clankContext = clankSignals.length > 0
       ? `\n\nACTIVE STRUCTURAL CONSTRAINTS (CLANK Engine):\n${clankSignals.map(s => `- [${s.severity}] ${s.label}: ${s.description}`).join("\n")}\nFactor these institutional flow constraints into your confidence and action.`
@@ -893,9 +893,9 @@ Deno.serve(async (req) => {
       ? `\n\nRECENT NEWS HEADLINES:\n${newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}\nIncorporate sentiment from these headlines into positiveNews/negativeNews fields.`
       : "";
 
-    const riskContext = `\n\nQUANTITATIVE RISK METRICS (computed from real returns):\n- 1-Day VaR (95%): ${currencySymbol}${riskMetrics.var95} per share\n- 1-Day CVaR (95%): ${currencySymbol}${riskMetrics.cvar95} per share\n- 1-Day VaR (99%): ${currencySymbol}${riskMetrics.var99} per share\n- Sharpe Ratio (annualized): ${riskMetrics.sharpeRatio}\n- Sortino Ratio: ${riskMetrics.sortinoRatio}\n- Max Drawdown (30D): ${riskMetrics.maxDrawdown}%\n- Beta Estimate: ${riskMetrics.betaEstimate}\n- Kelly Fraction: ${riskMetrics.kellyFraction}\nUse these to calibrate your confidence level — low Sharpe + high VaR = lower confidence, etc.`;
+    const riskContext = `\n\nQUANTITATIVE RISK METRICS (computed from real returns):\n- 1-Day VaR (95%): ${currencySymbol}${riskMetrics.var95} per share\n- 1-Day CVaR (95%): ${currencySymbol}${riskMetrics.cvar95} per share\n- 1-Day VaR (99%): ${currencySymbol}${riskMetrics.var99} per share\n- Sharpe Ratio (annualized): ${riskMetrics.sharpeRatio}\n- Sortino Ratio: ${riskMetrics.sortinoRatio}\n- Max Drawdown (30D): ${riskMetrics.maxDrawdown}%\n- Beta Estimate: ${riskMetrics.betaEstimate}\n- Kelly Fraction: ${riskMetrics.kellyFraction}\nUse these to calibrate your confidence level, low Sharpe + high VaR = lower confidence, etc.`;
 
-    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode — output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment — high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality — negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints — active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n11. Intelligence consensus (analyze-stock suggestion) — your action should respect it, but use context rather than defaulting blindly to WAIT.\n12. Desirable-asset context — treat it as a supporting bullish prior when the technicals agree.\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\nPROTECTION FIELD (CRITICAL):\n- MUST be specific to the ticker being analyzed — use the STOCK's OWN options (e.g., "${resolvedTicker} 780 PE" not "Nifty Put")\n- Include a specific strike price derived from the stop-loss or support level\n- Include risk per share in currency terms\n- For BUY: suggest a PUT at/near stop-loss strike as downside hedge\n- For SELL: suggest covering with a CALL at/near stop-loss strike\n- For WAIT: state "no position, no hedge needed"\n- NEVER suggest generic index hedges unless the ticker itself is an index\n\n${quantContext}${clankContext}${newsContext}${riskContext}${intelContext}${desirableContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string (MUST be stock-specific with strike price and risk per share),\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
+    const systemPrompt = `You are an institutional-grade quantitative trading decision engine. Respond with ONLY valid JSON, no markdown.\n\nThis is Direct Profit Mode, output must be ultra-simple for the user, but reasoning must use full institutional logic including VaR, CVaR, Sharpe ratio, structural constraints, and news sentiment.\n\nYou have REAL market data AND computed risk metrics below. Ground every number in that data.\n\nDecision framework:\n1. Momentum and moving-average alignment\n2. Volatility regime and VIX/macro backdrop\n3. VaR/CVaR risk assessment, high VaR relative to target = reduce confidence\n4. Sharpe/Sortino quality, negative Sharpe = WAIT unless strong reversal signal\n5. CLANK structural constraints, active constraints bias toward caution\n6. Support/resistance and position within 52-week range\n7. Volume conviction\n8. Mean reversion from 20-day average\n9. News sentiment integration\n10. Kelly fraction for position sizing context\n11. Intelligence consensus (analyze-stock suggestion), your action should respect it, but use context rather than defaulting blindly to WAIT.\n12. Desirable-asset context, treat it as a supporting bullish prior when the technicals agree.\n\nConfidence calibration (CRITICAL):\n- confidence represents signal alignment + risk-adjusted edge\n- Momentum 3/3 + volume + Sharpe>1 + no CLANK = confidence 70-85\n- Momentum 2/3 + decent Sharpe + minor CLANK = confidence 50-65\n- Mixed signals OR negative Sharpe OR critical CLANK = confidence 35-50\n- Genuinely conflicting = WAIT at 25-40\n- NEVER return confidence below 35 for BUY/SELL\n- ALL prices MUST remain in the provided currency\n\nPROTECTION FIELD (CRITICAL):\n- MUST be specific to the ticker being analyzed, use the STOCK's OWN options (e.g., "${resolvedTicker} 780 PE" not "Nifty Put")\n- Include a specific strike price derived from the stop-loss or support level\n- Include risk per share in currency terms\n- For BUY: suggest a PUT at/near stop-loss strike as downside hedge\n- For SELL: suggest covering with a CALL at/near stop-loss strike\n- For WAIT: state "no position, no hedge needed"\n- NEVER suggest generic index hedges unless the ticker itself is an index\n\n${quantContext}${clankContext}${newsContext}${riskContext}${intelContext}${desirableContext}\n\nJSON schema:\n{\n  "action": "BUY" | "SELL" | "WAIT",\n  "confidence": number,\n  "currency": string,\n  "entryLow": number,\n  "entryHigh": number,\n  "targetPrice": number,\n  "stopLoss": number,\n  "timeframe": string,\n  "direction": "UP" | "DOWN" | "SIDEWAYS",\n  "directionReason": string (under 8 words),\n  "positiveNews": string (incorporate real headlines),\n  "negativeNews": string (incorporate real headlines),\n  "protection": string (MUST be stock-specific with strike price and risk per share),\n  "currentPrice": number,\n  "quantScore": number,\n  "volatilityRegime": "LOW" | "NORMAL" | "HIGH",\n  "riskRewardRatio": number\n}`;
 
     const userPrompt = `Ticker: ${resolvedTicker}\nMarket: ${market}\nCurrency: ${currency} (ALL prices must stay in this currency)\nDate: ${new Date().toISOString().split("T")[0]}\n\nREAL DATA:\n- Current Price: ${currencySymbol}${snap.currentPrice}\n- Previous Close: ${currencySymbol}${snap.prevClose}\n- Day Range: ${currencySymbol}${snap.dayLow} - ${currencySymbol}${snap.dayHigh}\n- Day Change: ${tech.changePct}%\n- Volume: ${snap.volume.toLocaleString()} (${tech.volumeRatio}x average)\n- 52W High: ${currencySymbol}${snap.fiftyTwoWeekHigh}\n- 52W Low: ${currencySymbol}${snap.fiftyTwoWeekLow}\n- Position in 52W Range: ${tech.posIn52w}%\n- SMA 5: ${currencySymbol}${tech.sma5}\n- SMA 20: ${currencySymbol}${tech.sma20}\n- Momentum Score: ${tech.momentumScore}/3\n- Annualized Volatility: ${tech.annualizedVol}%\n- Z-Score: ${tech.zScore}\n- Support: ${currencySymbol}${tech.support}\n- Resistance: ${currencySymbol}${tech.resistance}\n- VIX: ${vix > 0 ? vix.toFixed(1) : "N/A"}\n- Last 5 closes: ${tech.prices5d.map((p) => p.toFixed(2)).join(", ") || "N/A"}\n\nRISK METRICS:\n- VaR 95%: ${currencySymbol}${riskMetrics.var95}/share | CVaR 95%: ${currencySymbol}${riskMetrics.cvar95}/share\n- VaR 99%: ${currencySymbol}${riskMetrics.var99}/share\n- Sharpe: ${riskMetrics.sharpeRatio} | Sortino: ${riskMetrics.sortinoRatio}\n- Max DD: ${riskMetrics.maxDrawdown}% | Beta: ${riskMetrics.betaEstimate}\n- Kelly: ${riskMetrics.kellyFraction}\n\n${clankSignals.length > 0 ? "STRUCTURAL CONSTRAINTS:\n" + clankSignals.map(s => `[${s.severity}] ${s.label}`).join("\n") : "No active structural constraints."}\n\n${newsHeadlines.length > 0 ? "RECENT NEWS:\n" + newsHeadlines.map((h, i) => `${i + 1}. ${h}`).join("\n") : "No recent headlines available."}\n\nProduce a complete, executable trade decision grounded in ALL the data above.`;
 
@@ -994,7 +994,7 @@ Deno.serve(async (req) => {
     // ── MASTER ARBITER ──────────────────────────────────────────────────
     // The dashboard intelligence (analyze-stock) is the single source of
     // truth for direction. Direct Profit's job is to translate that verdict
-    // into an executable ticket — never to contradict it. Map suggestion
+    // into an executable ticket, never to contradict it. Map suggestion
     // → action deterministically, then rebuild prices for the forced side.
     if (intelSummary?.suggestion) {
       const sug = String(intelSummary.suggestion);
@@ -1005,7 +1005,7 @@ Deno.serve(async (req) => {
           //  • "Skip" → force WAIT (intel explicitly says avoid)
           //  • "Hold" → DO NOT force WAIT. Hold means "no fresh conviction
           //             from the dashboard", but Direct Profit is a tactical
-          //             engine — if the deterministic/AI side has a clean
+          //             engine, if the deterministic/AI side has a clean
           //             technical edge (momentum + R:R), let it fire.
       const allowDirectionalAgainstSkip =
         sug === "Skip" &&
@@ -1056,7 +1056,7 @@ Deno.serve(async (req) => {
           output.riskRewardRatio = 0;
           output.protection = "Wait for a cleaner setup before taking risk.";
           (output as any).waitReasons = [
-            `Dashboard intelligence verdict: Skip — explicit avoid signal`,
+            `Dashboard intelligence verdict: Skip, explicit avoid signal`,
             ...(deterministic as any).waitReasons || [],
           ];
         } else {
@@ -1105,7 +1105,7 @@ Deno.serve(async (req) => {
     // vote weighted by its historical reliability × current confidence.
     // If the calibrated win-probability falls below the threshold or the
     // engines disagree too much, the BUY/SELL is downgraded to WAIT with
-    // an explicit STAND_ASIDE reason — this is the single biggest lever
+    // an explicit STAND_ASIDE reason, this is the single biggest lever
     // against day-to-day result inconsistency.
     const dirOf = (a: string): -1 | 0 | 1 => a === "BUY" ? 1 : a === "SELL" ? -1 : 0;
     // Desirable-board memory as a proper ensemble member. The board's
@@ -1113,7 +1113,7 @@ Deno.serve(async (req) => {
     // pseudo-observations (edge·n/(n+k)), so one lucky zone cannot
     // dominate, conviction scales with evidence rather than with mere
     // listing status, and the reliability prior itself grows with the
-    // number of matched zones. No override path exists downstream — if
+    // number of matched zones. No override path exists downstream, if
     // this edge is real it moves the calibrated probability and the gate
     // resolves the direction on its own math.
     const desirableZones = Math.max(0, Number(desirableHint?.zoneCount) || 0);
@@ -1226,7 +1226,7 @@ Deno.serve(async (req) => {
           };
         }
       }
-      // Skew & kurtosis for CF (L2 — passed to runConsensus)
+      // Skew & kurtosis for CF (L2, passed to runConsensus)
       const moments = returnMoments(snap.closes);
       momentSkew = moments.skew;
       momentKurt = moments.excessKurt;
@@ -1246,7 +1246,7 @@ Deno.serve(async (req) => {
           hasSignal: mp.severity === "DISTRESS" || mp.signal !== 0,
         };
       }
-      // Walk-forward edge (L4) — vetoes signals against the asset's own history
+      // Walk-forward edge (L4), vetoes signals against the asset's own history
       const wf = walkForwardEdge(snap.closes, 5);
       wfRaw = wf;
       if (wf.n >= 40) {
@@ -1280,13 +1280,13 @@ Deno.serve(async (req) => {
     ]);
     // Decision-theoretic gate for a point-of-decision module. The shared
     // screener defaults optimise precision over a whole universe (six
-    // AND-ed vetoes) — correct for scanning, but on a single user-chosen
+    // AND-ed vetoes), correct for scanning, but on a single user-chosen
     // asset they resolved WAIT on the vast majority of names, including
     // ones with a genuinely positive after-cost edge. Here the criterion
     // is expected utility: trade whenever the Cornish-Fisher expected R
     // after the round-trip cost haircut clears a small margin (0.05R) and
     // the calibrated win-probability sits meaningfully off coin-flip
-    // (≥53%). Disagreement is not a veto — it already suppresses the
+    // (≥53%). Disagreement is not a veto, it already suppresses the
     // calibrated probability through the Platt logit, and bucket
     // diversification is rewarded continuously via δ instead of being
     // demanded binarily.
@@ -1315,15 +1315,15 @@ Deno.serve(async (req) => {
       console.log(`direct-profit consensus gate: ${output.action} → WAIT (${consensus.standAsideReason})`);
       output.action = "WAIT";
       output.direction = "SIDEWAYS";
-      output.directionReason = "Engines disagree — stand aside";
+      output.directionReason = "Engines disagree, stand aside";
       output.entryLow = roundPrice(snap.currentPrice * 0.99);
       output.entryHigh = roundPrice(snap.currentPrice * 1.01);
       output.targetPrice = roundPrice(tech.resistance || snap.currentPrice * 1.02);
       output.stopLoss = roundPrice(tech.support || snap.currentPrice * 0.98);
       output.riskRewardRatio = 0;
-      output.protection = "No position — wait for engine consensus before risking capital.";
+      output.protection = "No position, wait for engine consensus before risking capital.";
       const bd = consensus.bucketDecision;
-      const dirLabel = (d: number) => d === 1 ? "BUY" : d === -1 ? "SELL" : "—";
+      const dirLabel = (d: number) => d === 1 ? "BUY" : d === -1 ? "SELL" : "--";
       const bucketLine = `Buckets: A(price)=${dirLabel(consensus.bucketDirs.A)} · B(intel)=${dirLabel(consensus.bucketDirs.B)} · C(regime)=${dirLabel(consensus.bucketDirs.C)}`;
       const flipHint = (() => {
         if (bd.consensus === "TWO_OF_3" || bd.consensus === "ALL_3") return null;
@@ -1377,7 +1377,7 @@ Deno.serve(async (req) => {
       console.log(`direct-profit consensus promote: WAIT → ${dir} (p=${consensus.calibratedProb}, E[R]=${consensus.expectedR})`);
       output.action = dir;
       output.direction = dir === "BUY" ? "UP" : "DOWN";
-      output.directionReason = `Ensemble consensus ${dir} — calibrated ${(consensus.calibratedProb * 100).toFixed(0)}% win-probability, ${consensus.expectedR.toFixed(2)}R expected after costs`;
+      output.directionReason = `Ensemble consensus ${dir}, calibrated ${(consensus.calibratedProb * 100).toFixed(0)}% win-probability, ${consensus.expectedR.toFixed(2)}R expected after costs`;
       output.entryLow = roundPrice(eL);
       output.entryHigh = roundPrice(eH);
       output.targetPrice = roundPrice(tg);
@@ -1400,7 +1400,7 @@ Deno.serve(async (req) => {
     (output as any).providersUsed = consensus.engineCount;
     (output as any).ensemble = consensus;
 
-    // ── QUANT EDGE — surface every institutional technique explicitly ──
+    // ── QUANT EDGE, surface every institutional technique explicitly ──
     // The Renaissance-style edge engines (statistical-arbitrage mean
     // reversion, walk-forward evidence, structural credit) already vote
     // inside the ensemble, but they were invisible to the user. Emit them
@@ -1433,7 +1433,7 @@ Deno.serve(async (req) => {
       const dirLabelOf = (d: number) => (d === 1 ? "BUY" : d === -1 ? "SELL" : "NEUTRAL");
 
       (output as any).quantEdge = {
-        // Expected profit — the headline number the user asked for.
+        // Expected profit, the headline number the user asked for.
         expectedProfit: {
           perShare: roundPrice(expectedProfitPerShare),
           pct: Number(expectedProfitPct.toFixed(2)),
@@ -1455,11 +1455,11 @@ Deno.serve(async (req) => {
               beta: Number(cointRaw.beta.toFixed(2)),
               signal: cointEngine ? dirLabelOf(cointEngine.direction) : "NEUTRAL",
               note: cointRaw.cointegrated
-                ? `Spread ${cointRaw.residZ > 0 ? "stretched high" : "stretched low"} vs ${isIndian ? "NIFTY" : "SPY"} — reverts toward fair value`
-                : `No stable cointegration with ${isIndian ? "NIFTY" : "SPY"} — pure mean-reversion edge absent`,
+                ? `Spread ${cointRaw.residZ > 0 ? "stretched high" : "stretched low"} vs ${isIndian ? "NIFTY" : "SPY"}, reverts toward fair value`
+                : `No stable cointegration with ${isIndian ? "NIFTY" : "SPY"}, pure mean-reversion edge absent`,
             }
           : null,
-        // Walk-forward forward-return edge — the asset's own history in this
+        // Walk-forward forward-return edge, the asset's own history in this
         // direction. Vetoes trades with no realised edge.
         walkForward: wfRaw && wfRaw.n >= 20
           ? {
@@ -1486,12 +1486,12 @@ Deno.serve(async (req) => {
           excessKurtosis: Number(momentKurt.toFixed(2)),
           tailMultiplier: Number(tailMult.toFixed(2)),
           note: tailMult > 1.2
-            ? "Left tail heavier than normal — downside penalised in expected value"
+            ? "Left tail heavier than normal, downside penalised in expected value"
             : "Tail risk near-normal",
         },
-        // Risk hedge — structured from the protection logic + risk metrics.
+        // Risk hedge, structured from the protection logic + risk metrics.
         hedge: act === "WAIT"
-          ? { needed: false, instruction: "No position — no hedge required." }
+          ? { needed: false, instruction: "No position, no hedge required." }
           : {
               needed: true,
               instruction: String(output.protection),
@@ -1528,7 +1528,7 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
-    // Phase II — the probability's provenance travels with the ticket.
+    // Phase II, the probability's provenance travels with the ticket.
     // `basis` says what kind of number the win-probability is; `reliability`
     // is the empirical evidence (settled-outcome bins) for how much belief
     // it has earned. Null reliability means "no evidence yet", never
@@ -1536,7 +1536,7 @@ Deno.serve(async (req) => {
     (output as any).model = modelInfo("direct-profit");
     (output as any).probabilityProvenance = {
       basis: consensus.probBasis,
-      meaning: "hand-set prior Platt map of (ensemble score, agreement) — a model score on a probability scale, not an empirically calibrated frequency",
+      meaning: "hand-set prior Platt map of (ensemble score, agreement), a model score on a probability scale, not an empirically calibrated frequency",
       reliability: reliabilityReport,
     };
 

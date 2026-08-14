@@ -1,4 +1,4 @@
-// TWRD shared types — Truth-Weighted Reality Database
+// TWRD shared types, Truth-Weighted Reality Database
 
 export type TwrdDomain = "financial" | "news" | "social" | "geo" | "scientific";
 

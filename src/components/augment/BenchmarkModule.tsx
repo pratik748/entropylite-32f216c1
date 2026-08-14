@@ -60,13 +60,13 @@ const BenchmarkModule = ({ stocks }: Props) => {
           <span className="text-[10px] text-muted-foreground">
             {ia.benchmarkReady
               ? `${ia.benchmarkTicker} daily series · OLS on ${bench?.beta.provenance.sampleSize ?? 0} aligned days`
-              : `${ia.benchmarkTicker} series unavailable — benchmark-relative metrics withheld`}
+              : `${ia.benchmarkTicker} series unavailable, benchmark-relative metrics withheld`}
           </span>
         </div>
         <MethodologyTooltip
           title="Benchmark Methodology"
           methods={[
-            { label: "Alpha / Beta", formula: "OLS: r_p = α + β·r_b + ε on daily returns", source: `Real ${ia.benchmarkTicker} closes via the same price pipeline`, notes: "No return/beta circularity — benchmark is an independent series." },
+            { label: "Alpha / Beta", formula: "OLS: r_p = α + β·r_b + ε on daily returns", source: `Real ${ia.benchmarkTicker} closes via the same price pipeline`, notes: "No return/beta circularity, benchmark is an independent series." },
             { label: "Tracking Error", formula: "stdev(r_p − r_b) × √252", source: "Grinold & Kahn (2000)" },
             { label: "Information Ratio", formula: "annualized active return / TE", source: "Grinold & Kahn (2000)" },
             { label: "Capture Ratios", formula: "mean(r_p)/mean(r_b) over up / down benchmark days", source: "Aligned daily series" },
@@ -97,7 +97,7 @@ const BenchmarkModule = ({ stocks }: Props) => {
           <AlertTriangle className="h-4 w-4 text-warning" />
           <p className="text-sm text-muted-foreground">
             Benchmark-relative metrics require the {ia.benchmarkTicker} series and ≥20 aligned observations.
-            Nothing is estimated from the portfolio's own beta — that would be circular.
+            Nothing is estimated from the portfolio's own beta, that would be circular.
           </p>
         </div>
       )}

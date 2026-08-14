@@ -1,4 +1,4 @@
-// Discovery v2 test suite — deterministic (seeded mulberry32, same
+// Discovery v2 test suite, deterministic (seeded mulberry32, same
 // convention as quant/upgrades.test.ts). The critical test is noise
 // rejection: on pure noise the robustness stack must reject nearly
 // everything.

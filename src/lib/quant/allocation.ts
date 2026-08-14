@@ -1,5 +1,5 @@
 /**
- * Allocation Layer — Hierarchical Risk Parity + Black–Litterman.
+ * Allocation Layer, Hierarchical Risk Parity + Black–Litterman.
  * ──────────────────────────────────────────────────────────────
  * Adds two institutional allocators alongside the existing Markowitz / ERC /
  * Kelly set in portfolio-math.ts:
@@ -81,7 +81,7 @@ function clusterVariance(cov: number[][], idx: number[]): number {
 
 /**
  * Hierarchical Risk Parity weights.
- * @param cov covariance matrix (need not be invertible — HRP never inverts).
+ * @param cov covariance matrix (need not be invertible, HRP never inverts).
  */
 export function hrpWeights(cov: number[][]): HRPResult | null {
   const N = cov.length;
@@ -147,7 +147,7 @@ export interface BLResult {
  *   Ω_kk = p_kᵀ (τΣ) p_k / confidence_k              (He–Litterman default,
  *                                                     scaled by confidence)
  *
- * With no views this returns Π exactly — the allocator then reproduces the
+ * With no views this returns Π exactly, the allocator then reproduces the
  * market portfolio, which is the correct "no-information" behaviour and the
  * main robustness win over raw sample-mean Markowitz.
  *

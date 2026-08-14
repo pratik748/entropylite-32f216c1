@@ -46,10 +46,10 @@ const STACK = [
     icon: Shield,
     title: "Risk & constraints",
     items: [
-      "CLANK structural constraint engine — institutional pressure detection",
-      "Fortress Mode — hard-stop liquidation discipline",
+      "CLANK structural constraint engine, institutional pressure detection",
+      "Fortress Mode, hard-stop liquidation discipline",
       "Causal Effects engine (1st / 2nd / 3rd order cascade modelling)",
-      "Aftermath Matrix — pre-trade impact, slippage, regret simulation",
+      "Aftermath Matrix, pre-trade impact, slippage, regret simulation",
     ],
     file: "src/lib/clank-engine.ts · src/lib/fortress-engine.ts",
   },
@@ -57,11 +57,11 @@ const STACK = [
     icon: GitBranch,
     title: "Strategy & memory",
     items: [
-      "Strategy Lab — regime-aware executable plans with exact levels",
-      "Strategy Factory — autonomous background hypothesis generation",
-      "Future Graph Machine — probabilistic forecasting pipeline",
-      "Scar Memory — every loss recorded, biasing future model selection",
-      "Outcome-Driven Gradient System — per-account persistent profit gradient",
+      "Strategy Lab, regime-aware executable plans with exact levels",
+      "Strategy Factory, autonomous background hypothesis generation",
+      "Future Graph Machine, probabilistic forecasting pipeline",
+      "Scar Memory, every loss recorded, biasing future model selection",
+      "Outcome-Driven Gradient System, per-account persistent profit gradient",
     ],
     file: "src/lib/future-graph-machine.ts · src/hooks/useStrategyMemory.ts",
   },
@@ -82,7 +82,7 @@ const STACK = [
 const PIPELINE = [
   { step: "01", label: "Ingest", body: "Real-time prices, fundamentals, news, geopolitics, FX." },
   { step: "02", label: "Normalize", body: "Tickers resolved · currency converted · log-returns computed." },
-  { step: "03", label: "Quantify", body: "σ, μ, ρ, Σ, VaR, CVaR, Merton DD per holding — live." },
+  { step: "03", label: "Quantify", body: "σ, μ, ρ, Σ, VaR, CVaR, Merton DD per holding, live." },
   { step: "04", label: "Reason", body: "Parallel AI providers race; CLANK constraints overlay." },
   { step: "05", label: "Simulate", body: "10,000-path Monte Carlo · causal cascades · aftermath matrix." },
   { step: "06", label: "Decide", body: "Strategy Lab emits BUY / SELL / HOLD with exact levels & sizing." },
@@ -93,12 +93,12 @@ export default function BackbonePage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Backbone | Entropy — research, math & engineering";
+    document.title = "Backbone | Entropy, research, math & engineering";
     const meta = document.querySelector('meta[name="description"]');
     if (meta)
       meta.setAttribute(
         "content",
-        "The research, mathematics and engineering stack behind Entropy — quant engine, AI orchestration, data pipeline, CLANK theory and the full SSRN manuscript.",
+        "The research, mathematics and engineering stack behind Entropy, quant engine, AI orchestration, data pipeline, CLANK theory and the full SSRN manuscript.",
       );
   }, []);
 
@@ -176,7 +176,7 @@ export default function BackbonePage() {
                 <ul className="space-y-2 mb-5">
                   {s.items.map((it) => (
                     <li key={it} className="text-[12.5px] text-white/55 leading-relaxed flex gap-2.5">
-                      <span className="text-white/20 mt-px">—</span>
+                      <span className="text-white/20 mt-px">-</span>
                       <span>{it}</span>
                     </li>
                   ))}

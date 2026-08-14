@@ -139,7 +139,7 @@ async function scoreEvents(headlines: RawHeadline[]): Promise<any[]> {
 - loc: best-guess { lat, lng, place } for the EVENT, not the publisher
 - entities: { countries: ISO names, tickers: real symbols (NSE/NYSE/etc), commodities: oil|gold|wheat|nat_gas|copper|... }
 
-Skip filler/celebrity/sports headlines (mark them with severity:0 — caller will drop). Be terse. Return ONLY JSON.`,
+Skip filler/celebrity/sports headlines (mark them with severity:0, caller will drop). Be terse. Return ONLY JSON.`,
       userPrompt: `Score these ${top.length} headlines. Return:
 {"events":[{"idx":1,"category":"...","severity":0.0,"market_relevance":0.0,"velocity":0.0,"confidence":0.0,"loc":{"lat":0,"lng":0,"place":"..."},"entities":{"countries":[],"tickers":[],"commodities":[]}}]}
 
@@ -196,7 +196,7 @@ serve(async (req) => {
     const [g, n, r] = await Promise.all([fetchGDELT(), fetchNewsData(), fetchRSS()]);
     const merged = dedupe([...g, ...n, ...r]);
 
-    // Drop anything older than 12h — feed must feel live
+    // Drop anything older than 12h, feed must feel live
     const fresh = merged.filter(h => Date.now() - h.ts < 12 * 60 * 60 * 1000);
     fresh.sort((a, b) => b.ts - a.ts);
 

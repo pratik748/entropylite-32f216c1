@@ -1,4 +1,4 @@
-// Evidence Layer — the intermediate stage between raw collection and the
+// Evidence Layer, the intermediate stage between raw collection and the
 // scoring models / confidence engine.
 //
 //   Candidates → Evidence Collection → EVIDENCE OBJECTS → Independent Models
@@ -8,17 +8,16 @@
 // features, fundamentals, news, macro) into a single, uniform, self-
 // describing list of `Evidence` objects. Each object states what was
 // observed, how strong and fresh it is, where it came from, and how much it
-// should be trusted — so downstream stages (confidence, diagnostics,
+// should be trusted, so downstream stages (confidence, diagnostics,
 // explainability) consume ONE structured representation instead of each
 // re-reading raw features in its own ad-hoc way.
 //
 // Design rules:
-//   • Pure and deterministic — same bundle in, same evidence out. No I/O.
+//   • Pure and deterministic, same bundle in, same evidence out. No I/O.
 //   • Computed ONCE per candidate and reused everywhere (dedup / perf).
 //   • Never invents a value: an object is emitted only when its underlying
 //     datum exists. Missing collectors simply produce fewer objects.
-//   • `strength` is descriptive (what the evidence says), not a verdict —
-//     the independent models remain the scorers. Buckets mirror the
+//   • `strength` is descriptive (what the evidence says), not a verdict, //     the independent models remain the scorers. Buckets mirror the
 //     consensus buckets so evidence and votes speak the same language.
 
 import { bucketOf, type Bucket } from "../buckets.ts";
@@ -81,7 +80,7 @@ export function deriveEvidence(
   // ── Price / flow (bucket A) ──────────────────────────────────────
   if (p) {
     // Momentum: return over a window scaled by the volatility expected over
-    // that window (a t-statistic-like reading) — the same volatility-scaled
+    // that window (a t-statistic-like reading), the same volatility-scaled
     // idea the momentum model uses, expressed as evidence.
     const sigma63 = Math.max(p.volAnnual * Math.sqrt(63 / 252), 0.01);
     const t63 = p.ret63d / sigma63;
@@ -104,12 +103,12 @@ export function deriveEvidence(
       { pctFrom52wHigh: Number(p.pctFrom52wHigh.toFixed(4)), zScore50d: Number(p.zScore50d.toFixed(2)) },
     ));
 
-    // Mean reversion — only speaks at oscillator extremes.
+    // Mean reversion, only speaks at oscillator extremes.
     if (p.rsi14 <= 30 || p.rsi14 >= 75) {
       const mr = p.rsi14 <= 30 ? clamp((30 - p.rsi14) / 25, 0, 0.8) : -clamp((p.rsi14 - 75) / 20, 0, 0.8);
       out.push(make(
         "mean_reversion", "mean_reversion", "price_history",
-        `RSI(14) ${p.rsi14.toFixed(0)} — ${p.rsi14 <= 30 ? "oversold" : "overbought"} extreme at ${p.zScore50d.toFixed(1)}σ from the 50-day mean.`,
+        `RSI(14) ${p.rsi14.toFixed(0)}, ${p.rsi14 <= 30 ? "oversold" : "overbought"} extreme at ${p.zScore50d.toFixed(1)}σ from the 50-day mean.`,
         mr,
         { rsi14: Number(p.rsi14.toFixed(1)), zScore50d: Number(p.zScore50d.toFixed(2)) },
       ));
@@ -125,7 +124,7 @@ export function deriveEvidence(
       ));
     }
 
-    // Liquidity — context, not directional (strength 0). Feeds the floor gate.
+    // Liquidity, context, not directional (strength 0). Feeds the floor gate.
     out.push(make(
       "liquidity", "liquidity", "price_history",
       `20-day average traded value ${Math.round(p.avgDollarVolume20d).toLocaleString()} ${p.currency ?? ""}.`.trim(),
@@ -133,7 +132,7 @@ export function deriveEvidence(
       { avgDollarVolume20d: Math.round(p.avgDollarVolume20d), bars: p.bars },
     ));
 
-    // Tail / structure — drawdown, vol, skew, kurtosis (bucket C).
+    // Tail / structure, drawdown, vol, skew, kurtosis (bucket C).
     const tail = -clamp(p.drawdownFromPeak * 1.5, 0, 0.9) + (p.skew < -0.8 && p.excessKurt > 2 ? -0.15 : 0);
     out.push(make(
       "tail_risk", "tail_risk", "price_history",
@@ -186,7 +185,7 @@ export function deriveEvidence(
       strength, { avgTone: Number(s.avgTone.toFixed(2)), articleCount: s.articleCount }, coverageScale));
   }
 
-  // ── Macro / regime (bucket C) — context, strength stays near 0 ────
+  // ── Macro / regime (bucket C), context, strength stays near 0 ────
   if (macro) {
     const bits: string[] = [];
     if (macro.rates.tenYearPct != null) bits.push(`10y yield ${macro.rates.tenYearPct}%${macro.rates.curveSlopePct != null ? `, 10y−3m curve ${macro.rates.curveSlopePct >= 0 ? "+" : ""}${macro.rates.curveSlopePct}pt` : ""}`);

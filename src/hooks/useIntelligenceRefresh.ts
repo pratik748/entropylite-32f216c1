@@ -62,7 +62,7 @@ export function useIntelligenceRefresh() {
       if (document.visibilityState === "visible") {
         const hiddenFor = hiddenSince.current ? Date.now() - hiddenSince.current : 0;
         hiddenSince.current = null;
-        // Skip refresh on quick tab-switches or backgrounding — avoids
+        // Skip refresh on quick tab-switches or backgrounding, avoids
         // hammering edge functions every time the user alt-tabs.
         if (hiddenFor < MIN_HIDDEN_MS) return;
         triggerRefresh();

@@ -1,20 +1,20 @@
 /**
- * Foresight runtime — the deterministic executor at the center of the
+ * Foresight runtime, the deterministic executor at the center of the
  * orchestration layer.
  *
  * One user turn:
- *   1. DECIDE   — foresight-plan (edge fn → existing callAI lanes) returns
+ *   1. DECIDE, foresight-plan (edge fn → existing callAI lanes) returns
  *                 either a direct response, a clarification, or a plan graph.
- *   2. EXECUTE  — the graph runs here, in application code: topological
+ *   2. EXECUTE, the graph runs here, in application code: topological
  *                 order, independent nodes in parallel, $ref data-flow
  *                 between nodes, params validated against the registry.
- *   3. VERIFY   — deterministic numeric-provenance scan, plus an LLM goal
+ *   3. VERIFY, deterministic numeric-provenance scan, plus an LLM goal
  *                 check for multi-step runs; one repair iteration allowed.
- *   4. RESPOND  — the explainer writes prose from the fact ledger only.
+ *   4. RESPOND, the explainer writes prose from the fact ledger only.
  *
  * Write tools never execute inside the loop. They surface as pending
  * actions and run only through confirmPending() after explicit user
- * approval — enforced here, not by the prompt.
+ * approval, enforced here, not by the prompt.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -155,7 +155,7 @@ export class ForesightRuntime {
       step.finishedAt = Date.now();
       step.digest = digestResult(result);
       this.onEvent({ type: "step", step: { ...step } });
-      const text = `Done — ${action.preview}`;
+      const text = `Done, ${action.preview}`;
       this.session.noteForesight(text, [action.tool]);
       this.onEvent({ type: "answer", text, facts: ledger.all() });
     } catch (e) {
@@ -175,10 +175,10 @@ export class ForesightRuntime {
     }
   }
 
-  /** Main entry — one conversational turn, possibly containing several tasks. */
+  /** Main entry, one conversational turn, possibly containing several tasks. */
   async runTurn(userText: string): Promise<void> {
     if (this.busy) {
-      this.onEvent({ type: "error", message: "A run is already in progress — cancel it first or wait." });
+      this.onEvent({ type: "error", message: "A run is already in progress, cancel it first or wait." });
       return;
     }
     this.busy = true;
@@ -256,7 +256,7 @@ export class ForesightRuntime {
       const { failures } = await this.executeGraph(nodes, results, ledger, graph, toolsUsed, signal);
       if (signal.aborted) return;
 
-      // Replan only when something failed and budget remains — the planner
+      // Replan only when something failed and budget remains, the planner
       // gets the error digests and may route around the failure.
       if (failures.length === 0 || iteration === MAX_PLAN_ITERATIONS) break;
       const repair = await this.replan(userText, graph, failures);
@@ -495,9 +495,9 @@ export class ForesightRuntime {
           context: this.session.toPromptContext(),
         },
       });
-      return { text: res.answer || "Run complete — results are in the activity ledger.", highlights: res.highlights };
+      return { text: res.answer || "Run complete, results are in the activity ledger.", highlights: res.highlights };
     } catch {
-      // Explainer unavailable — fall back to a deterministic summary so the
+      // Explainer unavailable, fall back to a deterministic summary so the
       // user still gets grounded output.
       const doneSteps = graph.steps.filter((s) => s.status === "done");
       const failedSteps = graph.steps.filter((s) => s.status === "failed");

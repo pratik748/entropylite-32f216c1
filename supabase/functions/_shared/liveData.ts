@@ -1,5 +1,5 @@
 /**
- * Live Data Scraper — institutional-grade real-time fundamentals & news.
+ * Live Data Scraper, institutional-grade real-time fundamentals & news.
  *
  * Sources:
  *  - Indian equities  → Screener.in, Moneycontrol news, BSE/NSE announcements
@@ -116,7 +116,7 @@ const SCREENER_RATIO_KEYS: Array<{ label: RegExp; key: keyof ScreenerSnapshot }>
 function buildScreenerCandidates(ticker: string): string[] {
   const base = ticker.replace(/\.(NS|BO|NSE|BSE)$/i, "").toUpperCase();
   const slugs = [base];
-  // Screener uses NSE symbols — try a few variants
+  // Screener uses NSE symbols, try a few variants
   if (ticker.toUpperCase().endsWith(".BO")) slugs.push(`${base}/consolidated`);
   return slugs.map((s) => `https://www.screener.in/company/${s}/`);
 }
@@ -332,7 +332,7 @@ export async function fetchFinviz(ticker: string): Promise<FinvizSnapshot | null
   if (!html) return setCached(key, null);
 
   const metrics: Record<string, string> = {};
-  // Snapshot table — alternating <td class="snapshot-td2-cp">Label</td><td class="snapshot-td2">Value</td>
+  // Snapshot table, alternating <td class="snapshot-td2-cp">Label</td><td class="snapshot-td2">Value</td>
   const cellRe = /<td[^>]*class="snapshot-td2[^"]*"[^>]*>([\s\S]*?)<\/td>/gi;
   const cells: string[] = [];
   let m;
@@ -728,7 +728,7 @@ export async function fetchTickerLiveBundle(rawTicker: string, isIndian: boolean
 /** Compact, prompt-ready summary string for AI context injection. */
 export function bundleToPromptContext(b: TickerLiveBundle): string {
   const lines: string[] = [];
-  lines.push(`LIVE SCRAPED DATA (≤15min cache) for ${b.ticker} — use as primary source of truth, override training-data values where they conflict.`);
+  lines.push(`LIVE SCRAPED DATA (≤15min cache) for ${b.ticker}, use as primary source of truth, override training-data values where they conflict.`);
 
   if (b.screener) {
     const s = b.screener;

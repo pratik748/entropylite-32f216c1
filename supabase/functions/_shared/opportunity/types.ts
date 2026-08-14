@@ -1,4 +1,4 @@
-// Opportunity Engine — canonical types.
+// Opportunity Engine, canonical types.
 //
 // This is THE single opportunity schema for the platform. Discover, Direct
 // Profit, Desirable Assets, alerts and any future recommendation module all
@@ -10,7 +10,7 @@
 //   → ConfidenceEngine → OpportunityValidator → ranked repository output
 //
 // Every numeric field must be traceable to observable market data. If a
-// value cannot be computed from evidence, it is omitted — never invented.
+// value cannot be computed from evidence, it is omitted, never invented.
 
 import type { Bucket, BucketDecision } from "../buckets.ts";
 import type { MarketContext } from "./marketContext.ts";
@@ -21,7 +21,7 @@ export type { MarketContext } from "./marketContext.ts";
 
 export type AssetClass = "equity" | "etf" | "index" | "commodity" | "bond" | "crypto";
 
-/** Where a candidate entered the universe — kept for full traceability. */
+/** Where a candidate entered the universe, kept for full traceability. */
 export interface CandidateOrigin {
   /** e.g. "screener:day_gainers", "screener:most_actives", "coverage:sector_etf" */
   source: string;
@@ -124,14 +124,14 @@ export interface EvidenceBundle {
   fundamentals: FundamentalFeatures | null;
   sentiment: SentimentFeatures | null;
   items: EvidenceItem[];
-  /** Collectors that ran but returned nothing (data honesty — shown in dataQuality). */
+  /** Collectors that ran but returned nothing (data honesty, shown in dataQuality). */
   missing: string[];
 }
 
 // ── Evidence objects (the normalized Evidence Layer) ────────────────
 //
 // The uniform, self-describing representation the Confidence Engine,
-// diagnostics and explainability all consume — derived ONCE per candidate
+// diagnostics and explainability all consume, derived ONCE per candidate
 // from the collected bundle (see evidenceLayer.ts). Categories map onto the
 // three orthogonal consensus buckets so evidence and model votes speak the
 // same language.
@@ -210,13 +210,13 @@ export interface OpportunitySizing {
   fractionalKellyPct: number;
   /** Weight that budgets ~2% annual portfolio vol to this position, percent. */
   volTargetWeightPct: number;
-  /** min(fractional Kelly, vol target) — the conservative binding constraint. */
+  /** min(fractional Kelly, vol target), the conservative binding constraint. */
   suggestedWeightPct: number;
   /** Which constraint bound the size. */
   basis: "fractional_kelly" | "vol_target";
   /** Estimated loss at the 95% horizon VaR for the suggested weight, percent of capital. */
   estMaxLossPct: number;
-  /** Whole units at suggested weight — only when the caller supplied portfolio value. */
+  /** Whole units at suggested weight, only when the caller supplied portfolio value. */
   suggestedQty?: number;
 }
 
@@ -248,7 +248,7 @@ export interface TradePlan {
   invalidationLevel: number;
 }
 
-/** Machine-readable reasons an opportunity was accepted — never vague prose.
+/** Machine-readable reasons an opportunity was accepted, never vague prose.
  *  The rejection side uses `RejectionCode`; this is the acceptance vocabulary. */
 export type AcceptanceReasonCode =
   | "bucket_consensus_met"
@@ -291,9 +291,9 @@ export interface ValidatedOpportunity {
   sparkline: number[];
   tradePlan: TradePlan;
 
-  /** 0..1 — calibrated probability the thesis is right, capped at 0.95 (never certainty). */
+  /** 0..1, calibrated probability the thesis is right, capped at 0.95 (never certainty). */
   confidence: number;
-  /** What produced this confidence (agreement, reputation, completeness) — auditable. */
+  /** What produced this confidence (agreement, reputation, completeness), auditable. */
   confidenceDrivers: string[];
   /** Expected move over the horizon, decimal (0.04 = +4%). Sign follows direction. */
   expectedEdgePct: number;
@@ -316,7 +316,7 @@ export interface ValidatedOpportunity {
   consensus: OpportunityConsensus;
 
   /** Structured Evidence Layer backing this opportunity (top items by
-   *  |strength|). Additive/optional — legacy consumers read the string
+   *  |strength|). Additive/optional, legacy consumers read the string
    *  arrays below; new consumers can render the self-describing objects. */
   evidence?: Evidence[];
   /** Machine-readable acceptance diagnostics (never vague explanations). */
@@ -345,7 +345,7 @@ export interface ValidatedOpportunity {
 
 // ── Pipeline diagnostics ────────────────────────────────────────────
 
-/** Machine-readable rejection codes — the audit vocabulary. */
+/** Machine-readable rejection codes, the audit vocabulary. */
 export type RejectionCode =
   | "no_price_history"
   | "insufficient_history"
@@ -370,7 +370,7 @@ export interface RejectionRecord {
   details?: Record<string, number>;     // the numbers behind the decision
 }
 
-/** A finalist that failed validation — kept visible so the funnel is auditable. */
+/** A finalist that failed validation, kept visible so the funnel is auditable. */
 export interface NearMiss {
   symbol: string;
   name: string;
@@ -394,7 +394,7 @@ export interface PipelineDiagnostics {
 
 export interface EngineResponse {
   asOf: string;
-  /** Where the pipeline ran. Always the edge function — there is no
+  /** Where the pipeline ran. Always the edge function, there is no
    *  client-side fallback venue. */
   executionVenue: "edge";
   regime: { label: "risk-on" | "neutral" | "risk-off"; evidence: string[] };

@@ -175,7 +175,7 @@ const HedgingModule = ({ stocks }: Props) => {
           <Shield className="h-5 w-5 text-foreground" />
           <span className="text-sm font-bold text-foreground uppercase tracking-wider">Active Hedging Engine</span>
           <span className={`text-[10px] font-mono ${volBasis === "measured" ? "text-muted-foreground" : "text-warning/90"}`}>
-            {volBasis === "measured" ? "σ measured · 1y history" : "σ heuristic — history not loaded"} · greeks are sizing illustrations, not option-chain quotes
+            {volBasis === "measured" ? "σ measured · 1y history" : "σ heuristic, history not loaded"} · greeks are sizing illustrations, not option-chain quotes
           </span>
         </div>
         <div className="flex gap-1.5">

@@ -20,7 +20,7 @@ interface SimulationProps {
   neutralRange: [number, number];
   bearRange: [number, number];
   currency?: string;
-  /** σ provenance from analyze-stock — labels whether the bands are computed from realized returns or assumed. */
+  /** σ provenance from analyze-stock, labels whether the bands are computed from realized returns or assumed. */
   rangeModel?: RangeModel | null;
 }
 
@@ -71,7 +71,7 @@ const SimulationTable = ({ currentPrice, bullRange, neutralRange, bearRange, cur
           >
             {rangeModel.sigmaSource === "realized"
               ? `σₘ ${rangeModel.monthlySigmaPct != null ? `${rangeModel.monthlySigmaPct}% ` : ""}· realized`
-              : "assumed σ — history unavailable"}
+              : "assumed σ, history unavailable"}
           </span>
         )}
       </div>

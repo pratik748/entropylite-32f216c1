@@ -3,8 +3,8 @@
  *
  * Findings survive page reloads so an analyst can pick a thread back up
  * days later ("what did we conclude about Tata Motors last week?").
- * localStorage-backed — same zero-infrastructure posture as the rest of the
- * platform's client caches — capped and LRU-evicted.
+ * localStorage-backed, same zero-infrastructure posture as the rest of the
+ * platform's client caches, capped and LRU-evicted.
  */
 
 import type { FactRecord, MemoryRecord } from "./types";
@@ -27,10 +27,10 @@ function persist(records: MemoryRecord[]): void {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(records));
   } catch {
-    // Quota exceeded — drop the oldest half and retry once.
+    // Quota exceeded, drop the oldest half and retry once.
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(records.slice(-Math.floor(MAX_RECORDS / 2))));
-    } catch { /* give up silently — memory is an enhancement, not a dependency */ }
+    } catch { /* give up silently, memory is an enhancement, not a dependency */ }
   }
 }
 

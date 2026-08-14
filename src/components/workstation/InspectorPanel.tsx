@@ -8,12 +8,12 @@ import { useEvidence } from "./EvidenceContext";
 import { GradeDot, MetricRow, ProvenanceChip, Sparkline, gradeText } from "./Metric";
 
 /**
- * Evidence Inspector — an investigation workspace, not a tooltip. For any
+ * Evidence Inspector, an investigation workspace, not a tooltip. For any
  * node: the full contract (definition → influence), what changed since the
  * last session, the relationship constellation, corroborating and
  * countervailing evidence, effect on the Bull/Base/Bear cases, and
  * deterministic sensitivity for valuation nodes. Every listed node is a
- * click away — investigations branch without dead ends.
+ * click away, investigations branch without dead ends.
  */
 
 const Label = ({ children }: { children: React.ReactNode }) => (
@@ -23,7 +23,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
 );
 
 const ago = (ts: number | null): string => {
-  if (!ts) return "—";
+  if (!ts) return "--";
   const mins = Math.round((Date.now() - ts) / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
@@ -199,7 +199,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
                 <span className={`font-mono text-[10px] font-semibold uppercase ${c.id === "bull" ? "text-gain" : c.id === "bear" ? "text-loss" : "text-foreground"}`}>
                   {c.label} · {c.probability}%
                 </span>
-                {" — this node is a named anchor; if it flips grade, the case re-weights."}
+                {", this node is a named anchor; if it flips grade, the case re-weights."}
               </p>
             ))}
           </div>
@@ -244,7 +244,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
       </div>
       <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted-foreground/70">
         {scored === 0
-          ? "Context evidence — informs the picture without pushing the call."
+          ? "Context evidence, informs the picture without pushing the call."
           : influenceRank >= 0
             ? `${influenceRank + 1 === 1 ? "Largest" : `#${influenceRank + 1}`} causal contribution to the ${synthesis.action} call.`
             : `One of ${graph.coverage.total} causal inputs behind the ${synthesis.action} call.`}
@@ -257,7 +257,7 @@ const InspectorBody = ({ metric }: { metric: EvidenceMetric }) => {
 };
 
 /**
- * Relationship mechanisms as a ledger — the named cause-and-effect sentences
+ * Relationship mechanisms as a ledger, the named cause-and-effect sentences
  * behind the evidence web, each row opening the connected investigation.
  * Prose over diagrams: this is a memo, not a mind map.
  */
@@ -322,7 +322,7 @@ const EmptyState = () => (
 
 /**
  * The bottom sheet portals to <body>, so a CSS xl:hidden wrapper cannot
- * suppress it — gate it with a real media query instead.
+ * suppress it, gate it with a real media query instead.
  */
 function useIsXl(): boolean {
   const [isXl, setIsXl] = useState(() =>
@@ -365,7 +365,7 @@ const InspectorPanel = () => {
         {selected ? <InspectorBody metric={selected} /> : <EmptyState />}
       </aside>
 
-      {/* below xl: bottom sheet on selection (JS-gated — it portals to body) */}
+      {/* below xl: bottom sheet on selection (JS-gated, it portals to body) */}
       {!isXl && (
         <Sheet open={!!selected} onOpenChange={(open) => !open && select(null)}>
           <SheetContent side="bottom" className="max-h-[82vh] overflow-y-auto border-border bg-background p-0">

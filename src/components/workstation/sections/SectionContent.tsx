@@ -19,7 +19,7 @@ const STATEMENT_SECTIONS = new Set([
   "financials/cash-flow",
 ]);
 
-/** Purpose-built analytical views — each section its own institutional module. */
+/** Purpose-built analytical views, each section its own institutional module. */
 const ANALYTICS_VIEWS: Record<string, typeof ProfitabilityView> = {
   "financials/balance-sheet": CapitalStructureView,
   "financials/health": HealthView,

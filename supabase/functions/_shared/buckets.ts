@@ -1,8 +1,8 @@
-// Engine bucketing — the core decorrelation fix.
+// Engine bucketing, the core decorrelation fix.
 //
 // The previous ensemble treated every engine as an independent vote, but
 // most engines ultimately read the same data (recent price). 5 momentum-
-// style engines all agreeing isn't 5 independent confirmations — it's
+// style engines all agreeing isn't 5 independent confirmations, it's
 // 1 confirmation echoed 5 times. We group engines into 3 buckets that
 // genuinely source different information, then require ≥2 buckets to
 // agree before firing. This is the single biggest accuracy lever in this

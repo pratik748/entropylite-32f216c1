@@ -1,5 +1,5 @@
 /**
- * UI operating tools — Foresight drives the terminal instead of describing
+ * UI operating tools, Foresight drives the terminal instead of describing
  * it. All effects go through the typed UI bus; components own the actual
  * state transitions.
  */
@@ -25,7 +25,7 @@ registerTool({
   },
   execute: async (params) => {
     const delivered = emitUIEvent("navigate", { tab: params.tab as string });
-    if (!delivered) throw new Error("terminal not mounted — navigation unavailable");
+    if (!delivered) throw new Error("terminal not mounted, navigation unavailable");
     return { data: { navigated: params.tab }, source: "ui" };
   },
 });
@@ -86,7 +86,7 @@ registerTool({
 
 registerTool({
   name: "ui.workbench_pin",
-  description: "Pin a structured result card into the Foresight workbench — a temporary workspace beside the conversation. Use for tables (weights, comparisons) and metric sets the analyst should keep in view. body for kind=table: {columns:[...], rows:[[...]]}; kind=metrics: {items:[{label, value, unit?}]}; kind=text: {text}.",
+  description: "Pin a structured result card into the Foresight workbench, a temporary workspace beside the conversation. Use for tables (weights, comparisons) and metric sets the analyst should keep in view. body for kind=table: {columns:[...], rows:[[...]]}; kind=metrics: {items:[{label, value, unit?}]}; kind=text: {text}.",
   category: "ui",
   permission: "read",
   keywords: ["pin", "workbench", "workspace", "keep", "card", "table"],

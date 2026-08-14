@@ -1,10 +1,10 @@
 /**
- * Foresight — shared types.
+ * Foresight, shared types.
  *
  * Foresight is the orchestration layer of EntropyLite: it plans with the
  * existing AI endpoint, executes deterministic engines and edge functions
  * through the tool registry, verifies its own output, and operates the UI.
- * Every quantitative value must originate from a tool result — these types
+ * Every quantitative value must originate from a tool result, these types
  * carry that provenance end to end.
  */
 
@@ -28,7 +28,7 @@ export type ToolCategory =
 export type ToolPermission = "read" | "confirm";
 
 export interface ForesightContext {
-  /** Live application handles — portfolio, navigation, prices. */
+  /** Live application handles, portfolio, navigation, prices. */
   host: HostAdapter;
   /** Abort signal for the current run (user cancelled / budget exhausted). */
   signal: AbortSignal;
@@ -61,7 +61,7 @@ export interface ForesightTool<R = unknown> {
   execute: (params: Record<string, unknown>, ctx: ForesightContext) => Promise<ToolResult<R>>;
 }
 
-// ── Host adapter — the application surface Foresight operates ─────────
+// ── Host adapter, the application surface Foresight operates ─────────
 
 export interface PortfolioPosition {
   id: string;
@@ -94,7 +94,7 @@ export interface PlanNode {
   params: Record<string, unknown>;
   /** Node ids that must complete first (also implied by $refs). */
   after?: string[];
-  /** Why this node exists — shown in the activity ledger. */
+  /** Why this node exists, shown in the activity ledger. */
   reason?: string;
 }
 

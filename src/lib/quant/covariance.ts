@@ -1,5 +1,5 @@
 /**
- * Covariance Estimation Layer — institutional-grade Σ estimators.
+ * Covariance Estimation Layer, institutional-grade Σ estimators.
  * ───────────────────────────────────────────────────────────────
  * Complements the existing hygiene pipeline (mpCleanCovariance → nearestPSD in
  * institutional.ts) with *estimation* improvements:
@@ -151,7 +151,7 @@ export function ledoitWolfShrinkage(series: number[][]): LedoitWolfResult | null
 
   let delta: number;
   if (gammaHat < 1e-18) {
-    delta = 0; // target equals sample — nothing to shrink
+    delta = 0; // target equals sample, nothing to shrink
   } else {
     const kappa = (piHat - rhoHat) / gammaHat;
     delta = Math.max(0, Math.min(1, kappa / T));
@@ -214,13 +214,13 @@ export interface DCCLiteResult {
 
 /**
  * Scalar DCC-lite: two-stage dynamic correlation.
- *   Stage 1 — per-asset EWMA variance h_it (λ_vol), standardise ε_it = x_it/√h_it.
- *   Stage 2 — EWMA pseudo-correlation Q_t = λ_corr Q_{t−1} + (1−λ_corr) ε_t ε_tᵀ,
+ *   Stage 1, per-asset EWMA variance h_it (λ_vol), standardise ε_it = x_it/√h_it.
+ *   Stage 2, EWMA pseudo-correlation Q_t = λ_corr Q_{t−1} + (1−λ_corr) ε_t ε_tᵀ,
  *             rescaled R_t = diag(Q_t)^{−½} Q_t diag(Q_t)^{−½}.
  *   Recombine Σ_t = D_t R_t D_t with D_t = diag(√h_it).
  *
  * This is Engle (2002) DCC with the GARCH recursions replaced by fixed-λ EWMA
- * (i.e. integrated GARCH limits) — no likelihood optimisation, deterministic,
+ * (i.e. integrated GARCH limits), no likelihood optimisation, deterministic,
  * and empirically captures most of DCC's benefit at horizon ≤ 1 month.
  * Cost O(N²T); browser-safe.
  */
@@ -266,7 +266,7 @@ export function dccLite(series: number[][], lambdaVol = 0.94, lambdaCorr = 0.97)
 // Correlation distance (HRP input)
 // ─────────────────────────────────────────────────────────────────
 
-/** d_ij = √(½ (1 − ρ_ij)) — a proper metric on correlation space. */
+/** d_ij = √(½ (1 − ρ_ij)), a proper metric on correlation space. */
 export function correlationDistance(corr: number[][]): number[][] {
   const N = corr.length;
   return Array.from({ length: N }, (_, i) =>

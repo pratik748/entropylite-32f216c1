@@ -7,7 +7,7 @@ import { Block, PendingEvidence } from "./blocks";
 /**
  * Default section renderer: the section's evidence nodes as stat tiles
  * (strongest first) plus a compact ledger of the rest. Sections whose
- * pipeline hasn't landed yet get the designed pending state — never blank.
+ * pipeline hasn't landed yet get the designed pending state, never blank.
  */
 const GenericSectionView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
   const { sectionMetrics, data } = useEvidence();

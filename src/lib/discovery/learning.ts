@@ -1,11 +1,11 @@
-// Continuous learning — consequence-weighted memory + regime-conditional
+// Continuous learning, consequence-weighted memory + regime-conditional
 // reliability (TRUTH Scar Memory §8, reduced to realized-outcome attribution;
-// the simulated ∂O/∂m gradient was rejected as marginal — see
+// the simulated ∂O/∂m gradient was rejected as marginal, see
 // docs/TRUTH_TO_ENTROPYLITE_MAP.md #13).
 //
 // Reuses the audited estimators in src/lib/quant/calibration.ts:
-//   betaUpdate  — decayed Beta-Bernoulli (bounded effective memory)
-//   betaMean    — posterior mean
+//   betaUpdate, decayed Beta-Bernoulli (bounded effective memory)
+//   betaMean, posterior mean
 // Storage: public.engine_regime_stats (one row per engine × regime) and the
 // new scar columns on public.scar_memory.
 
@@ -21,7 +21,7 @@ export function newReliabilityCell(priorMean = 0.55, strength = 10): Reliability
 
 /**
  * Record one outcome (hit ∈ {0,1} or fractional) with exponential
- * forgetting λ — effective memory 1/(1−λ) ≈ 50 outcomes at the default.
+ * forgetting λ, effective memory 1/(1−λ) ≈ 50 outcomes at the default.
  */
 export function updateReliability(cell: ReliabilityCell, hit: number, lambda = 0.98): ReliabilityCell {
   const s: BetaState = betaUpdate({ alpha: cell.alpha, beta: cell.beta }, hit, lambda);

@@ -1,5 +1,5 @@
 /**
- * AI caller — UNIFIED on Mistral.
+ * AI caller, UNIFIED on Mistral.
  *
  * All other provider names (groq/cloudflare/openai/gemini) are kept as type
  * aliases for backward compatibility, but every code path routes to Mistral.
@@ -9,7 +9,7 @@
  *
  * A third key (MISTRAL_API_KEY_3) acts as a priority reserve: it is not part
  * of the round-robin load split, and is tried FIRST when both rotating keys
- * hit limits — before any Gemini/1min fallback — so rate-limit bursts land on
+ * hit limits, before any Gemini/1min fallback, so rate-limit bursts land on
  * the reserve Mistral lane rather than a different provider.
  *
  * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
@@ -28,7 +28,7 @@ interface CallAIOptions {
   provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   jsonMode?: boolean;
   skipHardening?: boolean;
-  /** No-op (kept for backward compatibility — Mistral has no native web search). */
+  /** No-op (kept for backward compatibility, Mistral has no native web search). */
   useWebSearch?: boolean;
 }
 
@@ -52,19 +52,19 @@ function pickKeyIndex(total: number): number {
   return i;
 }
 
-const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER — MANDATORY]
+const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER, MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
 
-1. PROBABILISTIC ONLY — no deterministic opinions. All claims expressed as distributions or probabilities.
-2. STOCHASTIC MODEL — assume drift μ, volatility σ, and jump risk J. Treat outcomes as Monte-Carlo derived, not narrative.
-3. RISK-FIRST — tail risk (VaR 95%, max drawdown, liquidity risk, vol-expansion risk) dominates mean outcomes.
-4. REFLEXIVITY-AWARE — include feedback loops: price → flow → volatility → price; momentum amplification; crowding.
-5. SCENARIO DECOMPOSITION — bull (tail-up), bear (tail-down), neutral (mean-reverting cluster) — derived from distribution, not assigned.
-6. EXPECTED VALUE — EV = ∫ P(x)·R(x) dx with asymmetric payoff, fat-tail penalty, skew adjustment.
-7. NO SUBJECTIVE LANGUAGE — banned: "I think", "likely", "should", "guaranteed", "always", "never", em-dashes used as narrative flourish, marketing adjectives.
-8. NO AI-SLOP PUNCTUATION — no em-dash dramatics, no rhetorical pauses.
-9. OUTPUT DISCIPLINE — if the caller asks for JSON, return ONLY valid JSON, no prose, no markdown fences.
-10. EXECUTION-READY — every signal must be risk-adjusted and simulation-derived, not qualitative.
+1. PROBABILISTIC ONLY, no deterministic opinions. All claims expressed as distributions or probabilities.
+2. STOCHASTIC MODEL, assume drift μ, volatility σ, and jump risk J. Treat outcomes as Monte-Carlo derived, not narrative.
+3. RISK-FIRST, tail risk (VaR 95%, max drawdown, liquidity risk, vol-expansion risk) dominates mean outcomes.
+4. REFLEXIVITY-AWARE, include feedback loops: price → flow → volatility → price; momentum amplification; crowding.
+5. SCENARIO DECOMPOSITION, bull (tail-up), bear (tail-down), neutral (mean-reverting cluster), derived from distribution, not assigned.
+6. EXPECTED VALUE, EV = ∫ P(x)·R(x) dx with asymmetric payoff, fat-tail penalty, skew adjustment.
+7. NO SUBJECTIVE LANGUAGE, banned: "I think", "likely", "should", "guaranteed", "always", "never", em-dashes used as narrative flourish, marketing adjectives.
+8. NO AI-SLOP PUNCTUATION, no em-dash dramatics, no rhetorical pauses.
+9. OUTPUT DISCIPLINE, if the caller asks for JSON, return ONLY valid JSON, no prose, no markdown fences.
+10. EXECUTION-READY, every signal must be risk-adjusted and simulation-derived, not qualitative.
 
 Treat the market as an adaptive reflexive system, not static equilibrium.
 Violation of any rule = invalid response.`;
@@ -215,7 +215,7 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 }
 
 /**
- * Lovable AI Gateway lane — OpenAI-compatible, no user-supplied key required.
+ * Lovable AI Gateway lane, OpenAI-compatible, no user-supplied key required.
  * This is the primary lane: it keeps every engine on real model output instead
  * of degrading to deterministic placeholder math when third-party keys throttle.
  */
@@ -293,7 +293,7 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
   const apiKey = Deno.env.get("ONEMIN_AI_API_KEY");
   if (!apiKey) throw new Error("ONEMIN_AI_API_KEY not configured");
 
-  // 1min.ai has no system role — fold system into the user prompt.
+  // 1min.ai has no system role, fold system into the user prompt.
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode
     ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences. No comments."
@@ -374,7 +374,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 }
 
 // ---------------------------------------------------------------------------
-// Lane registry — assembles all available providers into a single rotation.
+// Lane registry, assembles all available providers into a single rotation.
 // ---------------------------------------------------------------------------
 interface Lane {
   label: string;
@@ -396,14 +396,14 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
   const gw = Deno.env.get("LOVABLE_API_KEY");
 
-  // Lovable AI Gateway first — managed quota, no third-party throttling.
+  // Lovable AI Gateway first, managed quota, no third-party throttling.
   if (gw) primary.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
   if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // Reserve Mistral key — kept out of the round-robin so it stays under its
+  // Reserve Mistral key, kept out of the round-robin so it stays under its
   // rate limits, and tried before Gemini when the rotating keys are exhausted.
   if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
-  // Gemini lanes — sequential fallback after every Mistral key fails.
+  // Gemini lanes, sequential fallback after every Mistral key fails.
   // Ensures analytics never go dark when Mistral is rate-limited or down.
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
   if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
@@ -480,7 +480,7 @@ Rules:
 }
 
 /**
- * Public API — single AI call. Always Mistral, with key1 → key2 fallback.
+ * Public API, single AI call. Always Mistral, with key1 → key2 fallback.
  */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
@@ -489,7 +489,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
 }
 
 /**
- * Public API — fan out for ensemble diversity. With Mistral-only we just
+ * Public API, fan out for ensemble diversity. With Mistral-only we just
  * return one result (kept as array to preserve existing call sites).
  */
 export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
@@ -501,10 +501,10 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
  * Live web search grounding via Gemini's built-in google_search tool.
  * Returns a compact bullet list of real-time web snippets (titles + URLs)
  * that the caller can inject directly into a prompt. Empty string on any
- * failure so callers degrade gracefully — but we DO try, because the user
+ * failure so callers degrade gracefully, but we DO try, because the user
  * explicitly asked for real-time recommendations, not training-cutoff guesses.
  */
 export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
-  // Live web context disabled — Gemini removed. Mistral-only stack.
+  // Live web context disabled, Gemini removed. Mistral-only stack.
   return "";
 }

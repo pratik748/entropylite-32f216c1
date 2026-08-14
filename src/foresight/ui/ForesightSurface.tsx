@@ -1,13 +1,13 @@
 /**
- * Foresight surface — the command console through which Foresight operates
+ * Foresight surface, the command console through which Foresight operates
  * the terminal. Ledger-style, monochrome, hairline construction: an activity
  * register, not a chat bubble UI. The interface itself (tabs, modules,
  * highlights) is where results are shown; this panel carries the
  * conversation, the execution ledger, evidence, and confirmations.
  *
  * Two presentations of the same panel:
- *   ≥ md — docked right-hand aside (⌘J).
- *   < md — full-screen sheet, launched from a small always-visible button
+ *   ≥ md, docked right-hand aside (⌘J).
+ *   < md, full-screen sheet, launched from a small always-visible button
  *          pinned top-center over the header.
  * Voice runs in both: dictation via the mic control, spoken replies via the
  * speaker toggle (see ../voice.ts).
@@ -101,7 +101,7 @@ function VerificationLine({ v }: { v: VerificationReport }) {
     <div className="mt-1.5 space-y-0.5">
       {!numericOk && (
         <div className="text-[10px] text-warning">
-          Unverified figures: {v.numericCheck.unsupported.slice(0, 6).join(", ")} — treat with caution.
+          Unverified figures: {v.numericCheck.unsupported.slice(0, 6).join(", ")}, treat with caution.
         </div>
       )}
       {v.goalCheck && !v.goalCheck.satisfied && v.goalCheck.issues.slice(0, 2).map((issue, i) => (
@@ -248,7 +248,7 @@ const SUGGESTIONS = [
 // Foresight still opens via ⌘J / the command palette; flip to restore.
 const FORESIGHT_LAUNCHER_ENABLED = false;
 
-/** The console itself — shared by the desktop dock and the mobile sheet. */
+/** The console itself, shared by the desktop dock and the mobile sheet. */
 function PanelBody() {
   const {
     setOpen, transcript, workbench, busy, prefill, setPrefill,
@@ -339,7 +339,7 @@ function PanelBody() {
             <button
               onClick={toggleVoice}
               className={`pressable flex h-6 w-6 items-center justify-center rounded transition-colors ${voiceOn ? "text-foreground bg-surface-2" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
-              title={voiceOn ? "Voice replies on — click to mute" : "Speak replies aloud"}
+              title={voiceOn ? "Voice replies on, click to mute" : "Speak replies aloud"}
             >
               {voiceOn ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
             </button>
@@ -375,7 +375,7 @@ function PanelBody() {
         {transcript.length === 0 && (
           <div className="pt-6">
             <p className="text-[11.5px] leading-relaxed text-muted-foreground">
-              Describe what you want — Foresight routes it through the platform's
+              Describe what you want, Foresight routes it through the platform's
               engines and operates the terminal. Numbers come only from
               EntropyLite computations; state changes always ask first.
             </p>
@@ -456,7 +456,7 @@ export default function ForesightSurface() {
 
   return (
     <>
-      {/* Phone launcher — small button pinned top-center over the header.
+      {/* Phone launcher, small button pinned top-center over the header.
           Hidden for now via FORESIGHT_LAUNCHER_ENABLED. */}
       <AnimatePresence initial={false}>
         {FORESIGHT_LAUNCHER_ENABLED && !open && (
@@ -475,7 +475,7 @@ export default function ForesightSurface() {
         )}
       </AnimatePresence>
 
-      {/* Desktop — docked right-hand aside (⌘J). */}
+      {/* Desktop, docked right-hand aside (⌘J). */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.aside
@@ -493,7 +493,7 @@ export default function ForesightSurface() {
         )}
       </AnimatePresence>
 
-      {/* Phone — full-screen sheet. */}
+      {/* Phone, full-screen sheet. */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div

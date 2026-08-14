@@ -240,7 +240,7 @@ export default function GeopoliticalMap({
     }
   }, [data, portfolioMarkers, visibleLayers, onSelectConflict]);
 
-  // Live geo events layer + heat overlay (separate effect — high churn)
+  // Live geo events layer + heat overlay (separate effect, high churn)
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -286,7 +286,7 @@ export default function GeopoliticalMap({
       .filter(e => e.loc && isLL(e.loc.lat, e.loc.lng) && !(e.loc.lat === 0 && e.loc.lng === 0))
       .map(e => [e.loc.lat, e.loc.lng, Math.min(1, e.decayedScore * 1.4)] as [number, number, number]);
     if (heatPoints.length > 0) {
-      // @ts-ignore — leaflet.heat extends L
+      // @ts-ignore, leaflet.heat extends L
       heatRef.current = L.heatLayer(heatPoints, {
         radius: 28,
         blur: 22,

@@ -1,5 +1,5 @@
 /**
- * Portfolio Sentinel — client bridge.
+ * Portfolio Sentinel, client bridge.
  * Registers positions for background monitoring, fetches alerts,
  * and updates user preferences (email toggle, drawdown thresholds).
  */

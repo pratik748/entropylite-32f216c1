@@ -41,7 +41,7 @@ const StockSummary = ({ ticker, currentPrice, buyPrice, quantity, currency }: St
         <div className="min-w-0">
           <Link
             to={workstationPath(ticker)}
-            title={`Open Equity Workstation — ${ticker}`}
+            title={`Open Equity Workstation, ${ticker}`}
             className="group inline-flex items-center gap-1 text-headline text-foreground transition-colors hover:text-muted-foreground"
           >
             {ticker}

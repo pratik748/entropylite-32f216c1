@@ -1,5 +1,5 @@
 /**
- * AI provider hook — locked to Mistral. Multi-provider toggle has been removed.
+ * AI provider hook, locked to Mistral. Multi-provider toggle has been removed.
  * Kept as a stable API so existing imports continue to compile.
  */
 

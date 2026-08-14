@@ -1,4 +1,4 @@
-// Claim extractor — turns heterogeneous engine payloads into TWRD claim triples.
+// Claim extractor, turns heterogeneous engine payloads into TWRD claim triples.
 // Lightweight rules-based: enough for MVP without a heavy NER model.
 
 import type { RawClaim, TwrdDomain, ClaimEvidence } from "./types.ts";

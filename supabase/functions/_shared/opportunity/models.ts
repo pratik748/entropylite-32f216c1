@@ -1,4 +1,4 @@
-// IndependentScoringModels — each model reads a different slice of the
+// IndependentScoringModels, each model reads a different slice of the
 // evidence and votes independently. Models must:
 //   • derive every number from the evidence bundle (no invented values),
 //   • explain themselves in `rationale` with the observed figures,
@@ -7,7 +7,7 @@
 //
 // Cross-validation happens later in the ConfidenceEngine: models are
 // grouped into orthogonal information buckets (price/flow, fundamental,
-// risk/regime — see _shared/buckets.ts) and conflicting evidence lowers
+// risk/regime, see _shared/buckets.ts) and conflicting evidence lowers
 // the calibrated confidence.
 
 import { mertonProxy, walkForwardEdge } from "../mathEdge.ts";
@@ -61,7 +61,7 @@ export function momentumModel(b: EvidenceBundle): ModelScore {
   const sigma21 = Math.max(p.volAnnual * Math.sqrt(21 / 252), 0.01);
   const t63 = p.ret63d / sigma63;
   const t21 = p.ret21d / sigma21;
-  // Weight the longer window 2:1 — less noise, and 12-1 style momentum
+  // Weight the longer window 2:1, less noise, and 12-1 style momentum
   // literature favors the multi-month signal. Scale /2 maps a 2-sigma
   // vol-adjusted move to full score.
   const score = (2 * t63 + t21) / 3 / 2;
@@ -78,7 +78,7 @@ export function meanReversionModel(b: EvidenceBundle): ModelScore {
   const rationale: string[] = [
     `RSI(14) ${p.rsi14.toFixed(0)}; price is ${p.zScore50d.toFixed(1)}σ from its 50-day mean.`,
   ];
-  // Only speaks at extremes — mid-range oscillators carry no information.
+  // Only speaks at extremes, mid-range oscillators carry no information.
   let score = 0;
   if (p.rsi14 <= 30 && p.zScore50d <= -1.5) {
     score = clamp((30 - p.rsi14) / 20 + (-p.zScore50d - 1.5) / 2, 0, 1) * 0.8;
@@ -87,7 +87,7 @@ export function meanReversionModel(b: EvidenceBundle): ModelScore {
     score = -clamp((p.rsi14 - 75) / 15 + (p.zScore50d - 2) / 2, 0, 1) * 0.8;
     rationale.push("Overbought extreme: stretched above its own trading range, vulnerable to give-back.");
   } else {
-    rationale.push("No extreme reading — model abstains in the middle of the range.");
+    rationale.push("No extreme reading, model abstains in the middle of the range.");
   }
   return finish("mean_reversion", "Mean reversion", score, rationale, 0.1);
 }
@@ -106,8 +106,8 @@ export function trendModel(b: EvidenceBundle): ModelScore {
   if (sma50AboveSma200 != null) score += sma50AboveSma200 ? 0.35 : -0.35;
   // Proximity to 52w high (within 5%) confirms an established uptrend;
   // deep drawdown (>30% off high) confirms a broken one.
-  if (p.pctFrom52wHigh > -0.05) { score += 0.2; rationale.push("Trading within 5% of its 52-week high — trend intact."); }
-  else if (p.drawdownFromPeak > 0.30) { score -= 0.2; rationale.push(`Deep drawdown (${pct(p.drawdownFromPeak)} off peak) — structure broken.`); }
+  if (p.pctFrom52wHigh > -0.05) { score += 0.2; rationale.push("Trading within 5% of its 52-week high, trend intact."); }
+  else if (p.drawdownFromPeak > 0.30) { score -= 0.2; rationale.push(`Deep drawdown (${pct(p.drawdownFromPeak)} off peak), structure broken.`); }
   return finish("trend", "Trend structure", score, rationale);
 }
 
@@ -122,9 +122,9 @@ export function volumeModel(b: EvidenceBundle): ModelScore {
   let score = 0;
   if (Math.abs(p.volumeZ20) >= 2 && Math.abs(p.ret5d) >= 0.01) {
     score = Math.sign(p.ret5d) * clamp(Math.abs(p.volumeZ20) / 4, 0, 0.7);
-    rationale.push(`Abnormal participation confirms the ${p.ret5d > 0 ? "advance" : "decline"} — moves on heavy volume persist more often than quiet ones.`);
+    rationale.push(`Abnormal participation confirms the ${p.ret5d > 0 ? "advance" : "decline"}, moves on heavy volume persist more often than quiet ones.`);
   } else {
-    rationale.push("No abnormal participation — model abstains.");
+    rationale.push("No abnormal participation, model abstains.");
   }
   return finish("volume", "Volume anomaly", score, rationale, 0.1);
 }
@@ -135,14 +135,14 @@ export function walkForwardModel(b: EvidenceBundle, horizonDays: number): ModelS
     return abstain("walkforward", "Walk-forward edge", "Not enough history for walk-forward evaluation at this horizon.");
   }
   const wf = walkForwardEdge(p.closes, horizonDays);
-  if (wf.n < 60) return abstain("walkforward", "Walk-forward edge", `Only ${wf.n} overlapping windows — sample too small.`);
+  if (wf.n < 60) return abstain("walkforward", "Walk-forward edge", `Only ${wf.n} overlapping windows, sample too small.`);
   const rationale = [
     `Historically, holding ${horizonDays} days won ${(wf.hitRate * 100).toFixed(0)}% of the time with mean forward return ${pct(wf.meanFwd)} (n=${wf.n}).`,
     `Forward-return Sharpe ${wf.fwdSharpe.toFixed(2)}.`,
   ];
   // Require a real historical edge; |Sharpe| < 0.4 is noise.
   const score = Math.abs(wf.fwdSharpe) < 0.4 ? 0 : clamp(wf.fwdSharpe / 2, -1, 1);
-  if (score === 0) rationale.push("No statistically meaningful historical edge at this horizon — abstaining.");
+  if (score === 0) rationale.push("No statistically meaningful historical edge at this horizon, abstaining.");
   return finish("walkforward", "Walk-forward edge", score, rationale, 0.1);
 }
 
@@ -163,7 +163,7 @@ export function valueModel(b: EvidenceBundle): ModelScore {
     rationale.push(`${f.forwardPE != null ? "Forward" : "Trailing"} P/E ${pe.toFixed(1)} (${s > 0 ? "inexpensive" : s < 0 ? "rich" : "fair"}).`);
   } else if (pe != null && pe <= 0) {
     score -= 0.5; inputs++;
-    rationale.push("Negative earnings — no valuation support.");
+    rationale.push("Negative earnings, no valuation support.");
   }
   if (f.pegRatio != null && f.pegRatio > 0) {
     const s = f.pegRatio < 1 ? 0.4 : f.pegRatio <= 2 ? 0 : -0.4;
@@ -172,7 +172,7 @@ export function valueModel(b: EvidenceBundle): ModelScore {
   }
   if (f.priceToBook != null && f.priceToBook > 0 && f.priceToBook < 1) {
     score += 0.3; inputs++;
-    rationale.push(`Price-to-book ${f.priceToBook.toFixed(2)} — below book value.`);
+    rationale.push(`Price-to-book ${f.priceToBook.toFixed(2)}, below book value.`);
   }
   if (inputs === 0) return abstain("value", "Value", "Valuation inputs unusable.");
   return finish("value", "Value", score / Math.max(1, inputs * 0.8), rationale);
@@ -188,7 +188,7 @@ export function qualityModel(b: EvidenceBundle): ModelScore {
   if (f.profitMargins != null) {
     const s = f.profitMargins > 0.15 ? 0.4 : f.profitMargins > 0.05 ? 0.15 : f.profitMargins > 0 ? 0 : -0.5;
     score += s; inputs++;
-    rationale.push(`Profit margin ${pct(f.profitMargins)}${f.profitMargins <= 0 ? " — loss-making" : ""}.`);
+    rationale.push(`Profit margin ${pct(f.profitMargins)}${f.profitMargins <= 0 ? ", loss-making" : ""}.`);
   }
   if (f.returnOnEquity != null) {
     const s = f.returnOnEquity > 0.18 ? 0.35 : f.returnOnEquity > 0.08 ? 0.1 : f.returnOnEquity > 0 ? 0 : -0.35;
@@ -247,9 +247,9 @@ export function analystModel(b: EvidenceBundle): ModelScore {
     rationale.push(`Mean price target implies ${pct(upside)} from last close.`);
   }
   if (inputs === 0) return abstain("analyst", "Analyst consensus", "Analyst inputs unusable.");
-  // Thin coverage (<4 analysts) halves conviction — one analyst isn't a consensus.
+  // Thin coverage (<4 analysts) halves conviction, one analyst isn't a consensus.
   const coverageScale = (f.numberOfAnalystOpinions ?? 0) >= 4 ? 1 : 0.5;
-  if (coverageScale < 1) rationale.push("Coverage is thin (<4 analysts) — conviction halved.");
+  if (coverageScale < 1) rationale.push("Coverage is thin (<4 analysts), conviction halved.");
   return finish("analyst", "Analyst consensus", (score / Math.max(1, inputs)) * coverageScale, rationale);
 }
 
@@ -275,7 +275,7 @@ export function regimeModel(b: EvidenceBundle, regime: MarketRegime): ModelScore
     `Market regime: ${regime.label} (benchmark 21d ${pct(regime.benchmarkRet21d)}, vol ${pct(regime.benchmarkVolAnnual)}).`,
   ];
   if (beta == null) {
-    rationale.push("Beta vs benchmark unavailable — abstaining.");
+    rationale.push("Beta vs benchmark unavailable, abstaining.");
     return abstain("regime", "Macro regime alignment", rationale.join(" "));
   }
   rationale.push(`Beta vs benchmark ${beta.toFixed(2)}.`);
@@ -305,10 +305,10 @@ export function tailRiskModel(b: EvidenceBundle): ModelScore {
   let score = 0;
   if (merton.severity === "DISTRESS") {
     score = -0.7;
-    rationale.push("Price has fallen far in volatility units with no trend support — structural stress veto.");
+    rationale.push("Price has fallen far in volatility units with no trend support, structural stress veto.");
   } else if (merton.severity === "STRESS") {
     score = -0.35;
-    rationale.push("Elevated structural stress — treated as contradicting evidence for longs.");
+    rationale.push("Elevated structural stress, treated as contradicting evidence for longs.");
   } else if (merton.signal === 1) {
     score = 0.25;
     rationale.push("Healthy distance from stress with trend support.");

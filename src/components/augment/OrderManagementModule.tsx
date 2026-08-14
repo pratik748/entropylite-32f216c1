@@ -20,11 +20,11 @@ const OrderManagementModule = ({ stocks }: Props) => {
   const { orders, analytics, valueBarData, sidePieData } = useMemo(() => {
     if (holdings.length === 0) return { orders: [], analytics: [], valueBarData: [], sidePieData: [] };
 
-    // Real-math slippage model — Almgren-Chriss square-root impact:
+    // Real-math slippage model, Almgren-Chriss square-root impact:
     //   slippage_bps ≈ k · σ_daily · √(notional / portfolio_value)
     // σ_daily is derived from the holding's real risk score (risk → annualised
     // vol → daily vol). k=0.5 is the standard liquidity coefficient used by
-    // bank execution desks. Deterministic — same input always returns the
+    // bank execution desks. Deterministic, same input always returns the
     // same number, no random jitter.
     const slippageBps = (notional: number, riskScore: number): number => {
       const sigmaDaily = (Math.max(10, Math.min(95, riskScore)) / 100) * 0.018;

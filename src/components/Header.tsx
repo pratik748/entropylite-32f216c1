@@ -93,7 +93,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">{openCount}/{markets.length}</span>
         </div>
 
-        {/* Global search — opens the command palette */}
+        {/* Global search, opens the command palette */}
         <button
           onClick={openPalette}
           className="hidden md:flex flex-1 max-w-md items-center gap-2 rounded-lg border border-border/70 bg-surface-2/60 px-3 h-8 text-left hover:bg-surface-2 hover:border-border transition-colors mx-2"
@@ -110,7 +110,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
 
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ml-auto">
           <DemoIndicator />
-          {/* Foresight operating surface — top launcher hidden for now.
+          {/* Foresight operating surface, top launcher hidden for now.
               Foresight itself is still reachable via ⌘J and the command
               palette ("Ask Foresight"); restore this button to bring it back. */}
           {FORESIGHT_LAUNCHER_ENABLED && (

@@ -1,10 +1,10 @@
 /**
- * Exposure analytics — sector, currency, style, and market-beta exposures
+ * Exposure analytics, sector, currency, style, and market-beta exposures
  * from real portfolio state and (where available) real return history.
  * ────────────────────────────────────────────────────────────────────────
  * Style buckets are realized-statistic terciles of the portfolio's own
  * universe (volatility from history, momentum = trailing compounded return)
- * — measurable facts, not vendor style boxes.
+ *, measurable facts, not vendor style boxes.
  */
 
 import { type ExposureAnalysis, type ExposureBucket, metric } from "./types";

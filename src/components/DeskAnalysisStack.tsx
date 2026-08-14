@@ -19,7 +19,7 @@ interface DeskAnalysisStackProps {
 }
 
 /**
- * The Desk's analysis pane stack — one tree serving both the mobile stacked
+ * The Desk's analysis pane stack, one tree serving both the mobile stacked
  * layout and the desktop center column (previously duplicated in Index.tsx).
  */
 const DeskAnalysisStack = ({ analysis, stocks, isMobile, onSelectTicker }: DeskAnalysisStackProps) => {

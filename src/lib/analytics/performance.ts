@@ -1,5 +1,5 @@
 /**
- * Performance analytics — pure functions over real daily return series.
+ * Performance analytics, pure functions over real daily return series.
  * ─────────────────────────────────────────────────────────────────────
  * Inputs are portfolio (and optionally benchmark) daily log-returns built
  * from fetched price history. Nothing here fabricates data: with an

@@ -18,7 +18,7 @@ const ESGModule = ({ stocks }: Props) => {
     if (analyzed.length === 0) return { scores: [], policyChecks: [], avgScore: 0, barData: [] };
 
     // Honesty rule: the provider gives us ONE overall ESG score per name.
-    // We do not manufacture E/S/G sub-scores from it — a decomposition we
+    // We do not manufacture E/S/G sub-scores from it, a decomposition we
     // don't have is shown as "unavailable", not invented (even deterministically).
     const esgScores = analyzed.map(s => {
       const real = typeof s.analysis?.esgScore === "number" ? s.analysis.esgScore : null;
@@ -33,7 +33,7 @@ const ESGModule = ({ stocks }: Props) => {
     const rated = esgScores.filter(e => e.overall != null) as Array<typeof esgScores[number] & { overall: number }>;
     const avg = rated.length > 0 ? rated.reduce((s, e) => s + e.overall, 0) / rated.length : 0;
     const minScore = rated.length > 0 ? Math.min(...rated.map(e => e.overall)) : 0;
-    const minTicker = rated.find(e => e.overall === minScore)?.ticker || "—";
+    const minTicker = rated.find(e => e.overall === minScore)?.ticker || "--";
 
     const policies = [
       { policy: "Min ESG score > 50", status: rated.length === 0 ? "N/A" : minScore > 50 ? "PASS" : "WARNING", detail: rated.length ? `Min: ${minTicker} (${minScore})` : "No rated holdings" },
@@ -63,7 +63,7 @@ const ESGModule = ({ stocks }: Props) => {
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio ESG Score</p>
-          <p className={`mt-1 font-mono text-3xl font-bold ${avgScore ? scoreColor(avgScore) : "text-muted-foreground"}`}>{avgScore ? `${avgScore.toFixed(0)}/100` : "—"}</p>
+          <p className={`mt-1 font-mono text-3xl font-bold ${avgScore ? scoreColor(avgScore) : "text-muted-foreground"}`}>{avgScore ? `${avgScore.toFixed(0)}/100` : "--"}</p>
           <p className="text-[9px] text-muted-foreground">{scores.filter(s => s.provenance === "provider").length}/{scores.length} rated</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -76,7 +76,7 @@ const ESGModule = ({ stocks }: Props) => {
         </div>
       </div>
 
-      {/* Chart Row — overall provider score only; E/S/G sub-scores are not
+      {/* Chart Row, overall provider score only; E/S/G sub-scores are not
           available from the connected source and are never synthesized. */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-1">ESG Score by Stock</h3>
@@ -110,7 +110,7 @@ const ESGModule = ({ stocks }: Props) => {
               {scores.map(e => (
                 <tr key={e.ticker} className="border-b border-border/50">
                   <td className="px-3 py-2 font-mono font-medium text-foreground">{e.ticker}</td>
-                  <td className={`px-3 py-2 font-mono font-bold ${e.overall != null ? scoreColor(e.overall) : "text-muted-foreground"}`}>{e.overall ?? "—"}</td>
+                  <td className={`px-3 py-2 font-mono font-bold ${e.overall != null ? scoreColor(e.overall) : "text-muted-foreground"}`}>{e.overall ?? "--"}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{e.controversy}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{e.provenance}</td>
                 </tr>

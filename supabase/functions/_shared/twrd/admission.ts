@@ -3,7 +3,7 @@
 // probabilistic scoring: impossible claims never reach TWRD, and syndicated
 // copies never manufacture independent corroboration in noisy-OR agreement.
 //
-// Deno twin of src/lib/discovery/{admission,novelty}.ts — keep in sync.
+// Deno twin of src/lib/discovery/{admission,novelty}.ts, keep in sync.
 
 import type { RawClaim, ClaimEvidence } from "./types.ts";
 
@@ -88,7 +88,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 /**
  * Collapse near-identical evidence (Jaccard > threshold on raw_text, or
  * duplicate source_id when no text). The deduped list is what should feed
- * noisy-OR agreement — k independent corroborators, not k wire copies.
+ * noisy-OR agreement, k independent corroborators, not k wire copies.
  */
 export function sybilDedupEvidence(evidence: ClaimEvidence[], threshold = 0.9): ClaimEvidence[] {
   const kept: ClaimEvidence[] = [];

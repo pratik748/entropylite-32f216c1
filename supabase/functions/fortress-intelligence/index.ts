@@ -46,7 +46,7 @@ Tie the reason to the threat it addresses. Mention the structural trigger.`,
   } catch (err) {
     console.error("fortress-intelligence error:", err);
     return new Response(JSON.stringify({ narratives: {}, error: (err as Error).message }), {
-      status: 200, // graceful degradation — UI falls back to deterministic rationale
+      status: 200, // graceful degradation, UI falls back to deterministic rationale
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

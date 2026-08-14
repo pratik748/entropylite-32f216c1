@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 /**
  * Tracks the device's system colour scheme. Returns `true` when the OS is set
- * to light — used by the public "lite mode" to swap chart colours that live in
+ * to light, used by the public "lite mode" to swap chart colours that live in
  * JS (Recharts style props) rather than CSS, since those can't ride the
  * --pub-* variables the rest of the marketing site flips through.
  */

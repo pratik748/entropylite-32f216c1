@@ -17,7 +17,7 @@ function boxMuller(rng: () => number) {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-/* Shared chart palette — monochrome structure, muted pos/neg, nothing else */
+/* Shared chart palette, monochrome structure, muted pos/neg, nothing else */
 const MONO = "rgba(255,255,255,0.85)";
 const MONO_SOFT = "rgba(255,255,255,0.38)";
 const MONO_FAINT = "rgba(255,255,255,0.16)";
@@ -454,7 +454,7 @@ export default function MathResearch() {
           </p>
         </div>
 
-        {/* Original research — CLANK manuscript */}
+        {/* Original research, CLANK manuscript */}
         <div className="mt-12 sm:mt-16 pt-10 border-t border-hairline">
           <div className="flex items-center gap-3 mb-6">
             <span className="h-px w-8 bg-hairline-strong" />

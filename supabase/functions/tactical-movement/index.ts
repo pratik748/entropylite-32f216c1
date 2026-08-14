@@ -82,7 +82,7 @@ async function fetchAISSnapshot(): Promise<Ship[]> {
           if (meta.ShipName && !existing.name) existing.name = String(meta.ShipName).trim();
           ships.set(mmsi, existing);
 
-          // Cap collection — chokepoints fill quickly
+          // Cap collection, chokepoints fill quickly
           if (ships.size > 400) {
             clearTimeout(closer);
             try { ws?.close(); } catch {}
@@ -90,7 +90,7 @@ async function fetchAISSnapshot(): Promise<Ship[]> {
           }
         } catch { /* ignore */ }
       };
-      ws.onerror = () => { /* swallow — closer will resolve */ };
+      ws.onerror = () => { /* swallow, closer will resolve */ };
       ws.onclose = () => {
         clearTimeout(closer);
         resolve(Array.from(ships.values()));
@@ -226,7 +226,7 @@ serve(async (req) => {
     const [ships, planes] = await Promise.all([fetchAISSnapshot(), fetchFlightsAll()]);
     const chokepoints = computeChokepointStress(ships, planes);
 
-    // Trim ships for payload size — keep highest-signal first (in-box, then closest to chokepoint)
+    // Trim ships for payload size, keep highest-signal first (in-box, then closest to chokepoint)
     const inAnyBox = (lat: number, lng: number) => CHOKEPOINTS.some(c => inBox(lat, lng, c.box));
     const trimmedShips = ships
       .filter(s => inAnyBox(s.lat, s.lng))

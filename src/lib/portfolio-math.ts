@@ -1,5 +1,5 @@
 /**
- * Portfolio Math — real, citable, deterministic.
+ * Portfolio Math, real, citable, deterministic.
  * Inputs come from the realized covariance matrix Σ and (where used) the
  * realized mean-return vector μ produced by useQuantSnapshot.
  *
@@ -183,7 +183,7 @@ export function minVarianceWeights(sigma: number[][]): number[] | null {
       if (subW[k] < worstVal) { worstVal = subW[k]; worst = k; }
     }
     if (worst === -1) {
-      // All non-negative — accept
+      // All non-negative, accept
       const w = new Array(n).fill(0);
       idx.forEach((i, k) => { w[i] = subW[k]; });
       return w;
@@ -237,7 +237,7 @@ export function riskParityWeights(sigma: number[][], maxIter = 500, tol = 1e-8):
   if (n < 2) return null;
   // Deterministic init = diag(Σ)^(-1/2) normalised (well-known starting point
   // for ERC solver; converges to the same fixed point regardless of init,
-  // and is NOT itself returned as the answer — the iteration overwrites it).
+  // and is NOT itself returned as the answer, the iteration overwrites it).
   const diag = sigma.map((r, i) => r[i]);
   if (diag.some(d => d <= 0)) return null;
   let w = diag.map(d => 1 / Math.sqrt(d));
@@ -271,12 +271,12 @@ export function riskParityWeights(sigma: number[][], maxIter = 500, tol = 1e-8):
     w = norm;
     if (err < tol) return w;
   }
-  return null; // failed to converge — never return a heuristic fallback
+  return null; // failed to converge, never return a heuristic fallback
 }
 
 /**
  * Continuous Kelly for a multivariate Gaussian return process.
- * Full-Kelly weights: w_K = Σ⁻¹·μ  (no sum constraint — these are bet sizes).
+ * Full-Kelly weights: w_K = Σ⁻¹·μ  (no sum constraint, these are bet sizes).
  * Fractional Kelly scales by `fraction` ∈ (0, 1].
  * For an allocation display we cash-pad: remaining = 1 − Σ wᵢ goes to cash.
  * Reference: Thorp (2006), Kelly (1956). Returns null if Σ singular.
@@ -304,7 +304,7 @@ export function fractionalKellyWeights(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Random Matrix Theory — noise vs signal
+// Random Matrix Theory, noise vs signal
 // ─────────────────────────────────────────────────────────────────
 
 /**

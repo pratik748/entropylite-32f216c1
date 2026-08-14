@@ -13,7 +13,7 @@ interface Props {
 }
 
 function deriveTradeSignal(e: ScoredGeoEvent): { stance: "Bullish" | "Bearish" | "Volatile"; confidence: number; horizon: string; tone: string } {
-  // Heuristic mapping — causal-effects gives the precise picture; this is the at-a-glance chip.
+  // Heuristic mapping, causal-effects gives the precise picture; this is the at-a-glance chip.
   const sev = e.severity;
   const rel = e.market_relevance;
   const conf = Math.round((0.5 * e.confidence + 0.3 * rel + 0.2 * sev) * 100);
@@ -75,7 +75,7 @@ export default function IntelStack({ event, onClear, portfolioTickers, tickerThr
         </button>
       </div>
 
-      {/* Snapshot — always visible at top */}
+      {/* Snapshot, always visible at top */}
       <div className="px-3 py-2.5 border-b border-border space-y-2">
         <div className="text-[12px] font-medium leading-snug text-foreground">
           {event.title}

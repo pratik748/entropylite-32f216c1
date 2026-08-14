@@ -1,4 +1,4 @@
-// Opportunity alerts — derived, never fabricated.
+// Opportunity alerts, derived, never fabricated.
 //
 // An "opportunity alert" is nothing more than a validated opportunity from
 // the shared engine that the user hasn't seen yet. This module observes the

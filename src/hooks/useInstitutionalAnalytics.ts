@@ -1,5 +1,5 @@
 /**
- * useInstitutionalAnalytics — single wiring point between real portfolio
+ * useInstitutionalAnalytics, single wiring point between real portfolio
  * state / market data and the analytics engine (src/lib/analytics).
  * ─────────────────────────────────────────────────────────────────────
  * Data flow:

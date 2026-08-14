@@ -50,7 +50,7 @@ export default function PublicNav() {
   return (
     <>
     <div className="sticky top-0 z-50">
-      {/* Utility strip — session facts only */}
+      {/* Utility strip, session facts only */}
       <div className="bg-carbon-950 border-b border-hairline-faint hidden sm:block">
         <div className="max-w-7xl mx-auto px-8 h-8 flex items-center justify-between">
           <span className="mkt-label text-[10px] text-white/35">
@@ -124,7 +124,7 @@ export default function PublicNav() {
       </nav>
     </div>
 
-    {/* Mobile sheet — rendered outside the backdrop-blurred <nav> on purpose.
+    {/* Mobile sheet, rendered outside the backdrop-blurred <nav> on purpose.
         A backdrop-filter ancestor becomes the containing block for fixed
         descendants, which would trap this sheet inside the 56px nav bar and
         collapse it to nothing. As a sibling of the sticky chrome, its fixed

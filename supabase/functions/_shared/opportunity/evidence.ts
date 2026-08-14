@@ -1,13 +1,13 @@
-// EvidenceCollectors — gather observable signals for each candidate.
+// EvidenceCollectors, gather observable signals for each candidate.
 //
 // Collectors are independent and fail independently. A collector that
 // returns nothing is recorded in `missing` so the final object can report
 // its own data quality honestly. No collector ever synthesizes values.
 //
 // Collectors:
-//   price_history  — Yahoo daily chart (1y) → returns/vol/trend/volume features
-//   yahoo_summary  — fundamentals, analyst state (finalists only, expensive)
-//   gdelt_news     — article tone + headline evidence (finalists only)
+//   price_history, Yahoo daily chart (1y) → returns/vol/trend/volume features
+//   yahoo_summary, fundamentals, analyst state (finalists only, expensive)
+//   gdelt_news, article tone + headline evidence (finalists only)
 
 import { fetchYahooSummary } from "../liveData.ts";
 import { returnMoments } from "../mathEdge.ts";
@@ -300,7 +300,7 @@ export async function fetchFundamentals(symbol: string): Promise<FundamentalFeat
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 /**
- * Stage-1 evidence from an already-fetched series (pure — no I/O). The
+ * Stage-1 evidence from an already-fetched series (pure, no I/O). The
  * venue's chart loader decides HOW the series was obtained; this decides
  * what it means.
  */

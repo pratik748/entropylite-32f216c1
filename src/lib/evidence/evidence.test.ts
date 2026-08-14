@@ -346,7 +346,7 @@ describe("causal contribution scoring", () => {
     for (const c of contributions) {
       expect(Math.abs(c.scored)).toBeLessThanOrEqual(1);
       if (c.base === 0) expect(c.scored).toBe(0);
-      // Sign never flips through propagation — drivers scale, they don't invert.
+      // Sign never flips through propagation, drivers scale, they don't invert.
       if (c.base !== 0) expect(Math.sign(c.scored)).toBe(Math.sign(c.base));
     }
     // roe has an aligned driver (moat) in the fixture → amplified above base.
@@ -615,7 +615,7 @@ describe("section availability", () => {
     const available = computeAvailableSections(data as any, graph);
     expect(available.has("financials/income-statement")).toBe(false);
     expect(available.has("financials/cash-flow")).toBe(false);
-    // Capital structure derives from market cap ÷ P/B and D/E — stays.
+    // Capital structure derives from market cap ÷ P/B and D/E, stays.
     expect(available.has("financials/balance-sheet")).toBe(true);
     expect(available.has("overview/summary")).toBe(true);
   });

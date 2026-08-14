@@ -1,12 +1,12 @@
 /**
- * Attribution — position contribution, risk contribution, and Brinson
+ * Attribution, position contribution, risk contribution, and Brinson
  * sector attribution, all from real portfolio state and Σ.
  * ────────────────────────────────────────────────────────────────────
  * Return contribution uses actual position P&L vs cost basis (weight ×
  * return, exactly additive to the portfolio return). Risk contribution is
  * the Euler decomposition RCᵢ = wᵢ(Σw)ᵢ / σ_p². Brinson runs against an
  * explicit, disclosed benchmark basis (equal-sector weights of the same
- * universe) — no pretend index composition.
+ * universe), no pretend index composition.
  */
 
 import { brinsonAttribution } from "@/lib/quant/institutional";

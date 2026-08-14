@@ -1,10 +1,10 @@
-// Shared Opportunity Engine — client-side types.
+// Shared Opportunity Engine, client-side types.
 //
 // These mirror `supabase/functions/_shared/opportunity/types.ts`. The
 // ValidatedOpportunity object is THE canonical opportunity shape for the
 // whole app: Discover, Direct Profit, Desirable Assets, alerts and any
 // future recommendation module consume exactly these objects from the
-// shared repository — no module defines its own opportunity schema,
+// shared repository, no module defines its own opportunity schema,
 // scoring, or ranking.
 
 export type AssetClass = "equity" | "etf" | "index" | "commodity" | "bond" | "crypto";
@@ -132,7 +132,7 @@ export interface TradePlan {
   entryLow: number;
   entryHigh: number;
   objective: number;          // 1σ favorable move (the consensus prior)
-  invalidationLevel: number;  // 1.25σ adverse — matches the invalidation conditions
+  invalidationLevel: number;  // 1.25σ adverse, matches the invalidation conditions
 }
 
 export interface ValidatedOpportunity {
@@ -152,7 +152,7 @@ export interface ValidatedOpportunity {
   confidenceDrivers: string[];
   expectedEdgePct: number;   // decimal; sign follows direction
   downsideRiskPct: number;   // decimal, positive (95% CF-VaR over horizon)
-  riskAdjustedScore: number; // |edge| × confidence / risk — the base ranking key
+  riskAdjustedScore: number; // |edge| × confidence / risk, the base ranking key
   portfolioAdjustedScore?: number; // × diversification multiplier when portfolio supplied
   convictionMultiplier?: number;   // ≥1 multi-factor conviction scaling for ranking
 

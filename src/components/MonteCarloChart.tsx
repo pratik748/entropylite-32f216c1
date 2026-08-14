@@ -87,7 +87,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
   const fmtPrice = (v: number) => `${sym}${convertToBase(v, assetCurrency).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   // Pull the asset's real 1-year daily closes so the simulation is calibrated
-  // to how THIS name actually trades — not a constant drift and a vol backed
+  // to how THIS name actually trades, not a constant drift and a vol backed
   // out of analyst price bands.
   const { prices, fetchHistorical } = useHistoricalPrices();
   useEffect(() => {
@@ -315,7 +315,7 @@ const MonteCarloChart = ({ currentPrice, bullRange, bearRange, ticker, currency 
         </div>
       </div>
 
-      {/* Calibration provenance — an institutional simulation states its inputs. */}
+      {/* Calibration provenance, an institutional simulation states its inputs. */}
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 font-mono text-[10px] ${
         calibration.source === "historical" ? "border-border bg-surface-2 text-muted-foreground" : "border-warning/20 bg-warning/5 text-warning/90"
       }`}>

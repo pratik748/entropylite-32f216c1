@@ -24,13 +24,13 @@ interface CommandPaletteProps {
   onSelectTab: (id: string) => void;
   onOpenBrief?: () => void;
   onToggleDirectProfit: () => void;
-  /** Tickers with analysis — each gets an "open workstation" command. */
+  /** Tickers with analysis, each gets an "open workstation" command. */
   workstationTickers?: string[];
   onOpenWorkstation?: (ticker: string) => void;
 }
 
 /**
- * ⌘K command palette — Spotlight for the terminal. Every screen and key
+ * ⌘K command palette, Spotlight for the terminal. Every screen and key
  * action, one keystroke away. Also opens with Ctrl+K.
  */
 const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit, workstationTickers, onOpenWorkstation }: CommandPaletteProps) => {
@@ -76,7 +76,7 @@ const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit, 
                   onSelect={() => run(() => onOpenWorkstation(ticker))}
                 >
                   <FileSearch className="mr-2 h-4 w-4 text-muted-foreground" />
-                  Open workstation — {ticker}
+                  Open workstation, {ticker}
                 </CommandItem>
               ))}
             </CommandGroup>

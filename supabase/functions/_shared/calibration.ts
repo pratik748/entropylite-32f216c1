@@ -1,8 +1,8 @@
 // Calibration for the ensemble's Platt map.
 //
 // The nightly-fitted `calibration_params` row is NO LONGER consumed. The
-// fit was never decisive — the gate's discrimination comes from the ensemble
-// score and agreement, and the priors map them faithfully — while a single
+// fit was never decisive, the gate's discrimination comes from the ensemble
+// score and agreement, and the priors map them faithfully, while a single
 // degenerate fit (observed live: α=0.97, β=0, γ=−2.67, whose maximum output
 // is 15%, clamped to the 0.50 floor) silently killed every verdict in the
 // product. A knob that can only subtract value does not deserve a seat in
@@ -34,7 +34,7 @@ export interface ReliabilityReport {
 /**
  * Latest nightly reliability report for the displayed prior-map probability.
  * This is the empirical evidence that decides how much belief the number
- * deserves. Returns null when the table is missing or empty — callers must
+ * deserves. Returns null when the table is missing or empty, callers must
  * treat "no evidence yet" as exactly that, never as "calibrated".
  */
 export async function loadReliabilityReport(): Promise<ReliabilityReport | null> {

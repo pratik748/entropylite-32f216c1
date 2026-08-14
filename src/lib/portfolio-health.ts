@@ -1,15 +1,15 @@
 /**
- * Portfolio Health — a single 0–100 vital sign composed from the real quant
+ * Portfolio Health, a single 0–100 vital sign composed from the real quant
  * snapshot. Deterministic, transparent, and honest: each sub-gauge is a named
  * function of quantities the platform already computes (useQuantSnapshot,
- * useMarketRegime). No opaque score — every point is explainable, which is
+ * useMarketRegime). No opaque score, every point is explainable, which is
  * Doctrine P2 (every claim shows its work).
  *
  * Sub-gauges (each 0–100, higher = healthier):
- *   1. Diversification — effective breadth 1/Σwᵢ² vs the holding count.
- *   2. Tail risk       — 95% daily VaR as a share of portfolio value.
- *   3. Return quality  — annualised Sharpe mapped through a smooth curve.
- *   4. Regime fit      — portfolio σ penalised in stressed regimes.
+ *   1. Diversification, effective breadth 1/Σwᵢ² vs the holding count.
+ *   2. Tail risk, 95% daily VaR as a share of portfolio value.
+ *   3. Return quality, annualised Sharpe mapped through a smooth curve.
+ *   4. Regime fit, portfolio σ penalised in stressed regimes.
  *
  * Health = weighted mean of the available sub-gauges (missing ones drop out,
  * weights renormalise). Feeds the SCR-01 briefing and the SCR-02 portfolio
@@ -43,7 +43,7 @@ export function computePortfolioHealth(input: HealthInput): HealthResult | null 
 
   const gauges: HealthGauge[] = [];
 
-  // 1. Diversification — effective number of holdings via inverse Herfindahl.
+  // 1. Diversification, effective number of holdings via inverse Herfindahl.
   const sum = weights.reduce((s, w) => s + Math.abs(w), 0) || 1;
   const w = weights.map((x) => Math.abs(x) / sum);
   const hhi = w.reduce((s, x) => s + x * x, 0);
@@ -57,7 +57,7 @@ export function computePortfolioHealth(input: HealthInput): HealthResult | null 
     detail: `${effN.toFixed(1)} effective of ${n} holdings`,
   });
 
-  // 2. Tail risk — daily 95% VaR as % of book. 1% → healthy, 6%+ → critical.
+  // 2. Tail risk, daily 95% VaR as % of book. 1% → healthy, 6%+ → critical.
   if (totalValue > 0 && var95Daily >= 0) {
     const varPct = (var95Daily / totalValue) * 100;
     const tailScore = ramp(6 - varPct, 0, 5); // 1% loss → 100, 6% → 0
@@ -69,7 +69,7 @@ export function computePortfolioHealth(input: HealthInput): HealthResult | null 
     });
   }
 
-  // 3. Return quality — annualised Sharpe. 0 → 40, 1.5+ → 100, negative → low.
+  // 3. Return quality, annualised Sharpe. 0 → 40, 1.5+ → 100, negative → low.
   if (Number.isFinite(sharpeAnnual)) {
     const sharpeScore = ramp(sharpeAnnual, -0.5, 1.8);
     gauges.push({
@@ -80,7 +80,7 @@ export function computePortfolioHealth(input: HealthInput): HealthResult | null 
     });
   }
 
-  // 4. Regime fit — penalise high vol when the regime is stressed.
+  // 4. Regime fit, penalise high vol when the regime is stressed.
   const r = (regime || "").toLowerCase();
   const stressed = r.includes("crisis") || r.includes("high vol") || r.includes("bear");
   if (Number.isFinite(sigmaAnnual) && sigmaAnnual > 0) {

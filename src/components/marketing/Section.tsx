@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Shared section grammar for the public site — fixed institutional dark.
+ * Shared section grammar for the public site, fixed institutional dark.
  *
  * Every section opens with the same construction: an indexed rule line,
  * a mono eyebrow, a display headline, an optional lede. Panels are flat
@@ -74,7 +74,7 @@ export function PageHeader({
   );
 }
 
-/** Primary action — solid white block, square corners. */
+/** Primary action, solid white block, square corners. */
 export function InkButton({
   children,
   onClick,
@@ -96,7 +96,7 @@ export function InkButton({
   );
 }
 
-/** Secondary action — hairline outline, square corners. */
+/** Secondary action, hairline outline, square corners. */
 export function LineButton({
   children,
   onClick,

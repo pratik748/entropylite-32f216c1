@@ -161,7 +161,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `${ticker} — Near max profit`,
+            title: `${ticker}, Near max profit`,
             description: `At ${(progressToMax * 100).toFixed(0)}% of computed max target ($${maxTarget.toFixed(2)}, +${maxProfitPct.toFixed(1)}%). Consider scaling out. Confidence: ${tracker.maxProfitConfidence}%`,
             variant: "destructive",
             duration: 20000,
@@ -174,7 +174,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `${ticker} — Max profit zone`,
+            title: `${ticker}, Max profit zone`,
             description: `Price $${currentPrice.toFixed(2)} reached computed ceiling $${maxTarget.toFixed(2)} (+${maxProfitPct.toFixed(1)}%). TAKE PROFIT NOW. Beyond this, risk/reward deteriorates.`,
             variant: "destructive",
             duration: 30000,
@@ -186,7 +186,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
           tracker.notifiedAt = now;
           dirty = true;
           toast({
-            title: `${ticker} — Falling from peak`,
+            title: `${ticker}, Falling from peak`,
             description: `Was at max profit zone ($${maxTarget.toFixed(2)}), now $${currentPrice.toFixed(2)} (+${pnlPct.toFixed(1)}%). Exit before gains erode further.`,
             variant: "destructive",
             duration: 20000,
@@ -205,7 +205,7 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `${ticker} — Sell signal`,
+          title: `${ticker}, Sell signal`,
           description: `Intelligence recommends: ${analysis.suggestion}. Current P&L: ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%${maxTarget ? ` | Max target was $${maxTarget.toFixed(2)}` : ""}`,
           variant: "destructive",
           duration: 15000,
@@ -222,14 +222,14 @@ export function useSellNotifications(stocks: PortfolioStock[]) {
         tracker.notifiedAt = now;
         dirty = true;
         toast({
-          title: `${ticker} — Elevated risk`,
+          title: `${ticker}, Elevated risk`,
           description: `Risk ${analysis.riskScore}/100 with ${pnlPct.toFixed(1)}% loss. ${maxTarget ? `Max target was $${maxTarget.toFixed(2)}, unlikely to recover.` : "Review position."}`,
           variant: "destructive",
           duration: 15000,
         });
       }
 
-      // "Profit Erased" alerts removed — the Auto-Lock Profit Engine
+      // "Profit Erased" alerts removed, the Auto-Lock Profit Engine
       // (useAutoLockProfits) now records a virtual exit at the optimal
       // moment and surfaces realized P&L instead of warning after the fact.
 

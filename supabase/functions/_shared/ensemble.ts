@@ -1,17 +1,17 @@
-// Ensemble Consensus Engine — pure, deterministic, dependency-free.
+// Ensemble Consensus Engine, pure, deterministic, dependency-free.
 //
 // v2 (accuracy-rebuild): the previous version weighted every engine
 // equally and called any 3+ agreeing engines "consensus". The flaw: most
 // of those engines were correlated (5 momentum-style engines reading the
 // same price tape don't give 5 independent confirmations). v2 introduces:
 //
-//   1. BUCKETS  — engines are assigned to one of 3 orthogonal info
+//   1. BUCKETS, engines are assigned to one of 3 orthogonal info
 //      sources (price/flow, fundamental/intel, risk/regime). We require
 //      ≥2 buckets to agree before firing, not ≥3 engines.
-//   2. COST HAIRCUT — expectedR subtracts a per-ticker round-trip cost.
+//   2. COST HAIRCUT, expectedR subtracts a per-ticker round-trip cost.
 //      Indian small-caps (150 bps) get filtered without us having to
 //      think about them.
-//   3. DB-LOADED CALIBRATION — α, β, γ are passed in from the caller
+//   3. DB-LOADED CALIBRATION, α, β, γ are passed in from the caller
 //      (loaded from `calibration_params` table, refit nightly). Falls
 //      back to v1 constants if no caller-supplied values.
 //
@@ -33,7 +33,7 @@ export interface EngineSignal {
   label: string;
   /** Directional vote */
   direction: EngineDirection;
-  /** Confidence 0..1 — how strongly this engine believes its direction */
+  /** Confidence 0..1, how strongly this engine believes its direction */
   confidence: number;
   /** Historical reliability prior 0..1 (default 0.55). Higher = more weight */
   reliability?: number;
@@ -54,7 +54,7 @@ export interface ConsensusResult {
    * Model win-probability for the dominant side, 0..1.
    *
    * HONESTY NOTE: despite the field name (kept for API compatibility), this
-   * is a PRIOR-MAP probability — a hand-set monotone Platt-form map of
+   * is a PRIOR-MAP probability, a hand-set monotone Platt-form map of
    * (ensemble score, agreement), NOT an empirically calibrated probability.
    * Its empirical reliability is measured nightly against realized outcomes
    * (calibration_reports); consult that evidence before treating the number
@@ -63,7 +63,7 @@ export interface ConsensusResult {
   calibratedProb: number;
   /** What kind of probability `calibratedProb` is. Always "prior_platt_map" today. */
   probBasis: "prior_platt_map" | "empirical_fit";
-  /** Agreement 0..1 — 1 = all engines on same side, 0 = perfect split */
+  /** Agreement 0..1, 1 = all engines on same side, 0 = perfect split */
   agreement: number;
   /** How many engines actually contributed a non-zero vote */
   engineCount: number;
@@ -99,7 +99,7 @@ const MIN_EXPECTED_R = 0.20;
 
 /** Gate thresholds, exported so callers can classify STAND_ASIDE decisions
  *  with the exact same constants the gate itself used. These are the
- *  SCREENER defaults (high precision, low recall — right for scanning a
+ *  SCREENER defaults (high precision, low recall, right for scanning a
  *  universe). Point-of-decision callers analysing a single user-chosen
  *  asset can pass `opts.gates` to run a decision-theoretic gate instead:
  *  trade whenever expected value after costs and fat tails is positive
@@ -134,7 +134,7 @@ function clamp(v: number, lo: number, hi: number): number {
  *   ensemble  = Σ direction_i × weight_i / Σ weight_i        ∈ [-1, +1]
  *   agreement = |Σ direction_i × weight_i| / Σ weight_i      ∈ [0, 1]
  *   calibrated= Platt-style: σ(α·ensemble + β·agreement + γ)
- *               with α=3.2, β=1.4, γ=0 — sigmoid keeps it bounded and
+ *               with α=3.2, β=1.4, γ=0, sigmoid keeps it bounded and
  *               smoothly maps near-tie ensembles to ~0.50.
  *
  * Decision gate:
@@ -274,7 +274,7 @@ export function runConsensus(
   // Whether it deserves belief is measured separately: calibration-fit bins
   // displayed probabilities against realized outcomes into
   // `calibration_reports` for the UI to show. The optional δ term folds
-  // bucket diversification into the logit — each agreeing orthogonal
+  // bucket diversification into the logit, each agreeing orthogonal
   // information source beyond the first shifts the probability up smoothly.
   const delta = clamp(opts?.bucketBonus ?? 0, 0, 1);
   const z = cal.alpha * Math.abs(ensembleScore)
@@ -285,7 +285,7 @@ export function runConsensus(
   const calibratedProb = clamp(probDominant, 0.5, 0.95);
 
   // Expected R-multiple AFTER round-trip cost. Indian small-caps with
-  // 1.5% haircut will routinely fall below threshold here — that is the
+  // 1.5% haircut will routinely fall below threshold here, that is the
   // feature. Cost in R-units = haircut/avgLoss% ≈ haircut/(0.02) for a
   // typical 2% stop.
   const haircutInR = haircut > 0 ? haircut / 0.02 : 0;
@@ -317,21 +317,21 @@ export function runConsensus(
     standAsideReason = `Only ${votingBuckets} of 3 info-buckets fired (need ${gates.minVotingBuckets}+: price-flow, fundamental, regime).`;
   } else if (agreeingBuckets < gates.minAgreeingBuckets) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Buckets disagree — only ${agreeingBuckets} of ${votingBuckets} support ${dominant === 1 ? "BUY" : "SELL"}.`;
+    standAsideReason = `Buckets disagree, only ${agreeingBuckets} of ${votingBuckets} support ${dominant === 1 ? "BUY" : "SELL"}.`;
   } else if (calibratedProb < gates.minCalibratedProb) {
     decision = "STAND_ASIDE";
     standAsideReason = `Model win-probability only ${(calibratedProb * 100).toFixed(0)}% (need ≥${(gates.minCalibratedProb * 100).toFixed(0)}%).`;
   } else if (agreement < gates.minAgreement) {
     decision = "STAND_ASIDE";
-    standAsideReason = `Engine agreement only ${(agreement * 100).toFixed(0)}% — too split to trade.`;
+    standAsideReason = `Engine agreement only ${(agreement * 100).toFixed(0)}%, too split to trade.`;
   } else if (expectedR < gates.minExpectedR) {
     decision = "STAND_ASIDE";
     if (tailMultiplier > 1.25) {
-      standAsideReason = `Expected R after fat-tail adjustment only ${expectedR.toFixed(2)} — left-tail ${tailMultiplier.toFixed(2)}× normal (negative skew / fat kurtosis).`;
+      standAsideReason = `Expected R after fat-tail adjustment only ${expectedR.toFixed(2)}, left-tail ${tailMultiplier.toFixed(2)}× normal (negative skew / fat kurtosis).`;
     } else if (haircut > 0.005) {
-      standAsideReason = `Expected R after costs only ${expectedR.toFixed(2)} — ${(haircut * 100).toFixed(2)}% round-trip cost eats the edge.`;
+      standAsideReason = `Expected R after costs only ${expectedR.toFixed(2)}, ${(haircut * 100).toFixed(2)}% round-trip cost eats the edge.`;
     } else {
-      standAsideReason = `Expected R-multiple ${expectedR.toFixed(2)} below threshold — risk/reward insufficient.`;
+      standAsideReason = `Expected R-multiple ${expectedR.toFixed(2)} below threshold, risk/reward insufficient.`;
     }
   }
 

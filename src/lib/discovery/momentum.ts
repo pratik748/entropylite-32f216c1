@@ -1,7 +1,7 @@
-// Epistemic momentum μ(x,t) = ∂T/∂t (TRUTH v2 §6.4) — estimated by
+// Epistemic momentum μ(x,t) = ∂T/∂t (TRUTH v2 §6.4), estimated by
 // exponentially-weighted least-squares slope over a claim's (or theme's)
 // TWRD score history. Finite-difference regression, NOT an analytic
-// derivative (the feedback process is not differentiable — per the
+// derivative (the feedback process is not differentiable, per the
 // manuscript's own correction).
 //
 // Interpretation: sustained μ > 0 on a claim cluster = consensus forming
@@ -15,7 +15,7 @@ export interface EpistemicMomentum {
   muPerDay: number;
   /** number of points used */
   n: number;
-  /** weighted R² of the linear fit — how trend-like the history is */
+  /** weighted R² of the linear fit, how trend-like the history is */
   r2: number;
 }
 

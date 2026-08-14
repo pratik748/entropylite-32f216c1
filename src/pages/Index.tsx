@@ -59,7 +59,7 @@ type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopoli
 export type PriceFreshness = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type PriceStatusMap = Record<string, { lastUpdate: number; status: PriceFreshness; failCount: number }>;
 
-// Monochrome instrument set — one voice, no candy. The active module is
+// Monochrome instrument set, one voice, no candy. The active module is
 // indicated by position and weight, not by hue.
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "dashboard",    label: "Desk",        icon: <LayoutDashboard className="h-4 w-4" strokeWidth={1.75} /> },
@@ -171,7 +171,7 @@ const IndexContent = () => {
     },
     [],
   );
-  // ── Foresight operating layer — bus subscriptions + host adapter ──
+  // ── Foresight operating layer, bus subscriptions + host adapter ──
   const activeTabRef = useRef(activeTab);
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
@@ -558,7 +558,7 @@ const IndexContent = () => {
               });
               toast({
                 title: "Added to Dashboard Portfolio",
-                description: `${normalizedTicker} • qty ${quantity} @ ${buyPrice.toFixed(2)} — open Dashboard to run full analysis`,
+                description: `${normalizedTicker} • qty ${quantity} @ ${buyPrice.toFixed(2)}, open Dashboard to run full analysis`,
               });
             }}
           />
@@ -581,7 +581,7 @@ const IndexContent = () => {
           {/* Global Ticker Strip */}
 
 
-          {/* Workspace — module rail (desktop) / module strip (mobile) + content */}
+          {/* Workspace, module rail (desktop) / module strip (mobile) + content */}
           <div className="flex flex-1 min-h-0">
             {!isMobile && (
               <ModuleRail
@@ -655,7 +655,7 @@ const IndexContent = () => {
                                 <p className="data-label mb-2.5">No instrument selected</p>
                                 <h2 className="mb-2 text-title-3 text-foreground">The desk is ready.</h2>
                                 <p className="max-w-sm text-center text-footnote text-muted-foreground px-4">
-                                  Add any global asset — equities, crypto, FX or commodities — and twelve
+                                  Add any global asset, equities, crypto, FX or commodities, and twelve
                                   engines will run a full pass with live pricing. Every position opens into
                                   the Equity Workstation: evidence graph, thesis engine, and risk lab.
                                 </p>
@@ -757,7 +757,7 @@ const IndexContent = () => {
           </main>
             </div>
 
-            {/* Foresight — docked operating surface (⌘J) */}
+            {/* Foresight, docked operating surface (⌘J) */}
             <ForesightSurface />
           </div>
 

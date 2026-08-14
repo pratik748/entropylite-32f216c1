@@ -31,7 +31,7 @@ const NewsImpactTable = ({ news, overallSentiment, totalPressure }: NewsImpactTa
       <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold text-foreground">Related News — Sentiment Pressure</h2>
+          <h2 className="text-base font-semibold text-foreground">Related News, Sentiment Pressure</h2>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm">
@@ -111,7 +111,7 @@ const SentimentBadge = ({ value }: { value: number }) => {
   );
 };
 
-// A dimensionless sentiment-pressure score — deliberately NOT rendered with a
+// A dimensionless sentiment-pressure score, deliberately NOT rendered with a
 // "%" so it is never mistaken for a predicted price move.
 const ImpactValue = ({ value }: { value: number }) => (
   <span className={`font-mono text-sm font-medium ${value > 0 ? "text-gain" : value < 0 ? "text-loss" : "text-muted-foreground"}`}>

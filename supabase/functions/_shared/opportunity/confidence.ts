@@ -9,14 +9,13 @@
 //   • Platt constants are refit nightly from realized outcomes
 //     (`calibration_params`).
 //   • Per-model reliabilities come from settled T+5 outcomes
-//     (`engine_reliability`), keyed by (model, ticker-class, regime) — a
+//     (`engine_reliability`), keyed by (model, ticker-class, regime), a
 //     model that stops working loses influence automatically.
-//   • Missing evidence collectors shrink confidence toward 0.50 — an
+//   • Missing evidence collectors shrink confidence toward 0.50, an
 //     opinion built on partial data is worth less, and says so.
 //
 // Ranking objective:  |expectedEdge| × confidence / downsideRisk
-// (× a diversification multiplier when the caller supplied a portfolio) —
-// expected risk-adjusted portfolio contribution, not popularity.
+// (× a diversification multiplier when the caller supplied a portfolio), // expected risk-adjusted portfolio contribution, not popularity.
 
 import { runConsensus, CONSENSUS_GATES, type CalibrationParams, type EngineSignal } from "../ensemble.ts";
 import { costHaircut, tickerClass } from "../costs.ts";
@@ -47,19 +46,19 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 // ── Validation thresholds ───────────────────────────────────────────
 // Each constant is a data-sufficiency or economic-viability floor, not a
 // tuning knob:
-//   MIN_PRICE_BARS   — ~6 months of dailies; anything less and vol/momentum
+//   MIN_PRICE_BARS, ~6 months of dailies; anything less and vol/momentum
 //                      estimates are statistically unstable.
-//   LIQUIDITY_FLOOR  — average daily traded value below which a retail-size
+//   LIQUIDITY_FLOOR, average daily traded value below which a retail-size
 //                      position already moves the market / can't exit cleanly.
 //                      Set per currency at roughly the same economic level
 //                      (~$1–2M/day equivalent).
 const MIN_PRICE_BARS = 120;
-//   MAX_DOWNSIDE_RISK — a horizon 95% CF-VaR above this is uninvestable tail
+//   MAX_DOWNSIDE_RISK, a horizon 95% CF-VaR above this is uninvestable tail
 //                       risk regardless of edge; the position can lose an
 //                       outsized fraction of itself over the holding period.
 //                       Set high (75%) so it only ever bites genuinely
 //                       extreme names (deep-vol crypto / small-caps at long
-//                       horizons) — normal equities sit far below it.
+//                       horizons), normal equities sit far below it.
 const MAX_DOWNSIDE_RISK = 0.75;
 const LIQUIDITY_FLOOR_BY_CCY: Record<string, number> = {
   USD: 2_000_000,
@@ -70,11 +69,11 @@ const LIQUIDITY_FLOOR_BY_CCY: Record<string, number> = {
 const DEFAULT_LIQUIDITY_FLOOR = 2_000_000;
 
 // Sizing constants:
-//   KELLY_FRACTION    — 0.25× Kelly, the standard survivability discount.
-//   KELLY_CAP         — no single idea exceeds 10% of capital on Kelly math.
-//   VOL_BUDGET_ANNUAL — each position is budgeted ~2% annualized portfolio
+//   KELLY_FRACTION, 0.25× Kelly, the standard survivability discount.
+//   KELLY_CAP, no single idea exceeds 10% of capital on Kelly math.
+//   VOL_BUDGET_ANNUAL, each position is budgeted ~2% annualized portfolio
 //                       vol contribution (weight = budget / asset vol).
-//   VOL_WEIGHT_CAP    — vol-target weight ceiling, 15%.
+//   VOL_WEIGHT_CAP, vol-target weight ceiling, 15%.
 const KELLY_FRACTION = 0.25;
 const KELLY_CAP = 0.10;
 const VOL_BUDGET_ANNUAL = 0.02;
@@ -89,7 +88,7 @@ export function detectRegime(benchmark: ChartSeries | null): MarketRegime {
       benchmarkRet21d: 0,
       benchmarkVolAnnual: 0,
       benchmarkAboveSma200: null,
-      evidence: ["Benchmark history unavailable — regime treated as neutral (no synthetic regime is invented)."],
+      evidence: ["Benchmark history unavailable, regime treated as neutral (no synthetic regime is invented)."],
     };
   }
   const f = computePriceFeatures(benchmark, null);
@@ -169,7 +168,7 @@ function buildInvalidation(b: EvidenceBundle, direction: "long" | "short", horiz
     if (direction === "short" && p.lastClose < p.sma50) out.push(`Reclaim of the 50-day average at ${p.sma50.toFixed(2)}.`);
     out.push("Average daily traded value falling below the liquidity floor.");
   }
-  out.push("Any information bucket (price/flow, fundamental, risk/regime) flipping against the position — the consensus gate would then fail on re-evaluation.");
+  out.push("Any information bucket (price/flow, fundamental, risk/regime) flipping against the position, the consensus gate would then fail on re-evaluation.");
   return out;
 }
 
@@ -200,8 +199,7 @@ function logReturns(closes: number[]): number[] {
 }
 
 /**
- * Weighted composite daily-return series for the caller's holdings —
- * the reference stream candidates are correlated against.
+ * Weighted composite daily-return series for the caller's holdings, * the reference stream candidates are correlated against.
  */
 export function buildPortfolioReturns(holdings: Array<{ series: ChartSeries; weight: number }>): number[] | null {
   const usable = holdings.filter((h) => h.series.closes.length >= 60 && h.weight > 0);
@@ -227,17 +225,16 @@ export interface EvaluationInput {
   horizonDays: number;
   calibration: CalibrationParams;
   reputation: ReputationBook;
-  /** Measured macro context — feeds the Evidence Layer's macro/regime objects. */
+  /** Measured macro context, feeds the Evidence Layer's macro/regime objects. */
   macro?: MacroContext | null;
-  /** Classified market environment — nudges confidence, never model direction. */
+  /** Classified market environment, nudges confidence, never model direction. */
   marketContext?: MarketContext | null;
   /** Weighted daily-return composite of the caller's holdings, if provided. */
   portfolioReturns?: number[] | null;
   /** Caller's portfolio value for qty sizing, denominated in portfolioCurrency. */
   portfolioValue?: number | null;
   /** Currency of portfolioValue (e.g. "INR" for India-mode users). Whole-unit
-   *  qty is only quoted when it matches the candidate's trading currency —
-   *  never by dividing rupees by a dollar price. */
+   *  qty is only quoted when it matches the candidate's trading currency, *  never by dividing rupees by a dollar price. */
   portfolioCurrency?: string | null;
 }
 
@@ -266,7 +263,7 @@ function standAsideCode(c: ReturnType<typeof runConsensus>): RejectionCode {
 }
 
 /**
- * Turn a scored candidate into a validated opportunity — or an explicit,
+ * Turn a scored candidate into a validated opportunity, or an explicit,
  * reasoned rejection. This is the only place opportunities are minted.
  */
 export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
@@ -357,7 +354,7 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     `Bucket-consensus calibrated probability ${(consensus.calibratedProb * 100).toFixed(0)}% (${consensus.bucketDecision.agreeingBuckets}/${consensus.bucketDecision.votingBuckets} buckets agree, engine agreement ${(consensus.agreement * 100).toFixed(0)}%).`,
     completeness < 1
       ? `Evidence completeness ${(completeness * 100).toFixed(0)}% (missing: ${bundle.missing.join(", ")}) shrinks confidence to ${(completenessConfidence * 100).toFixed(0)}%.`
-      : "All evidence collectors returned data — no completeness discount.",
+      : "All evidence collectors returned data, no completeness discount.",
     ...reputationNotes,
   ];
 
@@ -370,13 +367,13 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     const adjusted = clamp(confidence * ctxMult, 0.5, 0.95);
     if (adjusted !== confidence) {
       confidenceDrivers.push(
-        `Market context (${input.marketContext!.labels.join(", ")}) ${ctxMult >= 1 ? "supports" : "tempers"} a ${direction} here — confidence ${ctxMult >= 1 ? "lifted" : "trimmed"} to ${(adjusted * 100).toFixed(0)}%.`,
+        `Market context (${input.marketContext!.labels.join(", ")}) ${ctxMult >= 1 ? "supports" : "tempers"} a ${direction} here, confidence ${ctxMult >= 1 ? "lifted" : "trimmed"} to ${(adjusted * 100).toFixed(0)}%.`,
       );
       confidence = adjusted;
     }
   }
 
-  // Edge / risk — all from measured quantities:
+  // Edge / risk, all from measured quantities:
   //   sigmaH        = realized vol scaled to the horizon
   //   expectedEdge  = expectedR (σ-units, post cost + fat-tail) × sigmaH
   //   downsideRisk  = 95% Cornish-Fisher VaR over the horizon
@@ -386,11 +383,11 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   const downsideRiskPct = Math.max(sigmaH * zCF, 0.005);
 
   // Gate 2: tail-risk ceiling. Even a strong edge is uninvestable when the
-  // horizon 95% downside is a large fraction of the position — the honest,
+  // horizon 95% downside is a large fraction of the position, the honest,
   // machine-readable reason is "excessive downside risk", not silence.
   if (downsideRiskPct > MAX_DOWNSIDE_RISK) {
     return reject(symbol, "validation", "excessive_downside_risk",
-      `Horizon 95% downside risk ${pct(downsideRiskPct)} exceeds the ${pct(MAX_DOWNSIDE_RISK)} ceiling — tail risk is uninvestable at this horizon.`,
+      `Horizon 95% downside risk ${pct(downsideRiskPct)} exceeds the ${pct(MAX_DOWNSIDE_RISK)} ceiling, tail risk is uninvestable at this horizon.`,
       { downsideRiskPct: Number(downsideRiskPct.toFixed(3)), ceiling: MAX_DOWNSIDE_RISK });
   }
 
@@ -436,9 +433,9 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
         correlation: Number(corr.toFixed(3)),
         diversificationMultiplier: Number(mult.toFixed(3)),
         note: corr > 0.5
-          ? `Highly correlated (ρ=${corr.toFixed(2)}) with existing holdings — adds concentration, ranking penalized.`
+          ? `Highly correlated (ρ=${corr.toFixed(2)}) with existing holdings, adds concentration, ranking penalized.`
           : corr < 0
-            ? `Negatively correlated (ρ=${corr.toFixed(2)}) with existing holdings — genuine diversification.`
+            ? `Negatively correlated (ρ=${corr.toFixed(2)}) with existing holdings, genuine diversification.`
             : `Moderate correlation (ρ=${corr.toFixed(2)}) with existing holdings.`,
       };
       portfolioAdjustedScore = Number((riskAdjustedScore * mult).toFixed(3));
@@ -502,12 +499,12 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
     evidenceCount: evidence.length,
     netEvidenceStrength: evidenceSummary.netStrength,
   };
-  // Surface the strongest evidence objects (compact — keeps the payload lean).
+  // Surface the strongest evidence objects (compact, keeps the payload lean).
   const topEvidence = [...evidence].sort((a, b) => Math.abs(b.strength) - Math.abs(a.strength)).slice(0, 8);
 
   // ── Conviction multiplier (ranking refinement) ───────────────────
   // Beyond raw risk-adjusted edge, promote the setups where INDEPENDENT
-  // model factors genuinely corroborate each other — the "great asset"
+  // model factors genuinely corroborate each other, the "great asset"
   // signal. Every term is measured, bounded and explained; nothing is an
   // LLM opinion. Neutral inputs leave it at 1.0 (ranking unchanged).
   const convDrivers: string[] = [];
@@ -526,7 +523,7 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
   }
   const convictionMultiplier = Number(clamp(conviction, 1, 1.4).toFixed(3));
   if (convictionMultiplier > 1) {
-    confidenceDrivers.push(`Conviction ${((convictionMultiplier - 1) * 100).toFixed(0)}% ranking boost — ${convDrivers.join("; ")}.`);
+    confidenceDrivers.push(`Conviction ${((convictionMultiplier - 1) * 100).toFixed(0)}% ranking boost, ${convDrivers.join("; ")}.`);
   }
 
   const opportunity: ValidatedOpportunity = {
@@ -584,7 +581,7 @@ export function evaluateCandidate(input: EvaluationInput): EvaluationResult {
 }
 
 /**
- * Rank by expected risk-adjusted edge, refined by measured conviction — the
+ * Rank by expected risk-adjusted edge, refined by measured conviction, the
  * single ranking used everywhere. Base key is the portfolio-adjusted score
  * (edge × confidence / risk × diversification) when a portfolio was supplied,
  * else the risk-adjusted score; both are then scaled by the conviction

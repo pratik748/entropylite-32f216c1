@@ -1,5 +1,5 @@
 /**
- * Validation Framework — anti-overfitting research infrastructure.
+ * Validation Framework, anti-overfitting research infrastructure.
  * ────────────────────────────────────────────────────────────────
  * Institutional research practices for evaluating strategies produced by the
  * Strategy Lab / Strategy Factory / backtester (institutional.ts runBacktest):
@@ -16,7 +16,7 @@
  *   - Benjamini–Hochberg false-discovery-rate control for signal batteries
  *
  * Determinism: every stochastic routine takes an explicit integer seed and
- * uses mulberry32 — same inputs ⇒ same outputs, satisfying the platform's
+ * uses mulberry32, same inputs ⇒ same outputs, satisfying the platform's
  * "deterministic paths" contract.
  *
  * Compute: CSCV with S=10 partitions is C(10,5)=252 combinations; for 50
@@ -31,7 +31,7 @@ import { mean, stdev, normCDF, normInv } from "@/lib/quant/institutional";
 // Deterministic RNG
 // ─────────────────────────────────────────────────────────────────
 
-/** mulberry32 — small, fast, seedable PRNG (deterministic across platforms). */
+/** mulberry32, small, fast, seedable PRNG (deterministic across platforms). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -51,8 +51,7 @@ export interface Split { train: [number, number]; test: [number, number]; }
 /**
  * Rolling walk-forward splits over n observations.
  * Each split trains on [start, start+trainSize) and tests on the following
- * testSize observations; the window advances by `step` (default testSize —
- * non-overlapping OOS segments that tile the sample).
+ * testSize observations; the window advances by `step` (default testSize, * non-overlapping OOS segments that tile the sample).
  */
 export function walkForwardSplits(n: number, trainSize: number, testSize: number, step?: number): Split[] {
   const s = Math.max(1, step ?? testSize);
@@ -100,7 +99,7 @@ export function purgedKFoldSplits(n: number, k = 5, horizon = 5, embargo?: numbe
 }
 
 // ─────────────────────────────────────────────────────────────────
-// CSCV — Probability of Backtest Overfitting
+// CSCV, Probability of Backtest Overfitting
 // ─────────────────────────────────────────────────────────────────
 
 export interface PBOResult {
@@ -190,7 +189,7 @@ export function cscvPBO(strategyReturns: number[][], nPartitions = 10): PBOResul
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Sharpe inference — PSR, DSR, MinTRL, Lo standard error
+// Sharpe inference, PSR, DSR, MinTRL, Lo standard error
 // ─────────────────────────────────────────────────────────────────
 
 /**
@@ -289,7 +288,7 @@ export interface RealityCheckResult {
 
 /**
  * White's Reality Check (White 2000, "A Reality Check for Data Snooping").
- * H0: max_k E[r_k − r_benchmark] ≤ 0 — no strategy beats the benchmark.
+ * H0: max_k E[r_k − r_benchmark] ≤ 0, no strategy beats the benchmark.
  *
  * Test statistic V = max_k √T·(f̄_k); bootstrap distribution built from
  * stationary-bootstrap resamples of the centred excess returns.

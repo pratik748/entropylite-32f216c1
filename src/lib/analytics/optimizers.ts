@@ -1,17 +1,17 @@
 /**
- * Unified optimizer facade — every allocator behind one typed interface.
+ * Unified optimizer facade, every allocator behind one typed interface.
  * ──────────────────────────────────────────────────────────────────────
  * Wraps the existing solvers (portfolio-math, quant/allocation) and adds
  * robust MVO, risk budgeting, and CVaR minimization. Every result carries
  * diagnostics: the conditioning of the Σ actually used, shrinkage intensity,
  * convergence, explicit assumptions, and a confidence grade derived from the
- * sample-size-to-dimension ratio — nothing is asserted without basis.
+ * sample-size-to-dimension ratio, nothing is asserted without basis.
  *
  * Graceful degradation, in order:
  *   1. Ledoit–Wolf shrinkage of Σ when return series are supplied.
  *   2. nearest-PSD projection of whatever Σ we end up with.
  *   3. If a solver still fails (singular Σ, non-convergence) the result is
- *      null — callers show the reason, never a silent fallback allocation.
+ *      null, callers show the reason, never a silent fallback allocation.
  *
  * References: Markowitz (1952); Ledoit & Wolf (2004); Maillard–Roncalli–
  * Teiletche (2010); López de Prado (2016, HRP); Black & Litterman (1992);
@@ -161,7 +161,7 @@ function portfolioVolAnnual(w: number[], sigma: number[][]): number {
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Risk budgeting — generalized ERC (Bruder & Roncalli 2012).
+ * Risk budgeting, generalized ERC (Bruder & Roncalli 2012).
  * Solves wᵢ·(Σw)ᵢ = bᵢ·σ_p² by multiplicative fixed-point iteration
  * wᵢ ← wᵢ·√(bᵢ·σ_p²/RCᵢ). budgets must be positive and sum to 1.
  */
@@ -369,7 +369,7 @@ export function runOptimizer(id: OptimizerId, input: OptimizerInput): OptimizerR
           `equilibrium prior Π = δΣw with current weights as the market portfolio (δ=2.5, τ=0.05)`,
           (input.views?.length ?? 0) > 0
             ? `${input.views!.length} view(s) blended at stated confidence`
-            : "no active views — posterior equals equilibrium prior",
+            : "no active views, posterior equals equilibrium prior",
         );
       }
       if (!weights) { converged = false; notes.push("BL posterior or Σ inversion failed"); }

@@ -10,7 +10,7 @@ interface SectionRailProps {
 }
 
 /**
- * Workstation navigation rail — workspaces in 4 semantic groups.
+ * Workstation navigation rail, workspaces in 4 semantic groups.
  * Selecting a workspace lands on its first section; the active workspace
  * expands to show its sections. Vertical rail on md+, horizontal strip below.
  *

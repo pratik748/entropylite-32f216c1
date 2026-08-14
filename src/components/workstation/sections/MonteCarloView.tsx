@@ -8,7 +8,7 @@ import SectionShell from "./SectionShell";
 import { Block, PendingEvidence } from "./blocks";
 
 /**
- * Monte Carlo section — the closed-form outcome distribution over the
+ * Monte Carlo section, the closed-form outcome distribution over the
  * engine's 21-session horizon. Deterministic by construction: the cone and
  * every statistic are analytic properties of the same log-normal model
  * that prices the thesis cases (GBM, σ from realized volatility, bounded
@@ -68,7 +68,7 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
         ) : (
           <Block title="Outcome distribution">
             <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-              The distribution needs a price anchor and a volatility measurement — both re-sync
+              The distribution needs a price anchor and a volatility measurement, both re-sync
               automatically. Volatility and drawdown evidence elsewhere in the Risk Lab stays live meanwhile.
             </p>
           </Block>
@@ -106,7 +106,7 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
       <Block title={`Outcome distribution · ${model.horizonSessions} sessions · closed-form GBM`}>
         <ConeChart price={price} cone={cone} currency={currency} />
         <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground/70">
-          Percentile cone of the log-normal terminal distribution — σ from {sigmaSource} (
+          Percentile cone of the log-normal terminal distribution, σ from {sigmaSource} (
           {model.annualVolPct.toFixed(1)}% annualized), drift tilted by the momentum and risk pillars,
           bounded to ±0.75σ. Analytic, not sampled: the same inputs always produce the same cone, and
           this is the exact model that prices the Bull / Base / Bear cases in the Thesis workspace.
@@ -130,7 +130,7 @@ const MonteCarloView = ({ workspace, section }: { workspace: WorkspaceDef; secti
             <CaseCell label="Bull" probability={bullCase.probability} target={bullCase.target} currency={currency} tone="gain" />
           </div>
           <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground/70">
-            Probability of finishing inside each engine band under the distribution above — identical
+            Probability of finishing inside each engine band under the distribution above, identical
             numbers to Thesis › Bull / Base / Bear, because both read the same model.
           </p>
         </Block>

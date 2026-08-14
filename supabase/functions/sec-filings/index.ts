@@ -71,7 +71,7 @@ async function searchFilings(tickers: string[]): Promise<Filing[]> {
         const url = `https://efts.sec.gov/LATEST/search-index?q=%22${ticker}%22&forms=10-K,10-Q,8-K`;
         const res = await fetch(url, { headers: SEC_HEADERS });
         if (!res.ok) { await res.text(); continue; }
-        // No data — return nothing rather than fabricate a row.
+        // No data, return nothing rather than fabricate a row.
       } catch {
         // silently continue
       }
@@ -96,7 +96,7 @@ async function fetchInsiderTrades(tickers: string[]): Promise<InsiderTrade[]> {
       if (data.hits?.hits) {
         for (const hit of data.hits.hits.slice(0, 3)) {
           const s = hit._source || {};
-          // EDGAR listing API does not give shares/price — those live inside
+          // EDGAR listing API does not give shares/price, those live inside
           // the Form 4 XML. We refuse to fabricate them. Surface only what
           // EDGAR actually returned, with a link so the user can audit.
           const accession = String(hit._id || "").split(":")[0] || "";
@@ -163,7 +163,7 @@ serve(async (req) => {
       insiderSentiment,
       provenance: {
         filings: "sec.gov EDGAR full-text search",
-        insiderTrades: "sec.gov EDGAR Form 4 listing (shares/price not parsed — UNKNOWN until Form 4 XML reader is wired)",
+        insiderTrades: "sec.gov EDGAR Form 4 listing (shares/price not parsed, UNKNOWN until Form 4 XML reader is wired)",
       },
       summary: {
         totalFilings: filings.length,

@@ -1,4 +1,4 @@
-// TWRD TRUTH Engine — pure, streaming-friendly, normalised to [0,1]
+// TWRD TRUTH Engine, pure, streaming-friendly, normalised to [0,1]
 // Implements: T(x,t) = σ(w1S + w2A + w3D − w4B − w5C + b)
 
 import {
@@ -12,7 +12,7 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 export const sigmoid = (z: number): number => 1 / (1 + Math.exp(-z));
 
-/** S — Beta posterior mean θ = α / (α+β) */
+/** S, Beta posterior mean θ = α / (α+β) */
 export function sourceCredibility(alpha: number, beta: number): number {
   const denom = alpha + beta;
   if (denom <= 0) return 0.5;
@@ -25,7 +25,7 @@ export function meanTheta(thetas: number[]): number {
   return thetas.reduce((a, b) => a + b, 0) / thetas.length;
 }
 
-/** A — Noisy-OR agreement.  A = 1 − Π(1 − θ_i) */
+/** A, Noisy-OR agreement.  A = 1 − Π(1 − θ_i) */
 export function agreement(thetas: number[]): number {
   if (!thetas.length) return 0;
   let prod = 1;
@@ -38,19 +38,19 @@ export function updateAgreement(Aold: number, thetaNew: number): number {
   return clamp01(1 - (1 - clamp01(Aold)) * (1 - clamp01(thetaNew)));
 }
 
-/** D — exponential decay. λ_d derived from domain half-life. */
+/** D, exponential decay. λ_d derived from domain half-life. */
 export function decay(deltaSeconds: number, domain: TwrdDomain): number {
   const halfLife = HALF_LIFE_SECONDS[domain] ?? HALF_LIFE_SECONDS.financial;
   const lambda = Math.LN2 / halfLife;
   return clamp01(Math.exp(-lambda * Math.max(0, deltaSeconds)));
 }
 
-/** B — bias penalty. δ default 0.5 (TWRD §5.2.4). */
+/** B, bias penalty. δ default 0.5 (TWRD §5.2.4). */
 export function biasPenalty(biasHat: number, delta = 0.5): number {
   return clamp01(delta * clamp01(biasHat));
 }
 
-/** C — contradiction penalty. ε default 0.6 (TWRD §5.2.5). */
+/** C, contradiction penalty. ε default 0.6 (TWRD §5.2.5). */
 export function contradictionPenalty(maxContradictorT: number, eps = 0.6): number {
   return clamp01(eps * clamp01(maxContradictorT));
 }

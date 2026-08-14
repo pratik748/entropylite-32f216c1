@@ -44,7 +44,7 @@ const PRINCIPLES = [
   {
     n: "03",
     title: "The system learns from you, not the crowd.",
-    desc: "Every outcome you log adjusts the weights — biasing future analysis toward the patterns that worked for your book and away from the ones that did not.",
+    desc: "Every outcome you log adjusts the weights, biasing future analysis toward the patterns that worked for your book and away from the ones that did not.",
   },
   {
     n: "04",
@@ -55,22 +55,22 @@ const PRINCIPLES = [
 
 const CAPABILITIES = [
   { icon: Activity, title: "Quantitative risk engine", desc: "VaR and CVaR at 95% and 99% confidence, liquidity-adjusted, recomputed live for every position held." },
-  { icon: Shield, title: "CLANK constraint detection", desc: "Flags structural limits in liquidity, positioning and dealer gamma as they begin to bend — before price reacts." },
+  { icon: Shield, title: "CLANK constraint detection", desc: "Flags structural limits in liquidity, positioning and dealer gamma as they begin to bend, before price reacts." },
   { icon: Globe, title: "Geopolitical intelligence", desc: "A live read on global events with a market-impact score and a regime label that recalibrates the rest of the stack." },
   { icon: TrendingUp, title: "Probabilistic simulation", desc: "10,000-path Monte Carlo on every holding, run on realized volatility, reported as profit probability and tail risk." },
   { icon: Layers, title: "Statistical arbitrage", desc: "Mean-reversion candidates, cointegrated pairs and Z-score drift measured across the whole book, not a single ticker." },
   { icon: Target, title: "Asset discovery", desc: "A daily shortlist of setups scored on momentum, quality and interaction with your existing exposure." },
   { icon: BarChart3, title: "Company dossiers", desc: "A twelve-dimension read on any company: management, capital flows, narrative, structural risk and beyond." },
   { icon: FlaskConical, title: "Strategy factory", desc: "Spin up a scenario, calibrate it to the current regime, and paper-test the hypothesis before risking capital." },
-  { icon: Zap, title: "Causal cascade modelling", desc: "First-, second- and third-order effects propagated across sectors, currencies and asset classes — pre-trade." },
+  { icon: Zap, title: "Causal cascade modelling", desc: "First-, second- and third-order effects propagated across sectors, currencies and asset classes, pre-trade." },
 ];
 
 const PIPELINE = [
-  { step: "01", title: "Ingest", desc: "Live prices, geopolitics, multi-source news, FX and institutional flow signals stream in continuously — timestamped, normalized to your base currency." },
+  { step: "01", title: "Ingest", desc: "Live prices, geopolitics, multi-source news, FX and institutional flow signals stream in continuously, timestamped, normalized to your base currency." },
   { step: "02", title: "Quantify", desc: "Volatility, drift, correlation, covariance, VaR, CVaR and distance-to-default computed per holding, live." },
-  { step: "03", title: "Constrain", desc: "CLANK overlays structural limits — gamma walls, rebalance flows, liquidity vacuums — onto the probabilistic read." },
+  { step: "03", title: "Constrain", desc: "CLANK overlays structural limits, gamma walls, rebalance flows, liquidity vacuums, onto the probabilistic read." },
   { step: "04", title: "Simulate", desc: "10,000-path Monte Carlo and causal cascades resolve each event into a distribution of outcomes with attached probabilities." },
-  { step: "05", title: "Decide", desc: "The strategy layer emits concrete positioning — entry levels, projected ranges, invalidation zones, risk-budgeted size." },
+  { step: "05", title: "Decide", desc: "The strategy layer emits concrete positioning, entry levels, projected ranges, invalidation zones, risk-budgeted size." },
   { step: "06", title: "Learn", desc: "Every logged outcome feeds Scar Memory and the Outcome Gradient, sharpening the next read against your realized results." },
 ];
 
@@ -85,9 +85,9 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Entropy — Institutional market intelligence";
+    document.title = "Entropy, Institutional market intelligence";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Entropy is a probabilistic market-intelligence terminal. Twelve analytical engines — risk, constraint detection, simulation, flow — composed into one operational surface.");
+    if (meta) meta.setAttribute("content", "Entropy is a probabilistic market-intelligence terminal. Twelve analytical engines, risk, constraint detection, simulation, flow, composed into one operational surface.");
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
@@ -116,8 +116,8 @@ export default function LandingPage() {
             </h1>
 
             <p className="mkt-lede text-white/50 max-w-xl mt-7">
-              Entropy composes twelve analytical engines — risk, structural
-              constraints, simulation, flow — into one terminal. Not what will
+              Entropy composes twelve analytical engines, risk, structural
+              constraints, simulation, flow, into one terminal. Not what will
               happen. What <em className="not-italic text-white font-medium">can</em> happen,
               and with what probability.
             </p>
@@ -173,7 +173,7 @@ export default function LandingPage() {
                 <span className="text-white/40">Markets move on pressure.</span>
               </>
             }
-            lede="Four operating principles govern every engine in the stack. They are not slogans — each one is enforced in code."
+            lede="Four operating principles govern every engine in the stack. They are not slogans, each one is enforced in code."
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 mt-14 border-t border-l border-hairline">
@@ -205,7 +205,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 mt-12 border-t border-l border-hairline bg-carbon-950">
             {[
-              { n: "Layer 01", t: "Position", d: "Multi-currency, multi-exchange — normalized to your base currency in real time." },
+              { n: "Layer 01", t: "Position", d: "Multi-currency, multi-exchange, normalized to your base currency in real time." },
               { n: "Layer 02", t: "Probability", d: "10,000 GBM paths over a 252-day horizon, with profit probability and tail risk." },
               { n: "Layer 03", t: "Risk surface", d: "VaR and CVaR at 95% and 99% confidence, recomputed live per asset." },
               { n: "Layer 04", t: "Flow", d: "An institutional flow read across ETF rebalances, dealer gamma and dark pools." },
@@ -269,7 +269,7 @@ export default function LandingPage() {
                     <span className="text-white/40">to sized decision.</span>
                   </>
                 }
-                lede="Six stages, always running. You see only the conclusion — the pipeline is there when you want to audit it."
+                lede="Six stages, always running. You see only the conclusion, the pipeline is there when you want to audit it."
               />
               <div className="mt-8">
                 <LineButton onClick={() => navigate("/backbone")}>
@@ -293,7 +293,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 07 · CLANK — the constraint engine ── */}
+      {/* ── 07 · CLANK, the constraint engine ── */}
       <section className="bg-carbon-950 border-b border-hairline">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 py-24 sm:py-32">
           <div className="flex items-center gap-3 mb-8">
@@ -342,7 +342,7 @@ export default function LandingPage() {
             label="Proof"
             align="center"
             title={<>This is not opinion. This is mathematics.</>}
-            lede="Monte Carlo. VaR and CVaR. Merton. Ornstein–Uhlenbeck. Run on real history — every figure below is reproducible."
+            lede="Monte Carlo. VaR and CVaR. Merton. Ornstein–Uhlenbeck. Run on real history, every figure below is reproducible."
           />
         </div>
       </section>
@@ -360,7 +360,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 mt-14 border-t border-l border-hairline bg-carbon-950 max-w-4xl mx-auto">
             {[
-              { t: "Full stack, no tiering", d: "Every engine — probabilistic, structural, causal — is available from the first session." },
+              { t: "Full stack, no tiering", d: "Every engine, probabilistic, structural, causal, is available from the first session." },
               { t: "Portfolio-resident", d: "Add your tickers and a base currency; the engines begin their first pass immediately." },
               { t: "Founding pricing, for life", d: "Founding members keep founding terms permanently once paid tiers launch." },
             ].map((c, i) => (
@@ -430,7 +430,7 @@ export default function LandingPage() {
 
       <SiteFooter />
 
-      {/* Sticky mobile CTA — always one tap from the terminal */}
+      {/* Sticky mobile CTA, always one tap from the terminal */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-carbon-950/95 backdrop-blur-sm border-t border-hairline px-4 py-3">
         <button
           onClick={goSignup}

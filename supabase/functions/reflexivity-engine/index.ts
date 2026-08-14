@@ -1,5 +1,5 @@
 /**
- * Reflexivity Engine — operationalizes Soros's reflexivity into a real-time
+ * Reflexivity Engine, operationalizes Soros's reflexivity into a real-time
  * belief-about-belief map. Fuses Flow Intelligence + Sentiment + Causal Effects
  * into a single signal: where consensus is internally contradicted and about
  * to break.
@@ -139,7 +139,7 @@ function deriveContradictions(consensus: ReturnType<typeof deriveConsensus>, inp
   return out.sort((a, b) => b.gap - a.gap);
 }
 
-/** Shift ETA — expected time until belief breaks, derived from contradiction magnitude. */
+/** Shift ETA, expected time until belief breaks, derived from contradiction magnitude. */
 function deriveShiftETA(
   conviction: ReturnType<typeof deriveConviction>,
   contradictions: ReturnType<typeof deriveContradictions>,
@@ -214,7 +214,7 @@ serve(async (req) => {
       const weighted = await veracityGate(sigs);
       veracity = aggregateVeracity(weighted);
 
-      // False-Consensus override on Shift ETA — directly per TWRD spec.
+      // False-Consensus override on Shift ETA, directly per TWRD spec.
       if (veracity.falseConsensus) {
         shiftETA.label = "FALSE CONSENSUS";
         shiftETA.probability = Math.max(shiftETA.probability, 70);
@@ -223,7 +223,7 @@ serve(async (req) => {
       console.warn("TWRD veracity gate skipped:", (e as Error).message);
     }
 
-    // AI narrative layer — interprets the deterministic math into a Soros-voice thesis.
+    // AI narrative layer, interprets the deterministic math into a Soros-voice thesis.
     // The math above is real and complete; the AI only adds the narrative interpretation.
     // If the AI provider fails (rate limit, timeout, parse failure), we return the math
     // with thesis=null so the panel surfaces real signal instead of crashing the whole module.
@@ -238,22 +238,22 @@ serve(async (req) => {
 OPERATING DOCTRINE (strict):
 1. You do NOT predict price. You identify the contradiction inside the consensus and the trigger that exposes it.
 2. THESIS structure: (a) what does the market believe the market believes? (b) where is that belief inconsistent with the data? (c) what closes the gap?
-3. The trigger must be an OBSERVABLE event — a print, a level, a flow, a data release — not a vibe.
+3. The trigger must be an OBSERVABLE event, a print, a level, a flow, a data release, not a vibe.
 4. The trade must express the contradiction asymmetrically (positive convexity on the breaking belief).
-5. The risk must be the cleanest invalidation — what single observable would prove the belief was actually correct?
+5. The risk must be the cleanest invalidation, what single observable would prove the belief was actually correct?
 
 VOICE: Soros-letter cadence. Tight, paradoxical, never preachy. Each field ≤ 220 chars.
 
 Return ONLY valid JSON, no markdown, no commentary.`;
       const userPrompt = `Belief map:
 - Consensus: ${consensus.label} (${consensus.direction})
-- Components — Flow: ${consensus.components.flow}, Sentiment: ${consensus.components.sentiment}, Causal: ${consensus.components.causal}
+- Components, Flow: ${consensus.components.flow}, Sentiment: ${consensus.components.sentiment}, Causal: ${consensus.components.causal}
 - Conviction: ${conviction.label} (${conviction.score}, spread ${conviction.spread})
 - Top contradictions: ${contradictions.slice(0, 3).map((c) => c.pair + " gap " + c.gap).join("; ") || "none"}
 - Shift ETA: ${shiftETA.label} (${shiftETA.probability}% in ${shiftETA.window})
 - VIX: ${input.vix ?? "n/a"}, Regime: ${input.regime ?? "n/a"}
 
-Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice — what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
+Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice, what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
 
       const ai = await callAI({
         systemPrompt,

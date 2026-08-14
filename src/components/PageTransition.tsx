@@ -9,7 +9,7 @@ interface PageTransitionProps {
 /**
  * iOS-style contextual transition: the incoming view rises 10px and settles
  * on a spring while the outgoing view slips away. Transform + opacity only,
- * fully GPU-composited — no blur, no 3D, no layout thrash.
+ * fully GPU-composited, no blur, no 3D, no layout thrash.
  */
 const PageTransition = ({ children, tabKey }: PageTransitionProps) => {
   const reduceMotion = useReducedMotion();

@@ -57,7 +57,7 @@ const StatArbEngine = ({ stocks }: Props) => {
 
       // We require ≥120 daily observations and apply James-Stein-style
       // shrinkage toward zero (t / (t+1)) before annualising. We also clamp
-      // the annualised drift to ±35% — any single-asset μ outside that
+      // the annualised drift to ±35%, any single-asset μ outside that
       // range is not statistically defensible from <2y of daily data and
       // is exactly how naive ×252 produces fake "+249%" headline returns.
       if (histData?.closes?.length && histData.closes.length >= 120) {
@@ -1267,7 +1267,7 @@ function ForesightPanel({ assets, totalValue, portfolioMu, portfolioVol, fmt, sy
     setFgmRunning(true);
     setTimeout(() => {
       const a = assets[Math.min(selectedAsset, assets.length - 1)];
-      // Use REAL daily closes when available — eliminates the synthetic-data pipeline.
+      // Use REAL daily closes when available, eliminates the synthetic-data pipeline.
       const realCloses = historicalPrices[a.rawTicker as any]?.closes;
       const result = FGM.runFGM(a.ticker, a.buyPrice, a.price, a.mu, a.vol, fgmHorizon, fgmModel, fgmDepth, realCloses);
       setFgmResult(result); setFgmRunning(false);

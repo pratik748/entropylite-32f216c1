@@ -1,5 +1,5 @@
 /**
- * Intelligence tools — the platform's AI/analytical edge functions exposed
+ * Intelligence tools, the platform's AI/analytical edge functions exposed
  * to the planner. Each is a governed pass-through; the heavy cache tiers in
  * apiGovernor (30 min for `heavy`) make repeated invocations free.
  */
@@ -108,7 +108,7 @@ registerTool({
       body: { event: params.event, portfolio },
     });
     if (error) throw new Error(`causal-effects failed: ${error.message || error}`);
-    return { data, cached, source: "causal-effects", caveats: ["model-derived scenario tree — probabilistic, not a forecast"] };
+    return { data, cached, source: "causal-effects", caveats: ["model-derived scenario tree, probabilistic, not a forecast"] };
   },
 });
 
@@ -123,7 +123,7 @@ registerTool({
   },
   execute: async (params, ctx) => {
     const positions = ctx.host.getPositions();
-    if (positions.length === 0) throw new Error("The portfolio is empty — nothing to simulate.");
+    if (positions.length === 0) throw new Error("The portfolio is empty, nothing to simulate.");
     const { totalValue } = positionWeights(positions);
     const portfolio = positions.map((p) => ({
       ticker: p.ticker, quantity: p.quantity, buyPrice: p.buyPrice,
@@ -162,7 +162,7 @@ registerTool({
 
 registerTool({
   name: "intel.brief",
-  description: "The Entropy Brief — a synthesized daily digest of the portfolio: what moved, what needs attention, verdict changes.",
+  description: "The Entropy Brief, a synthesized daily digest of the portfolio: what moved, what needs attention, verdict changes.",
   category: "intelligence",
   permission: "read",
   keywords: ["brief", "digest", "summary", "daily", "morning"],

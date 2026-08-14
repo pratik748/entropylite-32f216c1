@@ -1,5 +1,5 @@
 /**
- * Foresight core tests — the trust boundary paths: schema validation,
+ * Foresight core tests, the trust boundary paths: schema validation,
  * registry/confirmation invariants, $ref data flow, dependency extraction,
  * and numeric provenance verification.
  */

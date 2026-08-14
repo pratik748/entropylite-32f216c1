@@ -1,5 +1,5 @@
 /**
- * Calibration Layer — probabilistic foundations for the proprietary engines.
+ * Calibration Layer, probabilistic foundations for the proprietary engines.
  * ──────────────────────────────────────────────────────────────────────────
  * The audit found CLANK constraint confidences hard-coded (0.65–0.95), ODG
  * scar factors computed from an ad-hoc count ratio, and TWRD/ODG probability
@@ -8,13 +8,11 @@
  *
  *   - Proper scoring rules: Brier score, log loss, reliability curves
  *     (so every probability the platform emits can be audited).
- *   - Decayed Beta-Bernoulli posterior (conjugate, streaming, O(1)) —
- *     replaces running averages for CLANK confidence learning; the same
+ *   - Decayed Beta-Bernoulli posterior (conjugate, streaming, O(1)), *     replaces running averages for CLANK confidence learning; the same
  *     structure TWRD already uses for source credibility, formalised with
  *     exponential forgetting so the system keeps adapting.
  *   - Empirical-Bayes shrinkage for small-sample proportions (ODG scar).
- *   - Online logistic regression (SGD, L2, bounded weights, serialisable) —
- *     the upgrade path from CLANK's hand-set trigger→probability maps to
+ *   - Online logistic regression (SGD, L2, bounded weights, serialisable), *     the upgrade path from CLANK's hand-set trigger→probability maps to
  *     coefficients learned from recorded activation events. Mirrors the SGD
  *     TWRD already runs on its truth weights, so one mechanism serves both.
  *
@@ -87,8 +85,7 @@ export interface BetaState { alpha: number; beta: number; }
  *   α ← λ·α + y,   β ← λ·β + (1 − y),   y ∈ [0,1] (fractional evidence OK)
  *
  * λ < 1 bounds the effective sample size at 1/(1−λ), so the posterior mean
- * behaves like a properly normalised EWMA of outcomes with prior anchoring —
- * the estimator keeps adapting instead of freezing as n → ∞ (the flaw in a
+ * behaves like a properly normalised EWMA of outcomes with prior anchoring, * the estimator keeps adapting instead of freezing as n → ∞ (the flaw in a
  * plain running average). λ = 0.98 ⇒ effective memory ≈ 50 outcomes.
  */
 export function betaUpdate(state: BetaState, y: number, lambda = 0.98): BetaState {
@@ -99,7 +96,7 @@ export function betaUpdate(state: BetaState, y: number, lambda = 0.98): BetaStat
 /** Posterior mean. */
 export const betaMean = (s: BetaState) => s.alpha / Math.max(s.alpha + s.beta, 1e-12);
 
-/** Posterior variance — use for "confidence about the confidence" displays. */
+/** Posterior variance, use for "confidence about the confidence" displays. */
 export function betaVariance(s: BetaState): number {
   const n = s.alpha + s.beta;
   return (s.alpha * s.beta) / Math.max(n * n * (n + 1), 1e-12);
@@ -116,7 +113,7 @@ export function betaPrior(mean: number, strength = 10): BetaState {
  *   p̂ = (successes + κ·p₀) / (trials + κ)
  * Shrinks small-sample frequencies toward the prior p₀ with strength κ.
  * This is the posterior mean of Beta(κp₀, κ(1−p₀)) after `trials` Bernoulli
- * observations — the standard fix for noisy small-n proportions (scar memory,
+ * observations, the standard fix for noisy small-n proportions (scar memory,
  * per-ticker hit rates, per-regime win rates).
  */
 export function shrunkProportion(successes: number, trials: number, priorMean = 0.5, priorStrength = 5): number {

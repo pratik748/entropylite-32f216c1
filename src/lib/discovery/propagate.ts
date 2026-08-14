@@ -1,4 +1,4 @@
-// Bounded k-hop impact propagation over the typed asset graph — TRUTH's
+// Bounded k-hop impact propagation over the typed asset graph, TRUTH's
 // Aftermath Simulation reduced to its browser-feasible core (k ≤ 2,
 // provenance-weighted edges, per-hop attenuation).
 //
@@ -10,7 +10,7 @@
 import type { AssetEdge, PropagatedImpact } from "./types";
 
 export interface PropagateOpts {
-  /** max hops (default 2 — deeper chains are noise at our edge quality) */
+  /** max hops (default 2, deeper chains are noise at our edge quality) */
   k?: number;
   /** per-hop attenuation ρ ∈ (0,1] (default 0.6) */
   rho?: number;
@@ -25,7 +25,7 @@ export interface PropagateOpts {
  * Seeds are never overwritten; each non-seed node accumulates the sum of
  * path contributions, clamped to [−1, 1]; `hops` reports the shortest
  * contributing distance. Cycles are handled by the hop bound (a node may be
- * reached along multiple paths — that is signal, not a bug).
+ * reached along multiple paths, that is signal, not a bug).
  */
 export function propagateImpact(
   edges: AssetEdge[],

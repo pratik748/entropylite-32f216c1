@@ -1,5 +1,5 @@
 /**
- * Report generation — composable, typed institutional reports.
+ * Report generation, composable, typed institutional reports.
  * ────────────────────────────────────────────────────────────
  * Each generator assembles ReportSections from already-computed analytics.
  * Sections declare which question they answer (what happened / why / what
@@ -116,7 +116,7 @@ export function performanceSection(ctx: ReportContext, perf: PerformanceMetrics)
   return {
     id: "performance",
     title: "Performance",
-    answers: "What happened — absolute and benchmark-relative results.",
+    answers: "What happened, absolute and benchmark-relative results.",
     blocks,
   };
 }
@@ -153,7 +153,7 @@ export function riskSection(ctx: ReportContext, risk: RiskMetrics): ReportSectio
   return {
     id: "risk-summary",
     title: "Risk Summary",
-    answers: "What could go wrong, and how badly — measured, not assumed.",
+    answers: "What could go wrong, and how badly, measured, not assumed.",
     blocks,
   };
 }
@@ -176,7 +176,7 @@ export function exposureSection(ctx: ReportContext, exposure: ExposureAnalysis):
   return {
     id: "exposure",
     title: "Exposure",
-    answers: "Where the capital actually sits — sector, currency, style, beta.",
+    answers: "Where the capital actually sits, sector, currency, style, beta.",
     blocks,
   };
 }
@@ -191,7 +191,7 @@ export function attributionSection(ctx: ReportContext, attribution: AttributionA
         `${(p.weight * 100).toFixed(1)}%`,
         `${p.returnPct >= 0 ? "+" : ""}${p.returnPct.toFixed(1)}%`,
         `${p.contributionPct >= 0 ? "+" : ""}${p.contributionPct.toFixed(2)}pp`,
-        p.riskContributionPct != null ? `${(p.riskContributionPct * 100).toFixed(1)}%` : "—",
+        p.riskContributionPct != null ? `${(p.riskContributionPct * 100).toFixed(1)}%` : "--",
       ]),
     },
   ];
@@ -212,7 +212,7 @@ export function attributionSection(ctx: ReportContext, attribution: AttributionA
   return {
     id: "attribution",
     title: "Attribution",
-    answers: "Why it happened — which positions and sectors drove the result.",
+    answers: "Why it happened, which positions and sectors drove the result.",
     blocks,
   };
 }
@@ -292,7 +292,7 @@ export function rebalancingSection(
           `${(target * 100).toFixed(1)}%`,
           `${drift >= 0 ? "+" : ""}${(drift * 100).toFixed(1)}%`,
           action,
-          action !== "HOLD" ? ctx.fmt(Math.abs(drift) * ctx.totalValue) : "—",
+          action !== "HOLD" ? ctx.fmt(Math.abs(drift) * ctx.totalValue) : "--",
         ];
       }),
     });
@@ -303,7 +303,7 @@ export function rebalancingSection(
   return {
     id: "rebalancing",
     title: "Rebalancing Recommendations",
-    answers: "What the investor should do — target weights, drifts, and the trade list.",
+    answers: "What the investor should do, target weights, drifts, and the trade list.",
     blocks,
   };
 }

@@ -86,7 +86,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     var99: snap.portfolio.var99,
     cvar95: snap.portfolio.cvar95,
     cvar99: historicalCVaR(snap.totalValue, snap.portfolio.returns, 0.99),
-    // No liquidity model exists for measured data — surface the heuristic
+    // No liquidity model exists for measured data, surface the heuristic
     // only under its own label, never as a measured figure.
     liquidityVar: aiData?.liquidityVar ?? 0,
   } : aiData ? {
@@ -124,7 +124,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
     ];
   }, [analyzed, aiData]);
 
-  // Historical stress — MEASURED: the worst realized loss windows of this
+  // Historical stress, MEASURED: the worst realized loss windows of this
   // actual portfolio's return series. No template, no scaling: this is what
   // the current weights actually did over the sample.
   const measuredStress = useMemo(() => {
@@ -265,7 +265,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <span className="text-xs text-gain">
             {varSource === "measured"
               ? "VaR/CVaR measured from return history · scenario & factor figures are heuristic estimates"
-              : "Heuristic risk estimates — return history not yet loaded"}
+              : "Heuristic risk estimates, return history not yet loaded"}
           </span>
           {volatilityRegime && <span className="ml-auto text-xs font-mono text-foreground">Regime: {volatilityRegime}</span>}
         </div>
@@ -295,7 +295,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
       {riskTab === "clank" && <ClankEngine stocks={stocks} />}
 
       {riskTab === "analytics" && <>
-      {/* Systemic concentration — real RMT */}
+      {/* Systemic concentration, real RMT */}
       {systemic && (
         <div className={`rounded-xl border p-4 flex items-center justify-between ${
           systemic.pc1 > 0.4 ? "border-loss/30 bg-loss/5"
@@ -314,12 +314,12 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
                 systemic.pc1 > 0.4 ? "text-loss" : systemic.pc1 > 0.25 ? "text-warning" : "text-gain"
               }`}>
                 {(systemic.pc1 * 100).toFixed(1)}%
-                {systemic.pc1 > 0.4 && " — diversification illusory"}
+                {systemic.pc1 > 0.4 && ", diversification illusory"}
               </p>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            {systemic.signalCount ?? "—"} of {systemic.N} eigenvalues above MP edge · {systemic.T}d
+            {systemic.signalCount ?? "--"} of {systemic.N} eigenvalues above MP edge · {systemic.T}d
           </p>
         </div>
       )}
@@ -336,7 +336,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
             <p className="mt-1 font-mono text-lg font-bold text-loss">
-              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+              {s.value > 0 ? `$${s.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "--"}
             </p>
             <p className="text-[9px] text-muted-foreground">{s.basis}</p>
           </div>
@@ -505,7 +505,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       )}
 
-      {/* Historical stress — measured from this portfolio's actual returns */}
+      {/* Historical stress, measured from this portfolio's actual returns */}
       {measuredStress && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
@@ -526,11 +526,11 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
         </div>
       )}
 
-      {/* Hypothetical stress templates — NOT repriced portfolios */}
+      {/* Hypothetical stress templates, NOT repriced portfolios */}
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Scenario Templates · hypothetical</h3>
-          <span className="text-[10px] font-mono text-warning/90">fixed shocks scaled by beta/concentration — not a repriced portfolio</span>
+          <span className="text-[10px] font-mono text-warning/90">fixed shocks scaled by beta/concentration, not a repriced portfolio</span>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           {stressScenarios.map((s: any) => (
@@ -561,7 +561,7 @@ const RiskDashboard = ({ stocks }: RiskDashboardProps) => {
               </span>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-warning">beta heuristic — no return history yet</span>
+                <span className="text-[10px] text-warning">beta heuristic, no return history yet</span>
                 <div className="flex gap-1">
                   {(["bull", "bear"] as const).map(r => (
                     <button key={r} onClick={() => setSelectedRegime(r)}

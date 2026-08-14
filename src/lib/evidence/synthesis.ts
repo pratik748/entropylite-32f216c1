@@ -1,5 +1,5 @@
 /**
- * Deterministic synthesis over the evidence graph — pillar scores, the
+ * Deterministic synthesis over the evidence graph, pillar scores, the
  * recommendation, probability-weighted cases, live thesis breakers and the
  * auditable confidence ledger. Pure computation: re-runs instantly whenever
  * a node changes, which is what makes the thesis continuously updated.
@@ -99,7 +99,7 @@ function buildBreakers(graph: EvidenceGraph): ThesisBreaker[] {
       state: v == null ? "watch" : v < 1 ? "tripped" : v < 1.3 ? "watch" : "intact",
       detail:
         v == null
-          ? "Price is sitting on support — the payoff ratio is unstable."
+          ? "Price is sitting on support, the payoff ratio is unstable."
           : `Current structure ${v}:1 against the 1.5:1 entry discipline.`,
       nodeIds: ["support_distance"],
     });
@@ -126,7 +126,7 @@ function buildBreakers(graph: EvidenceGraph): ThesisBreaker[] {
       detail:
         pct != null
           ? `Realized vol ${vol.value}% sits at the ${pct}th percentile of its own two-year regime.`
-          : `Realized vol ${vol.value}% — regime percentile pending price history.`,
+          : `Realized vol ${vol.value}%, regime percentile pending price history.`,
       nodeIds: ["volatility"],
     });
   }
@@ -186,10 +186,10 @@ export interface HorizonModel {
 /**
  * The single log-normal model behind cases, Monte Carlo and tail metrics:
  * geometric Brownian motion over the engine's 21-session horizon with σ
- * from the realized-volatility node and a bounded evidence drift — the
+ * from the realized-volatility node and a bounded evidence drift, the
  * momentum and risk pillars tilt the horizon mean by at most ±0.75σ.
  * Returns null when volatility or price are unavailable so callers can
- * fall back to designed pending states — never invented numbers.
+ * fall back to designed pending states, never invented numbers.
  */
 export function logNormalHorizon(
   graph: EvidenceGraph,
@@ -203,7 +203,7 @@ export function logNormalHorizon(
   const momentum = pillars.find((p) => p.pillar === "momentum")?.score ?? 50;
   const risk = pillars.find((p) => p.pillar === "risk")?.score ?? 50;
   // Evidence drift: momentum leads, contained risk supports; bounded ±0.75σ.
-  // Thesis breakers drag the drift — a tripped breaker is realised downside
+  // Thesis breakers drag the drift, a tripped breaker is realised downside
   // evidence, and the distribution that prices the cases and tail metrics
   // must carry it, otherwise the verdict (which reacts to breakers) can
   // contradict the expected return rendered next to it.
@@ -226,7 +226,7 @@ export function logNormalHorizon(
  * (≥ its lower bound), the bear case of finishing inside the bear band
  * (≤ its upper bound); the base case is the remaining mass. Returns null
  * when the model or the bands are unavailable so a prior-based fallback
- * can take over — the surface is never blank.
+ * can take over, the surface is never blank.
  */
 function caseProbabilities(
   graph: EvidenceGraph,
@@ -325,7 +325,7 @@ function buildCases(
       bearP,
       null,
       null,
-      "Risk factors dominate: the bear tail of the simulation is realized via a structure break or a risk-regime escalation. Watch the breaker panel — it is the early warning for this case.",
+      "Risk factors dominate: the bear tail of the simulation is realized via a structure break or a risk-regime escalation. Watch the breaker panel, it is the early warning for this case.",
       ["risk_composite", "max_drawdown", "volatility"],
     ),
   ];
@@ -357,7 +357,7 @@ function actionFrom(net: number, breakers: ThesisBreaker[], coverage: number): A
 /**
  * Causal contribution scoring. A node's pull on the recommendation is its
  * own weight, amplified when its declared drivers point the same way and
- * damped when they conflict — corroborated evidence counts for more than a
+ * damped when they conflict, corroborated evidence counts for more than a
  * lone reading, and contested evidence counts for less. Deterministic:
  * contribution = w × (1 + 0.25·aligned − 0.15·conflicting), clamped ±1.
  */
@@ -412,8 +412,7 @@ export function synthesize(
   // Quantitative coherence gate: the verdict must not contradict the sign
   // of the expected return implied by its own scenario distribution. An
   // ACCUMULATE with non-positive probability-weighted return, or a REDUCE
-  // with positive expectancy and no tripped breaker, downgrades to HOLD —
-  // the numbers on the surface and the action above them come from one
+  // with positive expectancy and no tripped breaker, downgrades to HOLD, // the numbers on the surface and the action above them come from one
   // model or the ticket does not ship.
   const cases = priceCases(buildCases(graph, pillars, analysis, price), analysis, price);
   const evPct = cases.some((c) => c.returnPct != null)
@@ -425,7 +424,7 @@ export function synthesize(
     if (action === "REDUCE" && evPct > 0 && trippedCount === 0) action = "HOLD";
   }
 
-  // Symmetric decision-theoretic promotion — the mirror of the gate above,
+  // Symmetric decision-theoretic promotion, the mirror of the gate above,
   // and the same philosophy as the quant engine's (trade when the calibrated
   // probability sits off coin-flip AND expectancy clears costs). The
   // net-weight thresholds alone (±1.6) parked most names at HOLD even when
@@ -463,23 +462,23 @@ export function synthesize(
     action === "ACCUMULATE"
       ? `Evidence favors owning ${graph.ticker}: net weight +${net} across ${nodes.length} nodes with no breaker tripped.`
       : action === "HOLD"
-        ? `The evidence on ${graph.ticker} is balanced (net ${net >= 0 ? "+" : ""}${net}) — hold existing exposure, add only on improved structure.`
+        ? `The evidence on ${graph.ticker} is balanced (net ${net >= 0 ? "+" : ""}${net}), hold existing exposure, add only on improved structure.`
         : action === "REDUCE"
           ? net <= -1.6
-            ? `Opposing evidence outweighs support on ${graph.ticker} (net ${net}) — reduce exposure and defend the position.`
+            ? `Opposing evidence outweighs support on ${graph.ticker} (net ${net}), reduce exposure and defend the position.`
             : trippedCount > 0
-              ? `A tripped thesis breaker overrides the evidence balance on ${graph.ticker} (net ${net >= 0 ? "+" : ""}${net}) — reduce exposure while it stands.`
-              : `The horizon distribution leans against ${graph.ticker}${pProfit != null ? ` (P(profit) ${Math.round(pProfit * 100)}%` : "("}${evPct != null ? `, Σ p·r ${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%)` : ")"} — reduce exposure and defend the position.`
-          : `The evidence stack argues against holding ${graph.ticker} here — ${breakers.filter((b) => b.state === "tripped").length} breaker(s) tripped, net weight ${net}.`;
+              ? `A tripped thesis breaker overrides the evidence balance on ${graph.ticker} (net ${net >= 0 ? "+" : ""}${net}), reduce exposure while it stands.`
+              : `The horizon distribution leans against ${graph.ticker}${pProfit != null ? ` (P(profit) ${Math.round(pProfit * 100)}%` : "("}${evPct != null ? `, Σ p·r ${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%)` : ")"}, reduce exposure and defend the position.`
+          : `The evidence stack argues against holding ${graph.ticker} here, ${breakers.filter((b) => b.state === "tripped").length} breaker(s) tripped, net weight ${net}.`;
 
   const narrative: string[] = [];
   if (strongestFor) {
     const n = graph.metrics[strongestFor.id];
-    narrative.push(`Strongest support: ${n.label} — ${lowerFirst(n.assessment.reason)}`);
+    narrative.push(`Strongest support: ${n.label}, ${lowerFirst(n.assessment.reason)}`);
   }
   if (strongestAgainst) {
     const n = graph.metrics[strongestAgainst.id];
-    narrative.push(`Strongest concern: ${n.label} — ${lowerFirst(n.assessment.reason)}`);
+    narrative.push(`Strongest concern: ${n.label}, ${lowerFirst(n.assessment.reason)}`);
   }
   const watchers = breakers.filter((b) => b.state !== "intact");
   if (watchers.length > 0) {

@@ -16,7 +16,7 @@ import {
 import { normalizeUserTicker } from "@/lib/ticker";
 
 /**
- * Equity Workstation — /company/:ticker/:workspaceId?/:sectionId?
+ * Equity Workstation, /company/:ticker/:workspaceId?/:sectionId?
  *
  * The dedicated surface for deep company analysis: evidence graph, grouped
  * workspaces, cross-linking Inspector, live synthesis in the context bar,
@@ -62,7 +62,7 @@ const CompanyWorkstationPage = () => {
   );
 };
 
-/** [ / ] steps through the visible sections only — withdrawn sections are skipped. */
+/** [ / ] steps through the visible sections only, withdrawn sections are skipped. */
 const SectionKeyNav = ({
   ticker,
   workspace,
@@ -86,7 +86,7 @@ const SectionKeyNav = ({
       const index = flat.findIndex(
         (entry) => entry.workspace.id === workspace.id && entry.section.id === section.id,
       );
-      // Active section may itself be withdrawn — step from the nearest slot.
+      // Active section may itself be withdrawn, step from the nearest slot.
       const from = index === -1 ? 0 : index;
       const next = flat[(from + (e.key === "]" ? 1 : -1) + flat.length) % flat.length];
       navigate(sectionPath(ticker, next.workspace.id, next.section.id));

@@ -1,5 +1,5 @@
 /**
- * Model registry — institutional memory for every methodology that emits a
+ * Model registry, institutional memory for every methodology that emits a
  * user-facing belief. Each engine attaches its registry entry to its
  * responses, so a stored output can always answer: which model produced
  * you, which version, validated how, wrong how.
@@ -9,7 +9,7 @@
  *    or output semantics. Historical outputs must never silently appear to
  *    come from today's methodology.
  *  - `validationStatus` may only claim what has actually been done.
- *  - `knownLimitations` is mandatory and must stay honest — it is the error
+ *  - `knownLimitations` is mandatory and must stay honest, it is the error
  *    budget in prose.
  */
 
@@ -58,7 +58,7 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
     knownLimitations: [
       "AI narrative layer can mis-structure levels; server promote/rebuild branch guards but does not eliminate this",
       "betaEstimate is a VIX/vol proxy, not a regression",
-      "no intraday data — gap risk between daily closes is invisible",
+      "no intraday data, gap risk between daily closes is invisible",
     ],
   },
   "analyze-stock": {
@@ -88,7 +88,7 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
       "ranking is a CONVICTION ORDER, not a probability; maxProfitTarget confidence is an uncalibrated heuristic score (known limitation); consensus fields inherit ensemble-consensus semantics.",
     validationStatus: "outcome-logged (nightly settlement, reliability reported)",
     knownLimitations: [
-      "candidate generation is AI-driven — selection bias toward well-covered names",
+      "candidate generation is AI-driven, selection bias toward well-covered names",
       "maxProfitTarget 'confidence' formula (80 − uplift·1.5 + Sharpe·10 − vol·0.3) is uncalibrated score theatre, retained pending replacement",
       "3-month lookback makes per-candidate stats noisy (SE on Sharpe is large at n≈60)",
     ],
@@ -104,7 +104,7 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
       "ALL outputs are heuristic ESTIMATES (methodology block attached to every response); clients holding real return history must prefer measured VaR/CVaR/correlations.",
     validationStatus: "unvalidated",
     knownLimitations: [
-      "no return-history input reaches this function — nothing here is measured",
+      "no return-history input reaches this function, nothing here is measured",
       "factor 'exposures' are bucket proxies, not regressions; contributions are invented scalings",
       "scenario impacts are templates, not repriced portfolios",
     ],
@@ -117,10 +117,10 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
       "AI-generated multi-order shock-propagation tree from a single event, with a 4-branch scenario tree. Fully model-authored; no market data enters the cascade.",
     inputs: ["user-described event", "portfolio description (optional)"],
     outputSemantics:
-      "Every effect is a HYPOTHESIS about a transmission mechanism, not established causality. Per-effect 'confidence' and scenario 'probability' are UNCALIBRATED model estimates — magnitudes and time horizons are illustrative analogues, not forecasts.",
+      "Every effect is a HYPOTHESIS about a transmission mechanism, not established causality. Per-effect 'confidence' and scenario 'probability' are UNCALIBRATED model estimates, magnitudes and time horizons are illustrative analogues, not forecasts.",
     validationStatus: "unvalidated",
     knownLimitations: [
-      "no market data grounds the cascade — it is a reasoned narrative, not a measured impulse response",
+      "no market data grounds the cascade, it is a reasoned narrative, not a measured impulse response",
       "confidence and probability values are model-invented and have never been scored against outcomes",
       "second/third-order effects compound the uncertainty of each prior link",
     ],
@@ -142,7 +142,7 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
   },
 };
 
-/** Look up a registry entry. Throws on unknown id — an unregistered model may not ship outputs. */
+/** Look up a registry entry. Throws on unknown id, an unregistered model may not ship outputs. */
 export function modelInfo(id: string): ModelRegistryEntry {
   const entry = REGISTRY[id];
   if (!entry) throw new Error(`modelRegistry: unregistered model "${id}"`);

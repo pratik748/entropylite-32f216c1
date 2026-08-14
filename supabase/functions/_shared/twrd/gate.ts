@@ -1,4 +1,4 @@
-// Veracity Gate — single helper used by every prediction/risk/scenario engine.
+// Veracity Gate, single helper used by every prediction/risk/scenario engine.
 // raw signal in → truth-weighted signal out + meta for UI/risk decisions.
 
 import type { RawSignal, WeightedSignal } from "./types.ts";

@@ -1,4 +1,4 @@
-// Opportunity Engine — HTTP handler for the Supabase edge function.
+// Opportunity Engine, HTTP handler for the Supabase edge function.
 //
 // ONE implementation of the request → pipeline → response flow. Venue
 // specifics (auth, learning-table access, chart loading) are injected via
@@ -109,12 +109,12 @@ export async function directChartLoader(
 /**
  * Wall-clock budget knobs. Two profiles trade universe breadth for speed;
  * the models, consensus gates and ranking are byte-identical between them.
- *   RELIABLE  — coverage grid + liquid single-name leaders (+ holdings),
+ *   RELIABLE, coverage grid + liquid single-name leaders (+ holdings),
  *               stage-2 fundamentals/news skipped and recorded as `missing`
  *               (completeness discount applies). Empirically ~2s / 30-40
  *               validated names against live data; the default so the board
  *               populates on first deploy.
- *   EDGE      — whole-market directory shard + screeners + trending, with
+ *   EDGE, whole-market directory shard + screeners + trending, with
  *               stage-2 enrichment. Heavier; enable once deploy timing is
  *               confirmed on the live project.
  */
@@ -285,7 +285,7 @@ export function createEngineHandler(
       // ── Preliminary screen → finalists ──────────────────────────────
       // Price/flow + risk + macro models run on everyone (they only need
       // price evidence + macro context). The strongest absolute preliminary
-      // signals — in either direction — earn the expensive fundamental/news
+      // signals, in either direction, earn the expensive fundamental/news
       // collectors. In single mode every requested ticker is a finalist.
       let finalists = usable;
       if (mode === "discover" && profile.enrich && usable.length > profile.finalists) {
@@ -313,7 +313,7 @@ export function createEngineHandler(
       if (profile.enrich) {
         enriched = await pMap(finalists, (b) => enrichBundle(b), 5);
       } else {
-        // Skipped on budget venues — record the collectors as missing so
+        // Skipped on budget venues, record the collectors as missing so
         // the evidence-completeness discount lowers confidence honestly.
         enriched = finalists.map((b) => ({
           ...b,
@@ -362,7 +362,7 @@ export function createEngineHandler(
 
       // Fire-and-forget: log validated signals so the nightly calibration
       // job can mark them to market, refit the Platt constants, and update
-      // per-model reliabilities — the loop that keeps confidence honest.
+      // per-model reliabilities, the loop that keeps confidence honest.
       if (loaders.logSignal) {
         for (const o of ranked) {
           loaders.logSignal({

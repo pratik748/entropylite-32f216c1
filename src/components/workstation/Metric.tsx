@@ -3,7 +3,7 @@ import { formatMetricValue, PROVENANCE_LABELS } from "@/lib/evidence/format";
 import { useEvidence } from "./EvidenceContext";
 
 /**
- * Metric display primitives — every figure on a workstation screen renders
+ * Metric display primitives, every figure on a workstation screen renders
  * through one of these, which makes every figure an Inspector target.
  */
 
@@ -39,7 +39,7 @@ export const ProvenanceChip = ({ provenance }: { provenance: EvidenceMetric["pro
           ? "Computed deterministically from market data"
           : provenance === "estimated"
             ? "Estimated from scraped data by the dossier model"
-            : "Model-scored signal — treat as judgment, not fact"
+            : "Model-scored signal, treat as judgment, not fact"
     }
   >
     {PROVENANCE_LABELS[provenance]}
@@ -47,7 +47,7 @@ export const ProvenanceChip = ({ provenance }: { provenance: EvidenceMetric["pro
 );
 
 /**
- * Data matrix — stat cells separated by hairline rules, the terminal grid.
+ * Data matrix, stat cells separated by hairline rules, the terminal grid.
  * Wrap MetricStat cells (or any cell) in this instead of a gap grid.
  */
 export const MetricGrid = ({
@@ -62,7 +62,7 @@ export const MetricGrid = ({
   </div>
 );
 
-/** Stat cell — the primary evidence unit, designed to sit inside MetricGrid. */
+/** Stat cell, the primary evidence unit, designed to sit inside MetricGrid. */
 export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
   const { graph, select, selectedId, relatedIds } = useEvidence();
   const active = selectedId === metric.id;
@@ -110,7 +110,7 @@ export const MetricStat = ({ metric }: { metric: EvidenceMetric }) => {
   );
 };
 
-/** Row — compact evidence line for ledgers and lists. */
+/** Row, compact evidence line for ledgers and lists. */
 export const MetricRow = ({ metric, trailing }: { metric: EvidenceMetric; trailing?: string }) => {
   const { graph, select, selectedId, relatedIds } = useEvidence();
   const active = selectedId === metric.id;
@@ -143,7 +143,7 @@ export const MetricRow = ({ metric, trailing }: { metric: EvidenceMetric; traili
 };
 
 function weightLabel(w: number): string {
-  if (w === 0) return "—";
+  if (w === 0) return "--";
   return `${w > 0 ? "+" : ""}${w.toFixed(2)}`;
 }
 

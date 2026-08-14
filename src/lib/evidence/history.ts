@@ -1,5 +1,5 @@
 /**
- * Historical intelligence — session-over-session evidence snapshots.
+ * Historical intelligence, session-over-session evidence snapshots.
  * Every graph build is diffed against the last stored session so the
  * workstation can answer "what changed, and in which direction" with real
  * deltas instead of generated text. Pure functions + a small localStorage
@@ -29,7 +29,7 @@ export interface EvidenceChange {
   deltaPct: number | null;
   gradeFrom: Grade;
   gradeTo: Grade;
-  /** True when the assessment grade itself flipped — the material changes. */
+  /** True when the assessment grade itself flipped, the material changes. */
   regraded: boolean;
   sinceTs: number;
 }
@@ -106,7 +106,7 @@ export function diffAndStore(graph: EvidenceGraph): EvidenceChange[] {
     try {
       localStorage.setItem(KEY(graph.ticker), JSON.stringify(toSnapshot(graph)));
     } catch {
-      /* storage full — history is an enhancement, never a requirement */
+      /* storage full, history is an enhancement, never a requirement */
     }
   }
   return changes;

@@ -55,7 +55,7 @@ export function logReturns(closes: number[]): number[] {
   return out;
 }
 
-/** Box–Muller — single canonical Gaussian RNG. */
+/** Box–Muller, single canonical Gaussian RNG. */
 export function gaussianRandom(): number {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
@@ -74,7 +74,7 @@ export function maxDrawdownPath(path: number[]): { drawdown: number; peakIdx: nu
   return { drawdown: mdd, peakIdx, troughIdx };
 }
 
-/** Φ(x) — Abramowitz & Stegun 7.1.26 */
+/** Φ(x), Abramowitz & Stegun 7.1.26 */
 export function normCDF(x: number): number {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
   const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
@@ -85,10 +85,10 @@ export function normCDF(x: number): number {
   return 0.5 * (1 + sign * y);
 }
 
-/** φ(x) — standard normal pdf */
+/** φ(x), standard normal pdf */
 export const normPDF = (x: number) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
 
-/** Inverse standard normal — Beasley-Springer-Moro */
+/** Inverse standard normal, Beasley-Springer-Moro */
 export function normInv(p: number): number {
   if (p <= 0 || p >= 1) return p <= 0 ? -Infinity : Infinity;
   const a = [-39.696830, 220.946098, -275.928510, 138.357751, -30.664798, 2.506628];
@@ -113,13 +113,13 @@ export function normInv(p: number): number {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §1  Cointegration — Engle–Granger ADF and Johansen-lite
+// §1  Cointegration, Engle–Granger ADF and Johansen-lite
 // ═══════════════════════════════════════════════════════════════════
 
 /**
  * Augmented Dickey–Fuller t-statistic on a residual series.
  * Tests H0: unit root (non-stationary), H1: stationary (cointegrated).
- * Critical values (MacKinnon 1991, no constant) — reject H0 if t < cv:
+ * Critical values (MacKinnon 1991, no constant), reject H0 if t < cv:
  *   1% = -2.58 · 5% = -1.95 · 10% = -1.62
  */
 export function adfTest(residuals: number[], lags = 1): { tStat: number; pApprox: number; stationary: boolean } {
@@ -234,7 +234,7 @@ export function johansenTrace(series: number[][]): { eigenvalues: number[]; rank
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §2  Hurst exponent — multi-scale R/S log-log regression
+// §2  Hurst exponent, multi-scale R/S log-log regression
 // ═══════════════════════════════════════════════════════════════════
 
 export function hurstRS(series: number[], minLag = 8, maxLag?: number): { H: number; r2: number; scales: number[]; rs: number[] } {
@@ -277,7 +277,7 @@ export function hurstRS(series: number[], minLag = 8, maxLag?: number): { H: num
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §3  Covariance hygiene — nearest-PSD + Marchenko–Pastur cleaning
+// §3  Covariance hygiene, nearest-PSD + Marchenko–Pastur cleaning
 // ═══════════════════════════════════════════════════════════════════
 
 /**
@@ -343,7 +343,7 @@ export function mpCleanCovariance(cov: number[][], T: number): { clean: number[]
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §4  VaR aggregation — multi-period scaling + Cornish-Fisher fat tail
+// §4  VaR aggregation, multi-period scaling + Cornish-Fisher fat tail
 // ═══════════════════════════════════════════════════════════════════
 
 /**
@@ -746,7 +746,7 @@ export function brinsonAttribution(rows: Array<{ sector: string; wP: number; wB:
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// §11  Convenience — unified VaR (replaces two inconsistent calculators)
+// §11  Convenience, unified VaR (replaces two inconsistent calculators)
 // ═══════════════════════════════════════════════════════════════════
 
 /** Single canonical VaR that absorbs both historical and parametric methods. */

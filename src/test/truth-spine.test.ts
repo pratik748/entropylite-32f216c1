@@ -41,7 +41,7 @@ import { RISK_FREE_SNAPSHOT as EDGE_RF_TABLE, riskFreeFor as edgeRiskFreeFor } f
 import { RISK_FREE_SNAPSHOT as CLIENT_RF_TABLE, riskFreeFor as clientRiskFreeFor } from "../lib/riskFree";
 import { sharpeWithSE as clientSharpeSE, volWithSE as clientVolSE, betaRegression as clientBetaReg } from "../lib/quant-engine";
 
-/** Deterministic pseudo-random walk (LCG) — no Math.random in tests. */
+/** Deterministic pseudo-random walk (LCG), no Math.random in tests. */
 function lcgCloses(n: number, seed = 42, drift = 0.0004, vol = 0.015): number[] {
   let s = seed;
   const next = () => {

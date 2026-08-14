@@ -1,12 +1,12 @@
 // EngineLoaders backed by plain Supabase REST calls: calibration params,
 // per-model reliabilities and the own-distribution maturity gate, using
-// the shared shrinkage/health rules in reputationCore.ts — fetch-only, no
+// the shared shrinkage/health rules in reputationCore.ts, fetch-only, no
 // Deno-specific client. Charts are loaded directly from Yahoo (Supabase
-// edge egress reaches it — the deployed historical-prices function proves
+// edge egress reaches it, the deployed historical-prices function proves
 // this), so no proxy hop is needed.
 //
 // The URL and anon key are the project's PUBLIC client credentials (they
-// ship in the browser bundle and in the committed .env) — no secret is
+// ship in the browser bundle and in the committed .env), no secret is
 // embedded here. Auth is enforced by validating the caller's own JWT
 // against Supabase Auth, exactly like the edge function's requireAuth.
 
@@ -54,7 +54,7 @@ async function loadCalibrationRow(): Promise<CalibrationRow | null> {
 
 // ── Own-distribution maturity gate ──────────────────────────────────
 // The nightly job fits calibration + model reliabilities on ALL settled
-// signals — historically the OLD engines' outcomes. A mapping fitted on a
+// signals, historically the OLD engines' outcomes. A mapping fitted on a
 // different signal distribution must not be applied to this engine (the
 // live row, fitted on old-engine losses, degenerates every new score to
 // p≈0.5 and empties the board). We therefore adopt the learned fit and
@@ -117,7 +117,7 @@ export function restLoaders(): EngineLoaders {
     async loadLearningHealth(reputationCells: number): Promise<LearningHealth> {
       const own = await ownSettledCount();
       if (own < MATURITY_MIN_SETTLED) {
-        // This engine's learning loop hasn't matured — report it as warming
+        // This engine's learning loop hasn't matured, report it as warming
         // up with ITS OWN sample count, not the legacy engines' fit.
         return {
           ...DEFAULT_LEARNING_HEALTH,

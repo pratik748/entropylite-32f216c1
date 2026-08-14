@@ -28,7 +28,7 @@ interface MarketData {
     moodScore: number;
     /** How moodScore was computed (server-side, from measured quotes). */
     moodBasis?: string;
-    /** Null — no fund-flow data source is connected; never fabricated. */
+    /** Null, no fund-flow data source is connected; never fabricated. */
     fiiFlow: string | null;
     diiFlow: string | null;
     flowDataAvailable?: boolean;
@@ -43,9 +43,9 @@ interface MarketData {
     gbpUsd?: number;
     btcUsd?: number;
     ethUsd?: number;
-    /** Measured top moves from live quotes — not model output. */
+    /** Measured top moves from live quotes, not model output. */
     topMovers: { name: string; change: number }[];
-    /** Model-suggested watch items — not confirmed calendar entries. */
+    /** Model-suggested watch items, not confirmed calendar entries. */
     keyEvents: string[];
     outlook: string;
     sectorRotation?: string;
@@ -201,7 +201,7 @@ const MarketOverview = () => {
             <MacroCard
               icon={<Globe className="h-4 w-4" />}
               label="Breadth"
-              value={data.macro.breadthPct != null ? `${data.macro.breadthPct}% up` : "—"}
+              value={data.macro.breadthPct != null ? `${data.macro.breadthPct}% up` : "--"}
             />
           </div>
         </div>
@@ -254,7 +254,7 @@ const MarketOverview = () => {
                   {event}
                 </div>
               )) : (
-                <div className="text-xs text-muted-foreground/70 italic">No watch items returned — refresh in a few seconds.</div>
+                <div className="text-xs text-muted-foreground/70 italic">No watch items returned, refresh in a few seconds.</div>
               )}
             </div>
             {data.macro.outlook && (

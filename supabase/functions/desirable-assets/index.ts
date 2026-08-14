@@ -493,13 +493,13 @@ function computeMaxProfitTarget(
     return { maxTarget: price * 1.1, confidence: 20, method: "fallback" };
   }
 
-  // Method 1: Statistical resistance — 90th percentile of recent highs
+  // Method 1: Statistical resistance, 90th percentile of recent highs
   const recentHighs = highs.length > 0 ? highs.slice(-60) : closes.slice(-60);
   const sorted = [...recentHighs].sort((a, b) => a - b);
   const p90 = sorted[Math.floor(sorted.length * 0.9)];
   const p95 = sorted[Math.floor(sorted.length * 0.95)];
 
-  // Method 2: Drift-based target — expected price using GBM over 60 trading days
+  // Method 2: Drift-based target, expected price using GBM over 60 trading days
   const returns = logReturns(closes);
   const mu = mean(returns);
   const sigma = stddev(returns);
@@ -843,7 +843,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   // Auto-Repair Department: tracks every self-healing step the pipeline takes.
-  // When something fails or yields too few results, we don't throw — we log the
+  // When something fails or yields too few results, we don't throw, we log the
   // repair action, fall forward to the next recovery stage, and keep going so
   // the panel always renders real content.
   const repairTrail: string[] = [];
@@ -885,7 +885,7 @@ serve(async (req) => {
       long_term: "Long-term (6 months+)",
     };
 
-    // ── ODGS — Outcome Density Gradient System (client-supplied) ──
+    // ── ODGS, Outcome Density Gradient System (client-supplied) ──
     // The user's own learned profit field. Past trades teach the engine
     // which assets, regimes, and synergies have been profitable for THIS
     // user. We surface that to the AI and use it as a reranker on the
@@ -909,11 +909,11 @@ serve(async (req) => {
     // CRITICAL: indiaMode is the user's EXPLICIT scope toggle. When OFF, the
     // user wants international/global assets even if their BASE display currency
     // is INR (or any other non-USD). Base currency is for display/conversion
-    // only — it must NEVER force regional asset selection on its own. Only
+    // only, it must NEVER force regional asset selection on its own. Only
     // honour the currency→region mapping when indiaMode is OFF AND the user
     // hasn't selected USD (i.e. they explicitly live in that currency zone AND
     // didn't toggle India). For INR specifically, treat as global when indiaMode
-    // is off — INR users routinely want US/global ideas when the toggle is off.
+    // is off, INR users routinely want US/global ideas when the toggle is off.
     const rawRegionInfo = CURRENCY_TO_REGION[baseCurrency];
     const treatAsGlobal = !indiaMode && (baseCurrency === "USD" || baseCurrency === "INR");
     const regionInfo = treatAsGlobal ? undefined : rawRegionInfo;
@@ -932,19 +932,19 @@ serve(async (req) => {
       _h = (_h + ((_h << 1) + (_h << 4) + (_h << 7) + (_h << 8) + (_h << 24))) >>> 0;
     }
     const seed = _h % 99999;
-    // Mistral-only — single source of truth for AI calls.
+    // Mistral-only, single source of truth for AI calls.
     const effectiveProvider = "mistral";
 
     const existingSectors = [...new Set(Object.values(portfolioSectors))].filter(Boolean);
     const portfolioContext = portfolioTickers.length > 0
       ? `Existing portfolio: ${portfolioTickers.map(t => `${t} (${portfolioSectors[t] || "unknown"}, weight: ${((portfolioWeights[t] || 0) * 100).toFixed(1)}%)`).join(", ")}. Sectors already held: ${existingSectors.join(", ") || "none"}.`
-      : "Empty portfolio — recommend foundational positions.";
+      : "Empty portfolio, recommend foundational positions.";
 
     // Cross-module consistency: the Analysis & Risk modules already gave a verdict on each
     // holding. Desirable Assets MUST honour those verdicts, not contradict them.
     const crossModuleBlock = (sellTickers.length || highRiskTickers.length || avoidSectorsLower.length)
-      ? `\n## CROSS-MODULE PORTFOLIO VERDICTS (HARD CONSTRAINT — DO NOT CONTRADICT):
-${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${sellTickers.join(", ")}. The user is being told to reduce exposure here. Do NOT recommend these tickers, close substitutes, direct competitors, or other names with the same business model.\n` : ""}${highRiskTickers.length ? `- Risk module flagged these holdings as HIGH RISK (riskScore ≥ 70): ${highRiskTickers.join(", ")}. Do NOT add more risk on top of this — avoid recommending high-volatility / high-beta names that would correlate with these.\n` : ""}${avoidSectorsLower.length ? `- AVOID these sectors entirely (already over-weighted with flagged-Sell or high-risk positions): ${avoidSectorsLower.join(", ")}. Zero recommendations from these sectors.\n` : ""}If a candidate would clearly contradict the user's existing Sell or risk warnings, REJECT it and pick something else. Recommendations must be additive to the portfolio's risk-adjusted profile, never additive to its problems.\n`
+      ? `\n## CROSS-MODULE PORTFOLIO VERDICTS (HARD CONSTRAINT, DO NOT CONTRADICT):
+${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${sellTickers.join(", ")}. The user is being told to reduce exposure here. Do NOT recommend these tickers, close substitutes, direct competitors, or other names with the same business model.\n` : ""}${highRiskTickers.length ? `- Risk module flagged these holdings as HIGH RISK (riskScore ≥ 70): ${highRiskTickers.join(", ")}. Do NOT add more risk on top of this, avoid recommending high-volatility / high-beta names that would correlate with these.\n` : ""}${avoidSectorsLower.length ? `- AVOID these sectors entirely (already over-weighted with flagged-Sell or high-risk positions): ${avoidSectorsLower.join(", ")}. Zero recommendations from these sectors.\n` : ""}If a candidate would clearly contradict the user's existing Sell or risk warnings, REJECT it and pick something else. Recommendations must be additive to the portfolio's risk-adjusted profile, never additive to its problems.\n`
       : "";
 
     const homeMarketRule = indiaMode
@@ -955,7 +955,7 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
 
     // Anti-repeat instruction
     // Scoped anti-repeat: only the most recent slate is treated as a soft avoid.
-    // We deliberately don't broadcast a 30-deep ban list to the model — that
+    // We deliberately don't broadcast a 30-deep ban list to the model, that
     // starves the engine and was the root cause of the "Most rejected names
     // were already in your portfolio" failure mode the user kept hitting.
     // HARD anti-repeat: the user complained that the same names keep coming
@@ -964,20 +964,20 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
     // instead of resurfacing yesterday's slate.
     const recentBan = previousTickers.slice(-40);
     const antiRepeatBlock = recentBan.length > 0
-      ? `\n## ANTI-REPEAT (HARD CONSTRAINT):\nThe user has already been shown these tickers recently. DO NOT re-emit ANY of them in this response — pick genuinely different names from the live universe: ${recentBan.join(", ")}.\nIf you would otherwise pick one of these, replace it with a fresh, equally-liquid alternative grounded in the LIVE WEB CONTEXT block below.\n`
+      ? `\n## ANTI-REPEAT (HARD CONSTRAINT):\nThe user has already been shown these tickers recently. DO NOT re-emit ANY of them in this response, pick genuinely different names from the live universe: ${recentBan.join(", ")}.\nIf you would otherwise pick one of these, replace it with a fresh, equally-liquid alternative grounded in the LIVE WEB CONTEXT block below.\n`
       : "";
 
     // HARD portfolio exclusion: anything the user already owns is NOT a
     // recommendation candidate, full stop. The model frequently ignored a
-    // soft mention buried in the prompt — promoting this to its own block
+    // soft mention buried in the prompt, promoting this to its own block
     // with explicit replacement language fixes the "6 already in portfolio"
     // collapse.
     const heldTickersUpper = portfolioTickers.map((t) => String(t).toUpperCase());
     const hardExclusionBlock = heldTickersUpper.length > 0
-      ? `\n## HARD EXCLUSION — DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list — keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
+      ? `\n## HARD EXCLUSION, DO NOT RECOMMEND ANY OF THESE (already held by user):\n${heldTickersUpper.join(", ")}\nDesirable asset != desirable recommendation. If a name on this list would otherwise be your top pick, you MUST emit a different, equally-liquid alternative instead. Do NOT pad the list, keep generating until you have at least 8 valid non-held picks with positive expected upside.\n`
       : "";
 
-    // ODGS prompt block — exposes the user's learned profit field to the model
+    // ODGS prompt block, exposes the user's learned profit field to the model
     // so candidate generation is *biased* by what has actually worked for this
     // user, not just generic quant aesthetics.
     let odgsBlock = "";
@@ -999,19 +999,19 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
         .join(", ");
       const scarList = (odgs.scarTickers || []).join(", ");
 
-      odgsBlock = `\n## ODGS — USER'S OWN LEARNED PROFIT FIELD (gen ${odgs.generation}, ${odgs.totalTrades} trades)
+      odgsBlock = `\n## ODGS, USER'S OWN LEARNED PROFIT FIELD (gen ${odgs.generation}, ${odgs.totalTrades} trades)
 The user's historical trade outcomes have shaped a personalized profit gradient. Use this to TILT selection, not as a hard rule:
 - HOT assets (proven winners for this user, prefer when liquid & quant filters pass): ${hotList || "none"}
 - COLD / underperforming assets (deprioritize even if narrative is strong): ${coldList || "none"}
-- SYNERGY pairs (these combinations historically lifted joint win rate — prefer at least 1 candidate that pairs well with current holdings): ${synergyList || "none"}
+- SYNERGY pairs (these combinations historically lifted joint win rate, prefer at least 1 candidate that pairs well with current holdings): ${synergyList || "none"}
 - HOT regime zones (asset clusters that have produced density of profits in similar regimes): ${zoneList || "none"}
-- Feature weights (what drives this user's profit field — favor candidates whose thesis aligns): ${featList || "none"}
-- SCAR tickers (caused real losses for this user — STRONGLY avoid recycling): ${scarList || "none"}
+- Feature weights (what drives this user's profit field, favor candidates whose thesis aligns): ${featList || "none"}
+- SCAR tickers (caused real losses for this user, STRONGLY avoid recycling): ${scarList || "none"}
 
 Rules:
 1. Prefer hot assets and synergy partners when they pass quality filters.
 2. Avoid scar tickers entirely unless thesis is fundamentally different from prior failure pattern.
-3. Do NOT over-concentrate the slate in hot assets — diversification still matters.
+3. Do NOT over-concentrate the slate in hot assets, diversification still matters.
 4. If a hot asset is already held (HARD EXCLUSION above), DO NOT emit it; pick a non-held name with similar exposure instead.
 `;
     }
@@ -1093,7 +1093,7 @@ Rules:
     let parsed: any = { marketCondition: "", regimeType: "transition", recommendations: [] };
     let candidates: any[] = [];
 
-    // Live macro calendar — high-importance events bias the regime call
+    // Live macro calendar, high-importance events bias the regime call
     let macroBlock = "";
     try {
       const events = await fetchMacroCalendar();
@@ -1103,7 +1103,7 @@ Rules:
       }
     } catch (e) { console.warn("Macro calendar fetch failed:", (e as Error).message); }
 
-    // Real-time web context (Google Search grounding) — fetch fresh market
+    // Real-time web context (Google Search grounding), fetch fresh market
     // narrative the model can't know from its training cutoff. Silent on failure.
     let webBlock = "";
     try {
@@ -1116,7 +1116,7 @@ Rules:
             ? "structural themes, secular growth, multi-year compounders, ETF flows"
             : "1-3 month catalysts, earnings, sector rotation";
       const sectorHint = preferredSectors?.length ? ` in ${preferredSectors.join(", ")}` : "";
-      const query = `Latest ${region} stock market news, top movers, and trade ideas${sectorHint} — focus on ${horizonHint}. Today's date: ${new Date().toISOString().split("T")[0]}.`;
+      const query = `Latest ${region} stock market news, top movers, and trade ideas${sectorHint}, focus on ${horizonHint}. Today's date: ${new Date().toISOString().split("T")[0]}.`;
       webBlock = await fetchLiveWebContext(query, 8);
     } catch (e) { console.warn("Live web context failed:", (e as Error).message); }
 
@@ -1130,10 +1130,10 @@ QUALITY MANDATE:
 - FORBIDDEN: penny stocks, OTC/pink-sheet, sub-$100M float, illiquid names (<$5M ADV), pump-and-dump meme plays. Everything else is fair game.
 - HUNT ASYMMETRY, NOT FAMILIARITY: the user wants **one-in-a-thousand** ideas, not the same mega-cap consensus trade every desk already owns. Favour uncrowded names with a specific, dateable catalyst over crowded FAANG/Nifty50 lookalikes.
 - Use exact tickers supported by Yahoo Finance.
-- NEVER recommend a ticker the user already owns — those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
+- NEVER recommend a ticker the user already owns, those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
 - Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - WHEN A "LIVE WEB CONTEXT" BLOCK IS PROVIDED: anchor at least 50% of your picks to facts in that block (recent earnings, breaking news, sector flows). Cite the catalyst from the live block in the catalyst field. Do NOT ignore fresh real-world events.
-- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Mix frontline liquidity with high-conviction mid-caps that have real catalysts. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Actively mix sectors AND market caps — at least half the slate should sit outside the top-10 mega-cap consensus trade when a liquid alternative exists. Liquid mid-caps ($1B–$20B) with a hard catalyst are strongly preferred over generic large-cap filler. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Mix frontline liquidity with high-conviction mid-caps that have real catalysts. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Actively mix sectors AND market caps, at least half the slate should sit outside the top-10 mega-cap consensus trade when a liquid alternative exists. Liquid mid-caps ($1B–$20B) with a hard catalyst are strongly preferred over generic large-cap filler. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -1142,14 +1142,14 @@ Home-market rule: ${homeMarketRule}
 ${userBudget ? `\nUser budget: ${baseCurrency} ${userBudget.toLocaleString()}. Ensure each recommendation's suggested quantity × price fits within this budget. Prefer positions sized for this budget.\n` : ""}
 ${preferredAssetTypes?.length ? `\nPreferred asset types: ${preferredAssetTypes.join(", ")}. Prioritize these asset types heavily. If user wants ETFs, recommend more ETFs. If Mutual Funds, recommend liquid index/sector funds.\n` : ""}
 ${preferredSectors?.length ? `\nPreferred sectors: ${preferredSectors.join(", ")}. Focus recommendations on these sectors. At least 60% of picks should be from these sectors.\n` : ""}
-${preferredHorizon ? `\n## TIME HORIZON LOCK — HARD CONSTRAINT\nUser is trading on a **${HORIZON_LABEL[preferredHorizon] || preferredHorizon}** horizon. Every single recommendation MUST be appropriate for this hold window:\n- intraday → liquid, high-volume names with intraday catalysts (earnings same day, breakouts, momentum continuation, options-flow targets). NO long-term thesis plays. timeHorizon must be in hours/1D.\n- short_term → swing setups with a catalyst within 4 weeks (technical breakout, near-term event, momentum). timeHorizon "1W" to "4W".\n- medium_term → 1-6 month thesis with concrete catalyst (earnings cycle, product launch, sector rotation). timeHorizon "1M" to "6M".\n- long_term → fundamental compounders, structural growth stories, ETFs/MFs for SIP-style holding. timeHorizon "6M+" to "2Y+". Avoid event-driven swing trades.\nSet horizonClass="${preferredHorizon}" on EVERY recommendation. Reject candidates that don't fit the horizon — do not pad the slate with mismatched ideas.\n` : `\nFor each pick, classify horizonClass honestly as one of: intraday | short_term | medium_term | long_term, and make timeHorizon match (e.g. "1D", "2W", "3M", "1Y").\n`}
+${preferredHorizon ? `\n## TIME HORIZON LOCK, HARD CONSTRAINT\nUser is trading on a **${HORIZON_LABEL[preferredHorizon] || preferredHorizon}** horizon. Every single recommendation MUST be appropriate for this hold window:\n- intraday → liquid, high-volume names with intraday catalysts (earnings same day, breakouts, momentum continuation, options-flow targets). NO long-term thesis plays. timeHorizon must be in hours/1D.\n- short_term → swing setups with a catalyst within 4 weeks (technical breakout, near-term event, momentum). timeHorizon "1W" to "4W".\n- medium_term → 1-6 month thesis with concrete catalyst (earnings cycle, product launch, sector rotation). timeHorizon "1M" to "6M".\n- long_term → fundamental compounders, structural growth stories, ETFs/MFs for SIP-style holding. timeHorizon "6M+" to "2Y+". Avoid event-driven swing trades.\nSet horizonClass="${preferredHorizon}" on EVERY recommendation. Reject candidates that don't fit the horizon, do not pad the slate with mismatched ideas.\n` : `\nFor each pick, classify horizonClass honestly as one of: intraday | short_term | medium_term | long_term, and make timeHorizon match (e.g. "1D", "2W", "3M", "1Y").\n`}
 
     Create 8-10 recommendations that prioritize:
 1) Diversified opportunity sources across sectors, strategies, and factor exposures
 2) Positive earnings momentum + heavy institutional participation
 3) Price trend confirmation (above key moving averages) without chasing crowded correlation clusters
 4) Catalyst-driven upside in 1-6 months with defendable downside control
-5) Deep liquidity and tight bid/ask — must be easily executable in size
+5) Deep liquidity and tight bid/ask, must be easily executable in size
 
 Hard constraints:
 ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUST be of the user's preferred asset types: ${preferredAssetTypes.join(", ")}. If user selected ETFs, return mostly ETFs (e.g. SPY, QQQ, VTI, ICICI Prudential Nifty ETF, Nippon India ETF etc). If Mutual Funds, return mutual fund tickers. If Bonds, return bond ETFs/instruments. Do NOT default to individual stocks unless "Stocks" is in the preferred list.` : `- Maximum 2 ETFs`}
@@ -1157,7 +1157,7 @@ ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUS
     - ABSOLUTELY NO loss-making businesses, deteriorating fundamentals, or broken charts
 - Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
 - Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
-- Reward asymmetry: at least 2 of the slate should be non-consensus names (mid-cap, under-covered, or a sector nobody is talking about this week) with defendable edge — not more MSFT/AAPL/RELIANCE clones
+- Reward asymmetry: at least 2 of the slate should be non-consensus names (mid-cap, under-covered, or a sector nobody is talking about this week) with defendable edge, not more MSFT/AAPL/RELIANCE clones
 - Provide strategy diversity across at least 3 strategy types
 - Each idea must be defendable with evidence, not narrative fluff
 
@@ -1199,7 +1199,7 @@ Return via the tool call only.`,
         try {
           const retryOpts = {
             ...aiOpts,
-            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Keep the asymmetry mandate — do NOT collapse into a generic FAANG/blue-chip list. Mix sectors and caps.`,
+            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Keep the asymmetry mandate, do NOT collapse into a generic FAANG/blue-chip list. Mix sectors and caps.`,
             temperature: 0.5,
           };
           const retryResults = await callAIParallel(retryOpts);
@@ -1238,7 +1238,7 @@ Return via the tool call only.`,
       // ideas. Strip .NS / .BO so we don't leak Indian tickers into international slates
       // just because the model latched onto INR-base context.
       // Also strip bare Indian base tickers (e.g. "RELIANCE", "TCS") and INR-currency
-      // candidates — model often emits them without the .NS suffix.
+      // candidates, model often emits them without the .NS suffix.
       const INDIAN_BASES = new Set([
         "WIPRO","TCS","INFY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","TATAMOTORS","BHARTIARTL","ITC",
         "KOTAKBANK","LT","AXISBANK","MARUTI","SUNPHARMA","TITAN","BAJFINANCE","HCLTECH","ADANIENT","ADANIPORTS",
@@ -1290,7 +1290,7 @@ Return via the tool call only.`,
       const cleanCount = candidates.length - contaminated.length;
       const needsRefill = candidates.length > 0 && (cleanCount < 6 || contaminated.length / candidates.length >= 0.4);
       if (needsRefill) {
-        repairLog(`Stage 1B refill: ${contaminated.length}/${candidates.length} candidates collided with held/recent — requesting replacements`);
+        repairLog(`Stage 1B refill: ${contaminated.length}/${candidates.length} candidates collided with held/recent, requesting replacements`);
         const bannedList = [
           ...heldSetUpper,
           ...Array.from(recentSetUpper).slice(-12),
@@ -1340,9 +1340,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     if (candidates.length === 0) {
-      // No reserve fallback — user explicitly demanded real AI + real-time
+      // No reserve fallback, user explicitly demanded real AI + real-time
       // recommendations only. Return honest empty so the UI prompts a retry.
-      repairLog("AI produced 0 candidates — returning honest empty (no reserve fallback per user policy)");
+      repairLog("AI produced 0 candidates, returning honest empty (no reserve fallback per user policy)");
       return new Response(JSON.stringify({
           recommendations: [],
           marketCondition: "",
@@ -1364,7 +1364,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     ];
     const uniqueTickers = [...new Set(allTickers)];
 
-    // Fire all Yahoo fetches in parallel — fetchYahooChart already has an 8s
+    // Fire all Yahoo fetches in parallel, fetchYahooChart already has an 8s
     // per-call timeout, so concurrency is bounded by individual aborts.
     const priceResults = await Promise.allSettled(
       uniqueTickers.map(async (ticker) => {
@@ -1381,9 +1381,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     // Auto-Repair: if Yahoo returned no price data at all, retry once with smaller batches
-    // (4 per batch) and a 3s cold-start delay — usually fixes transient rate-limit bursts.
+    // (4 per batch) and a 3s cold-start delay, usually fixes transient rate-limit bursts.
     if (Object.keys(tickerData).length === 0) {
-      repairLog(`Yahoo returned 0 price rows for ${uniqueTickers.length} tickers — retrying in smaller batches`);
+      repairLog(`Yahoo returned 0 price rows for ${uniqueTickers.length} tickers, retrying in smaller batches`);
       await new Promise((r) => setTimeout(r, 1500));
       const RETRY_BATCH = 4;
       for (let i = 0; i < uniqueTickers.length; i += RETRY_BATCH) {
@@ -1418,7 +1418,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
     const portReturns = portfolioReturnSeries(portfolioCloses, weights);
 
-    // ── STAGE 3: Tiered quantitative validation — ELITE FILTER ───
+    // ── STAGE 3: Tiered quantitative validation, ELITE FILTER ───
     interface ScoredRec {
       rec: any;
       sharpeRatio: number;
@@ -1522,7 +1522,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       if (portfolioTickers.includes(rec.ticker)) { bumpReject("F1_already_held"); continue; }
       if (previousTickerSet.has(rec.ticker)) { filtered++; bumpReject("F1_previous_repeat"); continue; }
 
-      // F1b: Cross-module veto — never contradict Stock Analysis & Risk verdicts.
+      // F1b: Cross-module veto, never contradict Stock Analysis & Risk verdicts.
       // Reject any candidate whose ticker is on the Sell/high-risk list or whose
       // sector matches a flagged-sector. This is a hard reject, not a score penalty.
       const recTickerUpper = String(rec.ticker || "").toUpperCase();
@@ -1538,7 +1538,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         continue;
       }
 
-      // F1c: Horizon lock — when the user picks a horizon, every recommendation
+      // F1c: Horizon lock, when the user picks a horizon, every recommendation
       // must match. Mismatched ideas are misleading (a "long-term compounder"
       // shown to an intraday trader is fraud-adjacent).
       if (preferredHorizon) {
@@ -1564,7 +1564,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
 
       // F2: Target must be above current price.
       // Repair-first: if the AI's target is stale (below live price), don't throw the
-      // name away — clear the field so the downstream quant layer recomputes a fresh
+      // name away, clear the field so the downstream quant layer recomputes a fresh
       // target from volatility / 52w range. Only reject if the AI handed us something
       // structurally absurd (e.g. negative or zero target with no recoverable signal).
       if (rec.targetPrice && td.price && rec.targetPrice < td.price * 0.95) {
@@ -1599,7 +1599,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
 
       // F3: Liquidity + investability guards (avoid tiny/random names)
       const dollarVolume = (td.volume || 0) * price;
-      // Indian stocks trade in INR with lower notional — use 2M INR (~$24K) threshold.
+      // Indian stocks trade in INR with lower notional, use 2M INR (~$24K) threshold.
       const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
       if (!isHedge && dollarVolume < minDollarVol) { filtered++; bumpReject("F3_illiquid"); continue; }
       if (!isHedge && ["micro", "small"].includes(String(rec.marketCap || "").toLowerCase())) { filtered++; bumpReject("F3_microcap_or_small"); continue; }
@@ -1646,7 +1646,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const mpt = computeMaxProfitTarget(td.closes, td.highs || [], td.price, vol, sr);
       const expectedUpsidePct = price > 0 ? ((mpt.maxTarget - price) / price) * 100 : 0;
 
-      // F4: Hard floor — only reject if BOTH upside is essentially zero AND risk is extreme.
+      // F4: Hard floor, only reject if BOTH upside is essentially zero AND risk is extreme.
       // Otherwise we let it into the "relaxed" tier so the panel never goes empty when valid
       // tickers are flowing through with real prices and history.
       if (!isHedge && expectedUpsidePct < -2 && riskCompositeScore >= 85) {
@@ -1654,7 +1654,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       }
 
       // Three-tier pass logic: strict / balanced / relaxed. We never silently drop a candidate
-      // that survived F1–F4 — the worst outcome is "relaxed" so the user always sees the real
+      // that survived F1–F4, the worst outcome is "relaxed" so the user always sees the real
       // best-of-what-the-market-offered today, with the tier honestly displayed.
       const strictPass = isHedge || (
         sr >= 0.15 &&
@@ -1684,7 +1684,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const filterTier: FilterTier = strictPass ? "strict" : balancedPass ? "balanced" : "relaxed";
       if (filterTier === "relaxed") bumpReject("tier_relaxed");
 
-      // ── COMPOSITE SCORE — heavily weighted toward momentum + trend ──
+      // ── COMPOSITE SCORE, heavily weighted toward momentum + trend ──
       const normSharpe = Math.min(Math.max(sr / 3, -1), 1);
       const diversification = 1 - Math.abs(portCorr);
       const capEff = rec.capitalEfficiency || 1;
@@ -1696,8 +1696,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const tierBonus = filterTier === "strict" ? 0.1 : 0.04;
 
       // ── RARITY BONUS: inline CUSUM changepoint on log returns ──
-      // Surfaces names in an actual regime break (not just drifting) —
-      // this is what makes an idea "one in a thousand" rather than generic.
+      // Surfaces names in an actual regime break (not just drifting), // this is what makes an idea "one in a thousand" rather than generic.
       let rarityBonus = 0;
       const cs = td.closes;
       if (cs && cs.length >= 30) {
@@ -1775,11 +1774,11 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     const { rejectSummary, rejectHeadline } = summarizeRejects(rejectReasons);
 
     if (scored.length === 0) {
-      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates — no reserve fallback (user policy: real AI only)`);
+      repairLog(`STAGE 3 yielded 0 scored survivors from ${candidates.length} candidates, no reserve fallback (user policy: real AI only)`);
     }
 
     // ── STAGE 3.5: Real-time earnings/news sentiment overlay ───────
-    // Run all sentiment lookups in parallel — GDELT calls now have a 5s timeout.
+    // Run all sentiment lookups in parallel, GDELT calls now have a 5s timeout.
     const sentimentCandidates = [...scored].sort((a, b) => b.quantScore - a.quantScore).slice(0, Math.min(6, scored.length));
     const sentimentByTicker: Record<string, RealtimeSentiment> = {};
     const sentimentResults = await Promise.allSettled(
@@ -1997,7 +1996,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     // Mirrors the way direct-profit weighs a single trade: market-regime
     // stress (VIX), fat-tail risk (Cornish-Fisher), historical forward-return
     // edge (walk-forward), news impact, and structural distress. Every effect
-    // is bounded ±10 pts on quantScore — we NEVER drop a candidate here.
+    // is bounded ±10 pts on quantScore, we NEVER drop a candidate here.
     let vixNow = 0;
     try {
       const ctrl = new AbortController();
@@ -2026,7 +2025,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         trendSlope: s.momentum20d > 0 ? 1 : s.momentum20d < 0 ? -1 : 0,
       });
 
-      // (a) Market-stress dampener — high VIX + high-vol NON-hedge is riskier
+      // (a) Market-stress dampener, high VIX + high-vol NON-hedge is riskier
       let stressTilt = 0;
       if (!isHedge && regimeStress > 0) {
         const volFactor = Math.min(1, (s.volatility || 0) / 60);
@@ -2035,7 +2034,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         stressTilt = +Math.round(regimeStress * 4); // hedges get a nudge
       }
 
-      // (b) Fat-tail penalty — negatively skewed, kurtotic tape crushes edge
+      // (b) Fat-tail penalty, negatively skewed, kurtotic tape crushes edge
       let tailTilt = 0;
       if (!isHedge && moments.n >= 40) {
         const cf = cfExpectedR({
@@ -2050,7 +2049,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         }
       }
 
-      // (c) Walk-forward edge reward — historical T+5 evidence for direction
+      // (c) Walk-forward edge reward, historical T+5 evidence for direction
       let wfTilt = 0;
       if (wf.n >= 30) {
         // fwdSharpe positive & meaningful ⇒ reward; negative ⇒ penalize
@@ -2058,7 +2057,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         wfTilt = Math.round(w * 6);
       }
 
-      // (d) News impact — reuse sentiment we already fetched (top candidates)
+      // (d) News impact, reuse sentiment we already fetched (top candidates)
       let newsTilt = 0;
       if (s.sentimentArticleCount > 0) {
         // small extra nudge beyond the sentimentImpact already applied,
@@ -2067,7 +2066,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         newsTilt = Math.round((s.sentimentScore / 100) * coverage * 4);
       }
 
-      // (e) Structural distress — bounded, non-blocking (Merton already fed
+      // (e) Structural distress, bounded, non-blocking (Merton already fed
       // consensus; here we ensure it also bites the score directly)
       let distressTilt = 0;
       if (!isHedge && mp.severity === "DISTRESS") distressTilt = -6;
@@ -2095,7 +2094,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
-    // Selectivity floor — no picks below 55 quantScore in the strict/balanced
+    // Selectivity floor, no picks below 55 quantScore in the strict/balanced
     // pool, and never surface a candidate the AI+quant BOTH disagreed on.
     const CONVICTION_FLOOR = 55;
     const highConviction = scored.filter((s) => !(s as any).lowConviction);
@@ -2178,7 +2177,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     // Then fill remaining by quantScore while enforcing sector/cap/correlation limits.
-    // Hard cap at 4 — fewer, higher-conviction names. Reduces AI load + timeouts and
+    // Hard cap at 4, fewer, higher-conviction names. Reduces AI load + timeouts and
     // forces only top-tier picks to surface.
     for (const s of selectionPool) {
       if (selected.length >= 4) break;
@@ -2197,7 +2196,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       }
     }
 
-    // Reliability backstop removed by design — no deterministic padding.
+    // Reliability backstop removed by design, no deterministic padding.
 
     // Ensure hedge coverage exists in final set (capped slate of 4 → at most 1 hedge).
     const minHedgeCount = portfolioTickers.length > 0 ? 1 : 0;
@@ -2281,7 +2280,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         entryZone = [Math.round(realPrice * 0.97 * 100) / 100, Math.round(realPrice * 1.02 * 100) / 100];
       }
 
-      // Fix hedging strategy — NEVER return empty or "no hedge"
+      // Fix hedging strategy, NEVER return empty or "no hedge"
       let hedgingStrategy = sanitizeText(s.rec.hedgingStrategy || "");
       const hedgePlan = deriveHedgePlan({
         strategy: s.rec.strategy || "equity",
@@ -2336,7 +2335,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       // Compute risk-reward string from validated numbers
       const riskReward = realPrice && targetPrice && stopLoss && (realPrice - stopLoss) > 0
         ? `1:${((targetPrice - realPrice) / (realPrice - stopLoss)).toFixed(1)}`
-        : s.rec.riskReward || "—";
+        : s.rec.riskReward || "--";
 
       // Generate dynamic thesis/catalyst for fallback candidates with empty text
       let thesis = sanitizeText(s.rec.thesis || "");
@@ -2430,7 +2429,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     console.log(`desirable-assets: ${candidates.length} candidates → ${enriched.length} passed tiered quant filters`);
 
     if (enriched.length === 0) {
-      repairLog(`enrichment produced 0 rows from ${scored.length} scored — returning honest empty set (no deterministic rescue)`);
+      repairLog(`enrichment produced 0 rows from ${scored.length} scored, returning honest empty set (no deterministic rescue)`);
     }
 
     return new Response(JSON.stringify({
@@ -2464,7 +2463,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         error: "Rate limit exceeded. Auto-retrying shortly.",
         autoRepaired: true,
         softFailure: true,
-        repairTrail: [...repairTrail, "rate-limited — client should back off"],
+        repairTrail: [...repairTrail, "rate-limited, client should back off"],
       }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (error.status === 402) {
@@ -2475,7 +2474,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         repairTrail: [...repairTrail, "AI credits exhausted"],
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    // Any other error — return 200 with empty recs + softFailure flag so the
+    // Any other error, return 200 with empty recs + softFailure flag so the
     // client keeps its last-good cached payload visible instead of erroring out.
     return new Response(JSON.stringify({
       recommendations: [],
@@ -2488,7 +2487,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       autoRepaired: true,
       softFailure: true,
       repairTrail: [...repairTrail, `top-level crash: ${String(error?.message || error).slice(0, 140)}`],
-      repairMessage: "Live feed hiccupped — auto-recovering with cached intelligence.",
+      repairMessage: "Live feed hiccupped, auto-recovering with cached intelligence.",
       timestamp: Date.now(),
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

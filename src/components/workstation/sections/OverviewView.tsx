@@ -16,7 +16,7 @@ const ACTION_TONE: Record<Action, string> = {
 };
 
 /**
- * Executive landing — the call and why on one screen: verdict, six pillar
+ * Executive landing, the call and why on one screen: verdict, six pillar
  * scores, strongest evidence each way, and where to go deeper.
  */
 const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section: SectionDef }) => {
@@ -33,7 +33,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
             ))}
           </div>
           <p className="text-center text-[11px] text-muted-foreground/70 animate-breathe">
-            Running twelve engines against {ticker} — fundamentals, price structure, dossier, simulation…
+            Running twelve engines against {ticker}, fundamentals, price structure, dossier, simulation…
           </p>
         </div>
       </SectionShell>
@@ -45,7 +45,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
       <SectionShell workspace={workspace} section={section} wide>
         <Block title="Evidence pending">
           <p className="text-[13px] leading-relaxed text-muted-foreground">
-            No feed answered on the first pass for {ticker} — the desk keeps retrying in the background
+            No feed answered on the first pass for {ticker}, the desk keeps retrying in the background
             and this page fills in the moment any engine lands. Live prices, fundamentals and the
             dossier each recover independently, so a single slow feed never blocks the rest.
           </p>
@@ -83,12 +83,12 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
         </div>
       </Block>
 
-      {/* How the call adds up — causal contributions around the zero axis */}
+      {/* How the call adds up, causal contributions around the zero axis */}
       <Block title="How the call adds up">
         <ContributionWaterfall />
       </Block>
 
-      {/* Pillars — hairline matrix */}
+      {/* Pillars, hairline matrix */}
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border/80 bg-border/70 sm:grid-cols-6">
         {synthesis.pillars.map((p) => {
           const top = p.nodeIds
@@ -126,7 +126,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
         })}
       </div>
 
-      {/* What changed — real session-over-session evidence deltas */}
+      {/* What changed, real session-over-session evidence deltas */}
       <Block title="Since last session">
         {changes.length > 0 ? (
           <div className="space-y-0.5">
@@ -159,7 +159,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
           </div>
         ) : (
           <p className="text-[12px] leading-relaxed text-muted-foreground">
-            No material evidence moves since the last stored session — deltas of ±2% or any grade
+            No material evidence moves since the last stored session, deltas of ±2% or any grade
             change appear here automatically, each one opening its investigation.
           </p>
         )}
@@ -176,7 +176,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
             </div>
           ) : (
             <p className="text-[12px] text-muted-foreground">
-              Nothing on the long side clears the evidence bar right now — that in itself is the finding.
+              Nothing on the long side clears the evidence bar right now, that in itself is the finding.
             </p>
           )}
         </Block>
@@ -189,7 +189,7 @@ const OverviewView = ({ workspace, section }: { workspace: WorkspaceDef; section
             </div>
           ) : (
             <p className="text-[12px] text-muted-foreground">
-              No material opposing evidence in the current graph — verify with the Risk Lab before sizing up.
+              No material opposing evidence in the current graph, verify with the Risk Lab before sizing up.
             </p>
           )}
         </Block>

@@ -34,7 +34,7 @@ const SectionShell = ({
         </div>
         {pendingSources.length > 0 ? (
           <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-muted-foreground/70 animate-breathe">
-            assembling — {pendingSources.map(([k]) => k).join(", ")}
+            assembling, {pendingSources.map(([k]) => k).join(", ")}
           </span>
         ) : staleSources.length > 0 ? (
           <span

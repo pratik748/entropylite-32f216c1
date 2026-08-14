@@ -1,5 +1,5 @@
 /**
- * Evidence graph — the only contract workstation screens render from.
+ * Evidence graph, the only contract workstation screens render from.
  *
  * A value cannot exist on screen without its definition, calculation,
  * assessment, provenance and thesis influence: "numbers without
@@ -40,14 +40,14 @@ export interface EvidenceMetric {
   definition: string;
   /** How it was computed, with the actual operands where possible. */
   calculation: string;
-  /** Stated implication — why it matters for this name. */
+  /** Stated implication, why it matters for this name. */
   whyItMatters: string;
   assessment: MetricAssessment;
   /** Trend series where a real series exists; empty otherwise. */
   history: HistoryPoint[];
   /** Percentile position (0–100) per available comparison scope. */
   percentiles: Partial<Record<PeerScope, number>>;
-  /** Graph edges — ids of related metrics, navigable in the Inspector. */
+  /** Graph edges, ids of related metrics, navigable in the Inspector. */
   relatedIds: string[];
   /** Signed influence on the final recommendation, −1…+1. */
   thesisWeight: number;
@@ -63,7 +63,7 @@ export interface EvidenceMetric {
   /**
    * Statistical uncertainty of the value itself, when measurable.
    * A point estimate without this field is either exact (reported) or its
-   * uncertainty has not been quantified — never "certain by omission".
+   * uncertainty has not been quantified, never "certain by omission".
    */
   uncertainty?: {
     /** Standard error, same units as `value`. */
@@ -173,7 +173,7 @@ export interface Synthesis {
   cases: ScenarioCase[];
   breakers: ThesisBreaker[];
   keyDrivers: { id: string; weight: number }[];
-  /** Causal contribution per node — the recommendation's full audit trail. */
+  /** Causal contribution per node, the recommendation's full audit trail. */
   contributions: Contribution[];
   ledger: {
     supporting: number;

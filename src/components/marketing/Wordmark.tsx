@@ -2,7 +2,7 @@ import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 import wordmarkWhite from "@/assets/entropy-wordmark-white.png";
 
 /**
- * Brand system for the public site — the ENTROPY blackletter wordmark,
+ * Brand system for the public site, the ENTROPY blackletter wordmark,
  * supplied as tight-cropped transparent assets in ink and white.
  */
 

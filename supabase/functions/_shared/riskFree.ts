@@ -1,5 +1,5 @@
 /**
- * Risk-free rate architecture — EDGE side.
+ * Risk-free rate architecture, EDGE side.
  * MIRRORED by src/lib/riskFree.ts; the truth-spine test asserts the two
  * tables are identical. Change BOTH or the build fails.
  *
@@ -12,7 +12,7 @@
  * Methodology (stated, not hidden):
  *  - Rates are short-tenor government-bill yields, ROUNDED TO 25bp, from a
  *    STATIC SNAPSHOT maintained manually in this file (`asOf` below). They
- *    are deliberately coarse — the honest error bar on a manually
+ *    are deliberately coarse, the honest error bar on a manually
  *    maintained snapshot is ±50bp, and consumers are told so via `basis`.
  *  - No live rates source is connected yet. When one is added, only this
  *    module changes; every consumer already carries the provenance fields.
@@ -39,21 +39,21 @@ const AS_OF = "2025-12-31";
 const SNAPSHOT_NOTE = "approximate short-tenor government yield, static snapshot rounded to 25bp";
 
 const TABLE: Record<string, Omit<RiskFreeRate, "fallbackFrom">> = {
-  USD: { currency: "USD", annualRate: 0.0425, tenor: "3M", asOf: AS_OF, source: `US 3M T-bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  INR: { currency: "INR", annualRate: 0.06,   tenor: "3M", asOf: AS_OF, source: `India 91-day T-bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  EUR: { currency: "EUR", annualRate: 0.02,   tenor: "3M", asOf: AS_OF, source: `Euro-area 3M bill (ECB depo anchor) — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  GBP: { currency: "GBP", annualRate: 0.04,   tenor: "3M", asOf: AS_OF, source: `UK 3M gilt bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  JPY: { currency: "JPY", annualRate: 0.005,  tenor: "3M", asOf: AS_OF, source: `Japan 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  CAD: { currency: "CAD", annualRate: 0.0275, tenor: "3M", asOf: AS_OF, source: `Canada 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  AUD: { currency: "AUD", annualRate: 0.0375, tenor: "3M", asOf: AS_OF, source: `Australia 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  SGD: { currency: "SGD", annualRate: 0.025,  tenor: "3M", asOf: AS_OF, source: `Singapore 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  HKD: { currency: "HKD", annualRate: 0.04,   tenor: "3M", asOf: AS_OF, source: `Hong Kong 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
-  CNY: { currency: "CNY", annualRate: 0.015,  tenor: "3M", asOf: AS_OF, source: `China 3M bill — ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  USD: { currency: "USD", annualRate: 0.0425, tenor: "3M", asOf: AS_OF, source: `US 3M T-bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  INR: { currency: "INR", annualRate: 0.06,   tenor: "3M", asOf: AS_OF, source: `India 91-day T-bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  EUR: { currency: "EUR", annualRate: 0.02,   tenor: "3M", asOf: AS_OF, source: `Euro-area 3M bill (ECB depo anchor), ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  GBP: { currency: "GBP", annualRate: 0.04,   tenor: "3M", asOf: AS_OF, source: `UK 3M gilt bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  JPY: { currency: "JPY", annualRate: 0.005,  tenor: "3M", asOf: AS_OF, source: `Japan 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  CAD: { currency: "CAD", annualRate: 0.0275, tenor: "3M", asOf: AS_OF, source: `Canada 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  AUD: { currency: "AUD", annualRate: 0.0375, tenor: "3M", asOf: AS_OF, source: `Australia 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  SGD: { currency: "SGD", annualRate: 0.025,  tenor: "3M", asOf: AS_OF, source: `Singapore 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  HKD: { currency: "HKD", annualRate: 0.04,   tenor: "3M", asOf: AS_OF, source: `Hong Kong 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
+  CNY: { currency: "CNY", annualRate: 0.015,  tenor: "3M", asOf: AS_OF, source: `China 3M bill, ${SNAPSHOT_NOTE}`, basis: "static_snapshot" },
 };
 
 /**
  * Risk-free rate for a currency. Unknown/missing currency falls back to USD
- * with `fallbackFrom` set — consumers must surface the substitution rather
+ * with `fallbackFrom` set, consumers must surface the substitution rather
  * than hide it.
  */
 export function riskFreeFor(currency: string | null | undefined): RiskFreeRate {

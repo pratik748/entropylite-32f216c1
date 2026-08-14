@@ -43,7 +43,7 @@ const PATH_COLORS = [
 
 // Canonical CCAR / DFAST-style stress multipliers. Numbers come from published
 // Federal Reserve supervisory stress test severities (severely adverse 2020-2024),
-// translated into per-day shocks. No LLM, no guess — these are industry constants.
+// translated into per-day shocks. No LLM, no guess, these are industry constants.
 const scenarioParams: Record<string, { drift: number; volMult: number; jumpProb: number; jumpSize: number; label: string; desc: string }> = {
   base:             { drift:  0.0003, volMult: 1.0, jumpProb: 0.000, jumpSize:  0.00,  label: "Base Case",          desc: "Empirical drift/vol; no scenario stress applied" },
   rate_shock:       { drift: -0.0002, volMult: 1.3, jumpProb: 0.010, jumpSize: -0.020, label: "Rate Shock +200bps", desc: "Fed CCAR rate-shock analog (200bp parallel)" },
@@ -64,7 +64,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
   const avgRisk = holdings.length > 0 ? holdings.reduce((s, h) => s + h.risk, 0) / holdings.length : 40;
   const avgBeta = holdings.length > 0 ? holdings.reduce((s, h) => s + h.beta, 0) / holdings.length : 1;
 
-  // Scenarios are deterministic CCAR-style stress recipes — no LLM calibration.
+  // Scenarios are deterministic CCAR-style stress recipes, no LLM calibration.
   const aiCalibration: any = null;
   const aiLoading = false;
   const params = scenarioParams[scenario] || scenarioParams.base;

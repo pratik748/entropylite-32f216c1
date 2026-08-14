@@ -1,10 +1,10 @@
-// CandidateGenerator — builds the scan universe from objective market
+// CandidateGenerator, builds the scan universe from objective market
 // sources. Nothing in this file is an "opportunity": these are candidates
 // only, and every candidate must survive evidence collection, independent
 // scoring, cross-validation and the validator before it can be shown.
 //
 // Three kinds of sources, in priority order:
-//   1. FULL EXCHANGE DIRECTORY (primary discovery) — the complete NASDAQ +
+//   1. FULL EXCHANGE DIRECTORY (primary discovery), the complete NASDAQ +
 //      NYSE/AMEX/ARCA listing files (~8–10k issues), filtered for exchange
 //      quality and issue type (no test issues, warrants, units, rights,
 //      preferreds, deficient/delinquent filers). One rotating shard of the
@@ -15,16 +15,15 @@
 //      engine evaluates the live tradeable market, and all per-symbol
 //      statistics (walk-forward, vol) are computed on each symbol's own
 //      history, so no cross-sectional survivorship adjustment is applied.
-//   2. Market-attention sources (Yahoo predefined screeners + trending) —
-//      supplementary only: they surface names with unusual activity faster
+//   2. Market-attention sources (Yahoo predefined screeners + trending), //      supplementary only: they surface names with unusual activity faster
 //      than shard rotation would, but confer zero scoring privilege.
-//   3. Asset-class coverage grid — the broad index / sector / bond /
+//   3. Asset-class coverage grid, the broad index / sector / bond /
 //      commodity ETF set that defines which markets the engine covers
 //      (analogous to an index provider's universe definition).
 //
 // If every dynamic source fails, the engine still runs on the coverage
 // grid; if evidence collection then fails too, the honest result is an
-// empty opportunity list — never a fabricated one.
+// empty opportunity list, never a fabricated one.
 
 import type { AssetClass, Candidate } from "./types.ts";
 
@@ -72,7 +71,7 @@ function quoteTypeToAssetClass(quoteType: string | undefined, symbol: string): A
   return "equity";
 }
 
-/** Yahoo predefined screeners — the market nominates candidates by activity. */
+/** Yahoo predefined screeners, the market nominates candidates by activity. */
 const SCREENER_IDS = [
   "most_actives",
   "day_gainers",
@@ -99,7 +98,7 @@ async function fetchScreenerCandidates(scrId: string, region: string, count: num
       currency: q?.currency ? String(q.currency) : undefined,
       origin: {
         source: `screener:${scrId}`,
-        reason: `Nominated by market activity — Yahoo predefined screener "${scrId}" (${region}).`,
+        reason: `Nominated by market activity, Yahoo predefined screener "${scrId}" (${region}).`,
       },
       snapshot: {
         price: Number(q?.regularMarketPrice) || undefined,
@@ -128,7 +127,7 @@ async function fetchTrendingCandidates(region: string): Promise<Candidate[]> {
       assetClass: quoteTypeToAssetClass(undefined, symbol) as AssetClass,
       origin: {
         source: "trending",
-        reason: `Elevated market attention — Yahoo trending tickers (${region}).`,
+        reason: `Elevated market attention, Yahoo trending tickers (${region}).`,
       },
     }));
 }
@@ -275,7 +274,7 @@ export async function directoryShardCandidates(): Promise<Candidate[]> {
 // ── Asset-class coverage grid ───────────────────────────────────────
 // Defines the markets the engine covers (broad index, sectors, duration,
 // credit, commodities, international, crypto majors). These are candidates,
-// not recommendations — they earn no score by being here.
+// not recommendations, they earn no score by being here.
 
 interface CoverageRow { symbol: string; name: string; assetClass: AssetClass }
 
@@ -320,7 +319,7 @@ const INDIA_COVERAGE: CoverageRow[] = [
 
 // ── Liquid market leaders (single-name breadth) ────────────────────
 // A sector-diversified set of the most liquid, institution-grade single
-// names per region. These are CANDIDATES ONLY — every one still has to earn
+// names per region. These are CANDIDATES ONLY, every one still has to earn
 // its way through evidence collection, the independent models, cross-bucket
 // consensus and the validator before it can be shown. Nothing here is a
 // recommendation; the list simply guarantees the engine always considers
@@ -401,7 +400,7 @@ const INDIA_LEADERS: CoverageRow[] = [
 /**
  * Sector-diversified liquid single-name leaders for the region. India mode
  * leads with NSE names but keeps US leaders too (global opportunity set for
- * INR-based users). Candidates only — validated like everything else.
+ * INR-based users). Candidates only, validated like everything else.
  */
 export function liquidLeaders(indiaMode: boolean): Candidate[] {
   const rows = indiaMode ? [...INDIA_LEADERS, ...US_LEADERS] : US_LEADERS;
@@ -412,12 +411,12 @@ export function liquidLeaders(indiaMode: boolean): Candidate[] {
     currency: /\.(NS|BO)$/i.test(r.symbol) ? "INR" : "USD",
     origin: {
       source: "coverage:liquid_leaders",
-      reason: "Liquid, institution-grade market leader — always considered so the engine evaluates real single names, not only broad ETFs.",
+      reason: "Liquid, institution-grade market leader, always considered so the engine evaluates real single names, not only broad ETFs.",
     },
   }));
 }
 
-/** Pure coverage-grid universe — also used by the browser fallback venue. */
+/** Pure coverage-grid universe, also used by the browser fallback venue. */
 export function coverageCandidates(indiaMode: boolean): Candidate[] {
   const rows = indiaMode ? [...INDIA_COVERAGE, ...US_COVERAGE] : US_COVERAGE;
   return rows.map((r) => ({
@@ -427,7 +426,7 @@ export function coverageCandidates(indiaMode: boolean): Candidate[] {
     currency: /\.(NS|BO)$/i.test(r.symbol) ? "INR" : "USD",
     origin: {
       source: "coverage:asset_class_grid",
-      reason: "Asset-class coverage instrument — part of the engine's defined market universe.",
+      reason: "Asset-class coverage instrument, part of the engine's defined market universe.",
     },
   }));
 }
@@ -449,8 +448,7 @@ export interface UniverseResult {
  * (primary discovery), then attention sources (supplementary).
  *
  * India mode: no free full-exchange directory is reliably available for
- * NSE/BSE, so discovery there uses region screeners + the coverage grid —
- * a documented data limitation, not a design choice.
+ * NSE/BSE, so discovery there uses region screeners + the coverage grid, * a documented data limitation, not a design choice.
  */
 export async function generateUniverse(opts: {
   indiaMode: boolean;

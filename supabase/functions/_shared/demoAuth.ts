@@ -2,7 +2,7 @@
  * Demo token verification shared by every auth-gated function.
  *
  * A demo token is issued only by `demo-session` after a correct access code.
- * It carries a synthetic subject — never the real portfolio owner — so a demo
+ * It carries a synthetic subject, never the real portfolio owner, so a demo
  * session can read the engines but can never write into a real user's rows.
  */
 

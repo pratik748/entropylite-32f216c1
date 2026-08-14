@@ -31,13 +31,13 @@ Deno.serve(async (req) => {
     const systemPrompt = `You are a senior equity research analyst at a tier-1 sell-side desk producing the deep dossier a portfolio manager reads before sizing a position. Your job is to fuse LIVE SCRAPED DATA (provided below) with your structural knowledge of the company into a single defensible JSON dossier.
 
 REASONING DISCIPLINE:
-1. The scraped block is GROUND TRUTH for current numbers (price, market cap, recent filings, current ownership, recent news). Where your training data conflicts, the scraped data wins — silently update.
+1. The scraped block is GROUND TRUTH for current numbers (price, market cap, recent filings, current ownership, recent news). Where your training data conflicts, the scraped data wins, silently update.
 2. Every signal score (0–100) must be defensible from the data: supplyChainRisk reflects supplier concentration + geographic exposure; competitiveMoat reflects market share + switching costs + IP; insiderConfidence reflects net insider buying vs selling over recent quarters.
 3. Revenue segments and geographic splits must reconcile to ~100% each. Unknown → estimate from the most recent annual report and tag the trend.
-4. Leadership entries must include real names + roles; if scraped data lacks tenure or background, infer from credible public bios — never fabricate education or board seats.
+4. Leadership entries must include real names + roles; if scraped data lacks tenure or background, infer from credible public bios, never fabricate education or board seats.
 5. narrative.analystConsensus and narrative.analystTargets must align with the scraped sell-side data when present; otherwise infer conservatively from sector + recent guidance.
 6. regulatoryExposure: only include items with a real, current basis (active inquiry, recent settlement, sector-wide rule). Generic risks ("subject to SEC rules") are NOT acceptable.
-7. Every string ≤ 240 chars. Output ONLY valid JSON — no markdown, no preamble, no commentary.`;
+7. Every string ≤ 240 chars. Output ONLY valid JSON, no markdown, no preamble, no commentary.`;
 
     const userPrompt = `Generate a comprehensive deep intelligence dossier for ${ticker}.${scrapedContext ? `\n\n${scrapedContext.slice(0, 6000)}` : ""}\n\nReturn a single JSON object with these keys:
 
@@ -105,7 +105,7 @@ All number fields for signals should be 0-100. Revenue percentages should sum to
 
         // Validate essential fields exist
         if (!parsed || (!parsed.companyName && !parsed.sector)) {
-          throw new Error("Incomplete response — missing companyName/sector");
+          throw new Error("Incomplete response, missing companyName/sector");
         }
 
         return new Response(JSON.stringify(parsed), {

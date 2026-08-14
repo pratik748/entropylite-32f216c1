@@ -1,5 +1,5 @@
 /**
- * ODG Trade Validator — outcome-path-validated gatekeeper.
+ * ODG Trade Validator, outcome-path-validated gatekeeper.
  *
  * Pure deterministic module. No network calls, no model training.
  * Sits between signal detection and execution and answers:

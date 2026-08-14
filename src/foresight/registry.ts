@@ -2,7 +2,7 @@
  * Foresight tool registry.
  *
  * Self-registering: tool modules call registerTool() at import time, so
- * adding a capability is one file with one call — the planner discovers it
+ * adding a capability is one file with one call, the planner discovers it
  * automatically through the generated manifest. Nothing in the runtime
  * refers to any tool by name.
  */
@@ -40,7 +40,7 @@ export function validateToolParams(name: string, raw: unknown): ValidationResult
 }
 
 /**
- * Keyword discovery over the registry — lets the planner (or the command
+ * Keyword discovery over the registry, lets the planner (or the command
  * palette) find capabilities without the full manifest in context.
  */
 export function discoverTools(query: string, limit = 8): ForesightTool[] {

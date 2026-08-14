@@ -233,7 +233,7 @@ const OutcomeGradientDashboard = () => {
                           )}
                           {sig.validation?.microHedge?.enabled && (
                             <div className="mt-1 rounded bg-warning/5 border border-warning/20 px-2 py-1 text-[9px] text-warning font-mono">
-                              CROWN-lite: micro-hedge armed — trigger on {sig.validation.microHedge.trigger.replace(/_/g, " ")}
+                              CROWN-lite: micro-hedge armed, trigger on {sig.validation.microHedge.trigger.replace(/_/g, " ")}
                             </div>
                           )}
                         </div>

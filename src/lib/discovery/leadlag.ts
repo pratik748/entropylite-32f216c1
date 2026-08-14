@@ -1,4 +1,4 @@
-// Lead–lag predictive edges — the deliberate replacement for TRUTH's
+// Lead–lag predictive edges, the deliberate replacement for TRUTH's
 // PC-algorithm causal discovery (rejected: faithfulness/Markov conditions
 // are violated in markets; see docs/TRUTH_TO_ENTROPYLITE_MAP.md #10).
 //
