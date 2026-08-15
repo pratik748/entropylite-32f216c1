@@ -146,3 +146,68 @@ export function futureSurvival(opts: {
     asymmetry,
   };
 }
+
+// ─── path-array evaluators (twins of src/lib/discovery/robustness.ts) ───
+// futureSurvival() above generates its own paths; these two evaluate paths
+// produced elsewhere (gbmPath / ouSimPaths / runFGM), so an engine that has
+// already simulated does not simulate twice.
+
+export interface PathConstraints {
+  maxAbsLogStep?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
+export interface FSSThesis {
+  entry: number;
+  target: number;
+  stop: number;
+  direction: 1 | -1;
+}
+
+function pathFeasible(path: number[], c: PathConstraints): boolean {
+  const maxStep = c.maxAbsLogStep ?? 0.5;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i];
+    if (!Number.isFinite(p) || p <= 0) return false;
+    if (c.minPrice !== undefined && p < c.minPrice) return false;
+    if (c.maxPrice !== undefined && p > c.maxPrice) return false;
+    if (i > 0 && Math.abs(Math.log(p / path[i - 1])) > maxStep) return false;
+  }
+  return true;
+}
+
+/** Fraction of constraint-feasible paths where target is touched before stop. */
+export function futureSurvivalScore(
+  paths: number[][],
+  thesis: FSSThesis,
+  constraints: PathConstraints = {},
+): { fss: number; nFeasible: number; nRejected: number; stopRate: number } {
+  let nFeasible = 0;
+  let nRejected = 0;
+  let survived = 0;
+  let stopped = 0;
+  const long = thesis.direction === 1;
+  for (const path of paths) {
+    if (!pathFeasible(path, constraints)) { nRejected++; continue; }
+    nFeasible++;
+    for (const p of path) {
+      if (long ? p >= thesis.target : p <= thesis.target) { survived++; break; }
+      if (long ? p <= thesis.stop : p >= thesis.stop) { stopped++; break; }
+    }
+  }
+  return {
+    fss: nFeasible > 0 ? survived / nFeasible : 0,
+    nFeasible,
+    nRejected,
+    stopRate: nFeasible > 0 ? stopped / nFeasible : 0,
+  };
+}
+
+/** RS = 1 - hit-rate dispersion across regimes; <2 usable cells = neutral 0.5. */
+export function regimeStability(cells: { hitRate: number; n: number }[], minN = 10): number {
+  const usable = cells.filter((c) => c.n >= minN);
+  if (usable.length < 2) return 0.5;
+  const rates = usable.map((c) => c.hitRate);
+  return Math.max(0, 1 - (Math.max(...rates) - Math.min(...rates)));
+}
