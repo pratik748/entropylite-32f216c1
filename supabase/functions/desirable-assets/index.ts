@@ -2092,6 +2092,67 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
     console.log(`[desirable-assets] direct-profit qualification applied (VIX=${vixNow.toFixed(1)}, regimeStress=${regimeStress})`);
 
+    // ── STAGE 3.8: Scan-level robustness (BH-FDR + path survival) ──
+    // Two corrections no per-name scorer can make on its own:
+    //   (1) the scan tests many names at once, so a raw drift statistic is
+    //       converted to a Benjamini-Hochberg q-value and a bounded posterior
+    //       P(real) = clip(1 - q, 0.05, 0.95) computed ACROSS this scan;
+    //   (2) the earlier Monte Carlo only reads terminal value, so survival is
+    //       re-measured path-dependently (target before stop) on
+    //       constraint-feasible paths.
+    // Bounded ±8 pts on quantScore. Nothing is dropped here.
+    if (scored.length > 0) {
+      const pVals = scored.map((s) => driftPValue(Array.isArray(s.closes) ? s.closes : []).p);
+      const pReals = pRealFromScan(pVals);
+      const qVals = pVals.map((_, i) => 1 - pReals[i]);
+      for (let i = 0; i < scored.length; i++) {
+        const s = scored[i];
+        const closes = Array.isArray(s.closes) ? s.closes : [];
+        const rets: number[] = [];
+        for (let k = 1; k < closes.length; k++) {
+          if (closes[k - 1] > 0 && closes[k] > 0) rets.push(Math.log(closes[k] / closes[k - 1]));
+        }
+        const entry = s.realPrice || closes[closes.length - 1] || 0;
+        const sigmaDaily = rets.length >= 25 ? stddev(rets) : 0;
+        const muDaily = rets.length >= 25 ? mean(rets) : 0;
+        // Stop placed at 60% of the reward distance (institutional 1:1.67 R
+        // floor), capped at a 12% adverse move so a wide target cannot imply
+        // an unrealistic stop.
+        const target = s.maxProfitTarget > entry ? s.maxProfitTarget : entry * 1.02;
+        const rewardPct = entry > 0 ? (target - entry) / entry : 0;
+        const stop = entry * (1 - Math.min(0.12, Math.max(0.02, 0.6 * rewardPct)));
+        const fs = entry > 0 && sigmaDaily > 0
+          ? futureSurvival({ entry, target, stop, muDaily, sigmaDaily, days: 60, paths: 1500 })
+          : null;
+
+        const pReal = pReals[i];
+        // Both terms are centred on neutral, so a candidate with no evidence
+        // either way receives no tilt.
+        const fdrTilt = Math.round((pReal - 0.5) * 2 * 4);
+        const survivalTilt = fs && fs.nFeasible >= 500 ? Math.round((fs.fss - 0.45) * 2 * 5) : 0;
+        const robustnessTilt = clamp(fdrTilt + survivalTilt, -8, 8);
+        s.quantScore = clamp(s.quantScore + robustnessTilt, 1, 99);
+
+        (s.rec as any).robustnessQual = {
+          pValue: Number(pVals[i].toFixed(4)),
+          qValue: Number(qVals[i].toFixed(4)),
+          pReal: Number(pReal.toFixed(3)),
+          survivesFdr: qVals[i] <= 0.1,
+          pathSurvival: fs ? Number((fs.fss * 100).toFixed(1)) : null,
+          stopOutRate: fs ? Number((fs.stopRate * 100).toFixed(1)) : null,
+          payoffAsymmetry: fs ? Number(fs.asymmetry.toFixed(2)) : null,
+          feasiblePaths: fs ? fs.nFeasible : null,
+          stopPrice: Number(stop.toFixed(2)),
+          targetPrice: Number(target.toFixed(2)),
+          fdrTilt,
+          survivalTilt,
+          tiltApplied: robustnessTilt,
+        };
+      }
+      const nSurviving = qVals.filter((q) => q <= 0.1).length;
+      console.log(`[desirable-assets] robustness stage: ${nSurviving}/${scored.length} candidates survive BH-FDR at q≤0.10`);
+    }
+
     // ── STAGE 4: Select top candidates by score ─────────────────
     scored.sort((a, b) => b.quantScore - a.quantScore);
 
