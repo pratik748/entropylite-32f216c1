@@ -21,6 +21,7 @@ import { modelInfo } from "../_shared/modelRegistry.ts";
 import { driftPValue, futureSurvival, pRealFromScan } from "../_shared/discovery/robustness.ts";
 import { opportunityScore, publishGate, expectedEdge, timeliness, liquidityFactor, confidenceFactor } from "../_shared/discovery/scoring.ts";
 import { gaussianHMM } from "../_shared/discovery/changepoint.ts";
+import { loadReliability, recordOpportunities, reliabilityOf } from "../_shared/discovery/store.ts";
 import type { OpportunityFactors } from "../_shared/discovery/types.ts";
 
 const corsHeaders = {
