@@ -2129,6 +2129,17 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           : null;
 
         const pReal = pReals[i];
+        // 3-state Gaussian HMM (scaled Baum-Welch) on the candidate's own
+        // returns: states are ordered by ascending sigma, so state 0 is the
+        // calmest regime. pChange = P(the regime switches next step). This is
+        // measured from the series, never asserted.
+        const hmm = rets.length >= 40 ? gaussianHMM(rets, 3) : null;
+        const regimeState = hmm ? hmm.states[hmm.states.length - 1] : null;
+        const pChange = hmm ? hmm.pChange : null;
+        // A signal inside a persistent calm regime is tradeable for longer; a
+        // signal in an unstable regime decays fast, which feeds timeliness.
+        const signalAgeDays = pChange === null ? 1 : 1 + 20 * pChange;
+
         // Both terms are centred on neutral, so a candidate with no evidence
         // either way receives no tilt.
         const fdrTilt = Math.round((pReal - 0.5) * 2 * 4);
@@ -2150,6 +2161,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           fdrTilt,
           survivalTilt,
           tiltApplied: robustnessTilt,
+          regimeState,
+          regimeVol: hmm && regimeState !== null ? Number(hmm.sigma[regimeState].toFixed(4)) : null,
+          regimeSwitchProb: pChange === null ? null : Number(pChange.toFixed(3)),
         };
 
         // ── Opportunity Score (multiplicative gated ranking statistic) ──
@@ -2190,7 +2204,7 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           conviction: clamp((s.maxProfitConfidence || 50) / 100, 0.01, 0.99),
           asymmetry: fs ? fs.asymmetry : 1,
           // freshness of the signal: a changepoint just detected is fresh
-          timeliness: timeliness((s as any).signalAgeDays ?? 1, 21),
+          timeliness: timeliness(signalAgeDays, 21),
           liquidity: liquidityFactor(advUsd, 5e6),
           novelty: clamp(1 - ((s as any).crowdingScore ?? 0.35), 0.05, 1),
           confidence: confidenceFactor(ciWidth, edge ? edge.eNet : 0),
