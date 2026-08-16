@@ -165,7 +165,7 @@ Deno.test("propagateImpact attenuates with hop distance", () => {
     { src: "A", dst: "B", type: "supply_chain" as const, weight: 0.8 },
     { src: "B", dst: "C", type: "supply_chain" as const, weight: 0.8 },
   ];
-  const out = propagateImpact([{ symbol: "A", impact: 1 }], edges, { maxHops: 2, rho: 0.5 });
+  const out = propagateImpact(edges, { A: 1 }, { k: 2, rho: 0.5 });
   const b = out.find((o) => o.symbol === "B");
   const c = out.find((o) => o.symbol === "C");
   assert(b && c && Math.abs(b.impact) > Math.abs(c.impact), "second-order impact must be smaller");
@@ -181,10 +181,14 @@ Deno.test("grangerLite finds a planted lead-lag and rejects noise", () => {
     x.push(rng() - 0.5);
     y.push(i === 0 ? rng() - 0.5 : 0.8 * x[i - 1] + 0.05 * (rng() - 0.5));
   }
-  assert(grangerLite(x, y).p < 0.01, "planted relationship should be detected");
+  // grangerLite(y, x) asks whether x leads y.
+  const planted = grangerLite(y, x);
+  assert(planted !== null && planted.pValue < 0.01, "planted relationship should be detected");
   const n1 = Array.from({ length: 300 }, () => rng() - 0.5);
   const n2 = Array.from({ length: 300 }, () => rng() - 0.5);
-  assert(grangerLite(n1, n2).p > 0.05, "independent noise should not register");
+  const noise = grangerLite(n1, n2);
+  assert(noise !== null && noise.pValue > 0.05, "independent noise should not register");
+  assertEquals(grangerLite([1, 2, 3], [1, 2, 3]), null, "short series must abstain");
 });
 
 Deno.test("admitBar rejects impossible bars", () => {
@@ -195,9 +199,13 @@ Deno.test("admitBar rejects impossible bars", () => {
 
 Deno.test("novelty treats syndication as one source", () => {
   assertEquals(jaccard(new Set(["a", "b"]), new Set(["a", "b"])), 1);
-  const dup = claimNovelty("RBI holds repo rate steady at 6.5 percent", ["RBI holds repo rate steady at 6.5 percent"]);
+  const repo = { subject: "RBI", relation: "holds repo rate steady at", object: "6.5 percent" };
+  const dup = claimNovelty(repo, [repo]);
   assert(dup < 0.2, `syndicated copy should score low novelty, got ${dup}`);
-  const fresh = claimNovelty("Cement volumes fall 12 percent in the south", ["RBI holds repo rate steady"]);
+  const fresh = claimNovelty(
+    { subject: "cement", relation: "volumes fall", object: "12 percent in the south" },
+    [repo],
+  );
   assert(fresh > 0.8);
 });
 
