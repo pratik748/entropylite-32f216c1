@@ -2170,7 +2170,8 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
               }]
             : []),
         ];
-        const costRoundTrip = 2 * (COST_BPS_BY_TIER[(s as any).liquidityTier as string] ?? 0.0015);
+        // costHaircut is already the round-trip decimal for the ticker's tier
+        const costRoundTrip = costHaircut(s.rec.ticker);
         const edge = expectedEdge(engineForecasts, { costRoundTrip, priorKappa: 0.25 });
         const advUsd = (s.volume || 0) * (entry || 0) * (s.realCurrency === "INR" ? 1 / 83 : 1);
         const ciWidth = edge ? 2 * 1.96 * Math.sqrt(Math.max(0, edge.s2Blend)) : 1;
