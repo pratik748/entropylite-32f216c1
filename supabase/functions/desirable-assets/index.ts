@@ -2151,13 +2151,88 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           survivalTilt,
           tiltApplied: robustnessTilt,
         };
+
+        // ── Opportunity Score (multiplicative gated ranking statistic) ──
+        // OS = E_net · R · C · Y · τ · L · N · Q, evaluated in log space so a
+        // single dead factor (no liquidity, no robustness) kills the candidate
+        // regardless of headline edge. OS is a RANKING statistic, never a
+        // return forecast, and `bottleneck` names the factor costing the most.
+        const horizonDays = 60;
+        const engineForecasts = [
+          // ensemble/quant view: horizon drift with its own sampling variance
+          { mu: muDaily * horizonDays, s2: Math.max(1e-8, (sigmaDaily * sigmaDaily * horizonDays) / Math.max(1, rets.length)), engineId: "drift" },
+          // path-simulation view: survival-implied expected move
+          ...(fs && fs.nFeasible >= 500
+            ? [{
+                mu: fs.fss * Math.log(target / entry) + (1 - fs.fss) * Math.log(stop / entry),
+                s2: Math.max(1e-8, (fs.fss * (1 - fs.fss)) / fs.nFeasible + 1e-4),
+                engineId: "survival",
+              }]
+            : []),
+        ];
+        const costRoundTrip = 2 * (COST_BPS_BY_TIER[(s as any).liquidityTier as string] ?? 0.0015);
+        const edge = expectedEdge(engineForecasts, { costRoundTrip, priorKappa: 0.25 });
+        const advUsd = (s.volume || 0) * (entry || 0) * (s.realCurrency === "INR" ? 1 / 83 : 1);
+        const ciWidth = edge ? 2 * 1.96 * Math.sqrt(Math.max(0, edge.s2Blend)) : 1;
+        // orthogonal evidence buckets that agree with the long thesis
+        const bucketsAgreeing = [
+          s.momentum20d > 0,
+          s.trendStrength > 0.5,
+          s.sentimentScore > 0,
+          s.earningsSignal === "bullish",
+          qVals[i] <= 0.1,
+          !!fs && fs.fss > 0.5,
+        ].filter(Boolean).length;
+        const factors: OpportunityFactors = {
+          eNet: edge ? edge.eNet : 0,
+          robustness: pReal * (fs ? fs.fss : 0),
+          conviction: clamp((s.maxProfitConfidence || 50) / 100, 0.01, 0.99),
+          asymmetry: fs ? fs.asymmetry : 1,
+          // freshness of the signal: a changepoint just detected is fresh
+          timeliness: timeliness((s as any).signalAgeDays ?? 1, 21),
+          liquidity: liquidityFactor(advUsd, 5e6),
+          novelty: clamp(1 - ((s as any).crowdingScore ?? 0.35), 0.05, 1),
+          confidence: confidenceFactor(ciWidth, edge ? edge.eNet : 0),
+        };
+        const os = opportunityScore(factors);
+        const gate = publishGate({
+          eNet: factors.eNet,
+          pReal,
+          fss: fs ? fs.fss : 0,
+          bucketsAgreeing,
+        });
+        (s as any).opportunityScore = os.os;
+        (s.rec as any).opportunity = {
+          score: Number(os.os.toExponential(3)),
+          logScore: Number.isFinite(os.logOs) ? Number(os.logOs.toFixed(3)) : null,
+          bottleneck: os.bottleneck.factor,
+          bottleneckValue: Number(os.bottleneck.value.toFixed(3)),
+          expectedEdgeNet: Number(factors.eNet.toFixed(4)),
+          shrinkage: edge ? Number(edge.kappa.toFixed(2)) : null,
+          bucketsAgreeing,
+          factors: Object.fromEntries(
+            Object.entries(factors).map(([k, v]) => [k, Number((v as number).toFixed(3))])
+          ),
+          publish: gate.publish,
+          gateReasons: gate.reasons,
+          isRankingStatistic: true,
+        };
       }
       const nSurviving = qVals.filter((q) => q <= 0.1).length;
       console.log(`[desirable-assets] robustness stage: ${nSurviving}/${scored.length} candidates survive BH-FDR at q≤0.10`);
+      const nPublishable = scored.filter((s) => (s.rec as any).opportunity?.publish).length;
+      console.log(`[desirable-assets] opportunity gate: ${nPublishable}/${scored.length} candidates pass all multiplicative gates`);
     }
 
     // ── STAGE 4: Select top candidates by score ─────────────────
-    scored.sort((a, b) => b.quantScore - a.quantScore);
+    // Primary key stays quantScore (the audited composite the UI displays);
+    // Opportunity Score breaks ties, so between two equally-scored names the
+    // one with real net edge, liquidity and payoff asymmetry wins.
+    scored.sort((a, b) => {
+      const d = b.quantScore - a.quantScore;
+      if (Math.abs(d) > 1e-9) return d;
+      return ((b as any).opportunityScore ?? 0) - ((a as any).opportunityScore ?? 0);
+    });
 
     // Selectivity floor, no picks below 55 quantScore in the strict/balanced
     // pool, and never surface a candidate the AI+quant BOTH disagreed on.
