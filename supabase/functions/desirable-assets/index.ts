@@ -2109,6 +2109,11 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       const pVals = scored.map((s) => driftPValue(Array.isArray(s.closes) ? s.closes : []).p);
       const pReals = pRealFromScan(pVals);
       const qVals = pVals.map((_, i) => 1 - pReals[i]);
+      // Regime label for the reliability lookup, derived from measured VIX.
+      const scanRegime = vixNow >= 30 ? "crisis" : vixNow >= 22 ? "stress" : vixNow >= 17 ? "elevated" : "calm";
+      const reliability = await loadReliability(scanRegime);
+      const drReal = reliabilityOf(reliability, "drift");
+      const svReal = reliabilityOf(reliability, "survival");
       for (let i = 0; i < scored.length; i++) {
         const s = scored[i];
         const closes = Array.isArray(s.closes) ? s.closes : [];
@@ -2175,12 +2180,19 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
         const horizonDays = 60;
         const engineForecasts = [
           // ensemble/quant view: horizon drift with its own sampling variance
-          { mu: muDaily * horizonDays, s2: Math.max(1e-8, (sigmaDaily * sigmaDaily * horizonDays) / Math.max(1, rets.length)), engineId: "drift" },
+          // Variance is inflated by the engine's realized unreliability in
+          // THIS regime, so a lane with a bad measured track record loses
+          // weight in the inverse-variance blend instead of being trusted.
+          {
+            mu: muDaily * horizonDays,
+            s2: Math.max(1e-8, (sigmaDaily * sigmaDaily * horizonDays) / Math.max(1, rets.length)) / Math.max(0.15, drReal.hitRate),
+            engineId: "drift",
+          },
           // path-simulation view: survival-implied expected move
           ...(fs && fs.nFeasible >= 500
             ? [{
                 mu: fs.fss * Math.log(target / entry) + (1 - fs.fss) * Math.log(stop / entry),
-                s2: Math.max(1e-8, (fs.fss * (1 - fs.fss)) / fs.nFeasible + 1e-4),
+                s2: Math.max(1e-8, (fs.fss * (1 - fs.fss)) / fs.nFeasible + 1e-4) / Math.max(0.15, svReal.hitRate),
                 engineId: "survival",
               }]
             : []),
@@ -2232,12 +2244,60 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
           publish: gate.publish,
           gateReasons: gate.reasons,
           isRankingStatistic: true,
+          regime: scanRegime,
+          reliabilityKnown: drReal.known || svReal.known,
         };
       }
       const nSurviving = qVals.filter((q) => q <= 0.1).length;
       console.log(`[desirable-assets] robustness stage: ${nSurviving}/${scored.length} candidates survive BH-FDR at q≤0.10`);
       const nPublishable = scored.filter((s) => (s.rec as any).opportunity?.publish).length;
       console.log(`[desirable-assets] opportunity gate: ${nPublishable}/${scored.length} candidates pass all multiplicative gates`);
+
+      // Ledger: every candidate, published or rejected, with frozen features.
+      // Best-effort, never blocks the response.
+      try {
+        const written = await recordOpportunities(
+          scored.map((s) => {
+            const opp = (s.rec as any).opportunity ?? {};
+            const rq = (s.rec as any).robustnessQual ?? {};
+            return {
+              symbol: String(s.rec.ticker || "UNKNOWN"),
+              signalClass: String((s.rec as any).horizonClass || "unspecified"),
+              direction: 1 as const,
+              horizonDays: 60,
+              os: Number(opp.score) || 0,
+              factors: opp.factors ?? {},
+              regime: scanRegime,
+              bottleneck: opp.bottleneck ? { factor: opp.bottleneck, value: opp.bottleneckValue } : null,
+              published: !!opp.publish,
+              rejectReasons: Array.isArray(opp.gateReasons) ? opp.gateReasons : [],
+              frozenFeatures: {
+                quantScore: s.quantScore,
+                sharpe: s.sharpeRatio,
+                maxDrawdown: s.maxDrawdown,
+                volatility: s.volatility,
+                momentum20d: s.momentum20d,
+                momentum5d: s.momentum5d,
+                trendStrength: s.trendStrength,
+                entry: s.realPrice,
+                target: rq.targetPrice ?? null,
+                stop: rq.stopPrice ?? null,
+                pReal: rq.pReal ?? null,
+                qValue: rq.qValue ?? null,
+                fss: rq.pathSurvival ?? null,
+                regimeState: rq.regimeState ?? null,
+                regimeSwitchProb: rq.regimeSwitchProb ?? null,
+                vix: vixNow,
+                sentimentScore: s.sentimentScore,
+                liquidityTier: (s.rec as any).liquidityTier ?? null,
+              },
+            };
+          })
+        );
+        if (written > 0) console.log(`[desirable-assets] ledger: recorded ${written} candidates (regime=${scanRegime})`);
+      } catch (e) {
+        console.warn(`[desirable-assets] ledger write failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
 
     // ── STAGE 4: Select top candidates by score ─────────────────
