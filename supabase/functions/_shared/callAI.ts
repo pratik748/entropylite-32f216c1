@@ -221,8 +221,8 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 
 /**
  * Lovable AI Gateway lane, OpenAI-compatible, no user-supplied key required.
- * This is the primary lane: it keeps every engine on real model output instead
- * of degrading to deterministic placeholder math when third-party keys throttle.
+ * This is the immediate managed-quota fallback after every configured Mistral lane
+ * has failed or exhausted rate/credit limits.
  */
 const GATEWAY_DEFAULT_MODEL = Deno.env.get("GATEWAY_DEFAULT_MODEL") || "google/gemini-3-flash-preview";
 
@@ -262,11 +262,11 @@ async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
   const { primary, fallback } = buildLanes(reported);
   if (primary.length === 0 && fallback.length === 0) {
-    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
+    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / LOVABLE_API_KEY / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2 / ONEMIN_AI_API_KEY)");
   }
 
-  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
-  // sequentially only after every primary lane has failed.
+  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK
+  // sequentially only after every primary Mistral lane has failed.
   const idx = primary.length ? pickKeyIndex(primary.length) : 0;
   const orderedPrimary = primary.slice(idx).concat(primary.slice(0, idx));
   const ordered = orderedPrimary.concat(fallback);
@@ -388,7 +388,8 @@ interface Lane {
 
 /**
  * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
- * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
+ * Fallback lanes are tried sequentially after every primary fails.
+ * Order is Mistral reserve → Lovable → other emergency providers.
  */
 function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
   const primary: Lane[] = [];
@@ -401,15 +402,15 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
   const gw = Deno.env.get("LOVABLE_API_KEY");
 
-  // Lovable AI Gateway first, managed quota, no third-party throttling.
-  if (gw) primary.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
+  // Mistral is the priority path. Every request tries all configured Mistral
+  // lanes first; Lovable is the immediate managed-quota fallback after Mistral.
   if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // Reserve Mistral key, kept out of the round-robin so it stays under its
-  // rate limits, and tried before Gemini when the rotating keys are exhausted.
+  // Reserve Mistral key stays first in fallback so all Mistral capacity is
+  // consumed before leaving Mistral. Lovable is the immediate fallback after
+  // Mistral, per product priority. Other providers are emergency fallbacks only.
   if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
-  // Gemini lanes, sequential fallback after every Mistral key fails.
-  // Ensures analytics never go dark when Mistral is rate-limited or down.
+  if (gw) fallback.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
   if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
