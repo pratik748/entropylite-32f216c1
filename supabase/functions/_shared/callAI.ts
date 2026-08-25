@@ -1,16 +1,15 @@
 /**
- * AI caller, UNIFIED on Mistral.
+ * AI caller, unified behind the shared callAI() interface.
  *
- * All other provider names (groq/cloudflare/openai/gemini) are kept as type
- * aliases for backward compatibility, but every code path routes to Mistral.
- * Two API keys are supported with automatic failover:
- *   - MISTRAL_API_KEY      (primary)
- *   - MISTRAL_API_KEY_2    (fallback, used if primary fails / 429 / 401 / 5xx)
+ * Mistral is routed as three explicit workspaces, not as interchangeable API
+ * keys within one workspace:
+ *   - MISTRAL_API_KEY      → mistral-workspace-1 (primary)
+ *   - MISTRAL_API_KEY_2    → mistral-workspace-2 (failover)
+ *   - MISTRAL_API_KEY_3    → mistral-workspace-3 (failover)
  *
- * A third key (MISTRAL_API_KEY_3) acts as a priority reserve: it is not part
- * of the round-robin load split, and is tried FIRST when both rotating keys
- * hit limits, before any Gemini/1min fallback, so rate-limit bursts land on
- * the reserve Mistral lane rather than a different provider.
+ * Each request attempts workspace 1, then workspace 2, then workspace 3. Only
+ * after every configured Mistral workspace is unavailable do existing emergency
+ * providers (Gemini, 1min.ai, Lovable Gateway) run.
  *
  * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
  * support OpenAI-style function declarations natively), and the JSON response
@@ -40,17 +39,6 @@ interface AIResult {
 
 const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
 const MISTRAL_FAST_MODEL = "mistral-small-latest";
-
-// Per-isolate round-robin cursor across Mistral keys. Persists for the
-// lifetime of the edge worker, so consecutive calls within the same warm
-// instance alternate keys and split load roughly 50/50.
-let __mistralKeyCursor = 0;
-function pickKeyIndex(total: number): number {
-  if (total <= 1) return 0;
-  const i = __mistralKeyCursor % total;
-  __mistralKeyCursor = (__mistralKeyCursor + 1) % 1_000_000;
-  return i;
-}
 
 const HARDENING_PREAMBLE = `[QUANT HARDENING LAYER, MANDATORY]
 You are operating inside a hedge-fund-grade probabilistic decision system. Every response must obey:
@@ -185,10 +173,53 @@ function buildJsonSkeleton(schema: any, depth = 0): any {
   }
 }
 
+interface MistralWorkspace {
+  id: string;
+  apiKey: string;
+}
+
+type MistralFailureClassification =
+  | "UNAUTHORIZED"
+  | "BILLING_UNAVAILABLE"
+  | "RATE_LIMIT"
+  | "PROVIDER_FAILURE"
+  | "REQUEST_ERROR"
+  | "NETWORK_TIMEOUT"
+  | "UNKNOWN";
+
+interface MistralFailure {
+  status?: number;
+  message?: string;
+  classification: MistralFailureClassification;
+}
+
+function classifyMistralFailure(error: any): MistralFailureClassification {
+  const status = Number(error?.status || error?.statusCode || 0);
+  if (status === 401) return "UNAUTHORIZED";
+  if (status === 402) return "BILLING_UNAVAILABLE";
+  if (status === 429) return "RATE_LIMIT";
+  if (status === 400) return "REQUEST_ERROR";
+  if (status >= 500 && status <= 599) return "PROVIDER_FAILURE";
+  if (error?.name === "AbortError" || /network|timeout|fetch failed/i.test(String(error?.message || error))) return "NETWORK_TIMEOUT";
+  return "UNKNOWN";
+}
+
+function toMistralFailure(error: any): MistralFailure {
+  return {
+    status: Number(error?.status || error?.statusCode || 0) || undefined,
+    message: error?.message || String(error),
+    classification: classifyMistralFailure(error),
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Call Mistral with a single API key. Throws on non-2xx with status info.
+ * Call Mistral with a workspace API key. Throws on non-2xx with status info.
  */
-async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
+async function callMistralWorkspaceOnce(opts: CallAIOptions, workspace: MistralWorkspace, reported?: AIResult["provider"]): Promise<AIResult> {
   const model = opts.model || MISTRAL_DEFAULT_MODEL;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const body: Record<string, any> = {
@@ -205,7 +236,7 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
   const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${workspace.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   }, timeout);
 
@@ -217,6 +248,37 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
   const text = data?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
   return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+}
+
+async function callMistralWorkspace(opts: CallAIOptions, workspace: MistralWorkspace, reported?: AIResult["provider"]): Promise<AIResult> {
+  const maxAttemptsForWorkspace = 2;
+  let lastFailure: MistralFailure | null = null;
+
+  for (let attempt = 1; attempt <= maxAttemptsForWorkspace; attempt++) {
+    try {
+      const result = await callMistralWorkspaceOnce(opts, workspace, reported);
+      console.info(`[AI] ${workspace.id} → success`);
+      return result;
+    } catch (error: any) {
+      const failure = toMistralFailure(error);
+      lastFailure = failure;
+      const statusLabel = failure.status ? String(failure.status) : "network";
+      console.warn(`[AI] ${workspace.id} → ${statusLabel} ${failure.classification}`);
+
+      if (failure.classification === "REQUEST_ERROR" || failure.classification === "UNAUTHORIZED" || failure.classification === "BILLING_UNAVAILABLE" || failure.classification === "RATE_LIMIT") {
+        throw failure;
+      }
+
+      if ((failure.classification === "PROVIDER_FAILURE" || failure.classification === "NETWORK_TIMEOUT" || failure.classification === "UNKNOWN") && attempt < maxAttemptsForWorkspace) {
+        await sleep(100 * attempt);
+        continue;
+      }
+
+      throw failure;
+    }
+  }
+
+  throw lastFailure || { classification: "UNKNOWN", message: "Mistral workspace failed" };
 }
 
 /**
@@ -256,30 +318,47 @@ async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?
 }
 
 /**
- * Mistral caller with automatic key 1 → key 2 fallback.
- * Falls back on any error from key 1 (rate limit, auth, network, empty body).
+ * Mistral caller with explicit workspace 1 → workspace 2 → workspace 3 routing.
+ * Emergency fallback providers are considered only after every configured
+ * Mistral workspace has failed. A 400 request error is surfaced immediately
+ * because changing workspaces will not fix malformed request configuration.
  */
 async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
-  const { primary, fallback } = buildLanes(reported);
-  if (primary.length === 0 && fallback.length === 0) {
+  const { workspaces, fallback } = buildLanes(reported);
+  if (workspaces.length === 0 && fallback.length === 0) {
     throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
   }
 
-  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
-  // sequentially only after every primary lane has failed.
-  const idx = primary.length ? pickKeyIndex(primary.length) : 0;
-  const orderedPrimary = primary.slice(idx).concat(primary.slice(0, idx));
-  const ordered = orderedPrimary.concat(fallback);
-
   let lastErr: any = null;
-  for (const lane of ordered) {
+
+  for (let i = 0; i < workspaces.length; i++) {
+    const lane = workspaces[i];
     try {
-      return await lane.call(opts);
+      const result = await lane.call(opts);
+      console.info(`[AI] final provider=mistral workspace=${lane.label}`);
+      return result;
     } catch (e: any) {
       lastErr = e;
-      console.warn(`callAI → lane ${lane.label} failed:`, e?.message || e);
+      if (e?.classification === "REQUEST_ERROR") {
+        console.warn(`[AI] ${lane.label} request error surfaced; no workspace cascade`);
+        throw e;
+      }
+      const nextWorkspace = workspaces[i + 1]?.label;
+      if (nextWorkspace) console.warn(`[AI] failover → ${nextWorkspace}`);
     }
   }
+
+  for (const lane of fallback) {
+    try {
+      const result = await lane.call(opts);
+      console.info(`[AI] final provider=${result.provider} lane=${lane.label}`);
+      return result;
+    } catch (e: any) {
+      lastErr = e;
+      console.warn(`callAI → emergency lane ${lane.label} failed:`, e?.message || e);
+    }
+  }
+
   throw lastErr || new Error("All AI lanes failed");
 }
 
@@ -337,10 +416,10 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // ---------------------------------------------------------------------------
 // Gemini lane (Google Generative Language API)
 // ---------------------------------------------------------------------------
-// Used as a tertiary failover after both Mistral keys. We expose two keys
-// (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and round-robin between them
-// inside the lane registry. Default model is gemini-2.0-flash for low latency
-// and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
+// Used as emergency failover after all configured Mistral workspaces fail.
+// We expose two keys (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and try them
+// sequentially inside the emergency lane registry. Default model is selected
+// for low latency and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
 const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
@@ -379,7 +458,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 }
 
 // ---------------------------------------------------------------------------
-// Lane registry, assembles all available providers into a single rotation.
+// Lane registry, assembles workspace-ordered Mistral plus emergency providers.
 // ---------------------------------------------------------------------------
 interface Lane {
   label: string;
@@ -387,36 +466,39 @@ interface Lane {
 }
 
 /**
- * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
- * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
+ * Returns workspace-aware Mistral lanes plus existing emergency providers.
+ * Workspaces are never round-robined: every request starts with workspace 1,
+ * then fails over to workspace 2 and workspace 3 only when classified failures
+ * indicate that the current workspace/key cannot serve this request.
  */
-function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
-  const primary: Lane[] = [];
+function buildLanes(reported?: AIResult["provider"]): { workspaces: Lane[]; fallback: Lane[] } {
   const fallback: Lane[] = [];
-  const m1 = Deno.env.get("MISTRAL_API_KEY");
-  const m2 = Deno.env.get("MISTRAL_API_KEY_2");
-  const m3 = Deno.env.get("MISTRAL_API_KEY_3");
+  const configuredWorkspaces: Array<MistralWorkspace | null> = [
+    { id: "mistral-workspace-1", apiKey: Deno.env.get("MISTRAL_API_KEY") || "" },
+    { id: "mistral-workspace-2", apiKey: Deno.env.get("MISTRAL_API_KEY_2") || "" },
+    { id: "mistral-workspace-3", apiKey: Deno.env.get("MISTRAL_API_KEY_3") || "" },
+  ];
+  const workspaces = configuredWorkspaces
+    .filter((workspace): workspace is MistralWorkspace => !!workspace?.apiKey)
+    .map((workspace) => ({
+      label: workspace.id,
+      call: (o: CallAIOptions) => callMistralWorkspace(o, workspace, reported),
+    }));
+
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
   const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
   const gw = Deno.env.get("LOVABLE_API_KEY");
 
-  // Mistral is the priority path. Every request tries all configured Mistral
-  // lanes first; Lovable is only used as the last managed-quota fallback.
-  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // Reserve Mistral key, kept out of the round-robin so it stays under its
-  // rate limits, and tried before Gemini when the rotating keys are exhausted.
-  if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
-  // Gemini lanes, sequential fallback after every Mistral key fails.
-  // Ensures analytics never go dark when Mistral is rate-limited or down.
+  // Existing emergency providers, sequential fallback after every Mistral
+  // workspace fails.
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
   if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
   if (gw) fallback.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
-  return { primary, fallback };
+  return { workspaces, fallback };
 }
 
 /**
@@ -486,7 +568,7 @@ Rules:
 }
 
 /**
- * Public API, single AI call. Always Mistral, with key1 → key2 fallback.
+ * Public API, single AI call. Mistral workspace routing with emergency fallbacks.
  */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
