@@ -4,6 +4,7 @@ import { setReadOnlyMode } from "@/lib/readOnlyMode";
 import {
   clearStoredDemo,
   hasStoredDemo,
+  isLocalDemoSession,
   resumeDemoSession,
   type DemoHistoryEntry,
   type DemoPosition,
@@ -50,8 +51,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const adopt = useCallback((next: DemoSession) => {
     console.info("[demo-session]", { stage: "provider-adopt", expiresAt: next.expiresAt });
     setReadOnlyMode(true);
-    // Engines authenticate with the signed demo token (read-only, synthetic subject).
-    supabase.functions.setAuth(next.token);
+    // Browser-only previews have no credential. Keep the anonymous key so the
+    // opaque local marker is never sent to a Supabase function.
+    supabase.functions.setAuth(isLocalDemoSession(next) ? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY : next.token);
     setSession(next);
     setResolving(false);
   }, []);
@@ -67,7 +69,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       if (!alive) return;
       if (s) {
         setReadOnlyMode(true);
-        supabase.functions.setAuth(s.token);
+        supabase.functions.setAuth(isLocalDemoSession(s) ? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY : s.token);
       }
       console.info("[demo-session]", { stage: "provider-resume-complete", restored: !!s });
       setSession(s);
