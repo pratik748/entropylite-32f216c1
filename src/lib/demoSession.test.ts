@@ -6,6 +6,7 @@ import {
   DemoSessionError,
   hasStoredDemo,
   isCompleteCode,
+  isLocalDemoSession,
   normalizeCodeInput,
   readStoredDemo,
   resumeDemoSession,
@@ -81,10 +82,12 @@ describe("demo session lifecycle", () => {
     expect(hasStoredDemo()).toBe(false);
   });
 
-  it("reports a network failure without persisting a token", async () => {
+  it("starts a browser-only preview when the demo function cannot be reached", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
-    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "NETWORK_ERROR" } satisfies Partial<DemoSessionError>);
-    expect(hasStoredDemo()).toBe(false);
+    const session = await createDemoSession("9740");
+    expect(isLocalDemoSession(session)).toBe(true);
+    expect(session.portfolio).toHaveLength(2);
+    expect(hasStoredDemo()).toBe(true);
   });
 
   it("never sends a non-numeric or over-length code to the server", async () => {
@@ -119,5 +122,18 @@ describe("demo session lifecycle", () => {
     );
     const s = await resumeDemoSession();
     expect(s?.history).toHaveLength(1);
+  });
+
+  it("rehydrates a browser-only preview without calling the demo function", async () => {
+    storeDemo({ token: "local-demo-test", expiresAt: Date.now() + 60_000, local: true });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const session = await resumeDemoSession();
+
+    expect(isLocalDemoSession(session)).toBe(true);
+    expect(session?.token).toBe("local-demo-test");
+    expect(session?.portfolio).toHaveLength(2);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

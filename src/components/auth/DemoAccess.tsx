@@ -5,7 +5,8 @@ import { useDemo } from "@/demo/DemoProvider";
 
 /**
  * Understated demo entry inside the existing gateway. Collapsed by default:
- * a single quiet line. Expanded: four digit cells, server-validated.
+ * a single quiet line. Expanded: four digit cells, with an offline preview
+ * fallback when the demo service has not been deployed.
  */
 export default function DemoAccess({ disabled }: { disabled?: boolean }) {
   const { adopt } = useDemo();
