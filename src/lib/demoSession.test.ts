@@ -3,6 +3,7 @@ import {
   applyDigits,
   clearStoredDemo,
   createDemoSession,
+  DemoSessionError,
   hasStoredDemo,
   isCompleteCode,
   normalizeCodeInput,
@@ -64,9 +65,25 @@ describe("demo session lifecycle", () => {
     expect(hasStoredDemo()).toBe(true);
   });
 
-  it("surfaces the server message for an invalid code and stores nothing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "That access code isn't valid." }, 401)));
-    await expect(createDemoSession("1111")).rejects.toThrow(/isn't valid/);
+  it("reports an invalid code category and stores nothing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_CODE_INVALID", error: "That access code isn't valid." }, 401)));
+    await expect(createDemoSession("1111")).rejects.toMatchObject({ code: "DEMO_CODE_INVALID" } satisfies Partial<DemoSessionError>);
+    expect(hasStoredDemo()).toBe(false);
+  });
+
+  it("reports session creation and missing-data failures without persisting a token", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_SESSION_CREATE_FAILED", error: "Demo service failed." }, 503)));
+    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "DEMO_SESSION_CREATE_FAILED" } satisfies Partial<DemoSessionError>);
+    expect(hasStoredDemo()).toBe(false);
+
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_DATA_LOAD_FAILED", error: "Demo data missing." }, 503)));
+    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "DEMO_DATA_LOAD_FAILED" } satisfies Partial<DemoSessionError>);
+    expect(hasStoredDemo()).toBe(false);
+  });
+
+  it("reports a network failure without persisting a token", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "NETWORK_ERROR" } satisfies Partial<DemoSessionError>);
     expect(hasStoredDemo()).toBe(false);
   });
 
@@ -86,7 +103,7 @@ describe("demo session lifecycle", () => {
 
   it("clears the stored token when resume is rejected as expired", async () => {
     storeDemo({ token: "tok.abc", expiresAt: Date.now() + 60_000 });
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "Demo session expired" }, 401)));
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_SESSION_EXPIRED", error: "Demo session expired" }, 401)));
     expect(await resumeDemoSession()).toBeNull();
     expect(hasStoredDemo()).toBe(false);
   });

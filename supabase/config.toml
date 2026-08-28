@@ -105,6 +105,12 @@ verify_jwt = false
 [functions.portfolio-sentinel]
 verify_jwt = false
 
+# Demo access starts unauthenticated. The function validates its own four-digit
+# code and issues a short-lived, read-only signed token, so the platform must
+# not reject the initial request before that validation can run.
+[functions.demo-session]
+verify_jwt = false
+
 [functions.foresight-plan]
 verify_jwt = false
 

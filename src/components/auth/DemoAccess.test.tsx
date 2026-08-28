@@ -48,14 +48,14 @@ describe("DemoAccess", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
 
-  it("surfaces an invalid-code message and clears the cells", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "That access code isn't valid." }, 401)));
+  it("surfaces the invalid-code failure category and clears the cells", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_CODE_INVALID", error: "That access code isn't valid." }, 401)));
     setup();
     await userEvent.click(screen.getByText("Explore Demo"));
     await userEvent.click(screen.getByTestId("demo-code-0"));
     await userEvent.paste("1111");
 
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/isn't valid/));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/DEMO_CODE_INVALID.*isn't valid/));
     expect((screen.getByTestId("demo-code-0") as HTMLInputElement).value).toBe("");
   });
 });
