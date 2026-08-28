@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { applyDigits, createDemoSession, isCompleteCode, normalizeCodeInput } from "@/lib/demoSession";
+import { applyDigits, createDemoSession, DemoSessionError, isCompleteCode, normalizeCodeInput } from "@/lib/demoSession";
 import { useDemo } from "@/demo/DemoProvider";
 
 /**
@@ -29,8 +29,9 @@ export default function DemoAccess({ disabled }: { disabled?: boolean }) {
       const session = await createDemoSession(code);
       adopt(session);
     } catch (e: any) {
+      console.error("[demo-session]", { stage: "access-failed", code: e instanceof DemoSessionError ? e.code : "UNKNOWN", message: e?.message });
       setStatus("error");
-      setMessage(e?.message || "That access code isn't valid.");
+      setMessage(e instanceof DemoSessionError ? `${e.code}: ${e.message}` : "DEMO_SESSION_CREATE_FAILED: Demo access failed.");
       setCells(["", "", "", ""]);
       inputs.current[0]?.focus();
     }
