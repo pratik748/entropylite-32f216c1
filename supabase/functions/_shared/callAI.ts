@@ -1,22 +1,16 @@
 /**
  * AI caller, unified behind the shared callAI() interface.
  *
- * Mistral is routed as three explicit workspaces, not as interchangeable API
- * keys within one workspace:
- *   - MISTRAL_API_KEY      → mistral-workspace-1 (primary)
- *   - MISTRAL_API_KEY_2    → mistral-workspace-2 (failover)
- *   - MISTRAL_API_KEY_3    → mistral-workspace-3 (failover)
- *
- * Each request attempts workspace 1, then workspace 2, then workspace 3. Only
- * after every configured Mistral workspace is unavailable do existing emergency
- * providers (Gemini, 1min.ai, Lovable Gateway) run.
- *
- * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
- * support OpenAI-style function declarations natively), and the JSON response
- * is wrapped into a synthetic toolCall so callers don't have to branch.
+ * Routing hierarchy:
+ * 1. User API (if explicitly configured)
+ * 2. Admin Global AI (centrally configured in database)
+ * 3. Existing workspace / fallback architecture (Mistral workspaces 1-3 -> Gemini -> 1min.ai -> Lovable Gateway)
  */
 
-interface CallAIOptions {
+import { getAdminGlobalAIConfig } from "./adminAIProvider.ts";
+import { callCustomAIProvider } from "./customAICaller.ts";
+
+export interface CallAIOptions {
   systemPrompt: string;
   userPrompt: string;
   maxTokens?: number;
@@ -29,9 +23,14 @@ interface CallAIOptions {
   skipHardening?: boolean;
   /** No-op (kept for backward compatibility, Mistral has no native web search). */
   useWebSearch?: boolean;
+  /** Optional user-specific API overrides */
+  userApiKey?: string;
+  userProvider?: string;
+  userModel?: string;
+  userBaseUrl?: string;
 }
 
-interface AIResult {
+export interface AIResult {
   text: string;
   provider: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   toolCall?: any;
@@ -57,18 +56,18 @@ You are operating inside a hedge-fund-grade probabilistic decision system. Every
 Treat the market as an adaptive reflexive system, not static equilibrium.
 Violation of any rule = invalid response.`;
 
-function hardenSystemPrompt(original: string, skip?: boolean): string {
+export function hardenSystemPrompt(original: string, skip?: boolean): string {
   if (skip) return original;
   if (original.includes("[QUANT HARDENING LAYER")) return original;
   return `${HARDENING_PREAMBLE}\n\n[CALLER CONTEXT]\n${original}`;
 }
 
 /** Remove em/en dashes from model prose (banned house style). Safe for JSON. */
-function stripLongDashes(text: string): string {
+export function stripLongDashes(text: string): string {
   return text.replace(/\s*[\u2014\u2013]\s+/g, ", ").replace(/[\u2014\u2013]/g, "-");
 }
 
-function stripThinkingBlocks(text: string): string {
+export function stripThinkingBlocks(text: string): string {
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   cleaned = cleaned.replace(/^Thinking[\s\S]*?\n\s*\n/i, "").trim();
   cleaned = cleaned.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
@@ -122,7 +121,7 @@ function stripThinkingBlocks(text: string): string {
   return cleaned;
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+export async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -568,10 +567,66 @@ Rules:
 }
 
 /**
- * Public API, single AI call. Mistral workspace routing with emergency fallbacks.
+ * Public API, single AI call.
+ *
+ * Implements request hierarchy:
+ * 1. User-specific API (if explicitly configured)
+ * 2. Admin Global AI (centrally configured in database)
+ * 3. System workspace & emergency fallback lanes (Mistral 1-3 -> Gemini -> 1min.ai -> Lovable Gateway)
  */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
+
+  // Level 1: User-provided API override
+  if (opts.userApiKey) {
+    try {
+      console.info("[AI] Using user-configured API provider");
+      return await callCustomAIProvider(
+        opts,
+        {
+          provider: opts.userProvider || "openai",
+          apiKey: opts.userApiKey,
+          model: opts.userModel || opts.model || "gpt-4o",
+          baseUrl: opts.userBaseUrl,
+        },
+        opts.provider || "openai"
+      );
+    } catch (err: any) {
+      console.warn("[AI] User-configured API failed, evaluating fallback chain:", err?.message || err);
+      // If user API fails, proceed down to Admin / System fallback
+    }
+  }
+
+  // Level 2: Admin Global AI configuration
+  try {
+    const adminConfig = await getAdminGlobalAIConfig();
+    if (adminConfig && adminConfig.enabled) {
+      console.info(`[AI] Using Admin Global AI: ${adminConfig.provider} (${adminConfig.model})`);
+      try {
+        return await callCustomAIProvider(
+          opts,
+          {
+            provider: adminConfig.provider,
+            apiKey: adminConfig.apiKey,
+            model: adminConfig.model,
+            baseUrl: adminConfig.baseUrl,
+            apiVersion: adminConfig.apiVersion,
+          },
+          opts.provider || (adminConfig.provider as any)
+        );
+      } catch (adminErr: any) {
+        console.warn(
+          `[AI] Admin Global AI (${adminConfig.provider}) failed, falling back to system lanes:`,
+          adminErr?.message || adminErr
+        );
+        // Fall through to system round-robin / fallback
+      }
+    }
+  } catch (err) {
+    console.warn("[AI] Failed to check admin AI config, using system fallback:", err);
+  }
+
+  // Level 3: Existing System Workspace Routing & Fallback Lanes
   if (needsTools) return await callMistralToolMode(opts);
   return await callMistral(opts, opts.provider || "mistral");
 }
