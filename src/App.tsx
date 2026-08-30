@@ -20,7 +20,6 @@ import BackbonePage from "./pages/BackbonePage";
 import CadencePage from "./pages/CadencePage";
 import CadenceEntryPage from "./pages/CadenceEntryPage";
 import CompanyWorkstationPage from "./pages/CompanyWorkstationPage";
-import AdminTestPage from "./pages/AdminTestPage";
 import { DemoProvider, useDemo } from "./demo/DemoProvider";
 
 const queryClient = new QueryClient();
@@ -107,7 +106,6 @@ const App = () => (
           <Route path="/access" element={<AccessPage />} />
           <Route path="/disclaimer" element={<DisclaimerPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/admin-test" element={<AdminTestPage />} />
           <Route
             path="/dashboard"
             element={
