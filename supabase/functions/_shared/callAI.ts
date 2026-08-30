@@ -4,7 +4,7 @@
  * Routing hierarchy:
  * 1. User API (if explicitly configured)
  * 2. Admin Global AI (centrally configured in database)
- * 3. Existing workspace / fallback architecture (Mistral workspaces 1-3 -> Gemini -> 1min.ai -> Lovable Gateway)
+ * 3. Existing workspace / fallback architecture (Mistral workspaces 1-3 -> Gemini -> 1min.ai)
  */
 
 import { getAdminGlobalAIConfig } from "./adminAIProvider.ts";
@@ -281,40 +281,9 @@ async function callMistralWorkspace(opts: CallAIOptions, workspace: MistralWorks
 }
 
 /**
- * Lovable AI Gateway lane, OpenAI-compatible, no user-supplied key required.
- * This is the final managed-quota fallback after every configured Mistral lane
- * has failed or exhausted rate/credit limits.
+ * REMOVED: Lovable AI Gateway to prevent shared credit exhaustion.
+ * Admin Global AI configuration should be used instead.
  */
-const GATEWAY_DEFAULT_MODEL = Deno.env.get("GATEWAY_DEFAULT_MODEL") || "google/gemini-3-flash-preview";
-
-async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const body: Record<string, any> = {
-    model: GATEWAY_DEFAULT_MODEL,
-    messages: [
-      { role: "system", content: systemText },
-      { role: "user", content: opts.userPrompt },
-    ],
-    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-  };
-  if (opts.jsonMode) body.response_format = { type: "json_object" };
-
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty gateway response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
-}
 
 /**
  * Mistral caller with explicit workspace 1 → workspace 2 → workspace 3 routing.
@@ -487,16 +456,14 @@ function buildLanes(reported?: AIResult["provider"]): { workspaces: Lane[]; fall
   const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
   const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
   const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
-  const gw = Deno.env.get("LOVABLE_API_KEY");
 
-  // Existing emergency providers, sequential fallback after every Mistral
-  // workspace fails.
+  // Emergency providers: sequential fallback after every Mistral workspace fails.
+  // Lovable Gateway removed to prevent shared credit exhaustion.
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
   if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
-  if (gw) fallback.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
   return { workspaces, fallback };
 }
 
@@ -572,7 +539,7 @@ Rules:
  * Implements request hierarchy:
  * 1. User-specific API (if explicitly configured)
  * 2. Admin Global AI (centrally configured in database)
- * 3. System workspace & emergency fallback lanes (Mistral 1-3 -> Gemini -> 1min.ai -> Lovable Gateway)
+ * 3. System workspace & emergency fallback lanes (Mistral 1-3 -> Gemini -> 1min.ai)
  */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   const needsTools = !!(opts.tools && opts.tools.length > 0);
