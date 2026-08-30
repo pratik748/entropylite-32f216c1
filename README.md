@@ -2,7 +2,7 @@
 
 A sophisticated financial intelligence and portfolio analysis platform built with React, TypeScript, and Supabase.
 
-## 🚀 Features
+## Features
 
 - **Portfolio Management**: Advanced portfolio construction, tracking, and analysis
 - **Risk Analytics**: Real-time risk monitoring, stress testing, and scenario analysis
@@ -31,13 +31,13 @@ A sophisticated financial intelligence and portfolio analysis platform built wit
 - **Maps**: Leaflet + React Globe GL
 - **Routing**: React Router v6
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - Node.js 18+ or Bun
 - npm or bun package manager
 - Git
 
-## 🔧 Installation
+##  Installation
 
 1. Clone the repository:
 ```bash
@@ -61,7 +61,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
 VITE_SUPABASE_URL=your_supabase_url
 ```
 
-## 🚀 Development
+## Development
 
 Start the development server:
 
@@ -71,7 +71,7 @@ npm run dev
 
 The app will be available at `http://localhost:5173`
 
-## 🏗️ Build
+## Build
 
 Create a production build:
 
@@ -85,7 +85,7 @@ Preview the production build:
 npm preview
 ```
 
-## 🧪 Testing
+## Testing
 
 Run tests:
 
@@ -122,14 +122,14 @@ entropylite-32f216c1/
 └── docs/                # Documentation
 ```
 
-## 🔐 Authentication
+##  Authentication
 
 The platform supports:
 - Demo access mode for testing
 - Supabase authentication integration
 - Session management with Lovable Cloud Auth
 
-## 🌐 Deployment
+##  Deployment
 
 The project is configured for deployment on platforms like:
 - Vercel
@@ -139,7 +139,7 @@ The project is configured for deployment on platforms like:
 Build command: `npm run build`
 Output directory: `dist`
 
-## 📝 Scripts
+##  Scripts
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
@@ -149,22 +149,22 @@ Output directory: `dist`
 - `npm test` - Run tests
 - `npm run test:watch` - Run tests in watch mode
 
-## 🤝 Contributing
+##  Contributing
 
 1. Create a feature branch from `main`
 2. Make your changes
 3. Submit a pull request
 
-## 📄 License
+##  License
 
 This project is proprietary and confidential.
 
-## 🔗 Links
+##  Links
 
 - Repository: https://github.com/pratik748/entropylite-32f216c1
 - Supabase Project: https://reprphurmjtveejeqejn.supabase.co
 
-## 📞 Support
+##  Support
 
 For issues and questions, please open an issue on GitHub.
 
