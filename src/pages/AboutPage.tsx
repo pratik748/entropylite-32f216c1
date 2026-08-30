@@ -58,6 +58,15 @@ const SECTIONS = [
       "Scar Memory records every market outcome and scenario accuracy. The Outcome Gradient engine uses this record to continuously improve confidence calibration and model selection, for your account alone.",
     ],
   },
+  {
+    n: "08",
+    title: "Architecture & origins",
+    body: [
+      "Entropy is designed and engineered by Pratik Sehwag as a research-grade intelligence system exploring the intersection of artificial intelligence, quantitative decision systems, and computational infrastructure, with a focus on building systems that move from raw information to verified decisions.",
+      "The platform represents one layer of a unified computational trajectory: MANOR (computational infrastructure), Entropy / EntropyLite (quantitative decision intelligence), and VENOR (verified reasoning and decision architecture).",
+      "Every module—from the statistical-arbitrage engine to the causal-effects simulator and CLANK constraint theory—is grounded in quantitative methodology and real market data. The platform provides intelligence, not investment advice. All decisions remain with the user.",
+    ],
+  },
 ];
 
 export default function AboutPage() {
@@ -122,19 +131,6 @@ export default function AboutPage() {
                 ))}
               </section>
             ))}
-
-            <section className="border-t border-hairline py-10">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="mkt-label text-[10px] text-white/30">08</span>
-                <h2 className="text-[18px] font-semibold tracking-tight text-white">Built by Pratik Sehwag</h2>
-              </div>
-              <p className="text-[14.5px] text-white/55 leading-relaxed">
-                Entropy is designed and engineered as a research-grade intelligence system. Every
-                module, from the statistical-arbitrage engine to the causal-effects simulator, is
-                grounded in quantitative methodology and real market data. The platform provides
-                intelligence, not advice. All investment decisions remain with the user.
-              </p>
-            </section>
           </div>
         </div>
       </main>

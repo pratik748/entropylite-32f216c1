@@ -3,7 +3,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-import { callAIParallel } from "../_shared/callAI.ts";
 import { buildTickerCandidates, isIndianTicker, normalizeTickerInput } from "../_shared/ticker.ts";
 import { runConsensus, type EngineSignal, pctToConf } from "../_shared/ensemble.ts";
 import { costHaircut, tickerClass } from "../_shared/costs.ts";
@@ -901,95 +900,20 @@ Deno.serve(async (req) => {
 
     const deterministic = buildDeterministicFallback(snap, tech, currency, market, vix, riskMetrics, clankSignals, newsHeadlines, resolvedTicker, currencySymbol, desirableHint);
 
-    const results = await callAIParallel({
-      systemPrompt,
-      userPrompt,
-      maxTokens: 1800,
-      temperature: 0.25,
-      jsonMode: true,
-    });
-
-    const parsed: any[] = [];
-    for (const result of results) {
-      try {
-        let obj: any;
-        try { obj = JSON.parse(result.text); } catch {
-          const match = result.text.match(/\{[\s\S]*\}/);
-          if (match) obj = JSON.parse(match[0]);
-        }
-        if (obj && obj.action) {
-          obj._provider = result.provider;
-          obj.currency = currency;
-          obj.currentPrice = snap.currentPrice;
-          parsed.push(obj);
-        }
-      } catch {
-        console.warn(`direct-profit parse failed for ${result.provider}`);
-      }
-    }
-
-    let output: Record<string, unknown>;
-
-    if (parsed.length === 0) {
-      // No fallback surface: an unavailable model lane is an outage, not a
-      // verdict. Fail loudly so the desk never reads placeholder math as a ticket.
-      console.error(`direct-profit: no model lane returned a parsable ticket for ${resolvedTicker}`);
-      return new Response(
-        JSON.stringify({ error: `Model lanes unavailable for ${resolvedTicker}. No ticket issued.` }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    } else {
-      const actionVotes: Record<string, number> = { BUY: 0, SELL: 0, WAIT: 0 };
-      for (const item of parsed) {
-        if (actionVotes[item.action] !== undefined) actionVotes[item.action]++;
-      }
-
-      const scored = parsed.map((item) => {
-        const confidence = Number(item.confidence) || 0;
-        const quantScore = Number(item.quantScore) || 0;
-        const rr = Number(item.riskRewardRatio) || 0;
-        const directionalBonus = item.action === "WAIT" ? 0 : 8;
-        return {
-          ...item,
-          _score: confidence + quantScore * 0.35 + Math.min(rr, 4) * 6 + directionalBonus,
-        };
-      });
-
-      const [consensusAction, consensusCount] = Object.entries(actionVotes).sort((a, b) => b[1] - a[1])[0];
-      const majorityExists = consensusCount > parsed.length / 2;
-      const best = majorityExists
-        ? scored
-            .filter((item) => item.action === consensusAction)
-            .sort((a, b) => b._score - a._score)[0]
-        : scored.sort((a, b) => b._score - a._score)[0];
-
-      output = sanitizeOutput(best, snap, tech, parsed.length, consensusCount, riskMetrics, clankSignals, newsHeadlines, deterministic);
-
-      // ── DETERMINISTIC OVERRIDE OF AI-WAIT ─────────────────────────────
-      // AI models default to WAIT under uncertainty even when the
-      // deterministic engine sees a clean technical edge. If the
-      // deterministic side has a non-WAIT action AND momentum is strong
-      // (|momentum|≥2), prefer it so the user gets actionable tickets
-      // instead of perpetual WAITs.
-      if (
-        output.action === "WAIT" &&
-        hasContextualDirectionalEdge(deterministic, tech, riskMetrics, clankSignals, desirableHint)
-      ) {
-        console.log(`direct-profit deterministic override: AI=WAIT → ${deterministic.action} (momentum=${tech.momentumScore})`);
-        output.action = deterministic.action;
-        output.direction = deterministic.direction;
-        output.directionReason = `Deterministic edge: ${deterministic.directionReason}`;
-        output.entryLow = deterministic.entryLow;
-        output.entryHigh = deterministic.entryHigh;
-        output.targetPrice = deterministic.targetPrice;
-        output.stopLoss = deterministic.stopLoss;
-        output.protection = deterministic.protection;
-        output.riskRewardRatio = deterministic.riskRewardRatio;
-        output.confidence = Math.max(Number(output.confidence) || 50, 55);
-        (output as any).waitReasons = undefined;
-        (output as any).consensus = "DETERMINISTIC_OVERRIDE";
-      }
-    }
+    // ── ZERO-LLM DETERMINISTIC VENOR DECISION CORE ──────────────────────
+    // Decisions are computed via pure mathematical and quantitative algorithms.
+    // Zero reliance on external generative LLMs.
+    let output: Record<string, unknown> = sanitizeOutput(
+      deterministic,
+      snap,
+      tech,
+      1,
+      1,
+      riskMetrics,
+      clankSignals,
+      newsHeadlines,
+      deterministic,
+    );
 
     // ── MASTER ARBITER ──────────────────────────────────────────────────
     // The dashboard intelligence (analyze-stock) is the single source of
