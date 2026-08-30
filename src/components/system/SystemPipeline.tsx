@@ -9,6 +9,7 @@ import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { DP_ENGINE_STATUS_KEY } from "@/components/DirectProfitMode";
 import { useAdmin } from "@/hooks/useAdmin";
 import AdminAIConfigPanel from "@/components/system/AdminAIConfigPanel";
+import VenorBoard from "@/components/system/VenorBoard";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 /**
@@ -284,6 +285,10 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           }
         />
       </div>
+      <Connector label="VENOR 6-Stage Reasoning Core" />
+
+      {/* VENOR Beast Full Architecture Board */}
+      <VenorBoard ticker={stocks.length > 0 ? stocks[0].ticker : "NVDA"} currentPrice={stocks.length > 0 ? (stocks[0].analysis?.currentPrice || stocks[0].buyPrice || 142.5) : 142.5} />
       <Connector />
 
       {/* 4, Institutional Workstation */}
