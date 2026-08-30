@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDemo } from "@/demo/DemoProvider";
 import type { User } from "@supabase/supabase-js";
 
 const ADMIN_EMAIL = "pardhan9013334137@gmail.com";
@@ -17,9 +18,13 @@ interface UseAdminResult {
  * While this is a client-side check for UI rendering purposes, all actual
  * admin operations are enforced server-side and cannot be bypassed.
  *
+ * IMPORTANT: Demo mode users NEVER see admin controls, even if the demo
+ * portfolio email matches the admin email.
+ *
  * @returns {UseAdminResult} Object containing isAdmin flag, loading state, and user
  */
 export function useAdmin(): UseAdminResult {
+  const { isDemo } = useDemo();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -29,6 +34,16 @@ export function useAdmin(): UseAdminResult {
 
     async function checkAdmin() {
       try {
+        // Demo users are NEVER admin, regardless of email
+        if (isDemo) {
+          if (mounted) {
+            setIsAdmin(false);
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
         const { data: { user }, error } = await supabase.auth.getUser();
 
         if (!mounted) return;
@@ -61,6 +76,14 @@ export function useAdmin(): UseAdminResult {
       async (event, session) => {
         if (!mounted) return;
 
+        // Demo users are NEVER admin
+        if (isDemo) {
+          setIsAdmin(false);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         if (session?.user) {
           setUser(session.user);
           const adminStatus = session.user.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
@@ -77,7 +100,7 @@ export function useAdmin(): UseAdminResult {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isDemo]);
 
   return { isAdmin, loading, user };
 }
