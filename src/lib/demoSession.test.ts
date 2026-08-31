@@ -3,10 +3,8 @@ import {
   applyDigits,
   clearStoredDemo,
   createDemoSession,
-  DemoSessionError,
   hasStoredDemo,
   isCompleteCode,
-  isLocalDemoSession,
   normalizeCodeInput,
   readStoredDemo,
   resumeDemoSession,
@@ -66,28 +64,10 @@ describe("demo session lifecycle", () => {
     expect(hasStoredDemo()).toBe(true);
   });
 
-  it("reports an invalid code category and stores nothing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_CODE_INVALID", error: "That access code isn't valid." }, 401)));
-    await expect(createDemoSession("1111")).rejects.toMatchObject({ code: "DEMO_CODE_INVALID" } satisfies Partial<DemoSessionError>);
+  it("surfaces the server message for an invalid code and stores nothing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "That access code isn't valid." }, 401)));
+    await expect(createDemoSession("1111")).rejects.toThrow(/isn't valid/);
     expect(hasStoredDemo()).toBe(false);
-  });
-
-  it("reports session creation and missing-data failures without persisting a token", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_SESSION_CREATE_FAILED", error: "Demo service failed." }, 503)));
-    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "DEMO_SESSION_CREATE_FAILED" } satisfies Partial<DemoSessionError>);
-    expect(hasStoredDemo()).toBe(false);
-
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_DATA_LOAD_FAILED", error: "Demo data missing." }, 503)));
-    await expect(createDemoSession("9740")).rejects.toMatchObject({ code: "DEMO_DATA_LOAD_FAILED" } satisfies Partial<DemoSessionError>);
-    expect(hasStoredDemo()).toBe(false);
-  });
-
-  it("starts a browser-only preview when the demo function cannot be reached", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
-    const session = await createDemoSession("9740");
-    expect(isLocalDemoSession(session)).toBe(true);
-    expect(session.portfolio).toHaveLength(2);
-    expect(hasStoredDemo()).toBe(true);
   });
 
   it("never sends a non-numeric or over-length code to the server", async () => {
@@ -106,7 +86,7 @@ describe("demo session lifecycle", () => {
 
   it("clears the stored token when resume is rejected as expired", async () => {
     storeDemo({ token: "tok.abc", expiresAt: Date.now() + 60_000 });
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ code: "DEMO_SESSION_EXPIRED", error: "Demo session expired" }, 401)));
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "Demo session expired" }, 401)));
     expect(await resumeDemoSession()).toBeNull();
     expect(hasStoredDemo()).toBe(false);
   });
@@ -122,18 +102,5 @@ describe("demo session lifecycle", () => {
     );
     const s = await resumeDemoSession();
     expect(s?.history).toHaveLength(1);
-  });
-
-  it("rehydrates a browser-only preview without calling the demo function", async () => {
-    storeDemo({ token: "local-demo-test", expiresAt: Date.now() + 60_000, local: true });
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    const session = await resumeDemoSession();
-
-    expect(isLocalDemoSession(session)).toBe(true);
-    expect(session?.token).toBe("local-demo-test");
-    expect(session?.portfolio).toHaveLength(2);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

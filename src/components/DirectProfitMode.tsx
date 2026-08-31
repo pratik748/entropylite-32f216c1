@@ -43,7 +43,6 @@ import { buildEvidenceGraph } from "@/lib/evidence/build";
 import { synthesize, logNormalHorizon, type HorizonModel } from "@/lib/evidence/synthesis";
 import { lognormalEs, normalCdf } from "@/lib/evidence/compute";
 import type { Synthesis } from "@/lib/evidence/types";
-import VenorBoard from "@/components/system/VenorBoard";
 
 interface RiskMetrics {
   var95: number;
@@ -2017,14 +2016,6 @@ const DirectProfitMode = ({ onAddToMainPortfolio, portfolioValueBase }: DirectPr
                 </CollapsibleContent>
               </Collapsible>
             )}
-
-            {/* ── VENOR 6-Stage Deterministic Architecture Board ── */}
-            <div className="border-t border-border p-3">
-              <VenorBoard
-                ticker={activeTicker || "NVDA"}
-                currentPrice={displayedActivePrice || 142.5}
-              />
-            </div>
 
             {/* Actions */}
             <div className="border-t border-border p-3 flex items-center justify-between">

@@ -1,173 +1,73 @@
-# EntropyLite
+# Welcome to your Lovable project
 
-A sophisticated financial intelligence and portfolio analysis platform built with React, TypeScript, and Supabase.
+## Project info
 
-## Features
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-- **Portfolio Management**: Advanced portfolio construction, tracking, and analysis
-- **Risk Analytics**: Real-time risk monitoring, stress testing, and scenario analysis
-- **Geopolitical Intelligence**: Interactive globe visualization with geopolitical event tracking
-- **Market Intelligence**: Live news feeds, sentiment analysis, and market overview
-- **Direct Profit Mode**: Evidence-driven decision making with quantitative techniques
-- **Augment Layer**: Comprehensive suite of institutional-grade modules including:
-  - Order Management
-  - Trade Lifecycle Management
-  - Risk Modeling & Stress Testing
-  - ESG Integration
-  - Compliance & Reporting
-  - Multi-Asset Support
-- **Entropy Sandbox**: Monte Carlo simulations, derivatives engine, and strategy lab
-- **Command Palette**: Quick navigation and actions across the platform
+## How can I edit this code?
 
-## 🛠️ Tech Stack
+There are several ways of editing your application.
 
-- **Frontend**: React 18 + TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS + shadcn/ui components
-- **Backend**: Supabase (PostgreSQL + Auth + Edge Functions)
-- **State Management**: TanStack Query
-- **3D Visualization**: Three.js + React Three Fiber
-- **Charts**: Recharts
-- **Maps**: Leaflet + React Globe GL
-- **Routing**: React Router v6
+**Use Lovable**
 
-##  Prerequisites
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-- Node.js 18+ or Bun
-- npm or bun package manager
-- Git
+Changes made via Lovable will be committed automatically to this repo.
 
-##  Installation
+**Use your preferred IDE**
 
-1. Clone the repository:
-```bash
-git clone https://github.com/pratik748/entropylite-32f216c1.git
-cd entropylite-32f216c1
-```
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-2. Install dependencies:
-```bash
-npm install
-```
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-3. Set up environment variables:
-   
-   The `.env` file is already configured with Supabase credentials. For production, update these values:
-```env
-SUPABASE_PUBLISHABLE_KEY=your_supabase_key
-SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_PROJECT_ID=your_project_id
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
-VITE_SUPABASE_URL=your_supabase_url
-```
+Follow these steps:
 
-## Development
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
 
-Start the development server:
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
 
-```bash
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`
+**Edit a file directly in GitHub**
 
-## Build
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-Create a production build:
+**Use GitHub Codespaces**
 
-```bash
-npm run build
-```
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-Preview the production build:
+## What technologies are used for this project?
 
-```bash
-npm preview
-```
+This project is built with:
 
-## Testing
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-Run tests:
+## How can I deploy this project?
 
-```bash
-npm test
-```
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
-Run tests in watch mode:
+## Can I connect a custom domain to my Lovable project?
 
-```bash
-npm run test:watch
-```
+Yes, you can!
 
-## 📁 Project Structure
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
-```
-entropylite-32f216c1/
-├── src/
-│   ├── components/        # React components
-│   │   ├── augment/      # Augment layer modules
-│   │   ├── auth/         # Authentication components
-│   │   ├── charts/       # Chart visualizations
-│   │   ├── geopolitical/ # Geopolitical intelligence
-│   │   ├── risk/         # Risk management
-│   │   ├── sandbox/      # Entropy sandbox features
-│   │   ├── terminal/     # Trading terminal components
-│   │   └── ui/          # shadcn/ui components
-│   ├── pages/            # Route pages
-│   ├── hooks/            # Custom React hooks
-│   ├── lib/              # Utility functions
-│   └── App.tsx           # Main app component
-├── public/               # Static assets
-├── supabase/            # Supabase config and migrations
-└── docs/                # Documentation
-```
-
-##  Authentication
-
-The platform supports:
-- Demo access mode for testing
-- Supabase authentication integration
-- Session management with Lovable Cloud Auth
-
-##  Deployment
-
-The project is configured for deployment on platforms like:
-- Vercel
-- Netlify
-- Cloudflare Pages
-
-Build command: `npm run build`
-Output directory: `dist`
-
-##  Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run build:dev` - Build in development mode
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm test` - Run tests
-- `npm run test:watch` - Run tests in watch mode
-
-##  Contributing
-
-1. Create a feature branch from `main`
-2. Make your changes
-3. Submit a pull request
-
-##  License
-
-This project is proprietary and confidential.
-
-##  Links
-
-- Repository: https://github.com/pratik748/entropylite-32f216c1
-- Supabase Project: https://reprphurmjtveejeqejn.supabase.co
-
-##  Support
-
-For issues and questions, please open an issue on GitHub.
-
----
-
-Built with ❤️ using React + TypeScript + Supabase
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

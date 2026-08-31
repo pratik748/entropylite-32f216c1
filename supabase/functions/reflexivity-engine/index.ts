@@ -231,7 +231,7 @@ serve(async (req) => {
     let actionable: { trigger: string; trade: string; risk: string } | null = null;
     let aiError: string | null = null;
     try {
-      // Use the standard shared callAI utility (Mistral priority lanes → Lovable managed fallback).
+      // Use the standard shared callAI utility (Cloudflare → Mistral → OpenAI fallback chain).
       const systemPrompt =
         `You are a reflexivity strategist in the Soros tradition. You analyse belief-about-belief: where market consensus is internally contradicted, where price action is shaping fundamentals (not the other way around), and when belief is structurally fragile.
 

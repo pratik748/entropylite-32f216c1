@@ -7,9 +7,6 @@ import { useInstitutionalAnalytics } from "@/hooks/useInstitutionalAnalytics";
 import { useOpportunities } from "@/hooks/useOpportunities";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
 import { DP_ENGINE_STATUS_KEY } from "@/components/DirectProfitMode";
-import { useAdmin } from "@/hooks/useAdmin";
-import AdminAIConfigPanel from "@/components/system/AdminAIConfigPanel";
-import VenorBoard from "@/components/system/VenorBoard";
 import type { PortfolioStock } from "@/components/PortfolioPanel";
 
 /**
@@ -142,7 +139,6 @@ const LayerCard = ({
 
 const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
   const navigate = useNavigate();
-  const { isAdmin } = useAdmin();
   const snapshot = useQuantSnapshot(stocks);
   const inst = useInstitutionalAnalytics(stocks);
   // auto: false, the board reports the opportunity repository as it stands;
@@ -190,14 +186,6 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           The platform's data flow, live. Each layer reports the same stores the modules read, nothing on this board is asserted without data behind it.
         </p>
       </div>
-
-      {/* Admin Control - Only visible to admin */}
-      {isAdmin && (
-        <>
-          <AdminAIConfigPanel />
-          <Connector />
-        </>
-      )}
 
       {/* 1, Market Data Layer */}
       <LayerCard
@@ -285,10 +273,6 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           }
         />
       </div>
-      <Connector label="VENOR 6-Stage Reasoning Core" />
-
-      {/* VENOR Beast Full Architecture Board */}
-      <VenorBoard ticker={stocks.length > 0 ? stocks[0].ticker : "NVDA"} currentPrice={stocks.length > 0 ? (stocks[0].analysis?.currentPrice || stocks[0].buyPrice || 142.5) : 142.5} />
       <Connector />
 
       {/* 4, Institutional Workstation */}

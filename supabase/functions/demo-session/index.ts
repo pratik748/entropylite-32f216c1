@@ -23,30 +23,6 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-type FailureCode =
-  | "DEMO_CODE_INVALID"
-  | "DEMO_SESSION_CREATE_FAILED"
-  | "DEMO_SESSION_NOT_FOUND"
-  | "DEMO_SESSION_EXPIRED"
-  | "DEMO_DATA_LOAD_FAILED"
-  | "DATABASE_ERROR"
-  | "NETWORK_ERROR";
-
-class DemoError extends Error {
-  constructor(readonly code: FailureCode, message: string, readonly status: number) {
-    super(message);
-  }
-}
-
-function log(stage: string, detail: Record<string, unknown> = {}) {
-  // Never log access codes, bearer tokens, HMACs, or portfolio contents.
-  console.info("[demo-session]", JSON.stringify({ stage, ...detail }));
-}
-
-function failure(code: FailureCode, error: string, status: number) {
-  return json({ code, error }, status);
-}
-
 /* ── token: base64url(payload).hex(hmac-sha256) ── */
 
 const enc = new TextEncoder();
@@ -104,10 +80,7 @@ function equals(a: string, b: string) {
 }
 
 function admin() {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) throw new DemoError("DEMO_SESSION_CREATE_FAILED", "Demo service is not configured.", 503);
-  return createClient(url, serviceKey, {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
   });
 }
@@ -115,20 +88,13 @@ function admin() {
 /** Resolves the demo portfolio owner id from the configured email. Never returned to the client. */
 async function resolveDemoOwner(): Promise<string | null> {
   const email = (Deno.env.get("DEMO_PORTFOLIO_EMAIL") || "").trim().toLowerCase();
-  if (!email) throw new DemoError("DEMO_SESSION_NOT_FOUND", "Demo portfolio is not configured.", 503);
+  if (!email) return null;
   const sb = admin();
   for (let page = 1; page <= 10; page++) {
     const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) {
-      log("owner-lookup-database-error", { page, message: error.message, status: error.status });
-      throw new DemoError("DATABASE_ERROR", "Could not look up the demo portfolio.", 503);
-    }
-    if (!data?.users?.length) return null;
+    if (error || !data?.users?.length) return null;
     const hit = data.users.find((u: any) => (u.email || "").toLowerCase() === email);
-    if (hit) {
-      log("owner-resolved", { page });
-      return hit.id;
-    }
+    if (hit) return hit.id;
     if (data.users.length < 200) return null;
   }
   return null;
@@ -136,7 +102,6 @@ async function resolveDemoOwner(): Promise<string | null> {
 
 /** Read-only snapshot of the demo portfolio context. */
 async function snapshot(ownerId: string) {
-  log("snapshot-start");
   const sb = admin();
   const [portfolio, history] = await Promise.all([
     sb.from("user_portfolios").select("id, ticker, buy_price, quantity, analysis, created_at").eq("user_id", ownerId).order("created_at"),
@@ -147,14 +112,6 @@ async function snapshot(ownerId: string) {
       .order("timestamp", { ascending: false })
       .limit(50),
   ]);
-  if (portfolio.error || history.error) {
-    log("snapshot-database-error", {
-      portfolioError: portfolio.error?.message ?? null,
-      historyError: history.error?.message ?? null,
-    });
-    throw new DemoError("DEMO_DATA_LOAD_FAILED", "Could not load demo portfolio data.", 503);
-  }
-  log("snapshot-complete", { portfolioCount: portfolio.data?.length ?? 0, historyCount: history.data?.length ?? 0 });
   return {
     portfolio: (portfolio.data ?? []).map((r: any) => ({
       id: r.id,
@@ -177,47 +134,40 @@ async function snapshot(ownerId: string) {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    log("cors-preflight");
-    return new Response("ok", { headers: corsHeaders });
-  }
-  if (req.method !== "POST") return failure("NETWORK_ERROR", "Method not allowed", 405);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   let body: any = {};
   try {
     body = await req.json();
   } catch {
-    return failure("NETWORK_ERROR", "Invalid request", 400);
+    return json({ error: "Invalid request" }, 400);
   }
 
   const action = body?.action === "resume" ? "resume" : "create";
-  log("request-received", { action, origin: req.headers.get("origin") ?? null });
 
   try {
     if (action === "resume") {
       const token = typeof body?.token === "string" ? body.token : "";
       const payload = await verify(token);
-      if (!payload) return failure("DEMO_SESSION_EXPIRED", "Demo session expired", 401);
+      if (!payload) return json({ error: "Demo session expired" }, 401);
       const data = await snapshot(payload.sub);
-      log("resume-complete", { expiresAt: payload.exp });
       return json({ demo: true, expiresAt: payload.exp, scope: payload.scope, label: payload.label, ...data });
     }
 
     // ── create ──
     const expected = Deno.env.get("DEMO_ACCESS_CODE") || "";
     const code = typeof body?.code === "string" ? body.code.trim() : "";
-    if (!/^\d{4}$/.test(code)) return failure("DEMO_CODE_INVALID", "That access code isn't valid.", 401);
-    if (!expected || !equals(code, expected)) return failure("DEMO_CODE_INVALID", "That access code isn't valid.", 401);
+    if (!/^\d{4}$/.test(code)) return json({ error: "That access code isn't valid." }, 401);
+    if (!expected || !equals(code, expected)) return json({ error: "That access code isn't valid." }, 401);
 
     const ownerId = await resolveDemoOwner();
-    if (!ownerId) return failure("DEMO_SESSION_NOT_FOUND", "Demo portfolio was not found.", 503);
+    if (!ownerId) return json({ error: "Demo workspace is unavailable right now." }, 503);
 
     const exp = Date.now() + TTL_MINUTES * 60_000;
     const token = await sign({ demo: true, sub: ownerId, exp, scope: DEMO_SCOPE, label: "Demo Workspace" });
-    log("session-created", { expiresAt: exp });
     const data = await snapshot(ownerId);
 
-    log("create-complete", { expiresAt: exp });
     return json({
       demo: true,
       token,
@@ -227,11 +177,7 @@ serve(async (req) => {
       ...data,
     });
   } catch (e) {
-    if (e instanceof DemoError) {
-      log("request-failed", { action, code: e.code, message: e.message });
-      return failure(e.code, e.message, e.status);
-    }
-    console.error("[demo-session]", JSON.stringify({ stage: "request-failed", action, code: "DEMO_SESSION_CREATE_FAILED", message: e instanceof Error ? e.message : String(e) }));
-    return failure("DEMO_SESSION_CREATE_FAILED", "Demo workspace is unavailable right now.", 500);
+    console.error("demo-session error", e instanceof Error ? e.message : e);
+    return json({ error: "Demo workspace is unavailable right now." }, 500);
   }
 });

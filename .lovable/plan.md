@@ -1,55 +1,67 @@
-# Deterministic Core: removing the language models from the engines
+# Portfolio Sentinel
 
-## First: what Claude's desirable-assets work actually was
+Goal: never let another CRWD-style 63% drop slip past silently. Every holding is monitored on the server, re-analyzed on a schedule, and the user is emailed the moment a risk trigger fires.
 
-It was never a `desirable-assets` function. It was a **library** (`src/lib/discovery/`, 1,645 lines, 24 seeded tests) built from `docs/TRUTH_TO_ENTROPYLITE_MAP.md`, and then never imported by any running code. Twelve modules:
+## 1. Email infrastructure (prerequisite)
 
-| Module | What it computes | Status |
-|---|---|---|
-| `robustness.ts` | BH q-values, P(real)=clip(1-q,.05,.95), future-survival score | **now live** (ported last turn) |
-| `changepoint.ts` | Page's CUSUM on robust z + 3-state Gaussian HMM (scaled Baum-Welch) | not wired |
-| `scoring.ts` | inverse-variance forecast blend, expected edge, payoff asymmetry, timeliness, liquidity, multiplicative `opportunityScore`, `publishGate` | not wired |
-| `leadlag.ts` | Newey-West HAC lead-lag scan, BH-gated, weight capped at 0.4 | not wired (needs `asset_graph_edges`) |
-| `learning.ts` | per-(engine x regime) Beta reliability, scar scoring | not wired (needs `engine_regime_stats`) |
-| `admission.ts` + `novelty.ts` | hard constraint gates, Jaccard sybil dedup | live, but only in `twrd-ingest` |
-| `momentum.ts`, `propagate.ts` | epistemic momentum, k<=2 impact propagation | not wired |
+Lovable Emails needs a verified sender domain. I'll:
+1. Check current domain status.
+2. If none, show the setup dialog — you complete DNS once, and every subsequent alert flows automatically.
+3. Scaffold **app (transactional)** email templates — one branded `portfolio-risk-alert` template with sections for the 5 trigger types.
 
-It also explicitly **rejected** the PC causal-discovery algorithm, POMDP planning, BOCPD and tensor networks with written reasons. That rejection log is the useful part: it is the same judgment call this plan needs.
+No third-party service, no API keys to paste.
 
-The reason the library matters now is that `scoring.ts` + `changepoint.ts` + `learning.ts` are exactly the deterministic replacements for what the models are currently doing by vibe.
+## 2. New database tables
 
-## The actual problem
+```text
+portfolio_watch          — one row per (user, ticker) with entry price, peak, thresholds,
+                           last_analysis_at, last_price, last_alert_at per trigger type
+risk_alerts              — append-only log of every fired alert (type, ticker, payload,
+                           email_status) for audit + in-UI history
+alert_preferences        — per-user email on/off, drawdown %, cooldown minutes
+```
+All RLS-scoped to `auth.uid()`, service_role full access for the cron worker.
 
-24 edge functions call a model. They fall into three very different classes, and only one of them is legitimately a model's job.
+## 3. Portfolio sentinel edge function
 
-**Class A - the model is inventing numbers that should be measured.** This is the real defect and the reason Direct Profit and the causal engine feel fake.
-`monte-carlo-intelligence` (asks a model for GBM drift/vol/jump params), `continuous-simulation` (asks for a Markov transition matrix), `clank-detection` (asks which mechanical constraints are active), `deep-intelligence` (asks for 1-100 scores on management/flow/narrative/structure), `geopolitical-data` (asks for conflict lat/lng and severity), `derivatives-intelligence`, `fortress-intelligence`, `crown-intelligence`, `flow-intelligence`, `portfolio-intelligence`, `causal-effects`, `reflexivity-engine`, `strategy-evolution`, `direct-profit`, `desirable-assets`.
+`portfolio-sentinel` (scheduled every 15 min via pg_cron, but each holding only *re-analyzes* every 4h unless a >3% move is detected):
 
-**Class B - the model is writing prose over numbers that are already real.** `market-data` morning commentary, `entropy-brief`, `trade-lesson`, `analyze-stock` narrative fields, the reflexivity thesis voice.
+For every active watch row:
+1. Fetch latest quote (market-data).
+2. **Fast triggers** (every run, cheap):
+   - Drawdown vs entry (default -8%, user-configurable)
+   - Drawdown vs peak (trailing -12%)
+   - Max-profit ceiling hit (uses the same `computeMaxProfitFromAnalysis` logic already in `useSellNotifications`, moved server-side)
+   - Corporate actions: detect stock split / large gap (>25% overnight, Yahoo `splitFactor`) → alert with "verify — likely split/dividend, not loss"
+3. **Slow triggers** (every 4h OR after >3% intraday move):
+   - Re-run `direct-profit` for a fresh consensus verdict
+   - Compare to stored `last_verdict`; if flip BUY→SELL with conviction ≥2/3, fire alert
+   - Update `last_analysis_at`
+4. **Staleness**: if `last_analysis_at` > 24h, fire nag alert + trigger refresh.
+5. Per-trigger cooldown (default 4h) to prevent spam.
+6. Enqueue email via `send-transactional-email` with idempotency key `alert-{ticker}-{type}-{bucket}`.
 
-**Class C - the model is parsing unstructured text.** `company-intelligence`, `geo-events`, news sentiment. There is no closed-form substitute for reading a filing; the deterministic answer here is a lexicon + rules, which is weaker but auditable.
+## 4. Cron
 
-Aladdin has no Class A. Every number is measured, calibrated, or explicitly a scenario input a human set.
+`pg_cron` job every 15 min → `portfolio-sentinel`. Uses queue infrastructure from `setup_email_infra`, so retries + DLQ are free.
 
-## Plan
+## 5. UI additions (minimal)
 
-### Stage 1 - Kill Class A in the two engines the user watches (this stage)
-- `monte-carlo-intelligence`: replace model-supplied params with MLE from real return history: drift = mean log return, vol = EWMA(lambda=0.94) + Student-t df fit, jumps via Lee-Mykland jump test on the actual series, correlation from Ledoit-Wolf shrunk covariance (`src/lib/quant/covariance.ts` already has this). Scenario overlays become named deterministic shocks, not model prose.
-- `continuous-simulation`: regime transition matrix estimated from the 3-state Gaussian HMM in `changepoint.ts` (Baum-Welch on real index returns), not asked for.
-- `clank-detection`: constraints become **rules with dates**: index-rebalance calendars, F&O expiry, lock-in expiry, circuit limits, ADR/ADV thresholds. A constraint is active or it is not; no model opinion.
-- `direct-profit`: decision comes from the ensemble + `opportunityScore` + the Stage 3.8 robustness layer already deployed; action/confidence/target/stop are computed, and the model is removed from the decision path entirely.
+- **Alert Center** panel in Augment dashboard: list of `risk_alerts` (dismissible, filter by ticker).
+- **Portfolio Panel**: small bell icon per holding → opens threshold sheet (custom drawdown %, mute).
+- **Header**: unread alert count badge.
 
-### Stage 2 - Wire the rest of Claude's library as the scoring spine
-`scoring.ts` (multiplicative `opportunityScore` + `publishGate`) becomes the single ranking function shared by `desirable-assets`, `direct-profit` and `crown-intelligence`, so the three engines stop contradicting each other. Add the two missing tables (`asset_graph_edges`, `engine_regime_stats`) so `leadlag.ts` and `learning.ts` can run, giving per-(engine x regime) reliability weights that are learned from realized outcomes rather than asserted.
+## 6. What's explicitly out of scope
 
-### Stage 3 - Class A elimination across the remaining engines
-`causal-effects` becomes an impulse-response over the estimated lead-lag graph (`propagate.ts`, k<=2, rho-attenuated). `fortress`/`crown`/`flow`/`portfolio` become factor/liquidity/crowding computations over the real book. `deep-intelligence` scores become z-scores against sector peers from real fundamentals.
-
-### Stage 4 - Class B: prose or nothing
-Each remaining narrative call gets a deterministic template driven by the computed numbers. Where a template reads badly, the section is deleted rather than model-filled. Class C keeps a model but is labelled as text extraction, never as a number source.
+- SMS/push (email only, per your answer).
+- Auto-executing sells (alerts only — you decide the trade).
+- Backfilling alerts for positions added before this feature.
 
 ## Technical notes
-- No stage adds a fallback. If real data is missing, the panel says the input is unavailable, which is the current standing rule.
-- Every replaced engine keeps its exact response shape so no frontend component breaks; only the provenance of the numbers changes.
-- Each engine gets deterministic unit tests (seeded, no network), which is only possible once the model is out of the path.
-- `callAI.ts` stays for Class C, but Class A/B removals delete their call sites so a model cannot silently return.
+
+- Corporate actions use Yahoo Finance `events` field on the chart endpoint + a heuristic (>25% overnight w/ no news = probable split).
+- Consensus flip uses the existing `ensemble.ts` gate; no new math.
+- Cost: ~15 quote calls/user/hour + 6 full re-analyses/day/holding — well within existing rate budget.
+- Test with: `bunx vitest run` + `curl_edge_functions` against `portfolio-sentinel`.
+
+Approve to build. I'll start with steps 1 (domain check) and 2 (migration) in parallel, then wire the sentinel and templates.
