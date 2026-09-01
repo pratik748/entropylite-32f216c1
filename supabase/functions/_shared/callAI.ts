@@ -220,11 +220,48 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
 }
 
 /**
- * Lovable AI Gateway lane, OpenAI-compatible, no user-supplied key required.
- * This is the primary lane: it keeps every engine on real model output instead
- * of degrading to deterministic placeholder math when third-party keys throttle.
+ * Generic OpenAI-compatible lane (OpenRouter, Groq, or any admin-supplied
+ * compatible endpoint). Used only as a fallback after every Mistral key.
  */
-const GATEWAY_DEFAULT_MODEL = Deno.env.get("GATEWAY_DEFAULT_MODEL") || "google/gemini-3-flash-preview";
+const OPENROUTER_DEFAULT_MODEL = getKeySync("OPENROUTER_MODEL") || "mistralai/mistral-large";
+const GROQ_DEFAULT_MODEL = getKeySync("GROQ_MODEL") || "llama-3.3-70b-versatile";
+
+async function callOpenAICompatible(
+  opts: CallAIOptions,
+  apiKey: string,
+  endpoint: string,
+  model: string,
+  reported?: AIResult["provider"],
+): Promise<AIResult> {
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const body: Record<string, any> = {
+    model: model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout(endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `${endpoint} ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty provider response");
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+}
+
 
 /**
  * Mistral caller with automatic key 1 → key 2 fallback.
