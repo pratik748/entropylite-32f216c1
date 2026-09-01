@@ -1,4 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { callAI } from "../_shared/callAI.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -11,39 +12,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const key = Deno.env.get("LOVABLE_API_KEY");
-    if (!key) throw new Error("LOVABLE_API_KEY missing");
-
     const sys =
       "You are an institutional trading desk mentor. Given a single trade, write ONE short, sharp, declarative lesson (max 18 words). No emoji. No hedging. No 'remember to'. Imperative or observational tone. Return only the lesson sentence.";
     const user = `Ticker: ${ticker}\nAction: ${action}\nEntry: ${entryPrice ?? "?"}\nCurrent: ${currentPrice ?? "?"}\nP&L: ${pnl ?? "n/a"}\nSource: ${source ?? "n/a"}\nCatalyst: ${catalyst ?? "n/a"}`;
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: user },
-        ],
-      }),
-    });
+    const result = await callAI({ systemPrompt: sys, userPrompt: user, maxTokens: 120 });
 
-    if (r.status === 429) {
-      return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (r.status === 402) {
-      return new Response(JSON.stringify({ error: "credits_exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error(`AI gateway ${r.status}: ${t}`);
-    }
-
-    const j = await r.json();
-    let lesson: string = j?.choices?.[0]?.message?.content?.trim() || "";
-    lesson = lesson
+    const lesson = (result.text || "")
+      .trim()
       .replace(/^["'`]+|["'`]+$/g, "")
       .replace(/\s*[\u2014\u2013]\s+/g, ", ")
       .replace(/[\u2014\u2013]/g, "-")
@@ -54,8 +30,10 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("trade-lesson error", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "unknown" }), {
-      status: 500,
+    const msg = e instanceof Error ? e.message : "unknown";
+    const status = /429|rate/i.test(msg) ? 429 : 500;
+    return new Response(JSON.stringify({ error: msg }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
