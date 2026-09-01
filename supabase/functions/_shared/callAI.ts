@@ -226,35 +226,6 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
  */
 const GATEWAY_DEFAULT_MODEL = Deno.env.get("GATEWAY_DEFAULT_MODEL") || "google/gemini-3-flash-preview";
 
-async function callLovableGateway(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const body: Record<string, any> = {
-    model: GATEWAY_DEFAULT_MODEL,
-    messages: [
-      { role: "system", content: systemText },
-      { role: "user", content: opts.userPrompt },
-    ],
-    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-  };
-  if (opts.jsonMode) body.response_format = { type: "json_object" };
-
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Gateway ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty gateway response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
-}
-
 /**
  * Mistral caller with automatic key 1 → key 2 fallback.
  * Falls back on any error from key 1 (rate limit, auth, network, empty body).
@@ -393,16 +364,14 @@ interface Lane {
 function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
   const primary: Lane[] = [];
   const fallback: Lane[] = [];
-  const m1 = Deno.env.get("MISTRAL_API_KEY");
-  const m2 = Deno.env.get("MISTRAL_API_KEY_2");
-  const m3 = Deno.env.get("MISTRAL_API_KEY_3");
-  const onemin = Deno.env.get("ONEMIN_AI_API_KEY");
-  const g1 = Deno.env.get("GOOGLE_GEMINI_KEY");
-  const g2 = Deno.env.get("GOOGLE_GEMINI_KEY_2");
-  const gw = Deno.env.get("LOVABLE_API_KEY");
-
-  // Lovable AI Gateway first, managed quota, no third-party throttling.
-  if (gw) primary.push({ label: "lovable-gateway", call: (o) => callLovableGateway(o, gw, reported) });
+  const m1 = getKeySync("MISTRAL_API_KEY");
+  const m2 = getKeySync("MISTRAL_API_KEY_2");
+  const m3 = getKeySync("MISTRAL_API_KEY_3");
+  const onemin = getKeySync("ONEMIN_AI_API_KEY");
+  const g1 = getKeySync("GOOGLE_GEMINI_KEY");
+  const g2 = getKeySync("GOOGLE_GEMINI_KEY_2");
+  const or1 = getKeySync("OPENROUTER_API_KEY");
+  const gq = getKeySync("GROQ_API_KEY");
   if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
   // Reserve Mistral key, kept out of the round-robin so it stays under its
@@ -412,7 +381,9 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   // Ensures analytics never go dark when Mistral is rate-limited or down.
   if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
   if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
-  if (onemin && Deno.env.get("ONEMIN_AI_ENABLED") === "1") {
+  if (or1) fallback.push({ label: "openrouter", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+  if (gq) fallback.push({ label: "groq", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+  if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
   return { primary, fallback };
