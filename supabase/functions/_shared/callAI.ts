@@ -15,7 +15,12 @@
  * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
  * support OpenAI-style function declarations natively), and the JSON response
  * is wrapped into a synthetic toolCall so callers don't have to branch.
+ *
+ * Keys resolve through the global API Manager (public.api_credentials, managed
+ * by an admin in-app) first, then environment variables. Lovable AI is NOT part
+ * of the chain.
  */
+import { getKeySync, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -496,6 +501,7 @@ Rules:
  * Public API, single AI call. Always Mistral, with key1 → key2 fallback.
  */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
+  await refreshManagedKeys();
   const needsTools = !!(opts.tools && opts.tools.length > 0);
   if (needsTools) return await callMistralToolMode(opts);
   return await callMistral(opts, opts.provider || "mistral");
