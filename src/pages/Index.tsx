@@ -21,6 +21,7 @@ import GeopoliticalGlobe from "@/components/GeopoliticalGlobe";
 import DesirableAssets from "@/components/DesirableAssets";
 import { useGeoIntelligence } from "@/hooks/useGeoIntelligence";
 import { useTradeLogger } from "@/hooks/useTradeLogger";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 import RiskDashboard from "@/components/RiskDashboard";
 import FortressMode from "@/components/risk/FortressMode";
@@ -76,6 +77,7 @@ const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const IndexContent = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useIsAdmin();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [directProfitMode, setDirectProfitMode] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
