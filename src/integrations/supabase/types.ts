@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -44,6 +44,33 @@ export type Database = {
           refresh_hours?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      asset_graph_edges: {
+        Row: {
+          as_of: string
+          dst: string
+          edge_type: string
+          meta: Json | null
+          src: string
+          weight: number
+        }
+        Insert: {
+          as_of?: string
+          dst: string
+          edge_type: string
+          meta?: Json | null
+          src: string
+          weight: number
+        }
+        Update: {
+          as_of?: string
+          dst?: string
+          edge_type?: string
+          meta?: Json | null
+          src?: string
+          weight?: number
         }
         Relationships: []
       }
@@ -226,6 +253,33 @@ export type Database = {
           last_updated?: string
           sample_count?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      engine_regime_stats: {
+        Row: {
+          alpha: number
+          beta: number
+          engine_id: string
+          n: number
+          regime: string
+          updated_at: string
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          engine_id: string
+          n?: number
+          regime: string
+          updated_at?: string
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          engine_id?: string
+          n?: number
+          regime?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -475,6 +529,86 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunities: {
+        Row: {
+          bottleneck: Json | null
+          created_at: string
+          direction: number
+          factors: Json
+          frozen_features: Json
+          horizon_days: number
+          id: string
+          os: number
+          published: boolean
+          regime: string | null
+          reject_reasons: string[] | null
+          signal_class: string
+          symbol: string
+        }
+        Insert: {
+          bottleneck?: Json | null
+          created_at?: string
+          direction: number
+          factors: Json
+          frozen_features?: Json
+          horizon_days: number
+          id?: string
+          os: number
+          published?: boolean
+          regime?: string | null
+          reject_reasons?: string[] | null
+          signal_class: string
+          symbol: string
+        }
+        Update: {
+          bottleneck?: Json | null
+          created_at?: string
+          direction?: number
+          factors?: Json
+          frozen_features?: Json
+          horizon_days?: number
+          id?: string
+          os?: number
+          published?: boolean
+          regime?: string | null
+          reject_reasons?: string[] | null
+          signal_class?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      opportunity_outcomes: {
+        Row: {
+          filled_at: string | null
+          fwd_return: number | null
+          hit: boolean | null
+          horizon_days: number
+          opportunity_id: string
+        }
+        Insert: {
+          filled_at?: string | null
+          fwd_return?: number | null
+          hit?: boolean | null
+          horizon_days: number
+          opportunity_id: string
+        }
+        Update: {
+          filled_at?: string | null
+          fwd_return?: number | null
+          hit?: boolean | null
+          horizon_days?: number
+          opportunity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_outcomes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_watch: {
         Row: {
           alert_state: Json
@@ -579,12 +713,15 @@ export type Database = {
       }
       scar_memory: {
         Row: {
+          corroboration: number
           created_at: string
           failure_pattern: string
           id: string
           momentum_bucket: string
+          permanent: boolean
           realized_pnl_pct: number
           regime: string
+          scar_score: number
           sentiment_bucket: string
           signal_type: string
           ticker: string
@@ -592,12 +729,15 @@ export type Database = {
           vol_bucket: string
         }
         Insert: {
+          corroboration?: number
           created_at?: string
           failure_pattern: string
           id?: string
           momentum_bucket: string
+          permanent?: boolean
           realized_pnl_pct?: number
           regime: string
+          scar_score?: number
           sentiment_bucket: string
           signal_type: string
           ticker: string
@@ -605,12 +745,15 @@ export type Database = {
           vol_bucket: string
         }
         Update: {
+          corroboration?: number
           created_at?: string
           failure_pattern?: string
           id?: string
           momentum_bucket?: string
+          permanent?: boolean
           realized_pnl_pct?: number
           regime?: string
+          scar_score?: number
           sentiment_bucket?: string
           signal_type?: string
           ticker?: string

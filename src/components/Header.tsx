@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useFX, SUPPORTED_CURRENCIES } from "@/hooks/useFX";
 import { getCurrencySymbol } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
-import { Command, LogOut, Search, Zap } from "lucide-react";
+import { Command, KeyRound, LogOut, Search, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { emitUIEvent } from "@/foresight/uiBus";
 import DemoIndicator from "@/components/DemoIndicator";
 import { useDemo } from "@/demo/DemoProvider";
@@ -31,6 +33,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, setIndiaMode } = useFX();
   const { isDemo, exit: exitDemo } = useDemo();
+  const { isAdmin } = useIsAdmin();
 
   // Auto-toggle India mode based on currency selection
   useEffect(() => {
@@ -158,6 +161,16 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
           <span className="hidden md:inline text-[11px] font-semibold text-muted-foreground tabular-nums tracking-tight border-l border-border/60 pl-3">
             {time.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </span>
+
+          {isAdmin && (
+            <Link
+              to="/admin/api"
+              title="API Manager"
+              className="pressable flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+            </Link>
+          )}
 
           <button
             onClick={() => (isDemo ? exitDemo() : supabase.auth.signOut())}
