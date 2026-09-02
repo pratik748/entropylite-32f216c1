@@ -50,33 +50,36 @@ export type Database = {
       api_credentials: {
         Row: {
           created_at: string
+          created_by: string | null
           id: string
-          key_value: string
+          is_active: boolean
           label: string | null
+          name: string
           notes: string | null
-          provider: string
-          status: string
           updated_at: string
+          value: string
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           id?: string
-          key_value: string
+          is_active?: boolean
           label?: string | null
+          name: string
           notes?: string | null
-          provider: string
-          status?: string
           updated_at?: string
+          value: string
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           id?: string
-          key_value?: string
+          is_active?: boolean
           label?: string | null
+          name?: string
           notes?: string | null
-          provider?: string
-          status?: string
           updated_at?: string
+          value?: string
         }
         Relationships: []
       }
