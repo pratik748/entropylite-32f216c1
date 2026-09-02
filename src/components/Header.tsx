@@ -33,6 +33,7 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, setIndiaMode } = useFX();
   const { isDemo, exit: exitDemo } = useDemo();
+  const { isAdmin } = useIsAdmin();
 
   // Auto-toggle India mode based on currency selection
   useEffect(() => {
