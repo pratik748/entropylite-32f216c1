@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow } from "lucide-react";
+import { KeyRound, LayoutDashboard, Eye, Globe, Shield, ShieldCheck, Sparkles, Target, ScatterChart, RefreshCw, Landmark, Activity, Newspaper, Workflow } from "lucide-react";
 import CommandPalette from "@/components/CommandPalette";
 import ModuleRail, { ModuleStrip } from "@/components/terminal/ModuleRail";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -750,6 +750,20 @@ const IndexContent = () => {
               )}
               {activeTab === "system" && (
                 <div className="px-3 sm:container py-3 sm:py-5 pb-8">
+                  {isAdmin && (
+                    <button
+                      onClick={() => navigate("/admin/api")}
+                      className="pressable mb-3 flex w-full items-center gap-3 rounded-xl border border-border/70 bg-surface-2/60 px-4 py-3 text-left hover:bg-surface-2 transition-colors"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-surface-3/70">
+                        <KeyRound className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-[12.5px] font-semibold tracking-tight text-foreground">API Manager</span>
+                        <span className="block text-[11px] text-muted-foreground">Manage global provider keys</span>
+                      </span>
+                    </button>
+                  )}
                   <SystemPipeline stocks={stocks} onNavigate={(id) => handleTabSwitch(id as Tab)} />
                 </div>
               )}
