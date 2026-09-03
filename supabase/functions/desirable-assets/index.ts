@@ -710,133 +710,9 @@ function summarizeRejects(rejectReasons: Record<string, number>) {
   return { rejectSummary, rejectHeadline };
 }
 
-type ReserveTemplate = {
-  ticker: string;
-  name: string;
-  assetClass: string;
-  exchange: string;
-  currency: string;
-  sector: string;
-  strategy: string;
-  marketCap: "mega" | "large" | "mid" | "small" | "micro";
-  tags?: string[];
-};
-
-const GLOBAL_RESERVE_UNIVERSE: ReserveTemplate[] = [
-  { ticker: "MSFT", name: "Microsoft", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["platform", "ai", "quality"] },
-  { ticker: "GOOGL", name: "Alphabet", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Communication", strategy: "equity", marketCap: "mega", tags: ["search", "cloud", "ads"] },
-  { ticker: "AMZN", name: "Amazon", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Consumer Discretionary", strategy: "equity", marketCap: "mega", tags: ["cloud", "consumer", "logistics"] },
-  { ticker: "META", name: "Meta Platforms", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Communication", strategy: "momentum", marketCap: "mega", tags: ["ads", "ai", "platform"] },
-  { ticker: "JPM", name: "JPMorgan Chase", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["banking", "quality"] },
-  { ticker: "V", name: "Visa", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["payments", "compounder"] },
-  { ticker: "LLY", name: "Eli Lilly", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Healthcare", strategy: "momentum", marketCap: "mega", tags: ["healthcare", "growth"] },
-  { ticker: "JNJ", name: "Johnson & Johnson", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Healthcare", strategy: "equity", marketCap: "mega", tags: ["defensive", "quality"] },
-  { ticker: "XOM", name: "Exxon Mobil", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Energy", strategy: "equity", marketCap: "mega", tags: ["cashflow", "energy"] },
-  { ticker: "CAT", name: "Caterpillar", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Industrials", strategy: "equity", marketCap: "large", tags: ["infrastructure", "cyclical"] },
-  { ticker: "WMT", name: "Walmart", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Consumer Staples", strategy: "equity", marketCap: "mega", tags: ["defensive", "retail"] },
-  { ticker: "COST", name: "Costco", assetClass: "Equity", exchange: "NASDAQ", currency: "USD", sector: "Consumer Staples", strategy: "equity", marketCap: "large", tags: ["membership", "quality"] },
-  { ticker: "NEE", name: "NextEra Energy", assetClass: "Equity", exchange: "NYSE", currency: "USD", sector: "Utilities", strategy: "equity", marketCap: "large", tags: ["utility", "defensive"] },
-  { ticker: "SPY", name: "SPDR S&P 500 ETF", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Index", strategy: "sector_hedge", marketCap: "mega", tags: ["index", "liquid", "core"] },
-  { ticker: "QQQ", name: "Invesco QQQ Trust", assetClass: "ETF", exchange: "NASDAQ", currency: "USD", sector: "Technology", strategy: "momentum", marketCap: "mega", tags: ["nasdaq", "growth", "liquid"] },
-  { ticker: "XLF", name: "Financial Select Sector SPDR", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Financials", strategy: "sector_hedge", marketCap: "large", tags: ["financials", "sector"] },
-  { ticker: "XLV", name: "Health Care Select Sector SPDR", assetClass: "ETF", exchange: "NYSEARCA", currency: "USD", sector: "Healthcare", strategy: "sector_hedge", marketCap: "large", tags: ["healthcare", "sector"] },
-  { ticker: "GLD", name: "SPDR Gold Shares", assetClass: "Commodity", exchange: "NYSEARCA", currency: "USD", sector: "Commodities", strategy: "correlation_hedge", marketCap: "large", tags: ["gold", "hedge", "safe_haven"] },
-  { ticker: "TLT", name: "iShares 20+ Year Treasury Bond ETF", assetClass: "Bond", exchange: "NASDAQ", currency: "USD", sector: "Hedge", strategy: "correlation_hedge", marketCap: "large", tags: ["bond", "duration", "hedge"] },
-  { ticker: "BTC-USD", name: "Bitcoin", assetClass: "Crypto", exchange: "CRYPTO", currency: "USD", sector: "Commodities", strategy: "momentum", marketCap: "mega", tags: ["crypto", "high_beta"] },
-];
-
-const INDIA_RESERVE_UNIVERSE: ReserveTemplate[] = [
-  { ticker: "RELIANCE.NS", name: "Reliance Industries", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Energy", strategy: "equity", marketCap: "mega", tags: ["energy", "platform"] },
-  { ticker: "HDFCBANK.NS", name: "HDFC Bank", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "equity", marketCap: "mega", tags: ["banking", "quality"] },
-  { ticker: "ICICIBANK.NS", name: "ICICI Bank", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "momentum", marketCap: "mega", tags: ["banking", "momentum"] },
-  { ticker: "INFY.NS", name: "Infosys", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["it", "export"] },
-  { ticker: "TCS.NS", name: "Tata Consultancy Services", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "equity", marketCap: "mega", tags: ["it", "quality"] },
-  { ticker: "BHARTIARTL.NS", name: "Bharti Airtel", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Communication", strategy: "momentum", marketCap: "mega", tags: ["telecom", "growth"] },
-  { ticker: "LT.NS", name: "Larsen & Toubro", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Industrials", strategy: "equity", marketCap: "large", tags: ["infra", "capex"] },
-  { ticker: "SUNPHARMA.NS", name: "Sun Pharmaceutical", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Healthcare", strategy: "equity", marketCap: "large", tags: ["pharma", "defensive"] },
-  { ticker: "HINDUNILVR.NS", name: "Hindustan Unilever", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Staples", strategy: "equity", marketCap: "mega", tags: ["fmcg", "defensive"] },
-  { ticker: "ITC.NS", name: "ITC", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Staples", strategy: "equity", marketCap: "large", tags: ["cashflow", "defensive"] },
-  { ticker: "MARUTI.NS", name: "Maruti Suzuki", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Discretionary", strategy: "equity", marketCap: "large", tags: ["auto", "consumer"] },
-  { ticker: "TATAMOTORS.NS", name: "Tata Motors", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Consumer Discretionary", strategy: "momentum", marketCap: "large", tags: ["auto", "cyclical"] },
-  { ticker: "NTPC.NS", name: "NTPC", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Utilities", strategy: "equity", marketCap: "large", tags: ["utility", "defensive"] },
-  { ticker: "ASIANPAINT.NS", name: "Asian Paints", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Materials", strategy: "equity", marketCap: "large", tags: ["consumer", "quality"] },
-  { ticker: "ULTRACEMCO.NS", name: "UltraTech Cement", assetClass: "Equity", exchange: "NSE", currency: "INR", sector: "Materials", strategy: "equity", marketCap: "large", tags: ["cement", "infra"] },
-  { ticker: "NIFTYBEES.NS", name: "Nippon India ETF Nifty 50 BeES", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Index", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "index", "core"] },
-  { ticker: "BANKBEES.NS", name: "Nippon India ETF Bank BeES", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Financials", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "banking"] },
-  { ticker: "ITBEES.NS", name: "Nippon India ETF Nifty IT", assetClass: "ETF", exchange: "NSE", currency: "INR", sector: "Technology", strategy: "sector_hedge", marketCap: "large", tags: ["etf", "technology"] },
-  { ticker: "GOLDBEES.NS", name: "Nippon India ETF Gold BeES", assetClass: "Commodity", exchange: "NSE", currency: "INR", sector: "Commodities", strategy: "correlation_hedge", marketCap: "large", tags: ["gold", "hedge"] },
-  { ticker: "SILVERBEES.NS", name: "Nippon India Silver ETF", assetClass: "Commodity", exchange: "NSE", currency: "INR", sector: "Commodities", strategy: "correlation_hedge", marketCap: "mid", tags: ["silver", "hedge"] },
-];
-
-function resolveReserveHorizon(preferredHorizon?: string) {
-  switch (preferredHorizon) {
-    case "intraday":
-      return { horizonClass: "intraday", timeHorizon: "1D", riskProfile: ["aggressive", "short_term"] };
-    case "short_term":
-      return { horizonClass: "short_term", timeHorizon: "2W", riskProfile: ["short_term"] };
-    case "long_term":
-      return { horizonClass: "long_term", timeHorizon: "12M", riskProfile: ["long_term"] };
-    case "medium_term":
-    default:
-      return { horizonClass: "medium_term", timeHorizon: "3M", riskProfile: ["medium_term"] };
-  }
-}
-
-function buildReserveCandidates(params: {
-  indiaMode: boolean;
-  heldTickers: string[];
-  previousTickers: string[];
-  preferredAssetTypes?: string[];
-  preferredSectors?: string[];
-  preferredHorizon?: string;
-}): any[] {
-  const universe = params.indiaMode ? INDIA_RESERVE_UNIVERSE : GLOBAL_RESERVE_UNIVERSE;
-  const banned = new Set([...params.heldTickers, ...params.previousTickers].map((t) => String(t).toUpperCase()));
-  const preferredAssetSet = new Set((params.preferredAssetTypes || []).map(normalizeAssetType));
-  const preferredSectorSet = new Set((params.preferredSectors || []).map(normalizeSectorPreference));
-  const horizon = resolveReserveHorizon(params.preferredHorizon);
-
-  const ranked = universe
-    .filter((template) => !banned.has(template.ticker.toUpperCase()))
-    .map((template) => {
-      const assetKey = normalizeAssetType(template.assetClass);
-      const sectorKey = normalizeSectorPreference(template.sector);
-      let score = 0;
-      if (preferredAssetSet.size > 0) score += preferredAssetSet.has(assetKey) ? 4 : -1;
-      if (preferredSectorSet.size > 0) score += preferredSectorSet.has(sectorKey) ? 4 : -0.5;
-      if (template.marketCap === "mega") score += 1;
-      if (template.assetClass === "ETF") score += 0.4;
-      if (HEDGE_STRATEGIES.has(template.strategy)) score += 0.25;
-      return { template, score };
-    })
-    .sort((a, b) => b.score - a.score);
-
-  const preferredSlice = ranked.filter((item) => item.score >= 0);
-  const ordered = (preferredSlice.length >= 8 ? preferredSlice : ranked)
-    .map(({ template }) => normalizeCandidate({
-      ...template,
-      currentEstPrice: 0,
-      entryZone: [0, 0],
-      targetPrice: 0,
-      stopLoss: 0,
-      timeHorizon: horizon.timeHorizon,
-      horizonClass: horizon.horizonClass,
-      suggestedQty: 1,
-      confidence: 58,
-      thesis: "",
-      catalyst: "",
-      hedgingStrategy: "",
-      riskReward: "1:2.0",
-      riskProfile: horizon.riskProfile,
-      pairedInstrument: null,
-      pairedStructure: null,
-      capitalEfficiency: 1,
-      correlationToPortfolio: HEDGE_STRATEGIES.has(template.strategy) ? "negative" : "low",
-    }))
-    .filter(Boolean);
-
-  return ordered;
-}
+// Deterministic reserve universes and their hardcoded ticker templates were
+// removed: the engine may only surface names it actually screened against live
+// data. No hardcoded slate, no market-cap preference, no substitution.
 
 // ── Main serve ─────────────────────────────────────────────────────
 serve(async (req) => {
@@ -950,7 +826,7 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
     const homeMarketRule = indiaMode
       ? "ALL recommendations must be Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs (e.g. NIFTYBEES.NS, GOLDBEES.NS), or Indian F&O instruments. No foreign stocks whatsoever."
       : isUSUser
-        ? "4-5 US equities from DIFFERENT sectors and market caps (include small/mid-cap under $10B)"
+        ? "4-5 liquid US-listed instruments, chosen purely on evidence quality. No market-cap preference in either direction."
         : `4-5 stocks from ${regionInfo.region} listed on ${regionInfo.exchange} with Yahoo Finance suffix ${regionInfo.suffix}`;
 
     // Anti-repeat instruction
@@ -962,7 +838,7 @@ ${sellTickers.length ? `- Stock Analysis flagged these holdings as SELL/EXIT: ${
     // back. Treat the last 40 surfaced tickers as a no-fly list, not a "soft
     // avoid". The model is then forced to genuinely re-screen the universe
     // instead of resurfacing yesterday's slate.
-    const recentBan = previousTickers.slice(-40);
+    const recentBan = previousTickers.slice(-12);
     const antiRepeatBlock = recentBan.length > 0
       ? `\n## ANTI-REPEAT (HARD CONSTRAINT):\nThe user has already been shown these tickers recently. DO NOT re-emit ANY of them in this response, pick genuinely different names from the live universe: ${recentBan.join(", ")}.\nIf you would otherwise pick one of these, replace it with a fresh, equally-liquid alternative grounded in the LIVE WEB CONTEXT block below.\n`
       : "";
@@ -1128,12 +1004,12 @@ QUALITY MANDATE:
 - Avoid clustered lookalikes: do not emit multiple names expressing the same crowded trade, same business model, or same mega-cap factor exposure.
 - Every pick must have a concrete catalyst, explicit hedge path, asymmetric risk/reward, and a specific reason it improves the user's portfolio rather than merely sounding good in isolation.
 - FORBIDDEN: penny stocks, OTC/pink-sheet, sub-$100M float, illiquid names (<$5M ADV), pump-and-dump meme plays. Everything else is fair game.
-- HUNT ASYMMETRY, NOT FAMILIARITY: the user wants **one-in-a-thousand** ideas, not the same mega-cap consensus trade every desk already owns. Favour uncrowded names with a specific, dateable catalyst over crowded FAANG/Nifty50 lookalikes.
+- SELECT ON MERIT ONLY: rank by evidence strength (catalyst quality, fundamentals, trend, liquidity, portfolio fit). Do not bias for or against mega-caps, mid-caps, well-known names, or obscure names. If the best evidence sits in a household name, recommend it; if it sits off the beaten path, recommend that.
 - Use exact tickers supported by Yahoo Finance.
 - NEVER recommend a ticker the user already owns, those are listed as HARD EXCLUSION in the user prompt and must be replaced with a different, equally-liquid alternative if you would otherwise have picked them.
 - Target prices must be set ABOVE the live market price with realistic upside grounded in the catalyst window. If you are unsure of the current price, prefer percentage-based upside framing (e.g. "10–15% over 3M") rather than a stale absolute target.
 - WHEN A "LIVE WEB CONTEXT" BLOCK IS PROVIDED: anchor at least 50% of your picks to facts in that block (recent earnings, breaking news, sector flows). Cite the catalyst from the live block in the catalyst field. Do NOT ignore fresh real-world events.
-- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Mix frontline liquidity with high-conviction mid-caps that have real catalysts. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Actively mix sectors AND market caps, at least half the slate should sit outside the top-10 mega-cap consensus trade when a liquid alternative exists. Liquid mid-caps ($1B–$20B) with a hard catalyst are strongly preferred over generic large-cap filler. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
+- Do not output markdown.${indiaMode ? "\nINDIA-ONLY MODE: Recommend ONLY Indian equities listed on NSE (.NS suffix) or BSE (.BO suffix), Indian ETFs, and Indian F&O instruments. Choose on evidence alone, frontline or mid-cap, whichever the data supports. All prices in INR. Consider SEBI/RBI regulations, Indian market structure, and domestic catalysts only. No foreign stocks." : "\nUse liquid US/global listings only. Market cap is not a selection criterion: pick whatever the evidence supports, across sectors. No OTC, no pink-sheet, no recent IPOs without analyst coverage."}`,
         userPrompt: `[SEED:${seed}] Date: ${new Date().toISOString().split("T")[0]}
 Portfolio value: $${portfolioValue.toLocaleString()} (${baseCurrency})
 ${portfolioContext}
@@ -1156,8 +1032,8 @@ ${preferredAssetTypes?.length ? `- CRITICAL: At least 70% of recommendations MUS
     - Liquidity floor: >$5M average daily dollar volume (>₹2Cr for India). Below that = reject. Above that, ALL market caps welcome if the catalyst is real.
     - ABSOLUTELY NO loss-making businesses, deteriorating fundamentals, or broken charts
 - Maximum 1 recommendation per sector unless the user's explicit sector filters force concentration
-- Do NOT fill the list with close substitutes or same-theme mega-caps just because they are famous
-- Reward asymmetry: at least 2 of the slate should be non-consensus names (mid-cap, under-covered, or a sector nobody is talking about this week) with defendable edge, not more MSFT/AAPL/RELIANCE clones
+- Do NOT fill the list with close substitutes of one another; each pick needs a distinct driver
+- Rank strictly on defendable edge. No quota for consensus names and no quota for obscure names
 - Provide strategy diversity across at least 3 strategy types
 - Each idea must be defendable with evidence, not narrative fluff
 
@@ -1199,7 +1075,7 @@ Return via the tool call only.`,
         try {
           const retryOpts = {
             ...aiOpts,
-            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Keep the asymmetry mandate, do NOT collapse into a generic FAANG/blue-chip list. Mix sectors and caps.`,
+            userPrompt: `${aiOpts.userPrompt}\n\nRETRY: previous attempt returned no usable picks. Return 8 high-conviction, liquid names with a clear dateable catalyst in the next 1–6 months. Rank on evidence only, no market-cap or popularity bias in either direction.`,
             temperature: 0.5,
           };
           const retryResults = await callAIParallel(retryOpts);
@@ -1265,7 +1141,7 @@ Return via the tool call only.`,
 
     // HARD anti-repeat enforcement: drop any candidate that matches the
     // recent ban list, regardless of how good the model thinks it is.
-    const recentBanSet = new Set(previousTickers.slice(-40).map((t) => String(t).toUpperCase()));
+    const recentBanSet = new Set(previousTickers.slice(-12).map((t) => String(t).toUpperCase()));
     if (recentBanSet.size > 0) {
       const before = candidates.length;
       candidates = candidates.filter((c: any) => !recentBanSet.has(String(c?.ticker || "").toUpperCase()));
@@ -1282,7 +1158,7 @@ Return via the tool call only.`,
     // stage and ask the model for replacements with the explicit exclusion list.
     try {
       const heldSetUpper = new Set(portfolioTickers.map((t) => String(t).toUpperCase()));
-      const recentSetUpper = new Set(previousTickers.map((t) => String(t).toUpperCase()));
+      const recentSetUpper = new Set(previousTickers.slice(-12).map((t) => String(t).toUpperCase()));
       const contaminated = candidates.filter((c: any) => {
         const t = String(c?.ticker || "").toUpperCase();
         return heldSetUpper.has(t) || recentSetUpper.has(t);
@@ -1454,7 +1330,9 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     const scored: ScoredRec[] = [];
-    const previousTickerSet = new Set(previousTickers.map((t) => String(t).toUpperCase()));
+    // Only the most recent slate is treated as a repeat. A deep ban list was
+    // pushing the engine off liquid names and into obscure tickers.
+    const previousTickerSet = new Set(previousTickers.slice(-12).map((t) => String(t).toUpperCase()));
 
     // Deterministic-rescue scored builder removed by design.
 
@@ -1602,7 +1480,6 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       // Indian stocks trade in INR with lower notional, use 2M INR (~$24K) threshold.
       const minDollarVol = indiaMode ? 2_000_000 : 20_000_000;
       if (!isHedge && dollarVolume < minDollarVol) { filtered++; bumpReject("F3_illiquid"); continue; }
-      if (!isHedge && ["micro", "small"].includes(String(rec.marketCap || "").toLowerCase())) { filtered++; bumpReject("F3_microcap_or_small"); continue; }
 
       const fundamentals = isHedge ? null : await fetchYahooSummary(rec.ticker);
       const profitMarginPct = fundamentals?.profitMargins != null ? fundamentals.profitMargins * 100 : null;
@@ -2127,7 +2004,6 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     const selectedNonHedge = new Set<string>();
     const forcedSectorMode = (preferredSectors?.length || 0) <= 1;
     const maxPerSector = forcedSectorMode ? 2 : 1;
-    const maxPerMarketCap = 2;
     const maxHighlyCorrelatedNames = portfolioTickers.length > 0 ? 1 : 2;
 
     const getSectorKey = (s: ScoredRec) => normalizeSectorPreference(String(s.rec.sector || "unknown"));
@@ -2138,16 +2014,13 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
       if (isHedgeStrategy(s)) return true;
 
       const sectorKey = getSectorKey(s);
-      const capKey = getCapKey(s);
       const sectorCount = selectedSectors.get(sectorKey) || 0;
-      const capCount = selectedCaps.get(capKey) || 0;
       const highCorrCount = Array.from(selectedNonHedge).filter((ticker) => {
         const other = selected.find((item) => item.rec.ticker === ticker);
         return other ? Math.abs(other.portfolioCorrelation) >= 0.65 : false;
       }).length;
 
       if (sectorCount >= maxPerSector) return false;
-      if (capCount >= maxPerMarketCap) return false;
       if (Math.abs(s.portfolioCorrelation) >= 0.65 && highCorrCount >= maxHighlyCorrelatedNames) return false;
       return true;
     };
