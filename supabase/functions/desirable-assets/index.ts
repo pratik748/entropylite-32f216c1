@@ -692,7 +692,6 @@ function summarizeRejects(rejectReasons: Record<string, number>) {
     F2_target_below_price: "had targets below live price (target auto-recomputed)",
     F2_invalid_target: "had structurally invalid target prices",
     F3_illiquid: "failed the liquidity bar",
-    F3_microcap_or_small: "were niche small or micro-cap names",
     F3_loss_maker: "were loss-making businesses",
     F3_weak_quality: "had weak quality or shrinking fundamentals",
     F4_no_upside_extreme_risk: "had poor upside versus extreme risk",
