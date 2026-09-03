@@ -1152,6 +1152,38 @@ Return via the tool call only.`,
     candidates = dedupeCandidates(candidates).slice(0, 28);
     console.log(`desirable-assets: AI returned ${candidates.length} picks (no fallback substitution)`);
 
+    // ── User filter enforcement (deterministic, server-side) ─────────
+    // Asset-type and sector selections were previously only prompt hints, so
+    // the model routinely ignored them. They are now enforced on the candidate
+    // set: anything outside the requested asset types or sectors is dropped.
+    // If a filter would empty the slate we keep the unfiltered set and report
+    // it, so the panel never silently goes blank.
+    const applyUserFilter = (label: string, keep: (c: any) => boolean) => {
+      const kept = candidates.filter(keep);
+      if (kept.length === 0) {
+        repairLog(`${label} filter matched no screened candidate this cycle, filter reported as unmet`);
+        return;
+      }
+      if (kept.length !== candidates.length) {
+        console.log(`desirable-assets ${label} filter: ${candidates.length} -> ${kept.length}`);
+      }
+      candidates = kept;
+    };
+
+    if (preferredAssetTypes?.length) {
+      const wanted = new Set(preferredAssetTypes.map(normalizeAssetType));
+      applyUserFilter("asset-type", (c) => wanted.has(normalizeAssetType(String(c?.assetClass || ""))));
+    }
+    if (preferredSectors?.length) {
+      const wantedSectors = new Set(preferredSectors.map(normalizeSectorPreference));
+      applyUserFilter("sector", (c) => {
+        const sectorKey = normalizeSectorPreference(String(c?.sector || ""));
+        if (wantedSectors.has(sectorKey)) return true;
+        // Hedges/index instruments are cross-sector by construction.
+        return HEDGE_STRATEGIES.has(String(c?.strategy || ""));
+      });
+    }
+
     // ── STAGE 1B: Refill pass if first AI pass is contaminated by held/repeat names ──
     // The dominant failure mode was the AI emitting names the user already owns or
     // names we just recommended. Detect that BEFORE the expensive Yahoo / Monte Carlo
