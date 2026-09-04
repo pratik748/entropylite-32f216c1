@@ -64,9 +64,3 @@ export async function getKey(name: string): Promise<string | undefined> {
   await refreshManagedKeys();
   return getKeySync(name);
 }
-
-/** All admin-managed credentials from the last loaded snapshot. */
-export function getManagedSnapshot(): Record<string, string> {
-  return { ...cache };
-}
-

@@ -62,8 +62,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "max-age=60" },
     });
   } catch (error) {
-    // requireAuth throws a Response (401), pass it through unchanged.
-    if (error instanceof Response) return error;
     console.error("FX rates error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },

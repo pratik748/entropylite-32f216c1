@@ -114,8 +114,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   } catch (error) {
-    // requireAuth throws a Response (401), pass it through unchanged.
-    if (error instanceof Response) return error;
     console.error("historical-prices error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,

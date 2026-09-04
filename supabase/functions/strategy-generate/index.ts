@@ -142,8 +142,6 @@ Generate 4–6 instructions, sorted by priority (1 = highest, execute first).`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    // requireAuth throws a Response (401), pass it through unchanged.
-    if (error instanceof Response) return error;
     console.error("Strategy generate error:", error);
     if (error.status === 429) {
       return new Response(JSON.stringify({ error: "Rate limited, please try again shortly" }), {

@@ -248,8 +248,6 @@ Include 6-8 conflicts. Keep summaries SHORT.`,
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   } catch (error) {
-    // requireAuth throws a Response (401), pass it through unchanged.
-    if (error instanceof Response) return error;
     console.error("Geopolitical data error:", error);
     return new Response(JSON.stringify({
       conflictEvents: FALLBACK_CONFLICTS,

@@ -175,8 +175,6 @@ ${lines}`,
     });
     return out;
   } catch (e) {
-    // requireAuth throws a Response (401), pass it through unchanged.
-    if (e instanceof Response) return e;
     console.error("scoreEvents AI error:", e);
     return [];
   }
