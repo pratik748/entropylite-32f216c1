@@ -207,10 +207,24 @@ function isModelAvailabilityError(status: number, body: string): boolean {
 }
 
 /**
+ * Remembers, per isolate, which model a given key was actually allowed to
+ * call, so a tier-restricted account stops paying a wasted 403 round-trip on
+ * every request.
+ */
+const modelMemo = new Map<string, string>();
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
  * Call Mistral with a single API key. Throws on non-2xx with status info.
+ * Free-tier keys rate-limit per second, so a 429 gets one short backoff retry
+ * on the same key before the lane is abandoned.
  */
 async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const chain = opts.model ? [opts.model, MISTRAL_FAST_MODEL, "open-mistral-nemo"] : MISTRAL_MODEL_CHAIN;
+  const memoKey = apiKey.slice(0, 8);
+  const preferred = modelMemo.get(memoKey);
+  const base = opts.model ? [opts.model, MISTRAL_FAST_MODEL, "open-mistral-nemo"] : MISTRAL_MODEL_CHAIN;
+  const chain = preferred ? [preferred, ...base.filter((m) => m !== preferred)] : base;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   let lastErr: any = null;
 
@@ -227,31 +241,44 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
     if (opts.jsonMode) body.response_format = { type: "json_object" };
 
     const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-    const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }, timeout);
+    let res: Response | null = null;
+    let errBody = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+      if (res.ok) break;
+      errBody = await res.text();
+      if (res.status === 429 && attempt === 0) {
+        const retryAfter = Number(res.headers.get("retry-after") || 0);
+        await sleep(retryAfter > 0 ? Math.min(retryAfter * 1000, 3000) : 1400);
+        continue;
+      }
+      break;
+    }
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      lastErr = { status: res.status, message: `Mistral ${model} ${res.status}: ${errBody.slice(0, 200)}` };
-      if (isModelAvailabilityError(res.status, errBody)) {
+    if (!res!.ok) {
+      lastErr = { status: res!.status, message: `Mistral ${model} ${res!.status}: ${errBody.slice(0, 200)}` };
+      if (isModelAvailabilityError(res!.status, errBody)) {
         console.warn(`callAI → model ${model} unavailable on this tier, stepping down`);
         continue;
       }
       throw lastErr;
     }
-    const data = await res.json();
+    const data = await res!.json();
     const text = data?.choices?.[0]?.message?.content;
     if (typeof text !== "string" || !text.trim()) {
       lastErr = new Error("Empty Mistral response");
       continue;
     }
+    modelMemo.set(memoKey, model);
     return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
   throw lastErr || new Error("Mistral: no usable model");
 }
+
 
 
 /**
