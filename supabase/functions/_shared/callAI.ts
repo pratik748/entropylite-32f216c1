@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -458,8 +458,36 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
-  return { primary, fallback };
+
+  // Admin-added credentials from the in-app API Manager: any active row whose
+  // value looks like an LLM key joins the chain even if the admin named it
+  // something arbitrary. Provider is inferred from the key's own shape, so a
+  // freshly added key is usable immediately with no redeploy and no naming
+  // convention to remember. Tried FIRST, since an admin adds a key precisely
+  // because the existing lanes are exhausted or blocked.
+  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
+  const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
+  const inferred: Lane[] = [];
+  for (const [name, value] of Object.entries(getManagedSnapshot())) {
+    if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
+    const v = value.trim();
+    if (/^sk-or-/.test(v)) {
+      inferred.push({ label: `managed:${name}(openrouter)`, call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+    } else if (/^gsk_/.test(v)) {
+      inferred.push({ label: `managed:${name}(groq)`, call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+    } else if (/^AIza[\w-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(gemini)`, call: (o) => callGeminiWithKey(o, v, reported) });
+    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(openai)`, call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
+    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(mistral)`, call: (o) => callMistralWithKey(o, v, reported) });
+    }
+    known.add(v);
+  }
+
+  return { primary: inferred.concat(primary), fallback };
 }
+
 
 /**
  * Convert a tool-calling request into a JSON-mode prompt and wrap the result
