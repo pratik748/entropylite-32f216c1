@@ -191,38 +191,68 @@ function buildJsonSkeleton(schema: any, depth = 0): any {
 }
 
 /**
+ * Models tried in order for a single Mistral key. If the account's tier does
+ * not allow the large model (403 tier_not_allowed) or the model name is not
+ * served (400/404), we step down to the open-weight models that every tier
+ * can call instead of burning the whole lane.
+ */
+const MISTRAL_MODEL_CHAIN = [MISTRAL_DEFAULT_MODEL, MISTRAL_FAST_MODEL, "open-mistral-nemo"];
+
+function isModelAvailabilityError(status: number, body: string): boolean {
+  if (status === 404) return true;
+  if (status !== 403 && status !== 400) return false;
+  const b = body.toLowerCase();
+  return b.includes("tier_not_allowed") || b.includes("not available in your subscription") ||
+    b.includes("model_not_found") || b.includes("invalid model");
+}
+
+/**
  * Call Mistral with a single API key. Throws on non-2xx with status info.
  */
 async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const model = opts.model || MISTRAL_DEFAULT_MODEL;
+  const chain = opts.model ? [opts.model, MISTRAL_FAST_MODEL, "open-mistral-nemo"] : MISTRAL_MODEL_CHAIN;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const body: Record<string, any> = {
-    model,
-    messages: [
-      { role: "system", content: systemText },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-  };
-  if (opts.jsonMode) body.response_format = { type: "json_object" };
+  let lastErr: any = null;
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
+  for (const model of chain) {
+    const body: Record<string, any> = {
+      model,
+      messages: [
+        { role: "system", content: systemText },
+        { role: "user", content: opts.userPrompt },
+      ],
+      temperature: opts.temperature ?? 0.6,
+      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+    };
+    if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
+    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+    const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, timeout);
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      lastErr = { status: res.status, message: `Mistral ${model} ${res.status}: ${errBody.slice(0, 200)}` };
+      if (isModelAvailabilityError(res.status, errBody)) {
+        console.warn(`callAI → model ${model} unavailable on this tier, stepping down`);
+        continue;
+      }
+      throw lastErr;
+    }
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text.trim()) {
+      lastErr = new Error("Empty Mistral response");
+      continue;
+    }
+    return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+  throw lastErr || new Error("Mistral: no usable model");
 }
+
 
 /**
  * Generic OpenAI-compatible lane (OpenRouter, Groq, or any admin-supplied
