@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -191,38 +191,95 @@ function buildJsonSkeleton(schema: any, depth = 0): any {
 }
 
 /**
+ * Models tried in order for a single Mistral key. If the account's tier does
+ * not allow the large model (403 tier_not_allowed) or the model name is not
+ * served (400/404), we step down to the open-weight models that every tier
+ * can call instead of burning the whole lane.
+ */
+const MISTRAL_MODEL_CHAIN = [MISTRAL_DEFAULT_MODEL, MISTRAL_FAST_MODEL, "open-mistral-nemo"];
+
+function isModelAvailabilityError(status: number, body: string): boolean {
+  if (status === 404) return true;
+  if (status !== 403 && status !== 400) return false;
+  const b = body.toLowerCase();
+  return b.includes("tier_not_allowed") || b.includes("not available in your subscription") ||
+    b.includes("model_not_found") || b.includes("invalid model");
+}
+
+/**
+ * Remembers, per isolate, which model a given key was actually allowed to
+ * call, so a tier-restricted account stops paying a wasted 403 round-trip on
+ * every request.
+ */
+const modelMemo = new Map<string, string>();
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
  * Call Mistral with a single API key. Throws on non-2xx with status info.
+ * Free-tier keys rate-limit per second, so a 429 gets one short backoff retry
+ * on the same key before the lane is abandoned.
  */
 async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const model = opts.model || MISTRAL_DEFAULT_MODEL;
+  const memoKey = apiKey.slice(0, 8);
+  const preferred = modelMemo.get(memoKey);
+  const base = opts.model ? [opts.model, MISTRAL_FAST_MODEL, "open-mistral-nemo"] : MISTRAL_MODEL_CHAIN;
+  const chain = preferred ? [preferred, ...base.filter((m) => m !== preferred)] : base;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const body: Record<string, any> = {
-    model,
-    messages: [
-      { role: "system", content: systemText },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-  };
-  if (opts.jsonMode) body.response_format = { type: "json_object" };
+  let lastErr: any = null;
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
+  for (const model of chain) {
+    const body: Record<string, any> = {
+      model,
+      messages: [
+        { role: "system", content: systemText },
+        { role: "user", content: opts.userPrompt },
+      ],
+      temperature: opts.temperature ?? 0.6,
+      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+    };
+    if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Mistral ${res.status}: ${errBody.slice(0, 200)}` };
+    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+    let res: Response | null = null;
+    let errBody = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+      if (res.ok) break;
+      errBody = await res.text();
+      if (res.status === 429 && attempt === 0) {
+        const retryAfter = Number(res.headers.get("retry-after") || 0);
+        await sleep(retryAfter > 0 ? Math.min(retryAfter * 1000, 3000) : 1400);
+        continue;
+      }
+      break;
+    }
+
+    if (!res!.ok) {
+      lastErr = { status: res!.status, message: `Mistral ${model} ${res!.status}: ${errBody.slice(0, 200)}` };
+      if (isModelAvailabilityError(res!.status, errBody)) {
+        console.warn(`callAI → model ${model} unavailable on this tier, stepping down`);
+        continue;
+      }
+      throw lastErr;
+    }
+    const data = await res!.json();
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text.trim()) {
+      lastErr = new Error("Empty Mistral response");
+      continue;
+    }
+    modelMemo.set(memoKey, model);
+    return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Mistral response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+  throw lastErr || new Error("Mistral: no usable model");
 }
+
+
 
 /**
  * Generic OpenAI-compatible lane (OpenRouter, Groq, or any admin-supplied
@@ -428,8 +485,36 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
-  return { primary, fallback };
+
+  // Admin-added credentials from the in-app API Manager: any active row whose
+  // value looks like an LLM key joins the chain even if the admin named it
+  // something arbitrary. Provider is inferred from the key's own shape, so a
+  // freshly added key is usable immediately with no redeploy and no naming
+  // convention to remember. Tried FIRST, since an admin adds a key precisely
+  // because the existing lanes are exhausted or blocked.
+  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
+  const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
+  const inferred: Lane[] = [];
+  for (const [name, value] of Object.entries(getManagedSnapshot())) {
+    if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
+    const v = value.trim();
+    if (/^sk-or-/.test(v)) {
+      inferred.push({ label: `managed:${name}(openrouter)`, call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+    } else if (/^gsk_/.test(v)) {
+      inferred.push({ label: `managed:${name}(groq)`, call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+    } else if (/^AIza[\w-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(gemini)`, call: (o) => callGeminiWithKey(o, v, reported) });
+    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(openai)`, call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
+    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(mistral)`, call: (o) => callMistralWithKey(o, v, reported) });
+    }
+    known.add(v);
+  }
+
+  return { primary: inferred.concat(primary), fallback };
 }
+
 
 /**
  * Convert a tool-calling request into a JSON-mode prompt and wrap the result
