@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, getManagedSnapshot, recordKeyHealth, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedProviderSnapshot, getManagedSnapshot, recordKeyHealth, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -312,6 +312,32 @@ async function callOpenAICompatible(
   return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
+async function callAnthropic(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: getKeySync("ANTHROPIC_MODEL") || "claude-3-5-haiku-latest",
+      system: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening),
+      messages: [{ role: "user", content: opts.userPrompt }],
+      temperature: opts.temperature ?? 0.6,
+      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+    }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `Anthropic ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = Array.isArray(data?.content) ? data.content.map((part: any) => part?.text || "").join("") : "";
+  if (!text.trim()) throw new Error("Empty Anthropic response");
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+}
+
 
 /**
  * Mistral caller with automatic key 1 → key 2 fallback.
@@ -477,6 +503,10 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const g2 = getKeySync("GOOGLE_GEMINI_KEY_2");
   const or1 = getKeySync("OPENROUTER_API_KEY");
   const gq = getKeySync("GROQ_API_KEY");
+  const openai = getKeySync("OPENAI_API_KEY");
+  const anthropic = getKeySync("ANTHROPIC_API_KEY");
+  const nvidia = getKeySync("NVIDIA_API_KEY");
+  const managed = getManagedSnapshot();
   if (m1) primary.push({ label: "mistral-1", credentialName: "MISTRAL_API_KEY", provider: "Mistral", source: getManagedSnapshot().MISTRAL_API_KEY ? "manager" : "environment", call: (o) => callMistralWithKey(o, m1, reported) });
   if (m2) primary.push({ label: "mistral-2", credentialName: "MISTRAL_API_KEY_2", provider: "Mistral", source: getManagedSnapshot().MISTRAL_API_KEY_2 ? "manager" : "environment", call: (o) => callMistralWithKey(o, m2, reported) });
   // Reserve Mistral key, kept out of the round-robin so it stays under its
@@ -488,6 +518,9 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   if (g2) fallback.push({ label: "gemini-2", credentialName: "GOOGLE_GEMINI_KEY_2", provider: "Gemini", source: getManagedSnapshot().GOOGLE_GEMINI_KEY_2 ? "manager" : "environment", call: (o) => callGeminiWithKey(o, g2, reported) });
   if (or1) fallback.push({ label: "openrouter", credentialName: "OPENROUTER_API_KEY", provider: "OpenRouter", source: getManagedSnapshot().OPENROUTER_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
   if (gq) fallback.push({ label: "groq", credentialName: "GROQ_API_KEY", provider: "Groq", source: getManagedSnapshot().GROQ_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+  if (openai) fallback.push({ label: "openai", credentialName: "OPENAI_API_KEY", provider: "OpenAI", source: managed.OPENAI_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, openai, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
+  if (anthropic) fallback.push({ label: "anthropic", credentialName: "ANTHROPIC_API_KEY", provider: "Anthropic", source: managed.ANTHROPIC_API_KEY ? "manager" : "environment", call: (o) => callAnthropic(o, anthropic, reported) });
+  if (nvidia) fallback.push({ label: "nvidia", credentialName: "NVIDIA_API_KEY", provider: "NVIDIA", source: managed.NVIDIA_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, nvidia, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", reported) });
   if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
     fallback.push({ label: "1minai", credentialName: "ONEMIN_AI_API_KEY", provider: "1min.ai", source: getManagedSnapshot().ONEMIN_AI_API_KEY ? "manager" : "environment", call: (o) => callOneMinAI(o, reported) });
   }
@@ -498,21 +531,27 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   // freshly added key is usable immediately with no redeploy and no naming
   // convention to remember. Tried FIRST, since an admin adds a key precisely
   // because the existing lanes are exhausted or blocked.
-  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
+  const known = new Set([m1, m2, m3, g1, g2, or1, gq, openai, anthropic, nvidia, onemin].filter(Boolean) as string[]);
   const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
   const inferred: Lane[] = [];
+  const managedProviders = getManagedProviderSnapshot();
   for (const [name, value] of Object.entries(getManagedSnapshot())) {
     if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
     const v = value.trim();
-    if (/^sk-or-/.test(v)) {
+    const configuredProvider = managedProviders[name];
+    if (configuredProvider === "openrouter" || /^sk-or-/.test(v)) {
       inferred.push({ label: `managed:${name}(openrouter)`, credentialName: name, provider: "OpenRouter", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-    } else if (/^gsk_/.test(v)) {
+    } else if (configuredProvider === "groq" || /^gsk_/.test(v)) {
       inferred.push({ label: `managed:${name}(groq)`, credentialName: name, provider: "Groq", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-    } else if (/^AIza[\w-]{20,}$/.test(v)) {
+    } else if (configuredProvider === "gemini" || /^AIza[\w-]{20,}$/.test(v)) {
       inferred.push({ label: `managed:${name}(gemini)`, credentialName: name, provider: "Gemini", source: "manager", call: (o) => callGeminiWithKey(o, v, reported) });
-    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
+    } else if (configuredProvider === "anthropic") {
+      inferred.push({ label: `managed:${name}(anthropic)`, credentialName: name, provider: "Anthropic", source: "manager", call: (o) => callAnthropic(o, v, reported) });
+    } else if (configuredProvider === "nvidia" || /^nvapi-/.test(v)) {
+      inferred.push({ label: `managed:${name}(nvidia)`, credentialName: name, provider: "NVIDIA", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", reported) });
+    } else if (configuredProvider === "openai" || /^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
       inferred.push({ label: `managed:${name}(openai)`, credentialName: name, provider: "OpenAI", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
-    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
+    } else if (configuredProvider === "mistral" || /^[A-Za-z0-9]{32}$/.test(v)) {
       inferred.push({ label: `managed:${name}(mistral)`, credentialName: name, provider: "Mistral", source: "manager", call: (o) => callMistralWithKey(o, v, reported) });
     }
     known.add(v);
