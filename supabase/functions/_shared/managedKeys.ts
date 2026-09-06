@@ -70,3 +70,33 @@ export function getManagedSnapshot(): Record<string, string> {
   return { ...cache };
 }
 
+export type KeyHealthEvent = {
+  name: string;
+  provider: string;
+  source: "manager" | "environment";
+  status: "ok" | "error";
+  latencyMs: number;
+  error?: string;
+};
+
+/** Persist provider health without ever storing or returning credential values. */
+export async function recordKeyHealth(event: KeyHealthEvent): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !service) return;
+  try {
+    const admin = createClient(url, service, { auth: { persistSession: false } });
+    const { error } = await admin.rpc("record_key_health", {
+      _name: event.name,
+      _provider: event.provider,
+      _source: event.source,
+      _status: event.status,
+      _latency_ms: Math.max(0, Math.round(event.latencyMs)),
+      _error: event.error?.slice(0, 300) || null,
+    });
+    if (error) throw error;
+  } catch (e) {
+    console.error("recordKeyHealth failed:", e instanceof Error ? e.message : e);
+  }
+}
+
