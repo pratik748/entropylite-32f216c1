@@ -107,6 +107,51 @@ export type Database = {
         }
         Relationships: []
       }
+      api_key_health: {
+        Row: {
+          credential_name: string
+          failure_count: number
+          is_configured: boolean
+          last_error: string | null
+          last_error_at: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          last_used_at: string | null
+          provider: string
+          source: string
+          success_count: number
+          updated_at: string
+        }
+        Insert: {
+          credential_name: string
+          failure_count?: number
+          is_configured?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          provider: string
+          source: string
+          success_count?: number
+          updated_at?: string
+        }
+        Update: {
+          credential_name?: string
+          failure_count?: number
+          is_configured?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          provider?: string
+          source?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       asset_graph_edges: {
         Row: {
           as_of: string
@@ -1226,6 +1271,17 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      record_key_health: {
+        Args: {
+          _error?: string
+          _latency_ms: number
+          _name: string
+          _provider: string
+          _source: string
+          _status: string
+        }
+        Returns: undefined
+      }
       record_key_telemetry: {
         Args: {
           _error?: string
