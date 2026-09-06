@@ -51,33 +51,57 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          failure_count: number
           id: string
           is_active: boolean
           label: string | null
+          last_error: string | null
+          last_error_at: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          last_used_at: string | null
           name: string
           notes: string | null
+          provider: string | null
+          success_count: number
           updated_at: string
           value: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          failure_count?: number
           id?: string
           is_active?: boolean
           label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
           name: string
           notes?: string | null
+          provider?: string | null
+          success_count?: number
           updated_at?: string
           value: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          failure_count?: number
           id?: string
           is_active?: boolean
           label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
           name?: string
           notes?: string | null
+          provider?: string | null
+          success_count?: number
           updated_at?: string
           value?: string
         }
@@ -1202,6 +1226,16 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      record_key_telemetry: {
+        Args: {
+          _error?: string
+          _latency_ms: number
+          _name: string
+          _provider: string
+          _status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
