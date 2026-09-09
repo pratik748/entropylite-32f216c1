@@ -126,7 +126,7 @@ export default function AboutPage() {
             <section className="border-t border-hairline py-10">
               <div className="flex items-center gap-3 mb-4">
                 <span className="mkt-label text-[10px] text-white/30">08</span>
-                <h2 className="text-[18px] font-semibold tracking-tight text-white">Built by Pratik Sehwag</h2>
+                <h2 className="text-[18px] font-semibold tracking-tight text-white">Built by Nija Sehwag</h2>
               </div>
               <p className="text-[14.5px] text-white/55 leading-relaxed">
                 Entropy is designed and engineered as a research-grade intelligence system. Every
