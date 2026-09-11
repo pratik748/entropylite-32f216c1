@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Activity, Shield, Globe, Target, BarChart3,
   TrendingUp, Layers, Zap, ArrowRight, ArrowUpRight, Plus,
-  FlaskConical,
+  FlaskConical, CheckCircle2,
 } from "lucide-react";
 import PublicNav from "@/components/PublicNav";
 import SiteFooter from "@/components/marketing/SiteFooter";
@@ -13,21 +13,21 @@ import FeatureGallery from "@/components/landing/FeatureGallery";
 import MathResearch from "@/components/landing/MathResearch";
 
 const STATS = [
-  { value: "10,000", label: "Monte Carlo paths per asset" },
-  { value: "12", label: "Analytical engines in parallel" },
-  { value: "95 / 99", label: "VaR & CVaR confidence levels" },
-  { value: "24 / 7", label: "Background scenario scan" },
+  { value: "10,000", label: "Monte Carlo paths per asset", sub: "Geometric Brownian Motion" },
+  { value: "12", label: "Analytical engines in parallel", sub: "Single composed decision" },
+  { value: "95 / 99", label: "VaR & CVaR confidence levels", sub: "Liquidity-adjusted tails" },
+  { value: "24 / 7", label: "Background scenario scan", sub: "Continuous constraint watch" },
 ];
 
 const METHODS = [
   "Monte Carlo · GBM",
-  "VaR / CVaR",
+  "VaR / CVaR 95/99",
   "Merton 1974",
   "Ornstein–Uhlenbeck",
-  "Cointegration",
-  "Shannon entropy",
-  "Bayesian priors",
-  "CLANK constraints",
+  "Cointegration Pairs",
+  "Shannon Entropy",
+  "Bayesian Priors",
+  "CLANK Constraints",
 ];
 
 const PRINCIPLES = [
@@ -85,7 +85,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Entropy, Institutional market intelligence";
+    document.title = "Entropy · Institutional market intelligence";
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute("content", "Entropy is a probabilistic market-intelligence terminal. Twelve analytical engines, risk, constraint detection, simulation, flow, composed into one operational surface.");
 
@@ -101,37 +101,152 @@ export default function LandingPage() {
       <PublicNav />
 
       {/* ── HERO · control room ── */}
-      <header className="bg-carbon-950 border-b border-hairline">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-16 sm:pt-24">
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-3 mb-7">
-              <span className="h-px w-8 bg-hairline-strong" />
-              <span className="mkt-label text-[10px] text-white/55">Probabilistic market infrastructure</span>
+      <header className="bg-carbon-950 border-b border-hairline relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-14 sm:pt-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            {/* Left: Headline and actions */}
+            <div className="lg:col-span-7">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="h-px w-8 bg-hairline-strong" />
+                <span className="mkt-label text-[10px] text-white/55">Probabilistic market infrastructure</span>
+              </div>
+
+              <h1 className="mkt-display text-white tracking-tight">
+                The market is a distribution.
+                <br />
+                <span className="text-white/40">Operate it like one.</span>
+              </h1>
+
+              <p className="mkt-lede text-white/55 max-w-xl mt-6">
+                Entropy composes twelve analytical engines, risk, structural
+                constraints, simulation, flow, into one terminal. Not what will
+                happen. What <em className="not-italic text-white font-medium">can</em> happen,
+                and with what probability.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-8">
+                <InkButton onClick={goSignup}>
+                  Open the Terminal
+                  <ArrowRight className="h-4 w-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
+                </InkButton>
+                <LineButton onClick={() => navigate("/backbone")}>
+                  Examine the mathematics
+                </LineButton>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-hairline-faint text-[11px] text-white/40 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-pos" /> Zero predictive fabrication
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-pos" /> 10,000-path stochastic MC
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-pos" /> Continuous CLANK constraints
+                </span>
+              </div>
             </div>
 
-            <h1 className="mkt-display text-white">
-              The market is a distribution.
-              <br />
-              <span className="text-white/40">Operate it like one.</span>
-            </h1>
+            {/* Right: Milled Institutional Telemetry Card */}
+            <div className="lg:col-span-5 hidden lg:block">
+              <div className="border border-hairline bg-carbon-900 shadow-2xl">
+                {/* Header bar */}
+                <div className="flex items-center justify-between px-5 h-10 border-b border-hairline bg-carbon-950">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-pos animate-pulse" />
+                    <span className="mkt-label text-[10px] text-white/70 tracking-wider">
+                      ENTROPY OPERATING CORE
+                    </span>
+                  </div>
+                  <span className="mkt-num text-[10px] text-white/40">REGIME: CALIBRATED</span>
+                </div>
 
-            <p className="mkt-lede text-white/50 max-w-xl mt-7">
-              Entropy composes twelve analytical engines, risk, structural
-              constraints, simulation, flow, into one terminal. Not what will
-              happen. What <em className="not-italic text-white font-medium">can</em> happen,
-              and with what probability.
-            </p>
+                {/* Live Distribution Graph Visualization */}
+                <div className="p-5 border-b border-hairline bg-carbon-950/40">
+                  <div className="flex items-center justify-between text-[11px] text-white/40 mb-3 font-mono">
+                    <span>GBM PROBABILITY DENSITY</span>
+                    <span className="text-pos">P(Profit) = 68.4%</span>
+                  </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-9">
-              <InkButton onClick={goSignup}>
-                Open the Terminal
-                <ArrowRight className="h-4 w-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />
-              </InkButton>
-              <LineButton onClick={() => navigate("/backbone")}>
-                Examine the mathematics
-              </LineButton>
+                  {/* Distribution Curve SVG */}
+                  <div className="relative h-28 w-full border border-hairline-faint bg-carbon-950 p-2 overflow-hidden">
+                    <svg viewBox="0 0 300 80" className="w-full h-full" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
+                        </linearGradient>
+                        <linearGradient id="tailGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#C4564F" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#C4564F" stopOpacity="0.02" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Tail Risk Area (Left < 95% VaR) */}
+                      <path
+                        d="M 10 75 Q 40 75 55 58 L 55 75 Z"
+                        fill="url(#tailGradient)"
+                      />
+
+                      {/* Normal Distribution Fill */}
+                      <path
+                        d="M 10 75 Q 60 74 110 40 Q 150 5 190 40 Q 240 74 290 75 Z"
+                        fill="url(#curveGradient)"
+                      />
+
+                      {/* Main Density Curve Line */}
+                      <path
+                        d="M 10 75 Q 60 74 110 40 Q 150 5 190 40 Q 240 74 290 75"
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                        strokeOpacity="0.85"
+                      />
+
+                      {/* Mean Axis */}
+                      <line x1="150" y1="5" x2="150" y2="75" stroke="#ffffff" strokeWidth="1" strokeDasharray="2 2" strokeOpacity="0.3" />
+
+                      {/* 95% VaR Line */}
+                      <line x1="55" y1="20" x2="55" y2="75" stroke="#C4564F" strokeWidth="1.2" strokeOpacity="0.8" />
+                    </svg>
+
+                    <div className="absolute top-2 left-3 text-[9px] font-mono text-neg">
+                      VaR (95%): -1.84%
+                    </div>
+                    <div className="absolute top-2 right-3 text-[9px] font-mono text-white/50">
+                      EV: +1.42σ
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4-cell Telemetry Grid */}
+                <div className="grid grid-cols-2 border-b border-hairline text-left">
+                  <div className="p-3.5 border-r border-hairline">
+                    <div className="mkt-label text-[9px] text-white/35">Simulation paths</div>
+                    <div className="mkt-num text-[14px] text-white mt-1">10,000 / asset</div>
+                  </div>
+                  <div className="p-3.5">
+                    <div className="mkt-label text-[9px] text-white/35">Horizon window</div>
+                    <div className="mkt-num text-[14px] text-white mt-1">252 trading days</div>
+                  </div>
+                  <div className="p-3.5 border-t border-r border-hairline">
+                    <div className="mkt-label text-[9px] text-white/35">CLANK constraints</div>
+                    <div className="mkt-num text-[14px] text-pos mt-1">Nominal (0 active)</div>
+                  </div>
+                  <div className="p-3.5 border-t border-hairline">
+                    <div className="mkt-label text-[9px] text-white/35">Signal engine</div>
+                    <div className="mkt-num text-[14px] text-white mt-1">12 / 12 running</div>
+                  </div>
+                </div>
+
+                {/* Card footer status */}
+                <div className="px-5 py-2.5 flex items-center justify-between text-[9.5px] font-mono text-white/35 bg-carbon-950">
+                  <span>LATENCY: 12ms</span>
+                  <span>FEED: REUTER · POLY · FED</span>
+                  <span className="text-white/60">INTEGRITY: 100%</span>
+                </div>
+              </div>
             </div>
-
           </div>
 
           {/* Stats band */}
@@ -139,23 +254,27 @@ export default function LandingPage() {
             {STATS.map((s, i) => (
               <div
                 key={s.label}
-                className={`py-7 pr-6 ${i > 0 ? "lg:border-l lg:border-hairline lg:pl-8" : ""} ${i % 2 === 1 ? "border-l border-hairline pl-6 lg:pl-8" : ""}`}
+                className={`py-8 pr-6 ${i > 0 ? "lg:border-l lg:border-hairline lg:pl-8" : ""} ${i % 2 === 1 ? "border-l border-hairline pl-6 lg:pl-8" : ""}`}
               >
-                <div className="mkt-num text-2xl sm:text-[26px] text-white">{s.value}</div>
-                <div className="mkt-label text-[9px] text-white/35 mt-2">{s.label}</div>
+                <div className="mkt-num text-2xl sm:text-[28px] font-semibold text-white tracking-tight">{s.value}</div>
+                <div className="text-[12.5px] font-medium text-white/70 mt-2 tracking-tight">{s.label}</div>
+                <div className="mkt-label text-[9px] text-white/30 mt-1">{s.sub}</div>
               </div>
             ))}
           </div>
 
-          <div className="pb-16 sm:pb-24" />
+          <div className="pb-12 sm:pb-16" />
         </div>
       </header>
 
       {/* ── METHODS STRIP ── */}
       <section className="border-b border-hairline bg-carbon-900">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-5 flex flex-wrap items-center gap-x-8 gap-y-3 justify-center">
-          {METHODS.map((m) => (
-            <span key={m} className="mkt-label text-[9px] text-white/30 whitespace-nowrap">{m}</span>
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex flex-wrap items-center gap-x-8 gap-y-2.5 justify-center">
+          {METHODS.map((m, idx) => (
+            <div key={m} className="flex items-center gap-4">
+              <span className="mkt-label text-[9.5px] text-white/40 tracking-wider whitespace-nowrap font-mono">{m}</span>
+              {idx < METHODS.length - 1 && <span className="h-1 w-1 rounded-full bg-hairline-strong hidden sm:inline-block" />}
+            </div>
           ))}
         </div>
       </section>
@@ -430,7 +549,7 @@ export default function LandingPage() {
 
       <SiteFooter />
 
-      {/* Sticky mobile CTA, always one tap from the terminal */}
+      {/* Sticky mobile CTA */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-carbon-950/95 backdrop-blur-sm border-t border-hairline px-4 py-3">
         <button
           onClick={goSignup}
