@@ -136,7 +136,7 @@ export default function LandingPage() {
 
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-hairline-faint text-[11px] text-white/40 font-mono">
                 <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3 w-3 text-pos" /> Zero predictive fabrication
+                  <CheckCircle2 className="h-3 w-3 text-pos" /> Closed-form econometric models
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-3 w-3 text-pos" /> 10,000-path stochastic MC
