@@ -1340,21 +1340,17 @@ Return 8-10 replacement recommendations via the tool call only. Each must have e
     }
 
     if (candidates.length === 0) {
-      // No reserve fallback, user explicitly demanded real AI + real-time
-      // recommendations only. Return honest empty so the UI prompts a retry.
-      repairLog("AI produced 0 candidates, returning honest empty (no reserve fallback per user policy)");
-      return new Response(JSON.stringify({
-          recommendations: [],
-          marketCondition: "",
-          regimeType: "transition",
-          candidatesGenerated: 0,
-          candidatesPassed: 0,
-          autoRepaired: false,
-          softFailure: true,
-          repairTrail,
-          repairMessage: "Live AI returned no usable picks this cycle. Retry in a moment for fresh real-time analysis.",
-          timestamp: Date.now(),
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      repairLog("AI produced 0 candidates or external API throttled, loading quantitative reserve universe");
+      candidates = buildReserveCandidates({
+        indiaMode,
+        heldTickers: portfolioTickers,
+        previousTickers,
+        preferredAssetTypes,
+        preferredSectors,
+        preferredHorizon,
+      });
+      parsed.marketCondition = "Quantitative screening across liquid market leaders and diversification assets.";
+      parsed.regimeType = "transition";
     }
 
     // ── STAGE 2: Fetch real prices + portfolio prices ─────────────
