@@ -47,17 +47,18 @@ const REGISTRY: Record<string, ModelRegistryEntry> = {
   },
   "direct-profit": {
     id: "direct-profit",
-    version: "4.0.0",
-    effectiveDate: "2026-09-11",
+    version: "3.1.0",
+    effectiveDate: "2026-07-17",
     methodology:
-      "Deterministic quantitative trade-structuring engine (canonical stats spine, empirical OLS beta with Blume shrinkage, Engle-Granger cointegration, Merton structural credit, walk-forward edge, and Cornish-Fisher higher moments) gated by multi-engine ensemble-consensus with decision-theoretic thresholds (p ≥ 0.53, E[R] ≥ 0.05R after costs); historical VaR/CVaR at n ≥ 20 else labeled parametric estimate; institutional NLG synthesis.",
-    inputs: ["Yahoo/AlphaVantage OHLCV", "Benchmark OHLCV (^NSEI/SPY)", "VIX", "real news titles", "ensemble-consensus verdict", "riskFree snapshot"],
+      "AI trade-structuring over a deterministic technical/risk snapshot (canonical stats spine), gated by ensemble-consensus with decision-theoretic thresholds (p ≥ 0.53, E[R] ≥ 0.05R after costs); historical VaR/CVaR at n ≥ 20 else labeled parametric estimate; currency-aware risk-free.",
+    inputs: ["Yahoo/AlphaVantage OHLCV", "VIX", "news titles", "ensemble-consensus verdict", "riskFree snapshot"],
     outputSemantics:
-      "action/entry/target/stop are a deterministic TRADE PLAN (hypothesis), not a forecast; win-prob inherits ensemble-consensus semantics; risk metrics are measured from empirical history; zero third-party LLM dependencies.",
+      "action/entry/target/stop are a model TRADE PLAN (hypothesis), not a forecast; win-prob inherits ensemble-consensus semantics; risk metrics are measured from history where sample permits.",
     validationStatus: "outcome-logged (nightly settlement, reliability reported)",
     knownLimitations: [
-      "daily closes only; intraday gap risk between market sessions is not modeled",
-      "historical covariance estimation assumes stationary correlation structure over the sample window",
+      "AI narrative layer can mis-structure levels; server promote/rebuild branch guards but does not eliminate this",
+      "betaEstimate is a VIX/vol proxy, not a regression",
+      "no intraday data, gap risk between daily closes is invisible",
     ],
   },
   "analyze-stock": {

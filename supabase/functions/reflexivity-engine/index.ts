@@ -255,17 +255,30 @@ Return ONLY valid JSON, no markdown, no commentary.`;
 
 Return ONLY a JSON object: { "thesis": "<2-3 sentences in Soros voice, what the market believes the market believes, and where that belief is wrong>", "actionable": { "trigger": "<specific observable event that confirms the belief is breaking>", "trade": "<directional asymmetric position to express the contradiction>", "risk": "<what would invalidate the thesis>" } }`;
 
-      // Deterministic Soros-cadence thesis and actionable synthesis
-      const primaryContradiction = contradictions[0]?.pair || "pricing efficiency vs fundamentals";
-      thesis = `Consensus pricing reflects ${consensus.label.toLowerCase()} expectations (${consensus.direction}), but underlying transmission across flow and causal signals reveals a structural divergence in ${primaryContradiction}. Estimated belief revision window: ${shiftETA.window} (${shiftETA.probability}% probability).`;
-      actionable = {
-        trigger: `Observable breach of key volatility/flow hurdle confirming consensus repricing in ${shiftETA.window}.`,
-        trade: `Asymmetric convexity positioning aligned with ${consensus.direction === "BULLISH" ? "tactical dispersion hedge" : "tail protection"}.`,
-        risk: `Persistent momentum without volatility expansion invalidates structural divergence thesis.`,
-      };
-      aiError = null;
+      const ai = await callAI({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.4,
+        maxTokens: 700,
+        jsonMode: true,
+      });
+
+      const parsed = safeParseJSON(ai.text);
+      if (parsed?.thesis && typeof parsed.thesis === "string") {
+        thesis = parsed.thesis;
+        actionable = parsed.actionable && typeof parsed.actionable === "object"
+          ? {
+              trigger: String(parsed.actionable.trigger || ""),
+              trade: String(parsed.actionable.trade || ""),
+              risk: String(parsed.actionable.risk || ""),
+            }
+          : null;
+      } else {
+        aiError = "AI returned no thesis";
+      }
     } catch (e: any) {
-      console.warn("Reflexivity narrative fallback:", e?.message);
+      aiError = e?.message || "AI narrative unavailable";
+      console.warn("Reflexivity narrative skipped:", aiError);
     }
 
     return new Response(
