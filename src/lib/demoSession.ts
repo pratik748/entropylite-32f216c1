@@ -29,54 +29,18 @@ export interface DemoHistoryEntry {
 export interface DemoSession {
   token: string;
   expiresAt: number;
-  /** Local sessions intentionally never impersonate a Supabase user. */
-  mode: "local";
   scope: string[];
   label: string;
   portfolio: DemoPosition[];
   history: DemoHistoryEntry[];
 }
 
-export type DemoFailureCode =
-  | "DEMO_CODE_INVALID"
-  | "DEMO_SESSION_CREATE_FAILED"
-  | "DEMO_SESSION_NOT_FOUND"
-  | "DEMO_SESSION_EXPIRED"
-  | "DEMO_DATA_LOAD_FAILED"
-  | "AUTH_STATE_NOT_READY"
-  | "DATABASE_ERROR"
-  | "NETWORK_ERROR";
-
-export class DemoSessionError extends Error {
-  constructor(
-    public readonly code: DemoFailureCode,
-    message: string,
-    public readonly status?: number,
-  ) {
-    super(message);
-    this.name = "DemoSessionError";
-  }
-}
-
 const STORAGE_KEY = "entropy.demo.session";
-const LOCAL_DEMO_CODE = "9740";
-const TTL_MINUTES = 45;
-
-// The demo is a read-only product preview, not a user workspace. Keeping its
-// snapshot in the client removes the deployment dependency on an edge function
-// and prevents a demo visitor from ever receiving a database identity.
-const LOCAL_DEMO_PORTFOLIO: DemoPosition[] = [
-  { id: "demo-msft", ticker: "MSFT", buyPrice: 412.18, quantity: 24, createdAt: "2026-01-13T09:30:00.000Z" },
-  { id: "demo-nvda", ticker: "NVDA", buyPrice: 136.42, quantity: 36, createdAt: "2026-02-04T09:30:00.000Z" },
-  { id: "demo-tlt", ticker: "TLT", buyPrice: 89.77, quantity: 55, createdAt: "2026-03-12T09:30:00.000Z" },
-];
-const LOCAL_DEMO_HISTORY: DemoHistoryEntry[] = [];
 
 /** Only the token and its expiry are persisted, never the access code. */
 interface StoredDemo {
   token: string;
   expiresAt: number;
-  mode: "local";
 }
 
 export function readStoredDemo(): StoredDemo | null {
@@ -84,7 +48,7 @@ export function readStoredDemo(): StoredDemo | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (typeof parsed?.token !== "string" || typeof parsed?.expiresAt !== "number" || parsed?.mode !== "local") return null;
+    if (typeof parsed?.token !== "string" || typeof parsed?.expiresAt !== "number") return null;
     if (parsed.expiresAt <= Date.now()) {
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
@@ -95,9 +59,9 @@ export function readStoredDemo(): StoredDemo | null {
   }
 }
 
-export function storeDemo(session: { token: string; expiresAt: number; mode: "local" }) {
+export function storeDemo(session: { token: string; expiresAt: number }) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token: session.token, expiresAt: session.expiresAt, mode: session.mode }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token: session.token, expiresAt: session.expiresAt }));
   } catch {
     /* private mode, session stays in memory only */
   }
@@ -135,50 +99,66 @@ export function isCompleteCode(cells: string[]): boolean {
   return cells.length === 4 && cells.every((c) => /^\d$/.test(c));
 }
 
-function trace(stage: string, detail: Record<string, unknown> = {}) {
-  // Deliberately omit access codes and tokens from browser diagnostics.
-  console.info("[demo-session]", { stage, ...detail });
+/* ── server calls ── */
+
+const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-session`;
+const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+async function post(body: Record<string, unknown>) {
+  const res = await fetch(FN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: ANON,
+      Authorization: `Bearer ${ANON}`,
+    },
+    body: JSON.stringify(body),
+  });
+  let payload: any = null;
+  try {
+    payload = await res.json();
+  } catch {
+    payload = null;
+  }
+  if (!res.ok) {
+    const message =
+      typeof payload?.error === "string" ? payload.error : "Demo workspace is unavailable right now.";
+    throw new Error(message);
+  }
+  return payload;
 }
 
-/**
- * Creates a local-only preview session. This deliberately makes no network or
- * Supabase call: the preview has fixed public fixture data and no write path.
- */
+/** Exchanges a four-digit access code for a restricted demo session. */
 export async function createDemoSession(code: string): Promise<DemoSession> {
-  trace("create-start");
-  if (normalizeCodeInput(code) !== LOCAL_DEMO_CODE) {
-    trace("create-rejected", { code: "DEMO_CODE_INVALID" });
-    throw new DemoSessionError("DEMO_CODE_INVALID", "That access code isn't valid.");
-  }
-  const expiresAt = Date.now() + TTL_MINUTES * 60_000;
+  const data = await post({ action: "create", code: normalizeCodeInput(code) });
   const session: DemoSession = {
-    token: `local-demo-${expiresAt}`,
-    expiresAt,
-    mode: "local",
-    scope: ["portfolio:read", "risk:read", "intelligence:read", "news:read", "analytics:read"],
-    label: "Demo Workspace",
-    portfolio: LOCAL_DEMO_PORTFOLIO,
-    history: LOCAL_DEMO_HISTORY,
+    token: data.token,
+    expiresAt: data.expiresAt,
+    scope: data.scope ?? [],
+    label: data.label ?? "Demo Workspace",
+    portfolio: data.portfolio ?? [],
+    history: data.history ?? [],
   };
   storeDemo(session);
-  trace("create-persisted", { expiresAt: session.expiresAt, portfolioCount: session.portfolio.length, historyCount: session.history.length });
   return session;
 }
 
-/** Re-hydrates the local-only demo session on refresh. */
+/** Re-hydrates a stored demo token on reload. Returns null when expired/invalid. */
 export async function resumeDemoSession(): Promise<DemoSession | null> {
   const stored = readStoredDemo();
   if (!stored) return null;
-  trace("resume-start", { expiresAt: stored.expiresAt });
-  const session: DemoSession = {
-    token: stored.token,
-    expiresAt: stored.expiresAt,
-    mode: "local",
-    scope: ["portfolio:read", "risk:read", "intelligence:read", "news:read", "analytics:read"],
-    label: "Demo Workspace",
-    portfolio: LOCAL_DEMO_PORTFOLIO,
-    history: LOCAL_DEMO_HISTORY,
-  };
-  trace("resume-complete", { expiresAt: session.expiresAt });
-  return session;
+  try {
+    const data = await post({ action: "resume", token: stored.token });
+    return {
+      token: stored.token,
+      expiresAt: data.expiresAt ?? stored.expiresAt,
+      scope: data.scope ?? [],
+      label: data.label ?? "Demo Workspace",
+      portfolio: data.portfolio ?? [],
+      history: data.history ?? [],
+    };
+  } catch {
+    clearStoredDemo();
+    return null;
+  }
 }

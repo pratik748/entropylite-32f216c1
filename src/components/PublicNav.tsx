@@ -52,21 +52,14 @@ export default function PublicNav() {
     <div className="sticky top-0 z-50">
       {/* Utility strip, session facts only */}
       <div className="bg-carbon-950 border-b border-hairline-faint hidden sm:block">
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-pos/90 animate-pulse" />
-            <span className="mkt-label text-[10px] text-white/40 tracking-wider">
-              Entropy · Institutional Infrastructure
-            </span>
-            <span className="h-3 w-px bg-hairline-strong hidden md:inline-block" />
-            <span className="mkt-label text-[9px] text-white/30 hidden md:inline-block font-mono">
-              12 Engines Active
-            </span>
-          </div>
-          <div className="flex items-center gap-5">
+        <div className="max-w-7xl mx-auto px-8 h-8 flex items-center justify-between">
+          <span className="mkt-label text-[10px] text-white/35">
+            Entropy · Probabilistic market infrastructure
+          </span>
+          <span className="flex items-center gap-6">
             <span className="mkt-num text-[10px] text-white/35">{utcDate}</span>
-            <span className="mkt-num text-[10px] text-white/60">{utc} UTC</span>
-          </div>
+            <span className="mkt-num text-[10px] text-white/50">{utc} UTC</span>
+          </span>
         </div>
       </div>
 
@@ -131,7 +124,11 @@ export default function PublicNav() {
       </nav>
     </div>
 
-    {/* Mobile sheet */}
+    {/* Mobile sheet, rendered outside the backdrop-blurred <nav> on purpose.
+        A backdrop-filter ancestor becomes the containing block for fixed
+        descendants, which would trap this sheet inside the 56px nav bar and
+        collapse it to nothing. As a sibling of the sticky chrome, its fixed
+        positioning resolves against the viewport as intended. */}
     {open && (
       <div className="md:hidden fixed inset-x-0 top-14 sm:top-[5.5rem] bottom-0 z-40 bg-carbon-950 border-t border-hairline px-5 pt-2 pb-8 overflow-auto">
         {[...NAV_LINKS, { label: "Client access", path: "/access" }].map((l, i) => (

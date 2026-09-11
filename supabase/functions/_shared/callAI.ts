@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, getManagedProviderSnapshot, getManagedSnapshot, recordKeyHealth, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -139,6 +139,16 @@ function stripThinkingBlocks(text: string): string {
   return cleaned;
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Build a tiny placeholder JSON example from a JSON-schema fragment.
  * Used to give Mistral a concrete shape to imitate when the caller passed
@@ -230,14 +240,15 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
     };
     if (opts.jsonMode) body.response_format = { type: "json_object" };
 
+    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
     let res: Response | null = null;
     let errBody = "";
     for (let attempt = 0; attempt < 2; attempt++) {
-      res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      res = await fetchWithTimeout("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
+      }, timeout);
       if (res.ok) break;
       errBody = await res.text();
       if (res.status === 429 && attempt === 0) {
@@ -296,11 +307,12 @@ async function callOpenAICompatible(
   };
   if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  const res = await fetch(endpoint, {
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout(endpoint, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -309,32 +321,6 @@ async function callOpenAICompatible(
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) throw new Error("Empty provider response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
-}
-
-async function callAnthropic(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getKeySync("ANTHROPIC_MODEL") || "claude-3-5-haiku-latest",
-      system: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening),
-      messages: [{ role: "user", content: opts.userPrompt }],
-      temperature: opts.temperature ?? 0.6,
-      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-    }),
-  });
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Anthropic ${res.status}: ${errBody.slice(0, 200)}` };
-  }
-  const data = await res.json();
-  const text = Array.isArray(data?.content) ? data.content.map((part: any) => part?.text || "").join("") : "";
-  if (!text.trim()) throw new Error("Empty Anthropic response");
   return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
@@ -357,27 +343,10 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
 
   let lastErr: any = null;
   for (const lane of ordered) {
-    const startedAt = performance.now();
     try {
-      const result = await lane.call(opts);
-      await recordKeyHealth({
-        name: lane.credentialName,
-        provider: lane.provider,
-        source: lane.source,
-        status: "ok",
-        latencyMs: performance.now() - startedAt,
-      });
-      return result;
+      return await lane.call(opts);
     } catch (e: any) {
       lastErr = e;
-      await recordKeyHealth({
-        name: lane.credentialName,
-        provider: lane.provider,
-        source: lane.source,
-        status: "error",
-        latencyMs: performance.now() - startedAt,
-        error: e?.message || String(e),
-      });
       console.warn(`callAI → lane ${lane.label} failed:`, e?.message || e);
     }
   }
@@ -416,11 +385,12 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
     },
   };
 
-  const res = await fetch("https://api.1min.ai/api/features?isStreaming=false", {
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout("https://api.1min.ai/api/features?isStreaming=false", {
     method: "POST",
     headers: { "API-KEY": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -459,12 +429,13 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
     },
   };
 
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, timeout);
 
   if (!res.ok) {
     const errBody = await res.text();
@@ -482,9 +453,6 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 // ---------------------------------------------------------------------------
 interface Lane {
   label: string;
-  credentialName: string;
-  provider: string;
-  source: "manager" | "environment";
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
@@ -503,26 +471,19 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   const g2 = getKeySync("GOOGLE_GEMINI_KEY_2");
   const or1 = getKeySync("OPENROUTER_API_KEY");
   const gq = getKeySync("GROQ_API_KEY");
-  const openai = getKeySync("OPENAI_API_KEY");
-  const anthropic = getKeySync("ANTHROPIC_API_KEY");
-  const nvidia = getKeySync("NVIDIA_API_KEY");
-  const managed = getManagedSnapshot();
-  if (m1) primary.push({ label: "mistral-1", credentialName: "MISTRAL_API_KEY", provider: "Mistral", source: getManagedSnapshot().MISTRAL_API_KEY ? "manager" : "environment", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) primary.push({ label: "mistral-2", credentialName: "MISTRAL_API_KEY_2", provider: "Mistral", source: getManagedSnapshot().MISTRAL_API_KEY_2 ? "manager" : "environment", call: (o) => callMistralWithKey(o, m2, reported) });
+  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
+  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
   // Reserve Mistral key, kept out of the round-robin so it stays under its
   // rate limits, and tried before Gemini when the rotating keys are exhausted.
-  if (m3) fallback.push({ label: "mistral-3-reserve", credentialName: "MISTRAL_API_KEY_3", provider: "Mistral", source: getManagedSnapshot().MISTRAL_API_KEY_3 ? "manager" : "environment", call: (o) => callMistralWithKey(o, m3, reported) });
+  if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
   // Gemini lanes, sequential fallback after every Mistral key fails.
   // Ensures analytics never go dark when Mistral is rate-limited or down.
-  if (g1) fallback.push({ label: "gemini-1", credentialName: "GOOGLE_GEMINI_KEY", provider: "Gemini", source: getManagedSnapshot().GOOGLE_GEMINI_KEY ? "manager" : "environment", call: (o) => callGeminiWithKey(o, g1, reported) });
-  if (g2) fallback.push({ label: "gemini-2", credentialName: "GOOGLE_GEMINI_KEY_2", provider: "Gemini", source: getManagedSnapshot().GOOGLE_GEMINI_KEY_2 ? "manager" : "environment", call: (o) => callGeminiWithKey(o, g2, reported) });
-  if (or1) fallback.push({ label: "openrouter", credentialName: "OPENROUTER_API_KEY", provider: "OpenRouter", source: getManagedSnapshot().OPENROUTER_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-  if (gq) fallback.push({ label: "groq", credentialName: "GROQ_API_KEY", provider: "Groq", source: getManagedSnapshot().GROQ_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-  if (openai) fallback.push({ label: "openai", credentialName: "OPENAI_API_KEY", provider: "OpenAI", source: managed.OPENAI_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, openai, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
-  if (anthropic) fallback.push({ label: "anthropic", credentialName: "ANTHROPIC_API_KEY", provider: "Anthropic", source: managed.ANTHROPIC_API_KEY ? "manager" : "environment", call: (o) => callAnthropic(o, anthropic, reported) });
-  if (nvidia) fallback.push({ label: "nvidia", credentialName: "NVIDIA_API_KEY", provider: "NVIDIA", source: managed.NVIDIA_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, nvidia, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", reported) });
+  if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
+  if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
+  if (or1) fallback.push({ label: "openrouter", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+  if (gq) fallback.push({ label: "groq", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
   if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
-    fallback.push({ label: "1minai", credentialName: "ONEMIN_AI_API_KEY", provider: "1min.ai", source: getManagedSnapshot().ONEMIN_AI_API_KEY ? "manager" : "environment", call: (o) => callOneMinAI(o, reported) });
+    fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
 
   // Admin-added credentials from the in-app API Manager: any active row whose
@@ -531,39 +492,24 @@ function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallbac
   // freshly added key is usable immediately with no redeploy and no naming
   // convention to remember. Tried FIRST, since an admin adds a key precisely
   // because the existing lanes are exhausted or blocked.
-  const known = new Set([m1, m2, m3, g1, g2, or1, gq, openai, anthropic, nvidia, onemin].filter(Boolean) as string[]);
+  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
   const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
   const inferred: Lane[] = [];
-  const managedProviders = getManagedProviderSnapshot();
   for (const [name, value] of Object.entries(getManagedSnapshot())) {
     if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
     const v = value.trim();
-    const configuredProvider = managedProviders[name];
-    if (configuredProvider === "openrouter" || /^sk-or-/.test(v)) {
-      inferred.push({ label: `managed:${name}(openrouter)`, credentialName: name, provider: "OpenRouter", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-    } else if (configuredProvider === "groq" || /^gsk_/.test(v)) {
-      inferred.push({ label: `managed:${name}(groq)`, credentialName: name, provider: "Groq", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-    } else if (configuredProvider === "gemini" || /^AIza[\w-]{20,}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(gemini)`, credentialName: name, provider: "Gemini", source: "manager", call: (o) => callGeminiWithKey(o, v, reported) });
-    } else if (configuredProvider === "anthropic") {
-      inferred.push({ label: `managed:${name}(anthropic)`, credentialName: name, provider: "Anthropic", source: "manager", call: (o) => callAnthropic(o, v, reported) });
-    } else if (configuredProvider === "nvidia" || /^nvapi-/.test(v)) {
-      inferred.push({ label: `managed:${name}(nvidia)`, credentialName: name, provider: "NVIDIA", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", reported) });
-    } else if (configuredProvider === "openai" || /^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(openai)`, credentialName: name, provider: "OpenAI", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
-    } else if (configuredProvider === "mistral" || /^[A-Za-z0-9]{32}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(mistral)`, credentialName: name, provider: "Mistral", source: "manager", call: (o) => callMistralWithKey(o, v, reported) });
+    if (/^sk-or-/.test(v)) {
+      inferred.push({ label: `managed:${name}(openrouter)`, call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+    } else if (/^gsk_/.test(v)) {
+      inferred.push({ label: `managed:${name}(groq)`, call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+    } else if (/^AIza[\w-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(gemini)`, call: (o) => callGeminiWithKey(o, v, reported) });
+    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(openai)`, call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
+    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(mistral)`, call: (o) => callMistralWithKey(o, v, reported) });
     }
     known.add(v);
-  }
-
-  const testKey = Deno.env.get("AI_TEST_API_KEY")?.trim();
-  if (testKey && !known.has(testKey)) {
-    if (/^sk-or-/.test(testKey)) inferred.unshift({ label: "test-key(openrouter)", credentialName: "AI_TEST_API_KEY", provider: "OpenRouter", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-    else if (/^gsk_/.test(testKey)) inferred.unshift({ label: "test-key(groq)", credentialName: "AI_TEST_API_KEY", provider: "Groq", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-    else if (/^AIza/.test(testKey)) inferred.unshift({ label: "test-key(gemini)", credentialName: "AI_TEST_API_KEY", provider: "Gemini", source: "environment", call: (o) => callGeminiWithKey(o, testKey, reported) });
-    else if (/^sk-/.test(testKey)) inferred.unshift({ label: "test-key(openai)", credentialName: "AI_TEST_API_KEY", provider: "OpenAI", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
-    else if (/^[A-Za-z0-9]{32}$/.test(testKey)) inferred.unshift({ label: "test-key(mistral)", credentialName: "AI_TEST_API_KEY", provider: "Mistral", source: "environment", call: (o) => callMistralWithKey(o, testKey, reported) });
   }
 
   return { primary: inferred.concat(primary), fallback };
