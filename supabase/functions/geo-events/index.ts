@@ -121,68 +121,6 @@ function dedupe(items: RawHeadline[]): RawHeadline[] {
   return Array.from(seen.values());
 }
 
-function deterministicScoreEvents(headlines: RawHeadline[]): any[] {
-  const top = headlines.slice(0, 35);
-  const out: any[] = [];
-  for (const h of top) {
-    const text = h.title.toLowerCase();
-    let category = "political";
-    let severity = 0.45;
-    let market_relevance = 0.5;
-    let velocity = 0.6;
-    const countries: string[] = [];
-    const tickers: string[] = [];
-    const commodities: string[] = [];
-
-    if (/missile|drone|strike|attack|war|military|troop|air defense|bomb|invasion/i.test(text)) {
-      category = "military";
-      severity = 0.85;
-      market_relevance = 0.75;
-      commodities.push("oil", "gold");
-    } else if (/sanction|tariff|embargo|trade war|export control|ban|curb/i.test(text)) {
-      category = "supply_chain";
-      severity = 0.65;
-      market_relevance = 0.8;
-      tickers.push("XLE", "SMH");
-    } else if (/rate|inflation|central bank|fed|ecb|rbi|liquidity|gdp|yield/i.test(text)) {
-      category = "economic";
-      severity = 0.55;
-      market_relevance = 0.9;
-      tickers.push("SPY", "TLT");
-    } else if (/cyber|hack|breach|malware|ransomware/i.test(text)) {
-      category = "cyber";
-      severity = 0.6;
-      market_relevance = 0.5;
-      tickers.push("CIBR");
-    }
-
-    if (/us|usa|biden|trump|america/i.test(text)) countries.push("USA");
-    if (/china|beijing|taiwan/i.test(text)) countries.push("CHN");
-    if (/russia|moscow|ukraine|kyiv/i.test(text)) countries.push("RUS", "UKR");
-    if (/iran|tehran|israel|gaza|middle east/i.test(text)) {
-      countries.push("ISR", "IRN");
-      if (!commodities.includes("oil")) commodities.push("oil");
-    }
-    if (/india|rbi|modi/i.test(text)) countries.push("IND");
-
-    out.push({
-      id: hashId(`${h.url || h.title}-${Math.floor(h.ts / 60000)}`),
-      title: h.title,
-      source: h.source,
-      url: h.url,
-      ts: h.ts,
-      loc: { lat: 0, lng: 0, place: h.place || countries[0] || "Global" },
-      category,
-      severity,
-      market_relevance,
-      velocity,
-      confidence: 0.7,
-      entities: { countries, tickers, commodities },
-    });
-  }
-  return out;
-}
-
 // ── AI scoring + structuring ──────────────────────────────────
 async function scoreEvents(headlines: RawHeadline[]): Promise<any[]> {
   if (headlines.length === 0) return [];
@@ -235,11 +173,12 @@ ${lines}`,
         entities: s.entities || { countries: [], tickers: [], commodities: [] },
       });
     });
-    return out.length > 0 ? out : deterministicScoreEvents(headlines);
+    return out;
   } catch (e) {
-    if (e instanceof Response) throw e;
-    console.warn("scoreEvents AI error, falling back to deterministic geopolitical taxonomy:", e);
-    return deterministicScoreEvents(headlines);
+    // requireAuth throws a Response (401), pass it through unchanged.
+    if (e instanceof Response) return e;
+    console.error("scoreEvents AI error:", e);
+    return [];
   }
 }
 

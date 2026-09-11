@@ -85,99 +85,59 @@ serve(async (req) => {
       const repairBlock = repair
         ? `\n=== REPAIR (previous graph partially failed, plan ONLY what is still needed; do not repeat completed nodes) ===\ncompleted: ${JSON.stringify(repair.completed)}\nfailed: ${JSON.stringify(repair.failed)}`
         : "";
-      try {
-        const { text } = await callAI({
-          systemPrompt: DECIDE_SYSTEM,
-          userPrompt:
-            `=== TOOL MANIFEST ===\n${JSON.stringify(manifest)}\n\n` +
-            `=== CONTEXT ===\n${context || "(new session)"}\n\n` +
-            `=== UI ===\nactiveTab: ${ui?.activeTab}\ntargets: ${JSON.stringify(ui?.targets || [])}\n\n` +
-            `=== PORTFOLIO ===\n${JSON.stringify(portfolio || [])}\n\n` +
-            `=== NOW ===\n${now}${repairBlock}\n\n` +
-            `=== ANALYST REQUEST ===\n${message}`,
-          jsonMode: true,
-          skipHardening: true,
-          temperature: 0.2,
-          maxTokens: 3000,
-        });
-        result = safeParseJSON(text);
-      } catch (aiErr) {
-        console.warn("Foresight decide fallback to deterministic graph routing:", aiErr);
-        // Deterministic routing fallback
-        result = {
-          mode: "plan",
-          goals: [`Execute request: ${message}`],
-          say: `Analyzing request and orchestrating deterministic telemetry pipeline.`,
-          graph: [
-            {
-              id: "n1",
-              tool: "market.resolve_symbol",
-              params: { query: message.replace(/[^a-zA-Z0-9]/g, " ").trim().split(" ")[0] || "SPY" },
-              reason: "Resolve symbol from utterance",
-            },
-            {
-              id: "n2",
-              tool: "market.quote",
-              params: { ticker: { $ref: "n1.symbol" } },
-              after: ["n1"],
-              reason: "Fetch live price and statistics",
-            },
-          ],
-        };
-      }
+      const { text } = await callAI({
+        systemPrompt: DECIDE_SYSTEM,
+        userPrompt:
+          `=== TOOL MANIFEST ===\n${JSON.stringify(manifest)}\n\n` +
+          `=== CONTEXT ===\n${context || "(new session)"}\n\n` +
+          `=== UI ===\nactiveTab: ${ui?.activeTab}\ntargets: ${JSON.stringify(ui?.targets || [])}\n\n` +
+          `=== PORTFOLIO ===\n${JSON.stringify(portfolio || [])}\n\n` +
+          `=== NOW ===\n${now}${repairBlock}\n\n` +
+          `=== ANALYST REQUEST ===\n${message}`,
+        jsonMode: true,
+        skipHardening: true,
+        temperature: 0.2,
+        maxTokens: 3000,
+      });
+      result = safeParseJSON(text);
       if (!result || typeof (result as Record<string, unknown>).mode !== "string") {
-        result = { mode: "respond", answer: "Deterministic telemetry router initialized.", goals: [message] };
+        throw new Error("planner returned malformed decision");
       }
     } else if (role === "respond") {
       const { message, goals, facts, steps, targets, context } = payload;
-      try {
-        const { text } = await callAI({
-          systemPrompt: RESPOND_SYSTEM,
-          userPrompt:
-            `=== GOALS ===\n${JSON.stringify(goals || [message])}\n\n` +
-            `=== FACTS (the ONLY permitted source of numbers) ===\n${facts}\n\n` +
-            `=== EXECUTED STEPS ===\n${steps}\n\n` +
-            `=== AVAILABLE HIGHLIGHT TARGETS ===\n${JSON.stringify(targets || [])}\n\n` +
-            `=== CONTEXT ===\n${context || ""}\n\n` +
-            `=== ANALYST REQUEST ===\n${message}`,
-          jsonMode: true,
-          skipHardening: true,
-          temperature: 0.35,
-          maxTokens: 1800,
-        });
-        const parsed = safeParseJSON(text);
-        if (parsed && typeof parsed.answer === "string") {
-          result = parsed;
-        }
-      } catch (err) {
-        console.warn("Foresight respond fallback:", err);
-      }
-      if (!result) {
-        result = {
-          answer: `Execution complete across deterministic quantitative tools. Facts extracted: ${typeof facts === "string" ? facts.slice(0, 180) : "Pipeline output recorded."}`,
-          highlights: [],
-        };
-      }
+      const { text } = await callAI({
+        systemPrompt: RESPOND_SYSTEM,
+        userPrompt:
+          `=== GOALS ===\n${JSON.stringify(goals || [message])}\n\n` +
+          `=== FACTS (the ONLY permitted source of numbers) ===\n${facts}\n\n` +
+          `=== EXECUTED STEPS ===\n${steps}\n\n` +
+          `=== AVAILABLE HIGHLIGHT TARGETS ===\n${JSON.stringify(targets || [])}\n\n` +
+          `=== CONTEXT ===\n${context || ""}\n\n` +
+          `=== ANALYST REQUEST ===\n${message}`,
+        jsonMode: true,
+        skipHardening: true,
+        temperature: 0.35,
+        maxTokens: 1800,
+      });
+      const parsed = safeParseJSON(text);
+      if (!parsed || typeof parsed.answer !== "string") throw new Error("explainer returned malformed answer");
+      result = parsed;
     } else if (role === "verify") {
       const { message, goals, answer, facts } = payload;
-      try {
-        const { text } = await callAI({
-          systemPrompt: VERIFY_SYSTEM,
-          userPrompt:
-            `=== GOALS ===\n${JSON.stringify(goals || [message])}\n\n` +
-            `=== FACTS ===\n${facts}\n\n` +
-            `=== ANSWER UNDER AUDIT ===\n${answer}`,
-          jsonMode: true,
-          skipHardening: true,
-          temperature: 0,
-          maxTokens: 600,
-          model: "mistral-small-latest",
-        });
-        const parsed = safeParseJSON(text);
-        result = parsed && typeof parsed.satisfied === "boolean" ? parsed : { satisfied: true, issues: [] };
-      } catch {
-        result = { satisfied: true, issues: [] };
-      }
+      const { text } = await callAI({
+        systemPrompt: VERIFY_SYSTEM,
+        userPrompt:
+          `=== GOALS ===\n${JSON.stringify(goals || [message])}\n\n` +
+          `=== FACTS ===\n${facts}\n\n` +
+          `=== ANSWER UNDER AUDIT ===\n${answer}`,
+        jsonMode: true,
+        skipHardening: true,
+        temperature: 0,
+        maxTokens: 600,
+        model: "mistral-small-latest",
+      });
+      const parsed = safeParseJSON(text);
+      result = parsed && typeof parsed.satisfied === "boolean" ? parsed : { satisfied: true, issues: [] };
     } else {
       throw new Error(`unknown role: ${role}`);
     }

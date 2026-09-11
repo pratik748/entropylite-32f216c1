@@ -9,88 +9,6 @@ const corsH = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function generateDeterministicCompanyDossier(ticker: string, isIndian: boolean, bundleContext?: string) {
-  const cleanTicker = ticker.toUpperCase().replace(/\.NS|\.BO/, "");
-  return {
-    companyName: `${cleanTicker} Corporation`,
-    sector: isIndian ? "National Equities · Core Industry" : "Broad Market Equities",
-    industry: "Institutional Market Benchmark",
-    headquarters: isIndian ? "Mumbai, India" : "New York, USA",
-    founded: "1995",
-    overview: `${cleanTicker} operates as an institutional core asset with diversified cash flows, balanced operating leverage, and robust market positioning.`,
-    marketCap: "Large Cap",
-    employees: "10,000+",
-    revenueSegments: [
-      { segment: "Core Commercial Operations", percentage: 55, trend: "growing" },
-      { segment: "Enterprise Services & Solutions", percentage: 30, trend: "stable" },
-      { segment: "Ancillary & Strategic Ventures", percentage: 15, trend: "growing" },
-    ],
-    geographicRevenue: [
-      { region: isIndian ? "Domestic (India)" : "North America", percentage: 65 },
-      { region: isIndian ? "International Export" : "International & APAC", percentage: 35 },
-    ],
-    supplyChain: {
-      suppliers: [{ name: "Tier-1 Domestic & Global Vendors", role: "Primary Component/Input Feed", riskLevel: "medium" }],
-      distributors: [{ name: "Direct Institutional & Enterprise Channels", region: "Global" }],
-      manufacturers: [{ name: "Primary Production & Outsourced Fab Units", type: "contract", location: isIndian ? "India / ASEAN" : "North America / Global" }],
-    },
-    ownership: {
-      insiderPct: isIndian ? 45 : 12,
-      institutionalPct: isIndian ? 38 : 72,
-      retailPct: isIndian ? 17 : 16,
-      topHolders: [
-        { name: "Top Institutional Sovereign & Mutual Funds", type: "institution", pct: 24, trend: "accumulating" },
-        { name: "Executive & Promoter Group", type: "insider", pct: isIndian ? 42 : 10, trend: "holding" },
-      ],
-    },
-    leadership: [
-      {
-        name: "Executive Leadership",
-        role: "Chief Executive Officer & Board",
-        since: "2018",
-        background: "Multi-decade institutional industry and capital allocation track record.",
-        previousCompanies: ["Tier-1 Industry Leaders"],
-        educationBackground: "Finance & Engineering",
-        boardMemberships: ["Industry Council"],
-        leadershipStyle: "Disciplined capital allocator focused on ROCE and market share defense.",
-      },
-    ],
-    partnerships: [
-      { partner: "Global Infrastructure Partners", type: "technology", description: "Enterprise integration and digital scalability", revenueImpact: "high", expirationRisk: "low" },
-    ],
-    competitors: [
-      { name: "Direct Sector Peer A", ticker: "PEER1", marketShare: 28, threat: "direct", strengths: "Scale and distribution" },
-      { name: "Direct Sector Peer B", ticker: "PEER2", marketShare: 22, threat: "direct", strengths: "Pricing leverage" },
-    ],
-    products: [
-      { name: "Primary Product & Service Platform", lifecycle: "mature", revenueContribution: 65, description: "Market-leading foundational enterprise offering." },
-      { name: "Next-Gen Growth Platform", lifecycle: "growth", revenueContribution: 35, description: "High-margin emerging technology and services segment." },
-    ],
-    regulatoryExposure: [
-      { issue: "Standard Domestic Regulatory Compliance", severity: "low", region: isIndian ? "SEBI / RBI / MCA" : "SEC / FINRA", status: "active" },
-    ],
-    insiderActivity: [
-      { name: "Institutional & Officer Filings", role: "Executive Committee", action: "grant", shares: 50000, date: new Date().toISOString().slice(0, 10), signal: "neutral" },
-    ],
-    narrative: {
-      newsSentiment: 65,
-      socialSentiment: 60,
-      analystConsensus: "buy",
-      earningsTone: "positive",
-      narrativeShifts: ["Margin expansion via operating leverage", "Disciplined working capital management"],
-      analystTargets: { low: 90, median: 115, high: 140 },
-    },
-    signals: {
-      supplyChainRisk: 35,
-      ownershipStability: 75,
-      competitiveMoat: 70,
-      regulatoryRisk: 30,
-      insiderConfidence: 65,
-      narrativeMomentum: 68,
-    },
-  };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsH });
 
@@ -171,36 +89,47 @@ REASONING DISCIPLINE:
 
 All number fields for signals should be 0-100. Revenue percentages should sum to ~100. Be factually accurate for ${ticker}. Use real company data where known, make informed estimates where not.`;
 
-    // Try AI generation first
-    try {
-      const result = await callAI({
-        systemPrompt,
-        userPrompt,
-        maxTokens: 8192,
-        temperature: 0.4,
-        provider: provider || "mistral",
-      });
+    // Retry up to 2 times on parse failures
+    let lastErr: any;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await callAI({
+          systemPrompt,
+          userPrompt,
+          maxTokens: 8192,
+          temperature: 0.4,
+          provider: provider || "mistral",
+        });
 
-      const parsed = safeParseJSON(result.text);
+        const parsed = safeParseJSON(result.text);
 
-      // Validate essential fields exist
-      if (parsed && (parsed.companyName || parsed.sector)) {
+        // Validate essential fields exist
+        if (!parsed || (!parsed.companyName && !parsed.sector)) {
+          throw new Error("Incomplete response, missing companyName/sector");
+        }
+
         return new Response(JSON.stringify(parsed), {
           headers: { ...corsH, "Content-Type": "application/json" },
         });
+      } catch (err: any) {
+        lastErr = err;
+        console.error(`company-intelligence attempt ${attempt + 1} failed:`, err.message || err);
+        if (attempt === 0) {
+          // Brief pause before retry
+          await new Promise(r => setTimeout(r, 500));
+        }
       }
-    } catch (err: any) {
-      console.warn("company-intelligence AI generation failed, using deterministic company dossier:", err?.message || err);
     }
 
-    const fallbackDossier = generateDeterministicCompanyDossier(ticker, isIndian, scrapedContext);
-    return new Response(JSON.stringify(fallbackDossier), {
+    console.error("company-intelligence all attempts failed:", lastErr?.message);
+    return new Response(JSON.stringify({ error: lastErr?.message || "Failed to generate intelligence" }), {
+      status: 500,
       headers: { ...corsH, "Content-Type": "application/json" },
     });
   } catch (err: any) {
     console.error("company-intelligence error:", err);
-    const fallbackDossier = generateDeterministicCompanyDossier("SPY", false);
-    return new Response(JSON.stringify(fallbackDossier), {
+    return new Response(JSON.stringify({ error: err.message || "Failed" }), {
+      status: 500,
       headers: { ...corsH, "Content-Type": "application/json" },
     });
   }
