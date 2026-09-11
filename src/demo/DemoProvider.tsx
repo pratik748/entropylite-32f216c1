@@ -40,6 +40,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   const exit = useCallback(() => {
+    console.info("[demo-session]", { stage: "provider-exit" });
     clearStoredDemo();
     setReadOnlyMode(false);
     supabase.functions.setAuth(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
@@ -47,22 +48,27 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const adopt = useCallback((next: DemoSession) => {
+    console.info("[demo-session]", { stage: "provider-adopt", expiresAt: next.expiresAt });
     setReadOnlyMode(true);
-    // Engines authenticate with the signed demo token (read-only, synthetic subject).
-    supabase.functions.setAuth(next.token);
+    // Local demo sessions never impersonate a Supabase user or call protected
+    // APIs with a fabricated token.
     setSession(next);
     setResolving(false);
   }, []);
 
   useEffect(() => {
-    if (!hasStoredDemo()) return;
+    if (!hasStoredDemo()) {
+      setResolving(false);
+      return;
+    }
     let alive = true;
+    console.info("[demo-session]", { stage: "provider-resume-start" });
     resumeDemoSession().then((s) => {
       if (!alive) return;
       if (s) {
         setReadOnlyMode(true);
-        supabase.functions.setAuth(s.token);
       }
+      console.info("[demo-session]", { stage: "provider-resume-complete", restored: !!s });
       setSession(s);
       setResolving(false);
     });
