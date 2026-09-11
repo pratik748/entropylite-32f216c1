@@ -352,6 +352,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    // requireAuth throws a Response (401), pass it through unchanged.
+    if (error instanceof Response) return error;
     console.error("Sentiment intel error:", error);
     return new Response(
       JSON.stringify({ error: "Failed to fetch sentiment data", details: error.message }),

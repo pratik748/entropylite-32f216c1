@@ -22,6 +22,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
+    if (error instanceof Response) return error;
     console.error("Strategy generate fallback:", error);
     const fallback = generateDeterministicStrategy({});
     return new Response(JSON.stringify(fallback), {

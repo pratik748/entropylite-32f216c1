@@ -237,6 +237,7 @@ ${lines}`,
     });
     return out.length > 0 ? out : deterministicScoreEvents(headlines);
   } catch (e) {
+    if (e instanceof Response) throw e;
     console.warn("scoreEvents AI error, falling back to deterministic geopolitical taxonomy:", e);
     return deterministicScoreEvents(headlines);
   }

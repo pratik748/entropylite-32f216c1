@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -44,6 +44,138 @@ export type Database = {
           refresh_hours?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      api_credentials: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          failure_count: number
+          id: string
+          is_active: boolean
+          label: string | null
+          last_error: string | null
+          last_error_at: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          last_used_at: string | null
+          name: string
+          notes: string | null
+          provider: string | null
+          success_count: number
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          failure_count?: number
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          name: string
+          notes?: string | null
+          provider?: string | null
+          success_count?: number
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          failure_count?: number
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          name?: string
+          notes?: string | null
+          provider?: string | null
+          success_count?: number
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      api_key_health: {
+        Row: {
+          credential_name: string
+          failure_count: number
+          is_configured: boolean
+          last_error: string | null
+          last_error_at: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          last_used_at: string | null
+          provider: string
+          source: string
+          success_count: number
+          updated_at: string
+        }
+        Insert: {
+          credential_name: string
+          failure_count?: number
+          is_configured?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          provider: string
+          source: string
+          success_count?: number
+          updated_at?: string
+        }
+        Update: {
+          credential_name?: string
+          failure_count?: number
+          is_configured?: boolean
+          last_error?: string | null
+          last_error_at?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          last_used_at?: string | null
+          provider?: string
+          source?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      asset_graph_edges: {
+        Row: {
+          as_of: string
+          dst: string
+          edge_type: string
+          meta: Json | null
+          src: string
+          weight: number
+        }
+        Insert: {
+          as_of?: string
+          dst: string
+          edge_type: string
+          meta?: Json | null
+          src: string
+          weight: number
+        }
+        Update: {
+          as_of?: string
+          dst?: string
+          edge_type?: string
+          meta?: Json | null
+          src?: string
+          weight?: number
         }
         Relationships: []
       }
@@ -226,6 +358,33 @@ export type Database = {
           last_updated?: string
           sample_count?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      engine_regime_stats: {
+        Row: {
+          alpha: number
+          beta: number
+          engine_id: string
+          n: number
+          regime: string
+          updated_at: string
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          engine_id: string
+          n?: number
+          regime: string
+          updated_at?: string
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          engine_id?: string
+          n?: number
+          regime?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -475,6 +634,86 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunities: {
+        Row: {
+          bottleneck: Json | null
+          created_at: string
+          direction: number
+          factors: Json
+          frozen_features: Json
+          horizon_days: number
+          id: string
+          os: number
+          published: boolean
+          regime: string | null
+          reject_reasons: string[] | null
+          signal_class: string
+          symbol: string
+        }
+        Insert: {
+          bottleneck?: Json | null
+          created_at?: string
+          direction: number
+          factors: Json
+          frozen_features?: Json
+          horizon_days: number
+          id?: string
+          os: number
+          published?: boolean
+          regime?: string | null
+          reject_reasons?: string[] | null
+          signal_class: string
+          symbol: string
+        }
+        Update: {
+          bottleneck?: Json | null
+          created_at?: string
+          direction?: number
+          factors?: Json
+          frozen_features?: Json
+          horizon_days?: number
+          id?: string
+          os?: number
+          published?: boolean
+          regime?: string | null
+          reject_reasons?: string[] | null
+          signal_class?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      opportunity_outcomes: {
+        Row: {
+          filled_at: string | null
+          fwd_return: number | null
+          hit: boolean | null
+          horizon_days: number
+          opportunity_id: string
+        }
+        Insert: {
+          filled_at?: string | null
+          fwd_return?: number | null
+          hit?: boolean | null
+          horizon_days: number
+          opportunity_id: string
+        }
+        Update: {
+          filled_at?: string | null
+          fwd_return?: number | null
+          hit?: boolean | null
+          horizon_days?: number
+          opportunity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_outcomes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_watch: {
         Row: {
           alert_state: Json
@@ -579,12 +818,15 @@ export type Database = {
       }
       scar_memory: {
         Row: {
+          corroboration: number
           created_at: string
           failure_pattern: string
           id: string
           momentum_bucket: string
+          permanent: boolean
           realized_pnl_pct: number
           regime: string
+          scar_score: number
           sentiment_bucket: string
           signal_type: string
           ticker: string
@@ -592,12 +834,15 @@ export type Database = {
           vol_bucket: string
         }
         Insert: {
+          corroboration?: number
           created_at?: string
           failure_pattern: string
           id?: string
           momentum_bucket: string
+          permanent?: boolean
           realized_pnl_pct?: number
           regime: string
+          scar_score?: number
           sentiment_bucket: string
           signal_type: string
           ticker: string
@@ -605,12 +850,15 @@ export type Database = {
           vol_bucket: string
         }
         Update: {
+          corroboration?: number
           created_at?: string
           failure_pattern?: string
           id?: string
           momentum_bucket?: string
+          permanent?: boolean
           realized_pnl_pct?: number
           regime?: string
+          scar_score?: number
           sentiment_bucket?: string
           signal_type?: string
           ticker?: string
@@ -989,15 +1237,64 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
+      record_key_health: {
+        Args: {
+          _error?: string
+          _latency_ms: number
+          _name: string
+          _provider: string
+          _source: string
+          _status: string
+        }
+        Returns: undefined
+      }
+      record_key_telemetry: {
+        Args: {
+          _error?: string
+          _latency_ms: number
+          _name: string
+          _provider: string
+          _status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1013,12 +1310,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1042,11 +1339,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1067,11 +1364,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1092,11 +1389,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1109,11 +1406,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1124,6 +1421,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const

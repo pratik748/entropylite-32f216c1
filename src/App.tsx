@@ -20,6 +20,7 @@ import BackbonePage from "./pages/BackbonePage";
 import CadencePage from "./pages/CadencePage";
 import CadenceEntryPage from "./pages/CadenceEntryPage";
 import CompanyWorkstationPage from "./pages/CompanyWorkstationPage";
+import AdminApiManagerPage from "./pages/AdminApiManagerPage";
 import { DemoProvider, useDemo } from "./demo/DemoProvider";
 
 const queryClient = new QueryClient();
@@ -119,6 +120,14 @@ const App = () => (
             element={
               <AuthGate>
                 <CompanyWorkstationPage />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/admin/api"
+            element={
+              <AuthGate>
+                <AdminApiManagerPage />
               </AuthGate>
             }
           />
