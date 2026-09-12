@@ -21,6 +21,7 @@ import CadencePage from "./pages/CadencePage";
 import CadenceEntryPage from "./pages/CadenceEntryPage";
 import CompanyWorkstationPage from "./pages/CompanyWorkstationPage";
 import AdminApiManagerPage from "./pages/AdminApiManagerPage";
+import VenorSimAdminPage from "./pages/VenorSimAdminPage";
 import { DemoProvider, useDemo } from "./demo/DemoProvider";
 
 const queryClient = new QueryClient();
@@ -128,6 +129,14 @@ const App = () => (
             element={
               <AuthGate>
                 <AdminApiManagerPage />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/admin/venor"
+            element={
+              <AuthGate>
+                <VenorSimAdminPage />
               </AuthGate>
             }
           />

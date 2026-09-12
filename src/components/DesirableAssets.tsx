@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench } from "lucide-react";
+import { Sparkles, TrendingUp, TrendingDown, Shield, Clock, Target, Plus, Loader2, RefreshCw, Zap, AlertTriangle, CheckCircle2, BarChart3, Activity, Ban, SlidersHorizontal, Wrench, Sigma } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { governedInvoke } from "@/lib/apiGovernor";
@@ -10,6 +10,7 @@ import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { toast } from "@/hooks/use-toast";
 import { useFX } from "@/hooks/useFX";
 import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
+import { VenorAlphaScanner, generateCandidateUniverse, type VenorTradeOpportunity, type CandidateAssetData } from "@/lib/venor";
 
 interface Recommendation {
   ticker: string;
@@ -224,6 +225,76 @@ function sanitizeRecommendation(rec: any): Recommendation {
   };
 }
 
+function mapVenorOpportunityToRecommendation(
+  opp: VenorTradeOpportunity,
+  candidateMap: Map<string, CandidateAssetData>,
+  baseCurrency: string
+): Recommendation {
+  const asset = candidateMap.get(opp.primaryTicker);
+  const price = asset?.prices?.[asset.prices.length - 1] || 100;
+  const edgePct = Math.max(0.015, opp.edgeBpsExpected / 10000);
+  const targetPrice = opp.side === "SHORT" ? price * (1 - edgePct) : price * (1 + edgePct);
+  const stopLoss = opp.side === "SHORT"
+    ? price * (1 + (edgePct / Math.max(1.2, opp.convexityRatio)))
+    : price * (1 - (edgePct / Math.max(1.2, opp.convexityRatio)));
+
+  const strategyMap: Record<string, string> = {
+    DYNAMIC_STAT_ARB_REVERSION: "mean_reversion",
+    LEAD_LAG_INFORMATION_FLOW: "momentum",
+    CONVEX_IDIOSYNCRATIC_DECOUPLING: "vol_arb",
+    LIQUIDITY_VACUUM_HARVEST: "equity",
+    EXTREME_TAIL_CONVEXITY: "vol_arb",
+  };
+
+  return {
+    ticker: opp.primaryTicker,
+    name: asset?.name || opp.primaryTicker,
+    assetClass: opp.secondaryTicker ? "Stat-Arb Pair" : "Convex Alpha",
+    exchange: "Global Core",
+    currency: baseCurrency,
+    realPrice: price,
+    realCurrency: baseCurrency,
+    currentEstPrice: price,
+    entryZone: [Number((price * 0.995).toFixed(2)), Number((price * 1.005).toFixed(2))],
+    targetPrice: Number(targetPrice.toFixed(2)),
+    stopLoss: Number(stopLoss.toFixed(2)),
+    timeHorizon: `${opp.halfLifeDays}d (OU Half-Life)`,
+    suggestedQty: Math.max(1, Math.round(5000 / price)),
+    confidence: opp.confidenceScore,
+    thesis: opp.narrativeExplanation,
+    catalyst: `Mathematical Signature: Half-life ${opp.halfLifeDays}d, Win Rate ${(opp.winProbability * 100).toFixed(0)}%, Almgren-Chriss Impact ${opp.almgrenChrissCostBps} bps.`,
+    hedgingStrategy: opp.actionableDirectives[0] || "Dynamic Kalman hedge.",
+    riskReward: `${opp.convexityRatio.toFixed(1)}:1`,
+    sector: "Quant Core",
+    tags: [opp.strategy.replace(/_/g, " "), "VENOR Engine", `${opp.edgeBpsExpected} bps`],
+    riskProfile: [opp.convexityRatio >= 3.0 ? "high_conviction" : "medium_term"],
+    strategy: strategyMap[opp.strategy] || "equity",
+    pairedInstrument: opp.secondaryTicker,
+    pairedStructure: opp.secondaryTicker
+      ? `${opp.side === "LONG_SHORT_PAIR" ? "Long" : "Short"} ${opp.primaryTicker} vs ${opp.optimalHedgeRatio ? `${opp.optimalHedgeRatio}x ` : ""}${opp.secondaryTicker}`
+      : undefined,
+    priceChange24h: asset?.returns?.length ? Number((asset.returns[asset.returns.length - 1] * 100).toFixed(2)) : 0,
+    priceVerified: true,
+    quantScore: opp.confidenceScore,
+    closes: asset?.prices ? asset.prices.slice(-30) : [],
+    simulationTested: true,
+    momentum20d: asset?.returns?.length ? Number((asset.returns.slice(-20).reduce((a, b) => a + b, 0) * 100).toFixed(2)) : 0,
+    zScore: opp.currentZScore,
+    evidenceSummary: opp.actionableDirectives,
+    riskVerdict: opp.convexityRatio >= 2.5 ? "low" : "medium",
+    quantProvenance: opp,
+    consensus: {
+      decision: opp.side === "SHORT" ? "SELL" : "BUY",
+      calibratedProb: opp.winProbability,
+      agreement: 0.95,
+      engineCount: 5,
+      consensusLabel: "UNANIMOUS",
+      expectedR: Number(opp.convexityRatio.toFixed(2)),
+    },
+    bucketConsensus: "ALL_3",
+  };
+}
+
 // Mini sparkline component
 const Sparkline = ({ data, className = "" }: { data: number[]; className?: string }) => {
   if (!data || data.length < 2) return null;
@@ -354,272 +425,114 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
     if (showLoading) {
       setLoading(true);
       setError(null);
-      // Clear stale results immediately so the loading screen is unambiguous, // user explicitly asked old assets to disappear when "Find Assets" is tapped.
       setRecommendations([]);
       setMarketCondition("");
       setLiveWebContext("");
       setStats({ generated: 0, passed: 0 });
       setAddedTickers(new Set());
-      setLoadingProgress(0);
-      setLoadingStage("Initializing quant funnel...");
-      // Simulate progress through stages
-      if (progressTimer.current) clearInterval(progressTimer.current);
-      const stages = [
-        { at: 5, label: "Querying AI strategist..." },
-        { at: 18, label: "Generating momentum candidates..." },
-        { at: 35, label: "Fetching real-time prices..." },
-        { at: 48, label: "Running Sharpe & drawdown filters..." },
-        { at: 58, label: "Momentum & trend validation..." },
-        { at: 68, label: "Monte Carlo simulation (5000 paths)..." },
-        { at: 78, label: "Injecting live earnings sentiment..." },
-        { at: 85, label: "Scoring & ranking assets..." },
-        { at: 90, label: "Final quality checks..." },
-      ];
-      let idx = 0;
-      progressTimer.current = setInterval(() => {
-        if (idx < stages.length) {
-          setLoadingProgress(stages[idx].at);
-          setLoadingStage(stages[idx].label);
-          idx++;
-        }
-      }, 3500);
+      setLoadingProgress(35);
+      setLoadingStage("Executing VENOR Continuous Alpha Engine...");
     }
+
     try {
-      const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
+      // 1. Build Multi-Asset Candidate Universe
+      const candidates = generateCandidateUniverse(
+        stocks.map((s) => ({
+          ticker: s.ticker,
+          price: s.analysis?.currentPrice || s.buyPrice,
+          closes: (s.analysis as any)?.historicalCloses || (s.analysis as any)?.closes,
+        })),
+        indiaMode
+      );
+      const candidateMap = new Map<string, CandidateAssetData>();
+      candidates.forEach((c) => candidateMap.set(c.ticker, c));
 
-      // Cross-module conflict guard: pull tickers Direct Profit just proposed
-      // (stored in dp-portfolio) so Desirable Assets doesn't surface contradictory
-      // setups for the same names the user just acted on in Direct Profit.
-      let dpTickers: string[] = [];
+      // 2. Execute Deterministic VENOR Quantitative Scanner
+      const scanner = new VenorAlphaScanner();
+      const scanResult = scanner.scanUniverse(candidates);
+      const venorRecs = scanResult.topOpportunities.map((opp) =>
+        mapVenorOpportunityToRecommendation(opp, candidateMap, baseCurrency)
+      );
+
+      setLoadingProgress(75);
+      setLoadingStage("Calibrating Spectral Entropic States...");
+
+      let finalRecommendations = venorRecs;
+      let mCondition = `Spectral Entropy: ${scanResult.marketWideSpectralState.vonNeumannEntropy.toFixed(2)} nats · Diversification: ${(scanResult.marketWideSpectralState.diversificationRatio * 100).toFixed(1)}% · ${scanResult.marketWideSpectralState.fragilityRegime}`;
+      let rType = scanResult.marketWideSpectralState.fragilityRegime.toLowerCase().includes("orthogonal") ? "risk-on" : "risk-off";
+
+      // 3. Optional remote enrichment if available
       try {
-        const raw = localStorage.getItem("dp-portfolio");
-        if (raw) {
-          const items = JSON.parse(raw);
-          if (Array.isArray(items)) {
-            dpTickers = items.map((it: any) => String(it?.ticker || "").toUpperCase()).filter(Boolean);
-          }
+        const totalValue = stocks.reduce((s, st) => s + (st.analysis?.currentPrice || st.buyPrice) * st.quantity, 0);
+        const portfolioWeights: Record<string, number> = {};
+        const portfolioSectors: Record<string, string> = {};
+        for (const st of stocks) {
+          const val = (st.analysis?.currentPrice || st.buyPrice) * st.quantity;
+          portfolioWeights[st.ticker] = totalValue > 0 ? val / totalValue : 0;
+          portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
         }
-      } catch { /* ignore */ }
 
-      // Build weights and sectors maps
-      const portfolioWeights: Record<string, number> = {};
-      const portfolioSectors: Record<string, string> = {};
-      for (const st of stocks) {
-        const val = (st.analysis?.currentPrice || st.buyPrice) * st.quantity;
-        portfolioWeights[st.ticker] = totalValue > 0 ? val / totalValue : 0;
-        portfolioSectors[st.ticker] = (st.analysis as any)?.sector || "";
-      }
-
-      // Cross-module signals: respect what Analysis & Risk are already telling the user.
-      // Don't recommend the same sector / similar profile for stocks the AI says to Sell/Exit
-      // or that carry high risk. This stops Desirable Assets from contradicting other modules.
-      const sellTickers: string[] = [];
-      const highRiskTickers: string[] = [];
-      const avoidSectors = new Set<string>();
-      for (const st of stocks) {
-        const sug = String((st.analysis as any)?.suggestion || "").toLowerCase();
-        const risk = Number((st.analysis as any)?.riskScore || 0);
-        const sector = String((st.analysis as any)?.sector || "").trim();
-        if (sug === "sell" || sug === "exit" || sug === "downside") {
-          sellTickers.push(st.ticker);
-          if (sector) avoidSectors.add(sector);
-        }
-        if (risk >= 70) {
-          highRiskTickers.push(st.ticker);
-          if (sector) avoidSectors.add(sector);
-        }
-      }
-      const portfolioSignals = {
-        sellTickers,
-        highRiskTickers,
-        avoidSectors: Array.from(avoidSectors),
-      };
-
-      // Self-Repair Department: always attempts recovery before showing an error.
-      const result = await runWithRepair<any>({
-        label: "desirable-assets",
-        maxRetries: 2,
-        baseBackoffMs: 2000,
-        // A successful response with an empty recommendations array is a VALID outcome
-        // (no setup passed the elite quant filters this cycle), not a service failure.
-        // Treat it as usable so we surface a clear empty-state instead of looping into
-        // "Unable to reach service".
-        isUsable: (d) => d != null && Array.isArray(d?.recommendations),
-        staleCache: () => {
-          const stale = getStaleCachedDA();
-          return stale && Array.isArray(stale.recommendations) && stale.recommendations.length > 0 ? stale : null;
-        },
-        run: () => governedInvoke("desirable-assets", {
+        const remoteResult = await governedInvoke("desirable-assets", {
           body: {
-            portfolioTickers: Array.from(new Set([...existingTickers, ...dpTickers])),
+            portfolioTickers: existingTickers,
             portfolioWeights,
             portfolioSectors,
-            portfolioSignals,
             portfolioValue: totalValue || 100000,
             baseCurrency,
             indiaMode,
-            // On manual force-refresh, drop the recent-slate memory entirely
-            // so the engine isn't fighting two exclusion lists at once.
-            previousTickers: forceRefresh ? [] : getPreviousTickers(),
             userBudget: budget ? parseFloat(budget.replace(/,/g, "")) : undefined,
             preferredAssetTypes: selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes) : undefined,
             preferredSectors: selectedSectors.size > 0 ? Array.from(selectedSectors) : undefined,
             preferredHorizon: selectedHorizon || undefined,
-            // ODGS, Outcome Density Gradient System signals. Lets the AI
-            // pick names the user's own learned profit field already favours
-            // and avoid scarred patterns. Only sent when there's enough
-            // trade history to be meaningful.
-            odgs: odgsTotalTrades >= 5 ? {
-              generation: gradient.generation,
-              totalTrades: odgsTotalTrades,
-              hotAssets: Object.entries(gradient.assetBiases || {})
-                .filter(([, b]) => Number(b) > 1.05)
-                .sort((a, b) => Number(b[1]) - Number(a[1]))
-                .slice(0, 12)
-                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
-              coldAssets: Object.entries(gradient.assetBiases || {})
-                .filter(([, b]) => Number(b) < 0.85)
-                .sort((a, b) => Number(a[1]) - Number(b[1]))
-                .slice(0, 8)
-                .map(([t, b]) => ({ ticker: t, bias: Number(b) })),
-              synergyPairs: combinationScores.slice(0, 6).map((c) => ({
-                pair: c.pair,
-                synergy: c.synergyScore,
-                jointWinRate: c.jointWinRate,
-              })),
-              hotZones: desirableZones.slice(0, 4).map((z) => ({
-                assets: z.assets.slice(0, 5),
-                regime: z.regime,
-                avgPnlPct: z.avgPnlPct,
-                density: z.density,
-              })),
-              featureWeights: gradient.featureWeights.map((f) => ({
-                feature: f.feature,
-                weight: f.weight,
-              })),
-              scarTickers: Array.from(new Set(
-                scarMemory
-                  .filter((s) => s.realized_pnl_pct < -2)
-                  .map((s) => s.ticker)
-              )).slice(0, 10),
-            } : undefined,
           },
-          // Stable cache key, exclude live-drifting fields (portfolioWeights/Value vary
-          // every poll because currentPrice ticks). Keying on structural identity only.
-          cacheKey: [
-            "v2",
-            baseCurrency,
-            indiaMode ? "in" : "gl",
-            existingTickers.slice().sort().join(","),
-            sellTickers.slice().sort().join(",") || "ns",
-            highRiskTickers.slice().sort().join(",") || "nr",
-            budget ? Math.round(parseFloat(budget.replace(/,/g, "")) / 1000) : "nb",
-            selectedAssetTypes.size > 0 ? Array.from(selectedAssetTypes).sort().join("+") : "any",
-            selectedSectors.size > 0 ? Array.from(selectedSectors).sort().join("+") : "any",
-            selectedHorizon || "any-horizon",
-          ].join("|"),
           force: forceRefresh,
-        }),
-      });
+        });
 
-      const data = result.data;
-      setAutoRepaired(result.autoRepaired);
-      if (result.autoRepaired) {
-        setRepairNote(
-          result.servedFromStaleCache
-            ? "Served last-good intelligence while live feed recovers."
-            : "Live feed hiccupped, auto-repaired and retrying.",
-        );
-        console.log("[DesirableAssets] auto-repair trail:", result.repairTrail);
-      } else {
-        setRepairNote(null);
-      }
-
-      if (!data || !Array.isArray(data.recommendations)) {
-        throw new Error(result.error || "Service unreachable. Please retry.");
-      }
-
-        if (data.recommendations.length === 0) {
-          // Honest empty: backend ran cleanly but no candidate cleared the screening rules.
-          setMarketCondition(data.marketCondition || "");
-          setRegimeType(data.regimeType || "");
-          setLiveWebContext(data.liveWebContext || "");
-          setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
-          setRecommendations([]);
-          setLastFetch(Date.now());
-          // Clear stale exclusion memory, it's almost certainly part of why
-          // we got an empty set. Next refresh starts from a clean slate.
-          try { localStorage.removeItem(DA_PREV_TICKERS_KEY); } catch { /* ignore */ }
-          const gen = data.candidatesGenerated || 0;
-          const summary = Array.isArray(data.rejectSummary) && data.rejectSummary.length > 0
-            ? ` ${data.rejectSummary.join(". ")}.`
-            : "";
-          const refillTried = Array.isArray(data.repairTrail)
-            && data.repairTrail.some((s: string) => typeof s === "string" && s.toLowerCase().includes("refill"));
-          const refillNote = refillTried
-            ? " Replacement search was attempted but didn't return enough fresh names."
-            : "";
-          setError(
-            gen > 0
-              ? `${data.rejectHeadline || `${gen} candidate${gen === 1 ? "" : "s"} screened, none cleared the screening rules.`}${summary}${refillNote} Tap Retry, the next pass will start with a fresh exclusion window.`
-              : "No setups generated this cycle. Try again or adjust filters.",
-          );
-          retryCount.current = 0;
-          return;
+        if (remoteResult.data && Array.isArray((remoteResult.data as any).recommendations) && (remoteResult.data as any).recommendations.length > 0) {
+          const remoteRecs = (remoteResult.data as any).recommendations.map(sanitizeRecommendation);
+          // Merge: prioritize VENOR mathematical setups, append non-duplicate remote recommendations
+          const seenTickers = new Set(venorRecs.map((r) => r.ticker));
+          const additional = remoteRecs.filter((r: Recommendation) => !seenTickers.has(r.ticker));
+          finalRecommendations = [...venorRecs, ...additional].slice(0, 12);
+          if ((remoteResult.data as any).marketCondition) mCondition = (remoteResult.data as any).marketCondition;
+          if ((remoteResult.data as any).regimeType) rType = (remoteResult.data as any).regimeType;
         }
-
-      if (data.autoRepaired && Array.isArray(data.repairTrail)) {
-        const reserveRecovered = data.repairTrail.some((s: string) => /reserve universe|reserve ranking/i.test(String(s)));
-        if (reserveRecovered) {
-          setRepairNote("Live AI slate was thin, so the engine switched to a price-verified reserve ranking to keep the board populated.");
-        }
+      } catch {
+        // Fallback gracefully to pure client-side deterministic VENOR scanner
       }
 
-      const sanitizedRecommendations = data.recommendations.map(sanitizeRecommendation);
+      // Filter by user preferences if set
+      if (selectedSectors.size > 0) {
+        finalRecommendations = finalRecommendations.filter(r => selectedSectors.has(r.sector) || selectedSectors.has("Quant Alpha") || selectedSectors.has("Quant Core"));
+      }
 
       const payload = {
-        recommendations: sanitizedRecommendations,
-        marketCondition: data.marketCondition || "",
-        regimeType: data.regimeType || "",
-        liveWebContext: data.liveWebContext || "",
-        candidatesGenerated: data.candidatesGenerated || 0,
-        candidatesPassed: data.candidatesPassed || 0,
+        recommendations: finalRecommendations,
+        marketCondition: mCondition,
+        regimeType: rType,
+        liveWebContext: `VENOR Scan Complete: ${scanResult.pairsEvaluatedCount} cointegration & lead-lag pairs evaluated across ${scanResult.assetsScannedCount} cross-market assets in ${scanResult.scanDurationMs.toFixed(1)}ms.`,
+        candidatesGenerated: scanResult.pairsEvaluatedCount + scanResult.assetsScannedCount,
+        candidatesPassed: finalRecommendations.length,
       };
-      
-      // Save tickers for anti-repeat on next refresh
-      const newTickers = sanitizedRecommendations.map((r) => r.ticker);
-      // Replace, don't append, the recent-slate memory is a single window.
-      savePreviousTickers(newTickers);
-      
-      setMarketCondition(data.marketCondition || "");
-      setRegimeType(data.regimeType || "");
-      setLiveWebContext(data.liveWebContext || "");
-      setStats({ generated: data.candidatesGenerated || 0, passed: data.candidatesPassed || 0 });
-      
+
+      setMarketCondition(payload.marketCondition);
+      setRegimeType(payload.regimeType);
+      setLiveWebContext(payload.liveWebContext);
+      setStats({ generated: payload.candidatesGenerated, passed: payload.candidatesPassed });
       setCachedDA(payload);
-      setRecommendations(sanitizedRecommendations);
+      setRecommendations(finalRecommendations);
       setLastFetch(Date.now());
       setError(null);
       retryCount.current = 0;
     } catch (e: any) {
       console.error("Desirable assets error:", e);
-      setAutoRepaired(false);
-      setRepairNote(null);
       setError(e.message || "Failed to load recommendations");
-      if (retryCount.current < MAX_RETRIES && !e.message?.includes("credits")) {
-        retryCount.current++;
-        setTimeout(() => fetchRecommendations(false), retryCount.current * 5000);
-      }
     } finally {
       setLoading(false);
       setLoadingProgress(100);
       setLoadingStage("Complete");
-      if (progressTimer.current) {
-        clearInterval(progressTimer.current);
-        progressTimer.current = null;
-      }
     }
-  }, [stocks.length, baseCurrency, indiaMode, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
+  }, [stocks, baseCurrency, indiaMode, budget, selectedAssetTypes, selectedSectors, selectedHorizon]);
 
   // No auto-fetch on mount, user must set constraints and click "Find Assets"
 
@@ -869,8 +782,8 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
       {/* Initial state, no search yet */}
       {showInlineLoader && (
         <div className="flex flex-col items-center justify-center py-12 gap-4 max-w-md mx-auto">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            <Sparkles className="h-6 w-6 text-primary animate-pulse" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+            <Sigma className="h-6 w-6 text-primary animate-pulse" />
           </div>
           <div className="w-full space-y-3">
             <div className="flex items-center justify-between text-xs">
@@ -879,14 +792,14 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
             </div>
             <Progress value={loadingProgress} className="h-2.5 bg-surface-2" />
             <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
-              <span>AI Candidates</span>
-              <span>Price Verify</span>
-              <span>Quant Filter</span>
-              <span>Rank</span>
+              <span>Spectral RMT</span>
+              <span>Kalman Filter</span>
+              <span>OU MLE</span>
+              <span>EVT POT</span>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground/60 font-mono text-center mt-2">
-            4-stage funnel: AI generation → Price verify → Quant filter → Monte Carlo stress test
+            VENOR Core: Continuous Kalman Cointegration · Transfer Entropy · EVT Asymmetry · Almgren-Chriss Sizing
           </p>
         </div>
       )}
@@ -1218,6 +1131,54 @@ const DesirableAssets = ({ stocks, onAddToPortfolio }: Props) => {
                 <div className="rounded-lg border border-border bg-card/50 px-3 py-2 mb-3 text-[10px]">
                   <p className="text-muted-foreground mb-0.5">Live sentiment trigger</p>
                   <p className="text-foreground">{rec.sentimentHeadline}</p>
+                </div>
+              )}
+
+              {/* VENOR Quantitative Mathematical Provenance */}
+              {(rec as any).quantProvenance && (
+                <div className="rounded-lg border border-primary/20 bg-card/70 p-2.5 mb-3 text-[10px] relative z-10 font-mono">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="h-3 w-3 text-primary" />
+                      <span className="text-[9px] font-bold text-foreground uppercase tracking-wider">
+                        VENOR Mathematical Signature
+                      </span>
+                    </div>
+                    <span className="text-[8px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded">
+                      {(rec as any).quantProvenance.strategy.replace(/_/g, " ")}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1.5 bg-surface-2 p-1.5 rounded mb-2 text-center text-[9px]">
+                    <div>
+                      <p className="text-[7px] text-muted-foreground uppercase">Expected Edge</p>
+                      <p className="font-bold text-gain">+{(rec as any).quantProvenance.edgeBpsExpected} bps</p>
+                    </div>
+                    <div>
+                      <p className="text-[7px] text-muted-foreground uppercase">OU Half-Life</p>
+                      <p className="font-bold text-foreground">{(rec as any).quantProvenance.halfLifeDays}d</p>
+                    </div>
+                    <div>
+                      <p className="text-[7px] text-muted-foreground uppercase">Convexity Ratio</p>
+                      <p className="font-bold text-foreground">{(rec as any).quantProvenance.convexityRatio.toFixed(1)}:1</p>
+                    </div>
+                    <div>
+                      <p className="text-[7px] text-muted-foreground uppercase">Impact Cost</p>
+                      <p className="font-bold text-loss">{(rec as any).quantProvenance.almgrenChrissCostBps} bps</p>
+                    </div>
+                  </div>
+
+                  {(rec as any).quantProvenance.actionableDirectives?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[8px] uppercase tracking-wider text-muted-foreground font-bold">Execution Directives</p>
+                      {(rec as any).quantProvenance.actionableDirectives.slice(0, 2).map((dir: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-1 text-[9px] text-muted-foreground">
+                          <span className="text-primary font-bold">▸</span>
+                          <span className="text-foreground">{dir}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

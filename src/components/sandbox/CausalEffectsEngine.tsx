@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2, Volume2, VolumeX } from "lucide-react";
-import { governedInvoke } from "@/lib/apiGovernor";
+import { GitBranch, Zap, Loader2, AlertTriangle, TrendingUp, TrendingDown, Activity, RefreshCw, Maximize2, Volume2, VolumeX, ShieldCheck } from "lucide-react";
+import { analyzeCausalShock, CausalAnalysisResult } from "@/lib/quant/macro-shock";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +29,8 @@ interface CausalAnalysis {
   scenario_tree: ScenarioBranch[];
   reflexivity_score: number;
   scar_tag: string;
+  disclaimer?: string;
+  source?: string;
 }
 
 interface Props {
@@ -96,17 +98,15 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
   const edgesRef = useRef<GraphEdge[]>([]);
   const waveProgressRef = useRef(0);
 
-  const analyze = useCallback(async (eventText: string) => {
+  const analyze = useCallback((eventText: string) => {
     if (!eventText.trim()) return;
     setLoading(true);
     setEvent(eventText);
     waveProgressRef.current = 0;
     try {
       const portfolio = stocks.filter(s => s.analysis).map(s => `${s.ticker} (${s.quantity} @ ${s.analysis?.currentPrice})`).join(", ");
-      const { data: result, error } = await governedInvoke("causal-effects", {
-        body: { event: eventText, portfolio },
-      });
-      if (error) throw error;
+      // Pure deterministic institutional quant engine (0ms latency, zero hallucinations)
+      const result = analyzeCausalShock(eventText, portfolio);
       setAnalysis(result);
       buildGraph(result);
     } catch (e) {
@@ -383,8 +383,13 @@ const CausalEffectsEngine = ({ stocks }: Props) => {
             <GitBranch className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-bold text-foreground">Causal Effects Engine</h3>
-            <p className="text-[9px] text-muted-foreground font-mono tracking-wider">SECOND & THIRD ORDER SIMULATION</p>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground">Causal Effects Engine</h3>
+              <span className="inline-flex items-center gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[8px] font-mono font-medium text-primary border border-primary/30">
+                <ShieldCheck className="h-2.5 w-2.5" /> QUANT CORE
+              </span>
+            </div>
+            <p className="text-[9px] text-muted-foreground font-mono tracking-wider">STRUCTURAL SVAR & IMPULSE PROPAGATION</p>
           </div>
           <button
             onClick={toggleChaos}
