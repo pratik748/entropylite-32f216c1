@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend } from "recharts";
-import { Activity, Lightbulb, Brain } from "lucide-react";
+import { Activity, Lightbulb, ShieldAlert } from "lucide-react";
 import { type PortfolioStock } from "@/components/PortfolioPanel";
 import { useNormalizedPortfolio } from "@/hooks/useNormalizedPortfolio";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
@@ -29,16 +29,12 @@ function percentile(arr: number[], p: number): number {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
 }
 
-// Distinct colors for individual paths
+// Institutional slate & monochromatic path hues
 const PATH_COLORS = [
-  "hsl(30,90%,55%)",  "hsl(180,70%,50%)", "hsl(120,60%,45%)", "hsl(280,60%,60%)",
-  "hsl(200,80%,55%)", "hsl(0,70%,55%)",   "hsl(60,80%,45%)",  "hsl(320,60%,55%)",
-  "hsl(160,60%,50%)", "hsl(240,50%,60%)", "hsl(45,90%,50%)",  "hsl(100,50%,50%)",
-  "hsl(350,70%,60%)", "hsl(210,70%,50%)", "hsl(90,60%,45%)",  "hsl(270,50%,55%)",
-  "hsl(20,80%,50%)",  "hsl(140,60%,45%)", "hsl(300,50%,55%)", "hsl(170,60%,50%)",
-  "hsl(50,80%,50%)",  "hsl(230,60%,55%)", "hsl(10,70%,50%)",  "hsl(190,70%,50%)",
-  "hsl(110,50%,45%)", "hsl(330,60%,55%)", "hsl(70,70%,45%)",  "hsl(250,50%,55%)",
-  "hsl(40,80%,50%)",  "hsl(150,60%,50%)",
+  "hsl(215, 15%, 45%)", "hsl(220, 12%, 40%)", "hsl(210, 18%, 50%)", "hsl(200, 15%, 48%)",
+  "hsl(225, 10%, 42%)", "hsl(215, 20%, 52%)", "hsl(210, 12%, 38%)", "hsl(220, 16%, 46%)",
+  "hsl(205, 14%, 44%)", "hsl(215, 15%, 49%)", "hsl(225, 18%, 53%)", "hsl(210, 10%, 41%)",
+  "hsl(220, 14%, 47%)", "hsl(200, 16%, 45%)", "hsl(215, 12%, 39%)", "hsl(225, 15%, 51%)",
 ];
 
 // Canonical CCAR / DFAST-style stress multipliers. Numbers come from published
@@ -305,18 +301,6 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           ]}
         />
       </div>
-      {aiLoading && (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
-          <Brain className="h-4 w-4 text-primary animate-pulse" />
-          <span className="text-xs text-primary">AI calibrating simulation parameters...</span>
-        </div>
-      )}
-      {aiCalibration && !aiLoading && (
-        <div className="flex items-center gap-2 rounded-lg border border-gain/20 bg-gain/5 px-3 py-1.5">
-          <Brain className="h-3.5 w-3.5 text-gain" />
-          <span className="text-[10px] text-gain">AI overlay active</span>
-        </div>
-      )}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="h-4 w-4 text-foreground" />
@@ -396,7 +380,7 @@ const MonteCarloEngine = ({ stocks }: Props) => {
               )}
 
               {/* Bold "Real" (median) path on top */}
-              <Line type="monotone" dataKey="real" stroke="hsl(220, 90%, 56%)" strokeWidth={3}
+              <Line type="monotone" dataKey="real" stroke="hsl(var(--primary))" strokeWidth={2.5}
                 dot={false} isAnimationActive={false} name="Real" />
 
               {/* Starting value reference */}
@@ -443,13 +427,6 @@ const MonteCarloEngine = ({ stocks }: Props) => {
           </ResponsiveContainer>
         </div>
       </div>
-
-      {aiCalibration?.narrativeSummary && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-2">AI Simulation Analysis</h3>
-          <p className="text-xs text-secondary-foreground leading-relaxed">{aiCalibration.narrativeSummary}</p>
-        </div>
-      )}
     </div>
   );
 };
