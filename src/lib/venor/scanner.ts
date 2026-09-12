@@ -313,18 +313,36 @@ export class VenorAlphaScanner {
       }
     }
 
-    // Sort opportunities by Institutional Edge Multiplier (WinProb * Edge / Cost)
+    // Sort opportunities by Institutional Edge Multiplier (WinProb * Edge * Convexity / Cost)
     const sorted = opportunities.sort((a, b) => {
       const scoreA = (a.winProbability * a.edgeBpsExpected * a.convexityRatio) / Math.max(1, a.almgrenChrissCostBps);
       const scoreB = (b.winProbability * b.edgeBpsExpected * b.convexityRatio) / Math.max(1, b.almgrenChrissCostBps);
       return scoreB - scoreA;
     });
 
+    // Enforce strict deduplication: an asset cannot appear in multiple cards
+    const deduped: VenorTradeOpportunity[] = [];
+    const usedTickers = new Set<string>();
+
+    for (const opp of sorted) {
+      const primary = opp.primaryTicker.toUpperCase();
+      const secondary = opp.secondaryTicker ? opp.secondaryTicker.toUpperCase() : null;
+
+      if (usedTickers.has(primary)) continue;
+      if (secondary && usedTickers.has(secondary)) continue;
+
+      usedTickers.add(primary);
+      if (secondary) usedTickers.add(secondary);
+      deduped.push(opp);
+
+      if (deduped.length >= 12) break;
+    }
+
     return {
       timestamp: Date.now(),
       assetsScannedCount: N,
       pairsEvaluatedCount: pairsEvaluated,
-      topOpportunities: sorted.slice(0, 15),
+      topOpportunities: deduped,
       marketWideSpectralState: {
         vonNeumannEntropy: spectral.vonNeumannEntropy,
         diversificationRatio: spectral.diversificationRatio,
@@ -349,31 +367,35 @@ export function generateCandidateUniverse(
   const universeDefinitions = indiaMode
     ? [
         { ticker: "RELIANCE", name: "Reliance Industries", basePrice: 2950, betaToMarket: 1.1, sector: "Energy" },
-        { ticker: "TCS", name: "Tata Consultancy Services", basePrice: 4120, betaToMarket: 0.85, sector: "Tech" },
-        { ticker: "INFY", name: "Infosys Ltd", basePrice: 1680, betaToMarket: 0.95, sector: "Tech" },
+        { ticker: "TCS", name: "Tata Consultancy Services", basePrice: 4120, betaToMarket: 0.85, sector: "Technology" },
+        { ticker: "INFY", name: "Infosys Ltd", basePrice: 1680, betaToMarket: 0.95, sector: "Technology" },
         { ticker: "HDFCBANK", name: "HDFC Bank", basePrice: 1640, betaToMarket: 1.05, sector: "Banking" },
         { ticker: "ICICIBANK", name: "ICICI Bank", basePrice: 1210, betaToMarket: 1.15, sector: "Banking" },
         { ticker: "BHARTIARTL", name: "Bharti Airtel", basePrice: 1540, betaToMarket: 0.75, sector: "Telecom" },
         { ticker: "LT", name: "Larsen & Toubro", basePrice: 3580, betaToMarket: 1.2, sector: "Infrastructure" },
-        { ticker: "TATAMOTORS", name: "Tata Motors", basePrice: 980, betaToMarket: 1.35, sector: "Auto" },
-        { ticker: "NIFTY50", name: "Nifty 50 Index", basePrice: 24800, betaToMarket: 1.0, sector: "Index" },
-        { ticker: "GOLD_INR", name: "Gold India MCX", basePrice: 72500, betaToMarket: -0.15, sector: "Commodities" },
+        { ticker: "TATAMOTORS", name: "Tata Motors", basePrice: 980, betaToMarket: 1.35, sector: "Automotive" },
+        { ticker: "NIFTY50", name: "Nifty 50 Index ETF", basePrice: 24800, betaToMarket: 1.0, sector: "Index" },
+        { ticker: "GOLDBEES", name: "Nippon Gold ETF", basePrice: 72, betaToMarket: -0.15, sector: "Commodities" },
       ]
     : [
         { ticker: "NVDA", name: "NVIDIA Corp", basePrice: 125, betaToMarket: 1.8, sector: "Semiconductors" },
         { ticker: "AMD", name: "Advanced Micro Devices", basePrice: 145, betaToMarket: 1.65, sector: "Semiconductors" },
+        { ticker: "TSM", name: "Taiwan Semiconductor Mfg", basePrice: 170, betaToMarket: 1.4, sector: "Semiconductors" },
         { ticker: "MSFT", name: "Microsoft Corp", basePrice: 430, betaToMarket: 0.95, sector: "Technology" },
         { ticker: "AAPL", name: "Apple Inc", basePrice: 220, betaToMarket: 0.9, sector: "Technology" },
         { ticker: "GOOGL", name: "Alphabet Inc", basePrice: 175, betaToMarket: 1.1, sector: "Technology" },
         { ticker: "META", name: "Meta Platforms", basePrice: 510, betaToMarket: 1.25, sector: "Technology" },
-        { ticker: "TSLA", name: "Tesla Inc", basePrice: 215, betaToMarket: 2.1, sector: "Automotive" },
+        { ticker: "AMZN", name: "Amazon.com Inc", basePrice: 185, betaToMarket: 1.15, sector: "Consumer" },
+        { ticker: "ASML", name: "ASML Holding NV", basePrice: 880, betaToMarket: 1.45, sector: "Semiconductors" },
         { ticker: "SPY", name: "SPDR S&P 500 ETF", basePrice: 550, betaToMarket: 1.0, sector: "Index" },
         { ticker: "QQQ", name: "Invesco QQQ Trust", basePrice: 475, betaToMarket: 1.2, sector: "Index" },
+        { ticker: "IWM", name: "iShares Russell 2000 ETF", basePrice: 215, betaToMarket: 1.25, sector: "Index" },
         { ticker: "GLD", name: "SPDR Gold Shares", basePrice: 235, betaToMarket: -0.1, sector: "Commodities" },
         { ticker: "SLV", name: "iShares Silver Trust", basePrice: 28, betaToMarket: 0.15, sector: "Commodities" },
         { ticker: "TLT", name: "iShares 20+ Year Treasury", basePrice: 92, betaToMarket: -0.35, sector: "Fixed Income" },
         { ticker: "HYG", name: "iShares High Yield Corporate", basePrice: 78, betaToMarket: 0.45, sector: "Credit" },
-        { ticker: "BTC_USD", name: "Bitcoin / USD", basePrice: 61500, betaToMarket: 1.9, sector: "Crypto" },
+        { ticker: "BTC", name: "Bitcoin Index", basePrice: 61500, betaToMarket: 1.9, sector: "Crypto" },
+        { ticker: "ETH", name: "Ethereum Index", basePrice: 2650, betaToMarket: 2.0, sector: "Crypto" },
       ];
 
   // Merge user holdings if not already in universe
