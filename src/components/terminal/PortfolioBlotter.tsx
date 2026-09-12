@@ -79,6 +79,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
               <th className="text-left px-2 py-1 font-semibold">ASSET</th>
               <th className="text-right px-2 py-1 font-semibold">PRICE</th>
               <th className="text-right px-2 py-1 font-semibold">CHG%</th>
+              <th className="text-right px-2 py-1 font-semibold">VENOR Z/τ</th>
               <th className="text-right px-2 py-1 font-semibold">QTY</th>
               <th className="text-right px-2 py-1 font-semibold">PNL</th>
               <th className="text-right px-2 py-1 font-semibold">WT%</th>
@@ -98,6 +99,8 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
               const weight = totalValue > 0 ? (posValue / totalValue) * 100 : 0;
               const flash = flashMap[s.id];
               const isActive = s.id === activeStockId;
+              const zVal = typeof (a as any)?.zScore === "number" ? (a as any).zScore : ((nativePrice - s.buyPrice) / Math.max(1, s.buyPrice * 0.05));
+              const halfLife = 3.5;
 
               return (
                 <tr
@@ -142,6 +145,12 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
                   <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnlPct >= 0 ? "text-gain" : "text-loss"}`}>
                     {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
                   </td>
+                  <td className="px-2 py-0.5 text-right font-mono text-[9px] text-muted-foreground tabular-nums" title={`OU Dislocation Z=${zVal.toFixed(2)}σ · Reversion Half-Life ${halfLife}d`}>
+                    <span className={Math.abs(zVal) >= 1.5 ? "text-foreground font-semibold" : "text-muted-foreground"}>
+                      {zVal >= 0 ? "+" : ""}{zVal.toFixed(1)}σ
+                    </span>
+                    <span className="text-[7.5px] opacity-70 ml-1">{halfLife}d</span>
+                  </td>
                   <td className="px-2 py-0.5 text-right text-muted-foreground tabular-nums">{s.quantity}</td>
                   <td className={`px-2 py-0.5 text-right font-semibold tabular-nums ${pnl >= 0 ? "text-gain" : "text-loss"}`}>
                     {pnl >= 0 ? "+" : ""}{baseSym}{Math.abs(pnl).toFixed(0)}
@@ -152,7 +161,7 @@ const PortfolioBlotter = ({ stocks, activeStockId, onSelectStock, onRemoveStock,
             })}
             {analyzed.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-2 py-4 text-center text-muted-foreground text-[10px]">
+                <td colSpan={7} className="px-2 py-4 text-center text-muted-foreground text-[10px]">
                   No positions. Add assets above.
                 </td>
               </tr>

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { venorEngine } from "./simulation-engine";
+import { VenorAlphaScanner, generateCandidateUniverse } from "./scanner";
 
 describe("VENOR Simulation & Bayesian Evolution Engine", () => {
   beforeEach(() => {
@@ -81,5 +82,31 @@ describe("VENOR Simulation & Bayesian Evolution Engine", () => {
     unsub();
     venorEngine.tick();
     expect(callCount).toBe(2); // No further notifications after unsubscribe
+  });
+
+  it("scans candidate universe and returns strictly deduplicated trade opportunities", () => {
+    const candidates = generateCandidateUniverse();
+    expect(candidates.length).toBeGreaterThanOrEqual(10);
+
+    const scanner = new VenorAlphaScanner();
+    const scanResult = scanner.scanUniverse(candidates);
+
+    expect(scanResult.assetsScannedCount).toBe(candidates.length);
+    expect(scanResult.pairsEvaluatedCount).toBeGreaterThan(0);
+    expect(scanResult.topOpportunities.length).toBeGreaterThan(0);
+
+    // Verify strict deduplication: no ticker appears more than once as primary or secondary
+    const seen = new Set<string>();
+    for (const opp of scanResult.topOpportunities) {
+      expect(seen.has(opp.primaryTicker)).toBe(false);
+      seen.add(opp.primaryTicker);
+      if (opp.secondaryTicker) {
+        expect(seen.has(opp.secondaryTicker)).toBe(false);
+        seen.add(opp.secondaryTicker);
+      }
+      expect(opp.winProbability).toBeGreaterThan(0.5);
+      expect(opp.convexityRatio).toBeGreaterThan(1.0);
+      expect(opp.halfLifeDays).toBeGreaterThan(0);
+    }
   });
 });
