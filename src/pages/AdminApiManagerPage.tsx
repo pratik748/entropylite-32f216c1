@@ -7,9 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Cpu,
-  HelpCircle,
   KeyRound,
-  Layers,
   Loader2,
   Play,
   Plus,
@@ -19,9 +17,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Terminal,
   Trash2,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -337,7 +333,7 @@ export default function AdminApiManagerPage() {
     setTestingAllFunctions(true);
     toast.info("Running system diagnostics across all edge functions...");
     try {
-      const { data, error } = await supabase.functions.invoke("test-ai-key", {
+      const { data, error } = await supabase.functions.invoke("test-all-functions", {
         body: { action: "test-all-functions" },
       });
       if (error) {

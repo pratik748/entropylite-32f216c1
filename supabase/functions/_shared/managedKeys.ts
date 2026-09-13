@@ -25,21 +25,21 @@ async function load(): Promise<Record<string, string>> {
     const admin = createClient(url, service, { auth: { persistSession: false } });
     const { data, error } = await admin
       .from("api_credentials")
-      .select("name, value, provider, is_active")
+      .select("name, value, is_active, provider")
       .eq("is_active", true);
     if (error) throw error;
     const map: Record<string, string> = {};
-    const providers: Record<string, string> = {};
+    const pMap: Record<string, string> = {};
     for (const row of data || []) {
       const name = String((row as any).name || "").trim();
       const value = String((row as any).value || "").trim();
-      const provider = String((row as any).provider || "").trim().toLowerCase();
+      const provider = String((row as any).provider || "").trim();
       if (name && value) {
         map[name] = value;
-        if (provider) providers[name] = provider;
+        if (provider) pMap[name] = provider;
       }
     }
-    providerCache = providers;
+    providerCache = pMap;
     return map;
   } catch (e) {
     console.error("managedKeys load failed:", e instanceof Error ? e.message : e);
@@ -101,37 +101,7 @@ export function getManagedSnapshot(): Record<string, string> {
   return { ...cache };
 }
 
+/** All admin-managed credential providers from the last loaded snapshot. */
 export function getManagedProviderSnapshot(): Record<string, string> {
   return { ...providerCache };
 }
-
-export type KeyHealthEvent = {
-  name: string;
-  provider: string;
-  source: "manager" | "environment";
-  status: "ok" | "error";
-  latencyMs: number;
-  error?: string;
-};
-
-/** Persist provider health without ever storing or returning credential values. */
-export async function recordKeyHealth(event: KeyHealthEvent): Promise<void> {
-  const url = Deno.env.get("SUPABASE_URL");
-  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !service) return;
-  try {
-    const admin = createClient(url, service, { auth: { persistSession: false } });
-    const { error } = await admin.rpc("record_key_health", {
-      _name: event.name,
-      _provider: event.provider,
-      _source: event.source,
-      _status: event.status,
-      _latency_ms: Math.max(0, Math.round(event.latencyMs)),
-      _error: event.error?.slice(0, 300) || null,
-    });
-    if (error) throw error;
-  } catch (e) {
-    console.error("recordKeyHealth failed:", e instanceof Error ? e.message : e);
-  }
-}
-
