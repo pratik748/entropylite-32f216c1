@@ -1,15 +1,26 @@
 /**
- * AI caller, UNIFIED on Mistral with multi-provider failover.
+ * AI caller, UNIFIED on Mistral.
  *
- * Primary routing prioritizes Mistral and active admin credentials.
- * Providers (Mistral, Gemini, OpenRouter, Groq, OpenAI, Anthropic, NVIDIA)
- * are supported with automatic failover, timeout management, rate-limit backoff,
- * and automatic model step-down.
+ * All other provider names (groq/cloudflare/openai/gemini) are kept as type
+ * aliases for backward compatibility, but every code path routes to Mistral.
+ * Two API keys are supported with automatic failover:
+ *   - MISTRAL_API_KEY      (primary)
+ *   - MISTRAL_API_KEY_2    (fallback, used if primary fails / 429 / 401 / 5xx)
+ *
+ * A third key (MISTRAL_API_KEY_3) acts as a priority reserve: it is not part
+ * of the round-robin load split, and is tried FIRST when both rotating keys
+ * hit limits, before any Gemini/1min fallback, so rate-limit bursts land on
+ * the reserve Mistral lane rather than a different provider.
+ *
+ * Tool-calling requests are converted to JSON-mode prompts (Mistral does not
+ * support OpenAI-style function declarations natively), and the JSON response
+ * is wrapped into a synthetic toolCall so callers don't have to branch.
  *
  * Keys resolve through the global API Manager (public.api_credentials, managed
- * by an admin in-app) first, then environment variables.
+ * by an admin in-app) first, then environment variables. Lovable AI is NOT part
+ * of the chain.
  */
-import { getKeySync, getManagedSnapshot, getManagedProviderSnapshot, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -19,22 +30,25 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini" | "openrouter" | "anthropic" | "nvidia";
+  provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   jsonMode?: boolean;
   skipHardening?: boolean;
-  /** No-op (kept for backward compatibility). */
+  /** No-op (kept for backward compatibility, Mistral has no native web search). */
   useWebSearch?: boolean;
 }
 
 interface AIResult {
   text: string;
-  provider: "groq" | "cloudflare" | "mistral" | "openai" | "gemini" | "openrouter" | "anthropic" | "nvidia";
+  provider: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
   toolCall?: any;
 }
 
 const MISTRAL_DEFAULT_MODEL = "mistral-large-latest";
 const MISTRAL_FAST_MODEL = "mistral-small-latest";
 
+// Per-isolate round-robin cursor across Mistral keys. Persists for the
+// lifetime of the edge worker, so consecutive calls within the same warm
+// instance alternate keys and split load roughly 50/50.
 let __mistralKeyCursor = 0;
 function pickKeyIndex(total: number): number {
   if (total <= 1) return 0;
@@ -68,7 +82,7 @@ function hardenSystemPrompt(original: string, skip?: boolean): string {
 
 /** Remove em/en dashes from model prose (banned house style). Safe for JSON. */
 function stripLongDashes(text: string): string {
-  return text.replace(/\s*[—–]\s+/g, ", ").replace(/[—–]/g, "-");
+  return text.replace(/\s*[\u2014\u2013]\s+/g, ", ").replace(/[\u2014\u2013]/g, "-");
 }
 
 function stripThinkingBlocks(text: string): string {
@@ -135,6 +149,11 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+/**
+ * Build a tiny placeholder JSON example from a JSON-schema fragment.
+ * Used to give Mistral a concrete shape to imitate when the caller passed
+ * OpenAI-style tools.
+ */
 function buildJsonSkeleton(schema: any, depth = 0): any {
   if (!schema || typeof schema !== "object" || depth > 6) return null;
   let type: any = schema.type;
@@ -171,6 +190,12 @@ function buildJsonSkeleton(schema: any, depth = 0): any {
   }
 }
 
+/**
+ * Models tried in order for a single Mistral key. If the account's tier does
+ * not allow the large model (403 tier_not_allowed) or the model name is not
+ * served (400/404), we step down to the open-weight models that every tier
+ * can call instead of burning the whole lane.
+ */
 const MISTRAL_MODEL_CHAIN = [MISTRAL_DEFAULT_MODEL, MISTRAL_FAST_MODEL, "open-mistral-nemo"];
 
 function isModelAvailabilityError(status: number, body: string): boolean {
@@ -181,9 +206,20 @@ function isModelAvailabilityError(status: number, body: string): boolean {
     b.includes("model_not_found") || b.includes("invalid model");
 }
 
+/**
+ * Remembers, per isolate, which model a given key was actually allowed to
+ * call, so a tier-restricted account stops paying a wasted 403 round-trip on
+ * every request.
+ */
 const modelMemo = new Map<string, string>();
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Call Mistral with a single API key. Throws on non-2xx with status info.
+ * Free-tier keys rate-limit per second, so a 429 gets one short backoff retry
+ * on the same key before the lane is abandoned.
+ */
 async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const memoKey = apiKey.slice(0, 8);
   const preferred = modelMemo.get(memoKey);
@@ -243,201 +279,188 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
   throw lastErr || new Error("Mistral: no usable model");
 }
 
+
+
+/**
+ * Generic OpenAI-compatible lane (OpenRouter, Groq, or any admin-supplied
+ * compatible endpoint). Used only as a fallback after every Mistral key.
+ */
+const OPENROUTER_DEFAULT_MODEL = getKeySync("OPENROUTER_MODEL") || "mistralai/mistral-large";
+const GROQ_DEFAULT_MODEL = getKeySync("GROQ_MODEL") || "llama-3.3-70b-versatile";
+
 async function callOpenAICompatible(
   opts: CallAIOptions,
   apiKey: string,
   endpoint: string,
-  defaultModel: string,
-  fallbackModels: string[] = [],
+  model: string,
   reported?: AIResult["provider"],
 ): Promise<AIResult> {
-  const models = [opts.model || defaultModel, ...fallbackModels.filter(m => m !== (opts.model || defaultModel))];
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  let lastErr: any = null;
+  const body: Record<string, any> = {
+    model: model,
+    messages: [
+      { role: "system", content: systemText },
+      { role: "user", content: opts.userPrompt },
+    ],
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
 
-  for (const model of models) {
-    const body: Record<string, any> = {
-      model,
-      messages: [
-        { role: "system", content: systemText },
-        { role: "user", content: opts.userPrompt },
-      ],
-      temperature: opts.temperature ?? 0.6,
-      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-    };
-    if (opts.jsonMode) body.response_format = { type: "json_object" };
-
-    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-    try {
-      const res = await fetchWithTimeout(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }, timeout);
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        lastErr = { status: res.status, message: `${endpoint} [${model}] ${res.status}: ${errBody.slice(0, 250)}` };
-        if (res.status === 404 || res.status === 400 || res.status === 422 || res.status === 429) {
-          console.warn(`callAI → model ${model} at ${endpoint} returned ${res.status}, trying fallback`);
-          if (res.status === 429 && models.indexOf(model) < models.length - 1) {
-            await new Promise((r) => setTimeout(r, 600));
-          }
-          continue;
-        }
-        throw lastErr;
-      }
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content;
-      if (typeof text !== "string" || !text.trim()) {
-        lastErr = new Error(`Empty response from ${endpoint} [${model}]`);
-        continue;
-      }
-      return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
-    } catch (e: any) {
-      if (e?.status && (e.status === 404 || e.status === 400 || e.status === 422 || e.status === 429) && models.indexOf(model) < models.length - 1) {
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw lastErr || new Error(`All models for ${endpoint} failed`);
-}
-
-async function callAnthropic(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const model = opts.model || getKeySync("ANTHROPIC_MODEL") || "claude-3-5-haiku-latest";
   const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+  const res = await fetchWithTimeout(endpoint, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      system: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening),
-      messages: [{ role: "user", content: opts.userPrompt }],
-      temperature: opts.temperature ?? 0.6,
-      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-    }),
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   }, timeout);
+
   if (!res.ok) {
     const errBody = await res.text();
-    throw { status: res.status, message: `Anthropic [${model}] ${res.status}: ${errBody.slice(0, 200)}` };
+    throw { status: res.status, message: `${endpoint} ${res.status}: ${errBody.slice(0, 200)}` };
   }
   const data = await res.json();
-  const text = Array.isArray(data?.content) ? data.content.map((part: any) => part?.text || "").join("") : "";
-  if (!text.trim()) throw new Error("Empty Anthropic response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "anthropic" };
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty provider response");
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
-const GEMINI_MODEL_CHAIN = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"];
-const geminiModelMemo = new Map<string, string>();
+
+/**
+ * Mistral caller with automatic key 1 → key 2 fallback.
+ * Falls back on any error from key 1 (rate limit, auth, network, empty body).
+ */
+async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const { primary, fallback } = buildLanes(reported);
+  if (primary.length === 0 && fallback.length === 0) {
+    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
+  }
+
+  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
+  // sequentially only after every primary lane has failed.
+  const idx = primary.length ? pickKeyIndex(primary.length) : 0;
+  const orderedPrimary = primary.slice(idx).concat(primary.slice(0, idx));
+  const ordered = orderedPrimary.concat(fallback);
+
+  let lastErr: any = null;
+  for (const lane of ordered) {
+    try {
+      return await lane.call(opts);
+    } catch (e: any) {
+      lastErr = e;
+      console.warn(`callAI → lane ${lane.label} failed:`, e?.message || e);
+    }
+  }
+  throw lastErr || new Error("All AI lanes failed");
+}
+
+// ---------------------------------------------------------------------------
+// 1min.ai lane
+// ---------------------------------------------------------------------------
+// 1min.ai exposes a unified gateway over many models. We use it as a third
+// resilience lane alongside Mistral. Endpoint:
+//   POST https://api.1min.ai/api/features?isStreaming=false
+//   Headers: API-KEY: <key>
+//   Body: { type: "CHAT_WITH_AI", model, promptObject: { prompt, isMixed, webSearch } }
+// Response shape: aiRecord.aiRecordDetail.resultObject[0] (string)
+const ONEMIN_DEFAULT_MODEL = Deno.env.get("ONEMIN_AI_MODEL") || "mistral-nemo";
+
+async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const apiKey = Deno.env.get("ONEMIN_AI_API_KEY");
+  if (!apiKey) throw new Error("ONEMIN_AI_API_KEY not configured");
+
+  // 1min.ai has no system role, fold system into the user prompt.
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const jsonHint = opts.jsonMode
+    ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences. No comments."
+    : "";
+  const combinedPrompt = `${systemText}\n\n=== USER ===\n${opts.userPrompt}${jsonHint}`;
+
+  const body = {
+    type: "CHAT_WITH_AI",
+    model: ONEMIN_DEFAULT_MODEL,
+    promptObject: {
+      prompt: combinedPrompt,
+      isMixed: false,
+      webSearch: false,
+    },
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const res = await fetchWithTimeout("https://api.1min.ai/api/features?isStreaming=false", {
+    method: "POST",
+    headers: { "API-KEY": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw { status: res.status, message: `1minAI ${res.status}: ${errBody.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  // Result can be array or string depending on the feature.
+  const raw = data?.aiRecord?.aiRecordDetail?.resultObject;
+  const text = Array.isArray(raw) ? raw.join("") : (typeof raw === "string" ? raw : "");
+  if (!text || !text.trim()) throw new Error("Empty 1minAI response");
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+}
+
+// ---------------------------------------------------------------------------
+// Gemini lane (Google Generative Language API)
+// ---------------------------------------------------------------------------
+// Used as a tertiary failover after both Mistral keys. We expose two keys
+// (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and round-robin between them
+// inside the lane registry. Default model is gemini-2.0-flash for low latency
+// and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
+const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const memoKey = apiKey.slice(0, 8);
-  const preferred = geminiModelMemo.get(memoKey);
-  const customModel = opts.model || getKeySync("GEMINI_MODEL") || getKeySync("GOOGLE_GEMINI_MODEL") || Deno.env.get("GEMINI_DEFAULT_MODEL");
-  const base = customModel ? [customModel, ...GEMINI_MODEL_CHAIN.filter(m => m !== customModel)] : GEMINI_MODEL_CHAIN;
-  const chain = preferred ? [preferred, ...base.filter((m) => m !== preferred)] : base;
-
+  const model = GEMINI_DEFAULT_MODEL;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode
     ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences."
     : "";
-  let lastErr: any = null;
-
-  for (const model of chain) {
-    const body: Record<string, any> = {
-      systemInstruction: { role: "system", parts: [{ text: systemText }] },
-      contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
-      generationConfig: {
-        temperature: opts.temperature ?? 0.6,
-        maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
-        ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
-      },
-    };
-
-    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    try {
-      const res = await fetchWithTimeout(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }, timeout);
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        lastErr = { status: res.status, message: `Gemini [${model}] ${res.status}: ${errBody.slice(0, 200)}` };
-        if (res.status === 404 || res.status === 400 || res.status === 403 || res.status === 429) {
-          console.warn(`callAI → Gemini model ${model} unavailable/rate-limited (${res.status}), stepping down...`);
-          if (res.status === 429 && chain.indexOf(model) < chain.length - 1) {
-            await new Promise((r) => setTimeout(r, 600));
-          }
-          continue;
-        }
-        throw lastErr;
-      }
-      const data = await res.json();
-      const parts = data?.candidates?.[0]?.content?.parts;
-      const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
-      if (!text || !text.trim()) {
-        lastErr = new Error(`Empty Gemini response from ${model}`);
-        continue;
-      }
-      geminiModelMemo.set(memoKey, model);
-      return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "gemini" };
-    } catch (e: any) {
-      if (e?.status && (e.status === 404 || e.status === 400 || e.status === 403 || e.status === 429) && chain.indexOf(model) < chain.length - 1) {
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw lastErr || new Error("All Gemini models failed");
-}
-
-async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
-  const key = getKeySync("ONEMIN_AI_API_KEY");
-  if (!key) throw new Error("1min.ai key not configured");
-  const model = opts.model || getKeySync("ONEMIN_AI_MODEL") || "gpt-4o-mini";
-  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-
-  const res = await fetch("https://api.1min.ai/api/features", {
-    method: "POST",
-    headers: {
-      "API-KEY": key,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "CHAT_WITH_AI",
-      model,
-      prompt: `${systemText}\n\n${opts.userPrompt}`,
+  const body: Record<string, any> = {
+    systemInstruction: { role: "system", parts: [{ text: systemText }] },
+    contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
+    generationConfig: {
       temperature: opts.temperature ?? 0.6,
-      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-    }),
-  });
+      maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
+    },
+  };
+
+  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, timeout);
+
   if (!res.ok) {
     const errBody = await res.text();
-    throw { status: res.status, message: `1min.ai ${res.status}: ${errBody.slice(0, 200)}` };
+    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
   }
   const data = await res.json();
-  const text = data?.result?.response || data?.response || data?.text || "";
-  if (!text || !text.trim()) throw new Error("Empty 1min.ai response");
+  const parts = data?.candidates?.[0]?.content?.parts;
+  const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
+  if (!text || !text.trim()) throw new Error("Empty Gemini response");
   return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
 }
 
+// ---------------------------------------------------------------------------
+// Lane registry, assembles all available providers into a single rotation.
+// ---------------------------------------------------------------------------
 interface Lane {
   label: string;
-  credentialName?: string;
-  provider: string;
-  source?: "manager" | "environment";
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
-function buildLanes(reported?: AIResult["provider"], requestedProvider?: string): { primary: Lane[]; fallback: Lane[] } {
+/**
+ * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
+ * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
+ */
+function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
   const primary: Lane[] = [];
   const fallback: Lane[] = [];
   const m1 = getKeySync("MISTRAL_API_KEY");
@@ -448,82 +471,55 @@ function buildLanes(reported?: AIResult["provider"], requestedProvider?: string)
   const g2 = getKeySync("GOOGLE_GEMINI_KEY_2");
   const or1 = getKeySync("OPENROUTER_API_KEY");
   const gq = getKeySync("GROQ_API_KEY");
-  const openai = getKeySync("OPENAI_API_KEY");
-  const anthropic = getKeySync("ANTHROPIC_API_KEY");
-  const nvidia = getKeySync("NVIDIA_API_KEY");
-  const managed = getManagedSnapshot();
-
-  const openrouterDefault = getKeySync("OPENROUTER_MODEL") || "mistralai/mistral-large-2411";
-  const openrouterFallbacks = ["google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct", "openrouter/auto"];
-  const groqDefault = getKeySync("GROQ_MODEL") || "llama-3.3-70b-versatile";
-  const groqFallbacks = ["llama-3.1-8b-instant", "mixtral-8x7b-32768"];
-
-  if (m1) primary.push({ label: "mistral-1", credentialName: "MISTRAL_API_KEY", provider: "Mistral", source: managed.MISTRAL_API_KEY ? "manager" : "environment", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) primary.push({ label: "mistral-2", credentialName: "MISTRAL_API_KEY_2", provider: "Mistral", source: managed.MISTRAL_API_KEY_2 ? "manager" : "environment", call: (o) => callMistralWithKey(o, m2, reported) });
-  if (m3) fallback.push({ label: "mistral-3-reserve", credentialName: "MISTRAL_API_KEY_3", provider: "Mistral", source: managed.MISTRAL_API_KEY_3 ? "manager" : "environment", call: (o) => callMistralWithKey(o, m3, reported) });
-
-  if (g1) fallback.push({ label: "gemini-1", credentialName: "GOOGLE_GEMINI_KEY", provider: "Gemini", source: managed.GOOGLE_GEMINI_KEY ? "manager" : "environment", call: (o) => callGeminiWithKey(o, g1, reported || "gemini") });
-  if (g2) fallback.push({ label: "gemini-2", credentialName: "GOOGLE_GEMINI_KEY_2", provider: "Gemini", source: managed.GOOGLE_GEMINI_KEY_2 ? "manager" : "environment", call: (o) => callGeminiWithKey(o, g2, reported || "gemini") });
-
-  if (or1) fallback.push({ label: "openrouter", credentialName: "OPENROUTER_API_KEY", provider: "OpenRouter", source: managed.OPENROUTER_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", openrouterDefault, openrouterFallbacks, reported || "openrouter") });
-  if (gq) fallback.push({ label: "groq", credentialName: "GROQ_API_KEY", provider: "Groq", source: managed.GROQ_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", groqDefault, groqFallbacks, reported || "groq") });
-  if (openai) fallback.push({ label: "openai", credentialName: "OPENAI_API_KEY", provider: "OpenAI", source: managed.OPENAI_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, openai, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", ["gpt-4o", "gpt-3.5-turbo"], reported || "openai") });
-  if (anthropic) fallback.push({ label: "anthropic", credentialName: "ANTHROPIC_API_KEY", provider: "Anthropic", source: managed.ANTHROPIC_API_KEY ? "manager" : "environment", call: (o) => callAnthropic(o, anthropic, reported || "anthropic") });
-  if (nvidia) fallback.push({ label: "nvidia", credentialName: "NVIDIA_API_KEY", provider: "NVIDIA", source: managed.NVIDIA_API_KEY ? "manager" : "environment", call: (o) => callOpenAICompatible(o, nvidia, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", [], reported || "nvidia") });
+  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
+  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
+  // Reserve Mistral key, kept out of the round-robin so it stays under its
+  // rate limits, and tried before Gemini when the rotating keys are exhausted.
+  if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
+  // Gemini lanes, sequential fallback after every Mistral key fails.
+  // Ensures analytics never go dark when Mistral is rate-limited or down.
+  if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
+  if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
+  if (or1) fallback.push({ label: "openrouter", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+  if (gq) fallback.push({ label: "groq", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
   if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
-    fallback.push({ label: "1minai", credentialName: "ONEMIN_AI_API_KEY", provider: "1min.ai", source: managed.ONEMIN_AI_API_KEY ? "manager" : "environment", call: (o) => callOneMinAI(o, reported) });
+    fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
   }
 
-  const known = new Set([m1, m2, m3, g1, g2, or1, gq, openai, anthropic, nvidia, onemin].filter(Boolean) as string[]);
+  // Admin-added credentials from the in-app API Manager: any active row whose
+  // value looks like an LLM key joins the chain even if the admin named it
+  // something arbitrary. Provider is inferred from the key's own shape, so a
+  // freshly added key is usable immediately with no redeploy and no naming
+  // convention to remember. Tried FIRST, since an admin adds a key precisely
+  // because the existing lanes are exhausted or blocked.
+  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
   const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
   const inferred: Lane[] = [];
-  const managedProviders = getManagedProviderSnapshot();
-  for (const [name, value] of Object.entries(managed)) {
+  for (const [name, value] of Object.entries(getManagedSnapshot())) {
     if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
     const v = value.trim();
-    const configuredProvider = (managedProviders[name] || "").toLowerCase();
-    if (configuredProvider === "openrouter" || /^sk-or-/.test(v) || /OPENROUTER/i.test(name)) {
-      inferred.push({ label: `managed:${name}(openrouter)`, credentialName: name, provider: "OpenRouter", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", openrouterDefault, openrouterFallbacks, reported || "openrouter") });
-    } else if (configuredProvider === "groq" || /^gsk_/.test(v) || /GROQ/i.test(name)) {
-      inferred.push({ label: `managed:${name}(groq)`, credentialName: name, provider: "Groq", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", groqDefault, groqFallbacks, reported || "groq") });
-    } else if (configuredProvider === "gemini" || /^AIza[\w-]{20,}$/.test(v) || /GEMINI/i.test(name)) {
-      inferred.push({ label: `managed:${name}(gemini)`, credentialName: name, provider: "Gemini", source: "manager", call: (o) => callGeminiWithKey(o, v, reported || "gemini") });
-    } else if (configuredProvider === "anthropic" || /ANTHROPIC|CLAUDE/i.test(name)) {
-      inferred.push({ label: `managed:${name}(anthropic)`, credentialName: name, provider: "Anthropic", source: "manager", call: (o) => callAnthropic(o, v, reported || "anthropic") });
-    } else if (configuredProvider === "nvidia" || /^nvapi-/.test(v) || /NVIDIA/i.test(name)) {
-      inferred.push({ label: `managed:${name}(nvidia)`, credentialName: name, provider: "NVIDIA", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://integrate.api.nvidia.com/v1/chat/completions", getKeySync("NVIDIA_MODEL") || "meta/llama-3.1-70b-instruct", [], reported || "nvidia") });
-    } else if (configuredProvider === "openai" || /^sk-[A-Za-z0-9_-]{20,}$/.test(v) || /OPENAI/i.test(name)) {
-      inferred.push({ label: `managed:${name}(openai)`, credentialName: name, provider: "OpenAI", source: "manager", call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", ["gpt-4o", "gpt-3.5-turbo"], reported || "openai") });
-    } else if (configuredProvider === "mistral" || /^[A-Za-z0-9]{32}$/.test(v) || /MISTRAL/i.test(name)) {
-      inferred.push({ label: `managed:${name}(mistral)`, credentialName: name, provider: "Mistral", source: "manager", call: (o) => callMistralWithKey(o, v, reported) });
+    if (/^sk-or-/.test(v)) {
+      inferred.push({ label: `managed:${name}(openrouter)`, call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
+    } else if (/^gsk_/.test(v)) {
+      inferred.push({ label: `managed:${name}(groq)`, call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
+    } else if (/^AIza[\w-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(gemini)`, call: (o) => callGeminiWithKey(o, v, reported) });
+    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(openai)`, call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
+    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
+      inferred.push({ label: `managed:${name}(mistral)`, call: (o) => callMistralWithKey(o, v, reported) });
     }
     known.add(v);
   }
 
-  const testKey = Deno.env.get("AI_TEST_API_KEY")?.trim();
-  if (testKey && !known.has(testKey)) {
-    if (/^sk-or-/.test(testKey)) inferred.unshift({ label: "test-key(openrouter)", credentialName: "AI_TEST_API_KEY", provider: "OpenRouter", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://openrouter.ai/api/v1/chat/completions", openrouterDefault, openrouterFallbacks, reported || "openrouter") });
-    else if (/^gsk_/.test(testKey)) inferred.unshift({ label: "test-key(groq)", credentialName: "AI_TEST_API_KEY", provider: "Groq", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://api.groq.com/openai/v1/chat/completions", groqDefault, groqFallbacks, reported || "groq") });
-    else if (/^AIza/.test(testKey)) inferred.unshift({ label: "test-key(gemini)", credentialName: "AI_TEST_API_KEY", provider: "Gemini", source: "environment", call: (o) => callGeminiWithKey(o, testKey, reported || "gemini") });
-    else if (/^sk-/.test(testKey)) inferred.unshift({ label: "test-key(openai)", credentialName: "AI_TEST_API_KEY", provider: "OpenAI", source: "environment", call: (o) => callOpenAICompatible(o, testKey, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", ["gpt-4o", "gpt-3.5-turbo"], reported || "openai") });
-    else if (/^[A-Za-z0-9]{32}$/.test(testKey)) inferred.unshift({ label: "test-key(mistral)", credentialName: "AI_TEST_API_KEY", provider: "Mistral", source: "environment", call: (o) => callMistralWithKey(o, testKey, reported) });
-  }
-
-  const allPrimary = inferred.concat(primary);
-
-  if (requestedProvider) {
-    const target = requestedProvider.toLowerCase();
-    const allLanes = allPrimary.concat(fallback);
-    const matched = allLanes.filter(l => l.provider.toLowerCase() === target);
-    const remainder = allLanes.filter(l => l.provider.toLowerCase() !== target);
-    if (matched.length > 0) {
-      return { primary: matched, fallback: remainder };
-    }
-  }
-
-  return { primary: allPrimary, fallback };
+  return { primary: inferred.concat(primary), fallback };
 }
 
+
+/**
+ * Convert a tool-calling request into a JSON-mode prompt and wrap the result
+ * back into a synthetic toolCall so callers don't have to branch.
+ */
 async function callMistralToolMode(opts: CallAIOptions): Promise<AIResult> {
   const forcedToolName =
     typeof opts.toolChoice === "object" && opts.toolChoice?.function?.name
@@ -565,66 +561,54 @@ Rules:
     userPrompt: `${opts.userPrompt}${schemaHint}`,
   };
 
-  const raw = await callAI(jsonOpts);
-  let parsed: any;
-  try {
-    parsed = JSON.parse(raw.text);
-  } catch (err) {
-    const match = raw.text.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { parsed = JSON.parse(match[0]); }
-      catch { parsed = { rawResponse: raw.text }; }
-    } else {
-      parsed = { rawResponse: raw.text };
+  const r = await callMistral(jsonOpts, opts.provider || "mistral");
+
+  // Normalise: if model returned a bare array, wrap it under the array field name.
+  let argText = r.text;
+  if (arrayFieldName) {
+    const trimmed = (r.text || "").trim().replace(/^```json?\s*/i, "").replace(/```\s*$/i, "").trim();
+    if (trimmed.startsWith("[")) {
+      argText = `{"${arrayFieldName}": ${trimmed}}`;
     }
   }
-
-  if (arrayFieldName && Array.isArray(parsed) && !parsed[arrayFieldName]) {
-    parsed = { [arrayFieldName]: parsed };
-  }
-
   return {
-    text: raw.text,
-    provider: raw.provider,
+    ...r,
+    text: argText,
     toolCall: {
-      id: `call_${Date.now()}`,
+      id: `synth_${Date.now()}`,
       type: "function",
-      function: {
-        name: forcedToolName,
-        arguments: JSON.stringify(parsed),
-      },
+      function: { name: forcedToolName, arguments: argText },
     },
   };
 }
 
+/**
+ * Public API, single AI call. Always Mistral, with key1 → key2 fallback.
+ */
 export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   await refreshManagedKeys();
+  const needsTools = !!(opts.tools && opts.tools.length > 0);
+  if (needsTools) return await callMistralToolMode(opts);
+  return await callMistral(opts, opts.provider || "mistral");
+}
 
-  if (opts.tools && opts.tools.length > 0) {
-    return await callMistralToolMode(opts);
-  }
+/**
+ * Public API, fan out for ensemble diversity. With Mistral-only we just
+ * return one result (kept as array to preserve existing call sites).
+ */
+export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
+  const r = await callAI(opts);
+  return [r];
+}
 
-  const reportedProvider = opts.provider || "mistral";
-  const { primary, fallback } = buildLanes(reportedProvider, opts.provider);
-  const lanesToTry = [...primary, ...fallback];
-
-  if (lanesToTry.length === 0) {
-    throw {
-      status: 500,
-      message: "No AI providers configured. Add MISTRAL_API_KEY or GOOGLE_GEMINI_KEY in the API Manager.",
-    };
-  }
-
-  let lastError: any = null;
-  for (const lane of lanesToTry) {
-    try {
-      const result = await lane.call(opts);
-      return result;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`callAI → Lane [${lane.label}] failed (${err?.status || err?.message || err}), trying next lane`);
-    }
-  }
-
-  throw lastError || new Error("All AI provider lanes failed.");
+/**
+ * Live web search grounding via Gemini's built-in google_search tool.
+ * Returns a compact bullet list of real-time web snippets (titles + URLs)
+ * that the caller can inject directly into a prompt. Empty string on any
+ * failure so callers degrade gracefully, but we DO try, because the user
+ * explicitly asked for real-time recommendations, not training-cutoff guesses.
+ */
+export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
+  // Live web context disabled, Gemini removed. Mistral-only stack.
+  return "";
 }

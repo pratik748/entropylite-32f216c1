@@ -1,5 +1,4 @@
 import StockSummary from "@/components/StockSummary";
-import VenorPositionSignature from "@/components/venor/VenorPositionSignature";
 import MonteCarloChart from "@/components/MonteCarloChart";
 import NewsImpactTable from "@/components/NewsImpactTable";
 import SimulationTable from "@/components/SimulationTable";
@@ -53,14 +52,6 @@ const DeskAnalysisStack = ({ analysis, stocks, isMobile, onSelectTicker }: DeskA
             buyPrice={analysis.buyPrice}
             quantity={analysis.quantity}
             currency={analysis.currency}
-          />
-          <VenorPositionSignature
-            ticker={analysis.ticker}
-            currentPrice={analysis.currentPrice}
-            buyPrice={analysis.buyPrice}
-            quantity={analysis.quantity}
-            currency={analysis.currency}
-            historicalCloses={(analysis as any)?.historicalCloses || (analysis as any)?.closes}
           />
           <MonteCarloChart
             currentPrice={analysis.currentPrice}

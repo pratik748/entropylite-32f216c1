@@ -138,7 +138,3 @@ verify_jwt = false
 
 [functions.twrd-query]
 verify_jwt = false
-
-[functions.test-ai-key]
-verify_jwt = false
-

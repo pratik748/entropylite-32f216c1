@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { buildTickerCandidates, normalizeTickerInput } from "../_shared/ticker.ts";
-import { getKeySync } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +9,7 @@ const corsHeaders = {
 };
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHAVANTAGE_API_KEY") || "";
 
 interface Bars { closes: number[]; volumes: number[]; timestamps: number[]; source?: string }
 
@@ -41,13 +41,12 @@ async function fetchYahoo(symbol: string, range = "1y", interval = "1d"): Promis
 
 // ── Alpha Vantage (fallback) ─────────────────────────────────────
 async function fetchAlphaVantage(symbol: string, range = "1y"): Promise<Bars | null> {
-  const apiKey = getKeySync("ALPHAVANTAGE_API_KEY") || Deno.env.get("ALPHAVANTAGE_API_KEY");
-  if (!apiKey) return null;
+  if (!ALPHA_VANTAGE_KEY) return null;
   // Only fallback for US-style tickers (Alpha Vantage is weaker on .NS / .BO)
   const cleanSym = symbol.replace(/\.(NS|BO)$/, "");
   try {
     const outputsize = (range === "5y" || range === "max") ? "full" : "compact"; // compact = 100 days
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${apiKey}`;
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${ALPHA_VANTAGE_KEY}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();

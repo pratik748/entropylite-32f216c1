@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDown, Database, Sigma, Target, Zap, Monitor, PieChart, RefreshCw, Cpu } from "lucide-react";
+import { ArrowDown, Database, Sigma, Target, Zap, Monitor, PieChart, RefreshCw } from "lucide-react";
 import { getGovernorMetrics } from "@/lib/apiGovernor";
 import { useQuantSnapshot } from "@/hooks/useQuantSnapshot";
 import { useInstitutionalAnalytics } from "@/hooks/useInstitutionalAnalytics";
@@ -326,24 +326,6 @@ const SystemPipeline = ({ stocks, onNavigate }: SystemPipelineProps) => {
           { label: "Lessons", value: String(lessons.length) },
         ]}
         note="Every directional signal is logged and marked to market T+5 by the nightly walk-forward job; the fitted calibration feeds back into the ensemble's win-probabilities. Trade lessons close the human loop."
-      />
-      <Connector />
-
-      {/* 7, VENOR Autonomous Strategy & Evolution Engine */}
-      <LayerCard
-        icon={<Cpu className="h-3.5 w-3.5" strokeWidth={1.75} />}
-        title="VENOR Autonomous Strategy & Evolution Core"
-        subtitle="continuous OU SDE · transfer entropy · RMT spectral · SVAR shock · EVT convexity · Bayesian hyperparameter adaptation"
-        tone="live"
-        statusLabel="100% operational · continuous loop"
-        metrics={[
-          { label: "Strategy fleet", value: "5 active" },
-          { label: "Microstructure", value: "Almgren-Chriss SDE" },
-          { label: "Adaptation", value: "Bayesian prior" },
-          { label: "Latency", value: "Deterministic" },
-        ]}
-        note="Continuously backtests and forward-simulates 5 quantitative strategy families on live price feeds, optimizing hyperparameters via Thompson sampling across generations with full mutation provenance."
-        action={{ label: "VENOR Sim Lab", onClick: () => onNavigate("venor") }}
       />
     </div>
   );

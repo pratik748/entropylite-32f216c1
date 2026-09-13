@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { getKeySync } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,7 +92,7 @@ async function fetchGDELTTone(ticker?: string) {
 
 // --- Newsdata.io Source Breakdown ---
 async function fetchSourceBreakdown(ticker?: string) {
-  const key = getKeySync("NEWSDATA_API_KEY") || Deno.env.get("NEWSDATA_API_KEY");
+  const key = Deno.env.get("NEWSDATA_API_KEY");
   if (!key) return [];
   try {
     const query = ticker ? `${ticker} stock` : "stock market OR earnings OR economy";
