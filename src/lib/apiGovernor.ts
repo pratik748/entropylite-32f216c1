@@ -370,18 +370,23 @@ export function getThrottleMultiplier(): number {
 }
 
 /**
- * Flush ALL cached data, used on page load / tab refocus to force live recomputation.
+ * Flush ALL cached data, used on key updates or page load to force live recomputation.
  */
 export function flushAllCaches() {
   cache.clear();
+  inflight.clear();
   metrics.lastAiCall = 0;
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(PERSIST_PREFIX)) localStorage.removeItem(k);
+      if (k && (k.startsWith(PERSIST_PREFIX) || k.startsWith("entropy-cache-"))) {
+        localStorage.removeItem(k);
+      }
     }
   } catch {}
 }
+
+export const invalidateAllCache = flushAllCaches;
 
 /**
  * Flush analytical caches only (keep raw price-feed cache intact).

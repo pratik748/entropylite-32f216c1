@@ -50,7 +50,7 @@ async function load(): Promise<Record<string, string>> {
 /** Warm the managed-credential cache. Cheap, cached per isolate for 60s. */
 export async function refreshManagedKeys(force = false): Promise<Record<string, string>> {
   const fresh = Date.now() - cacheAt < CACHE_TTL_MS;
-  if (!force && fresh && Object.keys(cache).length >= 0 && cacheAt > 0) return cache;
+  if (!force && fresh && Object.keys(cache).length > 0 && cacheAt > 0) return cache;
   if (inflight) return await inflight;
   inflight = load().then((map) => {
     cache = map;
@@ -61,9 +61,33 @@ export async function refreshManagedKeys(force = false): Promise<Record<string, 
   return await inflight;
 }
 
-/** Synchronous lookup against the last loaded snapshot, env as fallback. */
+const ALIAS_MAP: Record<string, string[]> = {
+  GOOGLE_GEMINI_KEY: ["GEMINI_API_KEY", "GEMINI_KEY", "GOOGLE_GEMINI_API_KEY"],
+  GEMINI_API_KEY: ["GOOGLE_GEMINI_KEY", "GEMINI_KEY", "GOOGLE_GEMINI_API_KEY"],
+  GOOGLE_GEMINI_KEY_2: ["GEMINI_API_KEY_2", "GEMINI_KEY_2"],
+  MISTRAL_API_KEY: ["MISTRAL_KEY", "MISTRALAI_API_KEY"],
+  MISTRAL_API_KEY_2: ["MISTRAL_KEY_2"],
+  MISTRAL_API_KEY_3: ["MISTRAL_KEY_3"],
+  OPENROUTER_API_KEY: ["OPENROUTER_KEY", "OPEN_ROUTER_API_KEY"],
+  GROQ_API_KEY: ["GROQ_KEY"],
+  OPENAI_API_KEY: ["OPENAI_KEY"],
+  ANTHROPIC_API_KEY: ["ANTHROPIC_KEY", "CLAUDE_API_KEY", "CLAUDE_KEY"],
+  NVIDIA_API_KEY: ["NVIDIA_KEY", "NVIDIA_NIM_KEY"],
+};
+
+/** Synchronous lookup against the last loaded snapshot, env as fallback, with alias resolution. */
 export function getKeySync(name: string): string | undefined {
-  return cache[name] || Deno.env.get(name) || undefined;
+  if (cache[name]) return cache[name];
+  const envVal = Deno.env.get(name);
+  if (envVal) return envVal;
+
+  const aliases = ALIAS_MAP[name] || [];
+  for (const alias of aliases) {
+    if (cache[alias]) return cache[alias];
+    const aEnv = Deno.env.get(alias);
+    if (aEnv) return aEnv;
+  }
+  return undefined;
 }
 
 /** Await-safe lookup: refreshes the snapshot first, then resolves. */
