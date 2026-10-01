@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, getManagedSnapshot, refreshManagedKeys } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys, getProviderHints, getHealthSnapshot, recordKeyHealth } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -292,65 +292,150 @@ async function callOpenAICompatible(
   opts: CallAIOptions,
   apiKey: string,
   endpoint: string,
-  model: string,
+  model: string | string[],
   reported?: AIResult["provider"],
 ): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
-  const body: Record<string, any> = {
-    model: model,
-    messages: [
-      { role: "system", content: systemText },
-      { role: "user", content: opts.userPrompt },
-    ],
-    temperature: opts.temperature ?? 0.6,
-    max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
-  };
-  if (opts.jsonMode) body.response_format = { type: "json_object" };
-
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const res = await fetchWithTimeout(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `${endpoint} ${res.status}: ${errBody.slice(0, 200)}` };
+  const models = Array.isArray(model) ? model : [model];
+  let lastErr: any = null;
+  for (const m of models) {
+    const body: Record<string, any> = {
+      model: m,
+      messages: [
+        { role: "system", content: systemText },
+        { role: "user", content: opts.userPrompt },
+      ],
+      temperature: opts.temperature ?? 0.6,
+      max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+    };
+    if (opts.jsonMode) body.response_format = { type: "json_object" };
+    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+    const res = await fetchWithTimeout(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, timeout);
+    if (!res.ok) {
+      const errBody = await res.text();
+      lastErr = { status: res.status, message: `${new URL(endpoint).host} ${m} ${res.status}: ${errBody.slice(0, 200)}` };
+      if (isModelAvailabilityError(res.status, errBody)) continue;
+      throw lastErr;
+    }
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text.trim()) { lastErr = new Error("Empty provider response"); continue; }
+    return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty provider response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+  throw lastErr || new Error("No usable model");
 }
 
-
-/**
- * Mistral caller with automatic key 1 → key 2 fallback.
- * Falls back on any error from key 1 (rate limit, auth, network, empty body).
- */
-async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
-  const { primary, fallback } = buildLanes(reported);
-  if (primary.length === 0 && fallback.length === 0) {
-    throw new Error("No AI providers configured (MISTRAL_API_KEY / MISTRAL_API_KEY_2 / MISTRAL_API_KEY_3 / GOOGLE_GEMINI_KEY / GOOGLE_GEMINI_KEY_2)");
+/** Anthropic Messages API lane. */
+async function callAnthropic(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
+  const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
+  const jsonHint = opts.jsonMode ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences." : "";
+  const models = [getKeySync("ANTHROPIC_MODEL") || "claude-3-5-haiku-latest", "claude-3-haiku-20240307"];
+  let lastErr: any = null;
+  for (const m of models) {
+    const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: m, system: systemText, max_tokens: Math.min(opts.maxTokens ?? 4096, 8192),
+        temperature: opts.temperature ?? 0.6,
+        messages: [{ role: "user", content: `${opts.userPrompt}${jsonHint}` }],
+      }),
+    }, (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000);
+    if (!res.ok) {
+      const errBody = await res.text();
+      lastErr = { status: res.status, message: `Anthropic ${m} ${res.status}: ${errBody.slice(0, 200)}` };
+      if (isModelAvailabilityError(res.status, errBody)) continue;
+      throw lastErr;
+    }
+    const data = await res.json();
+    const text = Array.isArray(data?.content) ? data.content.map((p: any) => p?.text || "").join("") : "";
+    if (!text.trim()) { lastErr = new Error("Empty Anthropic response"); continue; }
+    return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
+  throw lastErr || new Error("Anthropic: no usable model");
+}
 
-  // Round-robin across PRIMARY (Mistral) lanes; cascade to FALLBACK (Gemini, 1min)
-  // sequentially only after every primary lane has failed.
-  const idx = primary.length ? pickKeyIndex(primary.length) : 0;
-  const orderedPrimary = primary.slice(idx).concat(primary.slice(0, idx));
-  const ordered = orderedPrimary.concat(fallback);
+// ---------------------------------------------------------------------------
+// Fortress lane runner: circuit breaker + persisted per-key telemetry.
+// ---------------------------------------------------------------------------
+type FailureClass = "dead" | "rate" | "transient" | "model";
+
+export function classifyFailure(status: number | undefined, message: string): FailureClass {
+  const m = (message || "").toLowerCase();
+  if (status === 401 || m.includes("invalid api key") || m.includes("suspended") || m.includes("user not found") ||
+      m.includes("permission denied") || m.includes("api key not valid") || m.includes("unauthorized")) return "dead";
+  if (status === 402 || m.includes("insufficient") || m.includes("quota") || m.includes("billing")) return "rate";
+  if (status === 429 || m.includes("rate limit")) return "rate";
+  if (status === 404 || m.includes("model_not_found") || m.includes("does not exist")) return "model";
+  if (status === 403) return "dead";
+  return "transient";
+}
+
+const COOLDOWN_MS: Record<FailureClass, number> = {
+  dead: 30 * 60_000,      // bad/suspended key: stop paying its latency for 30 min
+  rate: 90_000,           // rate/quota: brief rest
+  model: 30 * 60_000,     // no usable model on this key
+  transient: 15_000,
+};
+
+/** Is this key resting after a recent failure? Uses persisted health so cold isolates benefit. */
+function coolingDown(name: string): boolean {
+  const h = getHealthSnapshot()[name];
+  if (!h || h.status !== "error" || !h.errorAt) return false;
+  if (h.okAt > h.errorAt) return false;
+  const cls = classifyFailure(undefined, h.error || "");
+  const statusMatch = /\b(4\d\d|5\d\d)\b/.exec(h.error || "");
+  const cls2 = statusMatch ? classifyFailure(Number(statusMatch[1]), h.error || "") : cls;
+  return Date.now() - h.errorAt < COOLDOWN_MS[cls2];
+}
+
+async function runLane(lane: Lane, opts: CallAIOptions): Promise<AIResult> {
+  const t0 = Date.now();
+  try {
+    const r = await lane.call(opts);
+    recordKeyHealth(lane.name, lane.provider, lane.source, true, Date.now() - t0);
+    return r;
+  } catch (e: any) {
+    const msg = String(e?.message || e || "error");
+    recordKeyHealth(lane.name, lane.provider, lane.source, false, Date.now() - t0, msg);
+    throw e;
+  }
+}
+
+async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const lanes = buildLanes(reported);
+  if (lanes.length === 0) {
+    throw { status: 503, message: "No AI keys configured. Add one in the API Manager." };
+  }
+  // Healthy lanes first (managed before environment, recent success first),
+  // resting lanes only as a last resort, dead keys never block the chain.
+  const health = getHealthSnapshot();
+  const score = (l: Lane) => (l.source === "manager" ? 2 : 0) + ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 1 : 0);
+  const ready = lanes.filter((l) => !coolingDown(l.name));
+  const resting = lanes.filter((l) => coolingDown(l.name) && classifyFailure(undefined, health[l.name]?.error || "") !== "dead");
+  const idx = ready.length ? pickKeyIndex(ready.length) : 0;
+  const rotated = ready.slice(idx).concat(ready.slice(0, idx)).sort((a, b) => score(b) - score(a));
+  const ordered = rotated.concat(resting);
 
   let lastErr: any = null;
+  const tried: string[] = [];
   for (const lane of ordered) {
     try {
-      return await lane.call(opts);
+      return await runLane(lane, opts);
     } catch (e: any) {
       lastErr = e;
-      console.warn(`callAI → lane ${lane.label} failed:`, e?.message || e);
+      tried.push(lane.name);
+      console.warn(`callAI → ${lane.name} (${lane.provider}) failed:`, String(e?.message || e).slice(0, 180));
     }
   }
-  throw lastErr || new Error("All AI lanes failed");
+  if (ordered.length === 0) {
+    throw { status: 503, message: "Every AI key is marked dead. Add or rotate a key in the API Manager." };
+  }
+  throw { status: 503, message: `All AI keys failed (${tried.join(", ")}). Last: ${String(lastErr?.message || lastErr).slice(0, 160)}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -452,69 +537,108 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 // Lane registry, assembles all available providers into a single rotation.
 // ---------------------------------------------------------------------------
 interface Lane {
-  label: string;
+  name: string;
+  provider: string;
+  source: "manager" | "environment";
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
-/**
- * Returns { primary, fallback }. Primary lanes round-robin (Mistral keys).
- * Fallback lanes are tried sequentially after every primary fails (Gemini, 1min).
- */
-function buildLanes(reported?: AIResult["provider"]): { primary: Lane[]; fallback: Lane[] } {
-  const primary: Lane[] = [];
-  const fallback: Lane[] = [];
-  const m1 = getKeySync("MISTRAL_API_KEY");
-  const m2 = getKeySync("MISTRAL_API_KEY_2");
-  const m3 = getKeySync("MISTRAL_API_KEY_3");
-  const onemin = getKeySync("ONEMIN_AI_API_KEY");
-  const g1 = getKeySync("GOOGLE_GEMINI_KEY");
-  const g2 = getKeySync("GOOGLE_GEMINI_KEY_2");
-  const or1 = getKeySync("OPENROUTER_API_KEY");
-  const gq = getKeySync("GROQ_API_KEY");
-  if (m1) primary.push({ label: "mistral-1", call: (o) => callMistralWithKey(o, m1, reported) });
-  if (m2) primary.push({ label: "mistral-2", call: (o) => callMistralWithKey(o, m2, reported) });
-  // Reserve Mistral key, kept out of the round-robin so it stays under its
-  // rate limits, and tried before Gemini when the rotating keys are exhausted.
-  if (m3) fallback.push({ label: "mistral-3-reserve", call: (o) => callMistralWithKey(o, m3, reported) });
-  // Gemini lanes, sequential fallback after every Mistral key fails.
-  // Ensures analytics never go dark when Mistral is rate-limited or down.
-  if (g1) fallback.push({ label: "gemini-1", call: (o) => callGeminiWithKey(o, g1, reported) });
-  if (g2) fallback.push({ label: "gemini-2", call: (o) => callGeminiWithKey(o, g2, reported) });
-  if (or1) fallback.push({ label: "openrouter", call: (o) => callOpenAICompatible(o, or1, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-  if (gq) fallback.push({ label: "groq", call: (o) => callOpenAICompatible(o, gq, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-  if (onemin && getKeySync("ONEMIN_AI_ENABLED") === "1") {
-    fallback.push({ label: "1minai", call: (o) => callOneMinAI(o, reported) });
-  }
+const GROQ_MODELS = [GROQ_DEFAULT_MODEL, "llama-3.1-8b-instant", "openai/gpt-oss-120b"];
+const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-4o-mini", "gpt-4.1-mini"];
+const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-3.1-8b-instruct"];
 
-  // Admin-added credentials from the in-app API Manager: any active row whose
-  // value looks like an LLM key joins the chain even if the admin named it
-  // something arbitrary. Provider is inferred from the key's own shape, so a
-  // freshly added key is usable immediately with no redeploy and no naming
-  // convention to remember. Tried FIRST, since an admin adds a key precisely
-  // because the existing lanes are exhausted or blocked.
-  const known = new Set([m1, m2, m3, g1, g2, or1, gq, onemin].filter(Boolean) as string[]);
-  const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL|_ENABLED)/i;
-  const inferred: Lane[] = [];
-  for (const [name, value] of Object.entries(getManagedSnapshot())) {
-    if (!value || known.has(value) || NON_LLM_NAME.test(name)) continue;
-    const v = value.trim();
-    if (/^sk-or-/.test(v)) {
-      inferred.push({ label: `managed:${name}(openrouter)`, call: (o) => callOpenAICompatible(o, v, "https://openrouter.ai/api/v1/chat/completions", OPENROUTER_DEFAULT_MODEL, reported) });
-    } else if (/^gsk_/.test(v)) {
-      inferred.push({ label: `managed:${name}(groq)`, call: (o) => callOpenAICompatible(o, v, "https://api.groq.com/openai/v1/chat/completions", GROQ_DEFAULT_MODEL, reported) });
-    } else if (/^AIza[\w-]{20,}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(gemini)`, call: (o) => callGeminiWithKey(o, v, reported) });
-    } else if (/^sk-[A-Za-z0-9_-]{20,}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(openai)`, call: (o) => callOpenAICompatible(o, v, "https://api.openai.com/v1/chat/completions", getKeySync("OPENAI_MODEL") || "gpt-4o-mini", reported) });
-    } else if (/^[A-Za-z0-9]{32}$/.test(v)) {
-      inferred.push({ label: `managed:${name}(mistral)`, call: (o) => callMistralWithKey(o, v, reported) });
-    }
-    known.add(v);
-  }
-
-  return { primary: inferred.concat(primary), fallback };
+function inferProvider(value: string): string | null {
+  const v = value.trim();
+  if (/^sk-or-/.test(v)) return "openrouter";
+  if (/^sk-ant-/.test(v)) return "anthropic";
+  if (/^gsk_/.test(v)) return "groq";
+  if (/^nvapi-/.test(v)) return "nvidia";
+  if (/^AIza[\w-]{20,}$/.test(v)) return "gemini";
+  if (/^sk-(proj-)?[A-Za-z0-9_-]{20,}$/.test(v)) return "openai";
+  if (/^[A-Za-z0-9]{32}$/.test(v)) return "mistral";
+  return null;
 }
 
+function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
+  const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
+  switch (provider) {
+    case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
+    case "gemini": return mk((o) => callGeminiWithKey(o, key, reported));
+    case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", [OPENROUTER_DEFAULT_MODEL, "meta-llama/llama-3.3-70b-instruct:free"], reported));
+    case "groq": return mk((o) => callOpenAICompatible(o, key, "https://api.groq.com/openai/v1/chat/completions", GROQ_MODELS, reported));
+    case "openai": return mk((o) => callOpenAICompatible(o, key, "https://api.openai.com/v1/chat/completions", OPENAI_MODELS(), reported));
+    case "nvidia": return mk((o) => callOpenAICompatible(o, key, "https://integrate.api.nvidia.com/v1/chat/completions", NVIDIA_MODELS, reported));
+    case "anthropic": return mk((o) => callAnthropic(o, key, reported));
+    case "cloudflare": {
+      const acct = getKeySync("CLOUDFLARE_ACCOUNT_ID");
+      if (!acct) return null;
+      return mk((o) => callOpenAICompatible(o, key, `https://api.cloudflare.com/client/v4/accounts/${acct}/ai/v1/chat/completions`, ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct"], reported));
+    }
+    case "1minai": return getKeySync("ONEMIN_AI_ENABLED") === "1" ? mk((o) => callOneMinAI(o, reported)) : null;
+    default: return null;
+  }
+}
+
+/** Every configured AI credential, environment and API Manager, deduplicated by value. */
+export const ENV_AI_KEYS: Array<[string, string]> = [
+  ["MISTRAL_API_KEY", "mistral"], ["MISTRAL_API_KEY_2", "mistral"], ["MISTRAL_API_KEY_3", "mistral"],
+  ["GOOGLE_GEMINI_KEY", "gemini"], ["GOOGLE_GEMINI_KEY_2", "gemini"],
+  ["OPENAI_API_KEY", "openai"], ["ANTHROPIC_API_KEY", "anthropic"],
+  ["OPENROUTER_API_KEY", "openrouter"], ["GROQ_API_KEY", "groq"], ["NVIDIA_API_KEY", "nvidia"],
+  ["CLOUDFLARE_API_TOKEN", "cloudflare"], ["ONEMIN_AI_API_KEY", "1minai"],
+];
+const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$)/i;
+
+export function buildLanes(reported?: AIResult["provider"]): Lane[] {
+  const lanes: Lane[] = [];
+  const seen = new Set<string>();
+  const managed = getManagedSnapshot();
+  const hints = getProviderHints();
+  const envNames = new Set(ENV_AI_KEYS.map(([n]) => n));
+
+  // 1. API Manager keys (admin-added, any name). Declared provider wins, else inferred from shape.
+  for (const [name, raw] of Object.entries(managed)) {
+    const v = (raw || "").trim();
+    if (!v || NON_LLM_NAME.test(name) || seen.has(v)) continue;
+    const known = ENV_AI_KEYS.find(([n]) => n === name)?.[1];
+    const provider = hints[name] || known || inferProvider(v);
+    if (!provider) continue;
+    const lane = laneFor(name, provider, v, "manager", reported);
+    if (lane) { lanes.push(lane); seen.add(v); }
+  }
+  // 2. Environment keys not overridden by the manager.
+  for (const [name, provider] of ENV_AI_KEYS) {
+    if (managed[name]) continue;
+    const v = (Deno.env.get(name) || "").trim();
+    if (!v || seen.has(v)) continue;
+    const lane = laneFor(name, provider, v, "environment", reported);
+    if (lane) { lanes.push(lane); seen.add(v); }
+  }
+  // 3. Any other env secret that looks like an LLM key (e.g. a test key).
+  for (const name of ["AI_TEST_API_KEY"]) {
+    if (envNames.has(name) || managed[name]) continue;
+    const v = (Deno.env.get(name) || "").trim();
+    const provider = v ? inferProvider(v) : null;
+    if (!v || !provider || seen.has(v)) continue;
+    const lane = laneFor(name, provider, v, "environment", reported);
+    if (lane) { lanes.push(lane); seen.add(v); }
+  }
+  return lanes;
+}
+
+/** Test exactly one credential end to end. Used by the API Manager. */
+export async function testKey(name: string): Promise<{ ok: boolean; provider: string | null; latencyMs: number; error?: string; sample?: string }> {
+  await refreshManagedKeys(true);
+  const lane = buildLanes().find((l) => l.name === name);
+  if (!lane) return { ok: false, provider: null, latencyMs: 0, error: "Not recognised as an AI key (unknown provider or empty value)." };
+  const t0 = Date.now();
+  try {
+    const r = await runLane(lane, { systemPrompt: "Reply with the single word OK.", userPrompt: "ping", maxTokens: 8, temperature: 0, skipHardening: true });
+    return { ok: true, provider: lane.provider, latencyMs: Date.now() - t0, sample: r.text.slice(0, 40) };
+  } catch (e: any) {
+    return { ok: false, provider: lane.provider, latencyMs: Date.now() - t0, error: String(e?.message || e).slice(0, 300) };
+  }
+}
 
 /**
  * Convert a tool-calling request into a JSON-mode prompt and wrap the result
