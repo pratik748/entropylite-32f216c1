@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI } from "../_shared/callAI.ts";
 import { safeParseJSON } from "../_shared/safeParseJSON.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { getKeySync, refreshManagedKeys } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,7 +11,7 @@ const corsHeaders = {
 };
 
 const UA = "Mozilla/5.0 (Lovable EntropyLite Geo Pipeline)";
-const NEWSDATA_KEY = Deno.env.get("NEWSDATA_API_KEY") || "";
+const getNewsDataKey = () => getKeySync("NEWSDATA_API_KEY") || Deno.env.get("NEWSDATA_API_KEY") || "";
 
 interface RawHeadline {
   title: string;
@@ -52,9 +53,10 @@ function parseGDELTDate(s: string): number | null {
 
 // ── 2. NewsData.io (free key already present) ──────────────────
 async function fetchNewsData(): Promise<RawHeadline[]> {
-  if (!NEWSDATA_KEY) return [];
+  const key = getNewsDataKey();
+  if (!key) return [];
   try {
-    const url = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_KEY}&category=world,politics,business&language=en&size=10`;
+    const url = `https://newsdata.io/api/1/news?apikey=${key}&category=world,politics,business&language=en&size=10`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const data = await res.json();
@@ -192,6 +194,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await refreshManagedKeys();
     await requireAuth(req, corsHeaders);
 
     const t0 = Date.now();

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getKey } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +9,8 @@ const corsHeaders = {
 const ALPACA_BASE = "https://paper-api.alpaca.markets";
 
 async function alpacaFetch(path: string, method: string, body?: unknown) {
-  const key = Deno.env.get("ALPACA_API_KEY");
-  const secret = Deno.env.get("ALPACA_SECRET_KEY");
+  const key = await getKey("ALPACA_API_KEY");
+  const secret = await getKey("ALPACA_SECRET_KEY");
   if (!key || !secret) throw new Error("Alpaca API keys not configured. Add ALPACA_API_KEY and ALPACA_SECRET_KEY in your backend secrets.");
 
   const headers: Record<string, string> = {

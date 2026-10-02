@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getKey } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +39,7 @@ async function fetchFRED(): Promise<MacroIndicator[]> {
     { id: "VIXCLS", name: "VIX Close", category: "volatility", impact: "high" as const },
   ];
 
-  const apiKey = Deno.env.get("ALPHAVANTAGE_API_KEY");
+  const apiKey = await getKey("ALPHAVANTAGE_API_KEY");
 
   for (const s of series) {
     try {
@@ -118,7 +119,7 @@ async function fetchWorldBank(): Promise<MacroIndicator[]> {
 
 // Fetch Polymarket signals for macro skew
 async function fetchPolymarketSkew(): Promise<{ skew: number; signals: string[] }> {
-  const apiKey = Deno.env.get("POLYMARKET_API_KEY");
+  const apiKey = await getKey("POLYMARKET_API_KEY");
   if (!apiKey) return { skew: 0, signals: [] };
 
   try {

@@ -20,7 +20,7 @@
  * by an admin in-app) first, then environment variables. Lovable AI is NOT part
  * of the chain.
  */
-import { getKeySync, getManagedSnapshot, refreshManagedKeys, getProviderHints, getHealthSnapshot, recordKeyHealth } from "./managedKeys.ts";
+import { getKeySync, getManagedSnapshot, refreshManagedKeys, getProviderHints, getHealthSnapshot, recordKeyHealth, getUpdatedAts } from "./managedKeys.ts";
 
 interface CallAIOptions {
   systemPrompt: string;
@@ -388,6 +388,12 @@ function coolingDown(name: string): boolean {
   const h = getHealthSnapshot()[name];
   if (!h || h.status !== "error" || !h.errorAt) return false;
   if (h.okAt > h.errorAt) return false;
+
+  // If this credential was updated in the API Manager AFTER the recorded error,
+  // the error belongs to the old key value, so do not cool down the new key!
+  const uAts = getUpdatedAts();
+  if (uAts[name] && uAts[name] > h.errorAt) return false;
+
   const cls = classifyFailure(undefined, h.error || "");
   const statusMatch = /\b(4\d\d|5\d\d)\b/.exec(h.error || "");
   const cls2 = statusMatch ? classifyFailure(Number(statusMatch[1]), h.error || "") : cls;
@@ -412,15 +418,23 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
   if (lanes.length === 0) {
     throw { status: 503, message: "No AI keys configured. Add one in the API Manager." };
   }
-  // Healthy lanes first (managed before environment, recent success first),
-  // resting lanes only as a last resort, dead keys never block the chain.
+  // Prioritization score:
+  // Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
+  // Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();
-  const score = (l: Lane) => (l.source === "manager" ? 2 : 0) + ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 1 : 0);
+  const score = (l: Lane) => (l.source === "manager" ? 10 : 0) + ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 2 : 0);
   const ready = lanes.filter((l) => !coolingDown(l.name));
   const resting = lanes.filter((l) => coolingDown(l.name) && classifyFailure(undefined, health[l.name]?.error || "") !== "dead");
-  const idx = ready.length ? pickKeyIndex(ready.length) : 0;
-  const rotated = ready.slice(idx).concat(ready.slice(0, idx)).sort((a, b) => score(b) - score(a));
-  const ordered = rotated.concat(resting);
+
+  // Rotate among equal-priority keys, but keep manager keys strictly ahead of environment
+  const sortedReady = [...ready].sort((a, b) => score(b) - score(a));
+  let ordered = sortedReady.concat(resting);
+
+  // Resilience safety net: if every single key was marked dead/resting, DO NOT fail with 503!
+  // Instead, try all configured lanes (manager keys first) as an emergency fallback.
+  if (ordered.length === 0) {
+    ordered = [...lanes].sort((a, b) => (a.source === "manager" ? -1 : 1));
+  }
 
   let lastErr: any = null;
   const tried: string[] = [];
@@ -432,9 +446,6 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
       tried.push(lane.name);
       console.warn(`callAI → ${lane.name} (${lane.provider}) failed:`, String(e?.message || e).slice(0, 180));
     }
-  }
-  if (ordered.length === 0) {
-    throw { status: 503, message: "Every AI key is marked dead. Add or rotate a key in the API Manager." };
   }
   throw { status: 503, message: `All AI keys failed (${tried.join(", ")}). Last: ${String(lastErr?.message || lastErr).slice(0, 160)}` };
 }
@@ -498,40 +509,58 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // inside the lane registry. Default model is gemini-2.0-flash for low latency
 // and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
 const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
+const GEMINI_MODELS = [
+  GEMINI_DEFAULT_MODEL,
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+];
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
-  const model = GEMINI_DEFAULT_MODEL;
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode
     ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences."
     : "";
-  const body: Record<string, any> = {
-    systemInstruction: { role: "system", parts: [{ text: systemText }] },
-    contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
-    generationConfig: {
-      temperature: opts.temperature ?? 0.6,
-      maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
-      ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
-    },
-  };
+  let lastErr: any = null;
 
-  const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, timeout);
+  for (const model of GEMINI_MODELS) {
+    const body: Record<string, any> = {
+      systemInstruction: { role: "system", parts: [{ text: systemText }] },
+      contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
+      generationConfig: {
+        temperature: opts.temperature ?? 0.6,
+        maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+        ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
+    };
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw { status: res.status, message: `Gemini ${res.status}: ${errBody.slice(0, 200)}` };
+    const timeout = (opts.maxTokens ?? 4096) > 4000 ? 90000 : 60000;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const res = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }, timeout);
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        lastErr = { status: res.status, message: `Gemini ${model} ${res.status}: ${errBody.slice(0, 200)}` };
+        if (res.status === 404 || res.status === 400) continue;
+        throw lastErr;
+      }
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts;
+      const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
+      if (!text || !text.trim()) { lastErr = new Error("Empty Gemini response"); continue; }
+      return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "gemini" };
+    } catch (e: any) {
+      lastErr = e;
+      if (e?.status === 404 || e?.status === 400) continue;
+      throw e;
+    }
   }
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts;
-  const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
-  if (!text || !text.trim()) throw new Error("Empty Gemini response");
-  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
+  throw lastErr || new Error("Gemini: no usable model");
 }
 
 // ---------------------------------------------------------------------------
@@ -558,6 +587,21 @@ function inferProvider(value: string): string | null {
   if (/^sk-(proj-)?[A-Za-z0-9_-]{20,}$/.test(v)) return "openai";
   if (/^[A-Za-z0-9]{32}$/.test(v)) return "mistral";
   return null;
+}
+
+export function detectProvider(name: string, value: string, hint?: string | null): string | null {
+  if (hint && hint !== "auto" && hint.trim()) return hint.trim().toLowerCase();
+  const n = name.toUpperCase();
+  if (n.includes("MISTRAL")) return "mistral";
+  if (n.includes("GEMINI") || n.includes("GOOGLE")) return "gemini";
+  if (n.includes("OPENROUTER")) return "openrouter";
+  if (n.includes("GROQ")) return "groq";
+  if (n.includes("OPENAI") || n.startsWith("GPT")) return "openai";
+  if (n.includes("ANTHROPIC") || n.includes("CLAUDE")) return "anthropic";
+  if (n.includes("NVIDIA")) return "nvidia";
+  if (n.includes("CLOUDFLARE")) return "cloudflare";
+  if (n.includes("1MIN")) return "1minai";
+  return inferProvider(value);
 }
 
 function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
@@ -597,21 +641,22 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   const hints = getProviderHints();
   const envNames = new Set(ENV_AI_KEYS.map(([n]) => n));
 
-  // 1. API Manager keys (admin-added, any name). Declared provider wins, else inferred from shape.
+  // 1. API Manager keys (admin-added, any name). Declared provider wins, else inferred from name/shape.
   for (const [name, raw] of Object.entries(managed)) {
     const v = (raw || "").trim();
     if (!v || NON_LLM_NAME.test(name) || seen.has(v)) continue;
-    const known = ENV_AI_KEYS.find(([n]) => n === name)?.[1];
-    const provider = hints[name] || known || inferProvider(v);
+    const provider = detectProvider(name, v, hints[name]);
     if (!provider) continue;
     const lane = laneFor(name, provider, v, "manager", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
   // 2. Environment keys not overridden by the manager.
-  for (const [name, provider] of ENV_AI_KEYS) {
+  for (const [name, defaultProvider] of ENV_AI_KEYS) {
     if (managed[name]) continue;
     const v = (Deno.env.get(name) || "").trim();
     if (!v || seen.has(v)) continue;
+    const provider = detectProvider(name, v, defaultProvider);
+    if (!provider) continue;
     const lane = laneFor(name, provider, v, "environment", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
@@ -619,19 +664,55 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   for (const name of ["AI_TEST_API_KEY"]) {
     if (envNames.has(name) || managed[name]) continue;
     const v = (Deno.env.get(name) || "").trim();
-    const provider = v ? inferProvider(v) : null;
-    if (!v || !provider || seen.has(v)) continue;
+    if (!v || seen.has(v)) continue;
+    const provider = detectProvider(name, v);
+    if (!provider) continue;
     const lane = laneFor(name, provider, v, "environment", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
   return lanes;
 }
 
-/** Test exactly one credential end to end. Used by the API Manager. */
+/** Test exactly one credential end to end. Supports both AI keys and data APIs. */
 export async function testKey(name: string): Promise<{ ok: boolean; provider: string | null; latencyMs: number; error?: string; sample?: string }> {
   await refreshManagedKeys(true);
+  const managed = getManagedSnapshot();
+  const rawKey = managed[name] || Deno.env.get(name) || "";
+  const upper = name.toUpperCase();
+
+  // Test data APIs (AlphaVantage, NewsData, etc.)
+  if (upper.includes("ALPHAVANTAGE")) {
+    if (!rawKey.trim()) return { ok: false, provider: "alphavantage", latencyMs: 0, error: "Key value is empty" };
+    const t0 = Date.now();
+    try {
+      const res = await fetchWithTimeout(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey=${rawKey.trim()}`, {}, 15000);
+      const text = await res.text();
+      const ok = res.ok && !text.includes("Invalid API call") && !text.includes("Error Message");
+      return { ok, provider: "alphavantage", latencyMs: Date.now() - t0, sample: ok ? "AlphaVantage OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };
+    } catch (e: any) {
+      return { ok: false, provider: "alphavantage", latencyMs: Date.now() - t0, error: e?.message || "Connection failed" };
+    }
+  }
+
+  if (upper.includes("NEWSDATA")) {
+    if (!rawKey.trim()) return { ok: false, provider: "newsdata", latencyMs: 0, error: "Key value is empty" };
+    const t0 = Date.now();
+    try {
+      const res = await fetchWithTimeout(`https://newsdata.io/api/1/news?apikey=${rawKey.trim()}&q=market&language=en`, {}, 15000);
+      const text = await res.text();
+      const ok = res.ok && !text.includes('"status":"error"');
+      return { ok, provider: "newsdata", latencyMs: Date.now() - t0, sample: ok ? "NewsData OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };
+    } catch (e: any) {
+      return { ok: false, provider: "newsdata", latencyMs: Date.now() - t0, error: e?.message || "Connection failed" };
+    }
+  }
+
   const lane = buildLanes().find((l) => l.name === name);
-  if (!lane) return { ok: false, provider: null, latencyMs: 0, error: "Not recognised as an AI key (unknown provider or empty value)." };
+  if (!lane) {
+    if (!rawKey.trim()) return { ok: false, provider: null, latencyMs: 0, error: "Key value is empty." };
+    const prov = detectProvider(name, rawKey);
+    return { ok: false, provider: prov, latencyMs: 0, error: `Could not initialize lane for key (provider: ${prov || "unknown"}).` };
+  }
   const t0 = Date.now();
   try {
     const r = await runLane(lane, { systemPrompt: "Reply with the single word OK.", userPrompt: "ping", maxTokens: 8, temperature: 0, skipHardening: true });
