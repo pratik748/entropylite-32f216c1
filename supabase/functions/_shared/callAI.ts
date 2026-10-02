@@ -199,7 +199,8 @@ function buildJsonSkeleton(schema: any, depth = 0): any {
 const MISTRAL_MODEL_CHAIN = [MISTRAL_DEFAULT_MODEL, MISTRAL_FAST_MODEL, "open-mistral-nemo"];
 
 function isModelAvailabilityError(status: number, body: string): boolean {
-  if (status === 404) return true;
+  if (status === 404 || status === 410) return true;
+  if (status === 403 && body.toLowerCase().includes("blocked at the project")) return true;
   if (status !== 403 && status !== 400) return false;
   const b = body.toLowerCase();
   return b.includes("tier_not_allowed") || b.includes("not available in your subscription") ||
@@ -543,9 +544,9 @@ interface Lane {
   call: (opts: CallAIOptions) => Promise<AIResult>;
 }
 
-const GROQ_MODELS = [GROQ_DEFAULT_MODEL, "llama-3.1-8b-instant", "openai/gpt-oss-120b"];
+const GROQ_MODELS = [GROQ_DEFAULT_MODEL, "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen/qwen3-32b", "openai/gpt-oss-20b", "openai/gpt-oss-120b"];
 const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-4o-mini", "gpt-4.1-mini"];
-const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-3.1-8b-instruct"];
+const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-4-maverick-17b-128e-instruct", "mistralai/mistral-small-24b-instruct", "meta/llama-3.1-8b-instruct"];
 
 function inferProvider(value: string): string | null {
   const v = value.trim();
