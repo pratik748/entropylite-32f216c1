@@ -52,6 +52,7 @@ import { useOutcomeGradient } from "@/hooks/useOutcomeGradient";
 import { ForesightProvider } from "@/foresight/ForesightProvider";
 import ForesightSurface from "@/foresight/ui/ForesightSurface";
 import Spotlight from "@/foresight/ui/Spotlight";
+import { SashaProvider } from "@/sasha/SashaProvider";
 import { onUIEvent } from "@/foresight/uiBus";
 import type { HostAdapter } from "@/foresight/types";
 
@@ -493,11 +494,12 @@ const IndexContent = () => {
 
   return (
     <ForesightProvider host={foresightHost}>
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <Header
-        directProfitMode={directProfitMode}
-        onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
-      />
+      <SashaProvider stocks={stocks} onNavigateTab={(tab) => handleTabSwitch(tab as Tab)}>
+        <div className="h-screen bg-background flex flex-col overflow-hidden">
+          <Header
+            directProfitMode={directProfitMode}
+            onToggleDirectProfit={() => setDirectProfitMode((p) => !p)}
+          />
       <CommandPalette
         tabs={tabs}
         onSelectTab={(id) => handleTabSwitch(id as Tab)}
@@ -843,6 +845,7 @@ const IndexContent = () => {
       )}
     </div>
     <Spotlight />
+      </SashaProvider>
     </ForesightProvider>
   );
 };

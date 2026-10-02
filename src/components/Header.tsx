@@ -6,6 +6,7 @@ import { Command, LogOut, Search, Zap } from "lucide-react";
 import { emitUIEvent } from "@/foresight/uiBus";
 import DemoIndicator from "@/components/DemoIndicator";
 import { useDemo } from "@/demo/DemoProvider";
+import { useSasha } from "@/sasha/SashaProvider";
 import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
 interface HeaderProps {
@@ -31,6 +32,10 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
   const [time, setTime] = useState(new Date());
   const { baseCurrency, setBaseCurrency, setIndiaMode } = useFX();
   const { isDemo, exit: exitDemo } = useDemo();
+  let sashaContext: ReturnType<typeof useSasha> | null = null;
+  try {
+    sashaContext = useSasha();
+  } catch {}
 
   // Auto-toggle India mode based on currency selection
   useEffect(() => {
@@ -139,6 +144,30 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
             >
               <Zap className={`h-3 w-3 ${directProfitMode ? "" : "text-warning"}`} />
               <span className="hidden sm:inline">Direct Profit</span>
+            </button>
+          )}
+
+          {/* SASHA Voice Quant Toggle */}
+          {sashaContext && (
+            <button
+              onClick={sashaContext.toggleOpen}
+              className={`pressable flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-[11.5px] font-semibold tracking-tight transition-colors ${
+                sashaContext.isOpen
+                  ? "bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm"
+                  : "border border-border/70 bg-surface-2/60 text-foreground hover:bg-surface-2"
+              }`}
+              title="SASHA Voice Copilot (Alt+S)"
+            >
+              <span className={`h-2 w-2 rounded-full transition-colors ${
+                sashaContext.state === "listening" 
+                  ? "bg-amber-400 animate-ping" 
+                  : sashaContext.state === "speaking" 
+                  ? "bg-emerald-400 animate-pulse" 
+                  : sashaContext.state === "computing"
+                  ? "bg-blue-400 animate-spin"
+                  : "bg-emerald-500"
+              }`} />
+              <span className="font-mono text-[11px] font-bold tracking-wider">SASHA</span>
             </button>
           )}
 
