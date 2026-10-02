@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getKey } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,12 +107,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const apiKey = Deno.env.get("POLYMARKET_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "POLYMARKET_API_KEY not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const apiKey = (await getKey("POLYMARKET_API_KEY")) || Deno.env.get("POLYMARKET_API_KEY") || "public";
 
     const body = await req.json().catch(() => ({}));
     const categories = body.categories || ["macro", "geopolitical", "crypto", "elections", "tech"];

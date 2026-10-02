@@ -14,6 +14,7 @@ import {
 } from "../_shared/stats.ts";
 import { riskFreeFor } from "../_shared/riskFree.ts";
 import { modelInfo } from "../_shared/modelRegistry.ts";
+import { getKeySync, refreshManagedKeys } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +23,7 @@ const corsHeaders = {
 };
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHAVANTAGE_API_KEY") || "";
+const getAlphaVantageKey = () => getKeySync("ALPHAVANTAGE_API_KEY") || Deno.env.get("ALPHAVANTAGE_API_KEY") || "";
 
 type Bars = {
   closes: number[];
@@ -77,13 +78,14 @@ function maxDrawdown(closes: number[]) {
 }
 
 async function fetchAlphaVantage(symbol: string): Promise<{ price: number; prevClose: number; high: number; low: number; volume: number } | null> {
-  if (!ALPHA_VANTAGE_KEY) return null;
+  const avKey = getAlphaVantageKey();
+  if (!avKey) return null;
   try {
     const normalized = normalizeTickerInput(symbol);
     const cleanSymbol = normalized.replace(/\.(NS|BO)$/, "");
     const exchange = normalized.endsWith(".BO") ? "BSE" : "NSE";
     const avSymbol = normalized.endsWith(".NS") || normalized.endsWith(".BO") ? `${exchange}:${cleanSymbol}` : cleanSymbol;
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${ALPHA_VANTAGE_KEY}`;
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(avSymbol)}&apikey=${avKey}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -130,11 +132,12 @@ async function fetchYahooBars(symbol: string, range = "1y"): Promise<Bars | null
 }
 
 async function fetchAlphaBars(symbol: string, range = "1y"): Promise<Bars | null> {
-  if (!ALPHA_VANTAGE_KEY) return null;
+  const avKey = getAlphaVantageKey();
+  if (!avKey) return null;
   const cleanSym = symbol.replace(/\.(NS|BO)$/, "");
   try {
     const outputsize = range === "1y" ? "full" : "compact";
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${ALPHA_VANTAGE_KEY}`;
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${avKey}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -313,6 +316,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    await refreshManagedKeys();
     await requireAuth(req, corsHeaders);
     const rawBody = await req.json();
     const requestedTicker = (rawBody.ticker || "").toString();

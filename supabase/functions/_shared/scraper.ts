@@ -3,6 +3,8 @@
  * Saves ScrapeGraph credits by trying free HTML scraping first.
  */
 
+import { getKey } from "./managedKeys.ts";
+
 const SCRAPEGRAPH_API = "https://api.scrapegraphai.com/v1/smartscraper";
 
 interface ScrapeResult {
@@ -105,7 +107,7 @@ export async function scrapeWithScrapeGraph(
   prompt: string,
   outputSchema?: Record<string, any>,
 ): Promise<ScrapeResult> {
-  const apiKey = Deno.env.get("SCRAPEGRAPH_API_KEY");
+  const apiKey = await getKey("SCRAPEGRAPH_API_KEY");
   if (!apiKey) {
     return { content: "", source: "scrapegraph", error: "SCRAPEGRAPH_API_KEY not set" };
   }

@@ -21,7 +21,22 @@ type Health = {
   last_error: string | null; last_error_at: string | null; last_used_at: string | null;
   success_count: number; failure_count: number;
 };
-const PROVIDERS = ["auto", "mistral", "gemini", "openai", "anthropic", "openrouter", "groq", "nvidia", "cloudflare"];
+const PROVIDERS = [
+  "auto",
+  "mistral",
+  "gemini",
+  "openai",
+  "anthropic",
+  "openrouter",
+  "groq",
+  "nvidia",
+  "cloudflare",
+  "alphavantage",
+  "newsdata",
+  "polymarket",
+  "alpaca",
+  "scrapegraph",
+];
 
 function ago(iso?: string | null) {
   if (!iso) return "never";
@@ -44,7 +59,32 @@ const KNOWN = [
   "ANTHROPIC_API_KEY",
   "ALPHAVANTAGE_API_KEY",
   "NEWSDATA_API_KEY",
+  "POLYMARKET_API_KEY",
+  "ALPACA_API_KEY",
+  "ALPACA_SECRET_KEY",
+  "SCRAPEGRAPH_API_KEY",
 ];
+
+function detectProviderFromInput(n: string, v: string): string {
+  const upper = n.toUpperCase();
+  if (upper.includes("GEMINI")) return "gemini";
+  if (upper.includes("MISTRAL")) return "mistral";
+  if (upper.includes("GROQ")) return "groq";
+  if (upper.includes("ANTHROPIC") || upper.includes("CLAUDE")) return "anthropic";
+  if (upper.includes("OPENROUTER")) return "openrouter";
+  if (upper.includes("OPENAI")) return "openai";
+  if (upper.includes("ALPHAVANTAGE")) return "alphavantage";
+  if (upper.includes("NEWSDATA")) return "newsdata";
+  if (upper.includes("POLYMARKET")) return "polymarket";
+  if (upper.includes("ALPACA")) return "alpaca";
+  if (upper.includes("SCRAPEGRAPH")) return "scrapegraph";
+  if (v.startsWith("AIzaSy")) return "gemini";
+  if (v.startsWith("sk-ant-")) return "anthropic";
+  if (v.startsWith("gsk_")) return "groq";
+  if (v.startsWith("sk-or-")) return "openrouter";
+  if (v.startsWith("sk-")) return "openai";
+  return "auto";
+}
 
 function mask(v?: string) {
   if (!v) return "";
@@ -92,14 +132,34 @@ export default function AdminApiManagerPage() {
 
   const load = useCallback(async () => {
     setBusy(true);
-    const { data, error } = await (supabase as any)
+    let { data, error } = await (supabase as any)
       .from("api_credentials")
-      .select("id, name, label, is_active, updated_at, value")
+      .select("id, name, label, is_active, updated_at, value, provider")
       .order("name", { ascending: true });
+    if (error && error.message?.includes("provider")) {
+      const fallback = await (supabase as any)
+        .from("api_credentials")
+        .select("id, name, label, is_active, updated_at, value")
+        .order("name", { ascending: true });
+      data = fallback.data;
+      error = fallback.error;
+    }
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     setRows((data || []) as Credential[]);
   }, []);
+
+  const resetHealth = async (keyName: string) => {
+    const { error } = await supabase.functions.invoke("api-key-admin", {
+      body: { action: "reset_health", name: keyName },
+    });
+    if (error) {
+      toast.error(`Failed to reset health: ${error.message}`);
+    } else {
+      toast.success(`Cleared error cooldown for ${keyName}`);
+      void loadStatus();
+    }
+  };
 
   useEffect(() => {
     document.title = "API Manager | Entropy";
@@ -116,16 +176,24 @@ export default function AdminApiManagerPage() {
     if (!n || !value.trim()) { toast.error("Name and key value are required"); return; }
     const { data: userRes } = await supabase.auth.getUser();
     setBusy(true);
+    const payload: any = {
+      name: n,
+      value: value.trim(),
+      label: label.trim() || null,
+      is_active: true,
+      created_by: userRes?.user?.id ?? null,
+    };
+    if (provider !== "auto") {
+      payload.provider = provider;
+    }
     const { error } = await (supabase as any)
       .from("api_credentials")
-      .upsert(
-        { name: n, value: value.trim(), label: label.trim() || null, provider: provider === "auto" ? null : provider, is_active: true, created_by: userRes?.user?.id ?? null },
-        { onConflict: "name" },
-      );
+      .upsert(payload, { onConflict: "name" });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`${n} saved. Testing now.`);
     setName(""); setValue(""); setLabel(""); setProvider("auto");
+    await supabase.functions.invoke("api-key-admin", { body: { action: "reset_health", name: n } });
     await load();
     void test(n);
   };
@@ -142,8 +210,10 @@ export default function AdminApiManagerPage() {
   const remove = async (row: Credential) => {
     const { error } = await (supabase as any).from("api_credentials").delete().eq("id", row.id);
     if (error) { toast.error(error.message); return; }
+    void supabase.functions.invoke("api-key-admin", { body: { action: "reset_health", name: row.name } });
     toast.success(`${row.name} removed`);
     void load();
+    void loadStatus();
   };
 
   if (loading) {
@@ -193,7 +263,12 @@ export default function AdminApiManagerPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                const nVal = e.target.value;
+                setName(nVal);
+                const d = detectProviderFromInput(nVal, value);
+                if (d !== "auto") setProvider(d);
+              }}
               placeholder="KEY_NAME"
               list="known-key-names"
               className="h-11 rounded-xl border border-border bg-card px-3.5 text-[13px] font-mono tracking-tight outline-none focus:border-primary/60"
@@ -217,7 +292,12 @@ export default function AdminApiManagerPage() {
           </div>
           <input
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              const vVal = e.target.value;
+              setValue(vVal);
+              const d = detectProviderFromInput(name, vVal);
+              if (d !== "auto") setProvider(d);
+            }}
             placeholder="Key value"
             type="password"
             autoComplete="off"
@@ -280,7 +360,16 @@ export default function AdminApiManagerPage() {
                       <td className="px-3 py-2.5 text-right font-mono">{h?.last_latency_ms != null ? `${h.last_latency_ms} ms` : "--"}</td>
                       <td className="px-3 py-2.5 text-right font-mono">{h ? `${h.success_count} / ${h.failure_count}` : "--"}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{ago(h?.last_used_at)}</td>
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="px-3 py-2.5 text-right space-x-2">
+                        {bad && (
+                          <button
+                            onClick={() => void resetHealth(l.name)}
+                            className="text-[12px] font-semibold text-loss hover:underline"
+                            title="Clear error lockout / cooldown"
+                          >
+                            Reset
+                          </button>
+                        )}
                         <button onClick={() => void test(l.name)} disabled={!!testing} className="text-[12px] font-semibold text-primary disabled:opacity-50">
                           {testing === l.name ? <Loader2 className="h-3 w-3 animate-spin" /> : "Test"}
                         </button>

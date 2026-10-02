@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getKey } from "../_shared/managedKeys.ts";
 
 import { scrapePremiumNews } from "../_shared/scraper.ts";
 import { fetchMoneycontrolNews, fetchBSEAnnouncements, fetchEDGARFilings } from "../_shared/liveData.ts";
@@ -219,7 +220,7 @@ async function fetchGDELT(query: string): Promise<Article[]> {
 }
 
 async function fetchNewsdata(query: string): Promise<Article[]> {
-  const NEWSDATA_API_KEY = Deno.env.get("NEWSDATA_API_KEY");
+  const NEWSDATA_API_KEY = await getKey("NEWSDATA_API_KEY");
   if (!NEWSDATA_API_KEY) return [];
   try {
     const url = `https://newsdata.io/api/1/latest?apikey=${NEWSDATA_API_KEY}&q=${encodeURIComponent(query)}&language=en&category=business`;

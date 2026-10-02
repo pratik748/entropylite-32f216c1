@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth } from "../_shared/auth.ts";
 import { buildLanes, testKey, ENV_AI_KEYS } from "../_shared/callAI.ts";
-import { refreshManagedKeys } from "../_shared/managedKeys.ts";
+import { refreshManagedKeys, clearKeyHealth, clearAllKeyHealth, getManagedSnapshot } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,13 +28,26 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "status");
 
+    // Always ensure fresh credentials in isolate memory
+    await refreshManagedKeys(true);
+
+    if (action === "reset_health") {
+      const name = String(body?.name || "").slice(0, 120);
+      if (name && name !== "*") {
+        await clearKeyHealth(name);
+      } else {
+        await clearAllKeyHealth();
+      }
+      await refreshManagedKeys(true);
+      return json({ ok: true, message: `Health cleared for ${name || "all"}` });
+    }
+
     if (action === "test") {
       const name = String(body?.name || "").slice(0, 120);
       if (!name) return json({ error: "name required" }, 400);
       return json(await testKey(name));
     }
 
-    await refreshManagedKeys(true);
     if (action === "test_all") {
       const names = buildLanes().map((l) => l.name);
       const results: Record<string, unknown> = {};
@@ -42,8 +55,26 @@ Deno.serve(async (req) => {
       return json({ results });
     }
 
-    // status: every AI key in the chain, in the order it will be tried
+    // status: every AI key in the chain, plus any configured data API keys
     const lanes = buildLanes().map((l, i) => ({ order: i + 1, name: l.name, provider: l.provider, source: l.source }));
+    
+    // Also include any data keys from the API Manager (AlphaVantage, NewsData, etc.)
+    const managed = getManagedSnapshot();
+    let currentOrder = lanes.length;
+    for (const [kName, val] of Object.entries(managed)) {
+      if (!lanes.some((l) => l.name === kName) && val) {
+        currentOrder++;
+        const prov = kName.toUpperCase().includes("ALPHAVANTAGE")
+          ? "alphavantage"
+          : kName.toUpperCase().includes("NEWSDATA")
+          ? "newsdata"
+          : kName.toUpperCase().includes("POLYMARKET")
+          ? "polymarket"
+          : "custom";
+        lanes.push({ order: currentOrder, name: kName, provider: prov, source: "manager" });
+      }
+    }
+
     const { data: health } = await admin.from("api_key_health").select("*");
     const envConfigured = ENV_AI_KEYS.filter(([n]) => !!Deno.env.get(n)).map(([n, p]) => ({ name: n, provider: p }));
     return json({ lanes, health: health || [], envConfigured });
