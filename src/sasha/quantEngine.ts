@@ -28,6 +28,7 @@ import type {
   StressTestIntent,
   LLMFallbackIntent,
   ClankConstraintFlag,
+  CointegrationStats,
 } from "./types";
 
 // Sector mapping for portfolio asset classification
