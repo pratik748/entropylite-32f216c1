@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type {
   SashaResult,
+  SingleStockData,
   SubsetRiskData,
   StockComparisonData,
   NewsImpactData,
@@ -506,7 +507,198 @@ export const StressTestCard: React.FC<{ data: StressTestData }> = ({ data }) => 
   );
 };
 
-// ── 5. General Quant Synthesis Card ──────────────────────────────────────────
+// ── 5. Single Stock Fact Sheet & Quant Telemetry Card ──────────────────────────
+
+export const SingleStockCard: React.FC<{ data: SingleStockData }> = ({ data }) => {
+  const { handleAction } = useSasha();
+  const isPositive = data.periodReturnPct >= 0;
+  const currSym = data.currency === "INR" ? "₹" : data.currency === "USD" ? "$" : "";
+
+  // Sparkline path generator
+  const minP = Math.min(...data.sparkline);
+  const maxP = Math.max(...data.sparkline);
+  const rangeP = maxP - minP || 1;
+  const w = 340;
+  const h = 54;
+  const padding = 4;
+  const points = data.sparkline.map((val, idx) => {
+    const x = padding + (idx / Math.max(1, data.sparkline.length - 1)) * (w - 2 * padding);
+    const y = h - padding - ((val - minP) / rangeP) * (h - 2 * padding);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const sparklineD = `M ${points.join(" L ")}`;
+
+  return (
+    <div className="space-y-3.5 text-left">
+      {/* Header Snapshot */}
+      <div className="flex items-start justify-between border-b border-border/60 pb-2.5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[16px] font-bold text-foreground tracking-tight">{data.ticker}</span>
+            <span className="rounded bg-surface-2 border border-border/80 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground uppercase">
+              {data.sector}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground font-serif">{data.name}</p>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[16px] font-bold text-foreground tabular-nums">
+            {currSym}{data.lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {data.currency === "INR" ? " INR" : ""}
+          </div>
+          <div className={`text-[10px] font-mono font-medium ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+            {isPositive ? "+" : ""}{data.periodReturnPct.toFixed(2)}% ({data.range})
+          </div>
+        </div>
+      </div>
+
+      {/* Mini SVG Sparkline */}
+      {data.sparkline && data.sparkline.length > 1 && (
+        <div className="rounded-lg border border-border/80 bg-surface-2/40 p-2 space-y-1">
+          <div className="flex items-center justify-between text-[9px] font-mono text-muted-foreground">
+            <span>Price Trajectory ({data.range})</span>
+            <span>Range: {currSym}{minP.toFixed(1)} – {currSym}{maxP.toFixed(1)}</span>
+          </div>
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12 overflow-visible">
+            <path
+              d={sparklineD}
+              fill="none"
+              stroke={isPositive ? "#34d399" : "#f87171"}
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Primary Quantitative Telemetry Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="rounded-lg border border-border/80 bg-surface-2/50 p-2">
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono">
+            Beta (β vs {data.benchmark})
+          </span>
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground tabular-nums">
+            {data.betaRegression.beta.toFixed(2)}
+          </span>
+          <span className="text-[9px] text-muted-foreground/60 font-mono">R² = {data.betaRegression.rSquared.toFixed(2)}</span>
+        </div>
+
+        <div className="rounded-lg border border-border/80 bg-surface-2/50 p-2">
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono">
+            Annual Vol (σ)
+          </span>
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground tabular-nums">
+            {data.volatilityAnnualPct.toFixed(1)}%
+          </span>
+          <span className="text-[9px] text-muted-foreground/60 font-mono">252-day realized</span>
+        </div>
+
+        <div className="rounded-lg border border-border/80 bg-surface-2/50 p-2">
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono">
+            P/E (TTM)
+          </span>
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground tabular-nums">
+            {data.fundamentals.peRatio.toFixed(1)}x
+          </span>
+          <span className="text-[9px] text-muted-foreground/60 font-mono">Fwd: {data.fundamentals.forwardPe.toFixed(1)}x</span>
+        </div>
+
+        <div className="rounded-lg border border-border/80 bg-surface-2/50 p-2">
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono">
+            Return on Equity
+          </span>
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-emerald-400 tabular-nums">
+            {data.fundamentals.returnOnEquityPct.toFixed(1)}%
+          </span>
+          <span className="text-[9px] text-muted-foreground/60 font-mono">ROE (LTM)</span>
+        </div>
+      </div>
+
+      {/* Institutional Multiples & Margin Table */}
+      <div className="rounded-lg border border-border/80 bg-surface-1/90 p-2.5 space-y-2">
+        <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground font-mono border-b border-border/60 pb-1">
+          Fundamental Ratios & Financial Profile
+        </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono">
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Market Cap</span>
+            <span className="font-semibold text-foreground">${data.fundamentals.marketCapBln.toFixed(1)}B</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">EV / EBITDA</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.evToEbitda.toFixed(1)}x</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Gross Margin</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.grossMarginPct.toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Operating Margin</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.operatingMarginPct.toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Rev Growth (YoY)</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.revenueGrowthYoyPct >= 0 ? "+" : ""}{data.fundamentals.revenueGrowthYoyPct.toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Debt / Equity</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.debtToEquity.toFixed(2)}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">FCF Yield</span>
+            <span className="font-semibold text-foreground">{data.fundamentals.freeCashFlowYieldPct.toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground text-[8.5px] block">Correlation (r)</span>
+            <span className="font-semibold text-foreground">{data.betaRegression.correlation.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* News Sentiment & Headlines */}
+      {data.news && data.news.headlines.length > 0 && (
+        <div className="rounded-lg border border-border/80 bg-surface-1/90 p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[9px] font-mono border-b border-border/50 pb-1">
+            <span className="font-semibold uppercase tracking-[0.12em] text-muted-foreground">Catalysts & Wire Sentiment</span>
+            <span className={`font-semibold capitalize ${data.news.sentiment === "bullish" ? "text-emerald-400" : data.news.sentiment === "bearish" ? "text-red-400" : "text-muted-foreground"}`}>
+              {data.news.sentiment} (Veracity: {data.news.veracityScore}%)
+            </span>
+          </div>
+          <div className="space-y-1">
+            {data.news.headlines.slice(0, 2).map((headline, idx) => (
+              <p key={idx} className="text-[11px] text-foreground font-serif leading-tight">
+                • {headline}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 1-Click Interactive Actions */}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => handleAction("workstation", { ticker: data.ticker })}
+          className="pressable flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-surface-3 transition-colors"
+        >
+          <FileSearch className="h-3 w-3 text-muted-foreground" />
+          Open {data.ticker} Workstation
+        </button>
+        <button
+          type="button"
+          onClick={() => handleAction("screener")}
+          className="pressable flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border/80 bg-surface-1 px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-2 transition-colors"
+        >
+          <Sliders className="h-3 w-3 text-muted-foreground" />
+          Factor Screener
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── 6. General Quant Synthesis Card ──────────────────────────────────────────
 
 export const GeneralQuantCard: React.FC<{ data: GeneralQuantData }> = ({ data }) => {
   return (
@@ -652,6 +844,7 @@ export const SashaVisualCard: React.FC<{ result: SashaResult }> = ({ result }) =
       </div>
 
       {/* Dynamic Quantitative Payload */}
+      {result.cardType === "single_stock" && <SingleStockCard data={result.cardData as SingleStockData} />}
       {result.cardType === "subset_risk" && <SubsetRiskCard data={result.cardData as SubsetRiskData} />}
       {result.cardType === "stock_comparison" && <StockComparisonCard data={result.cardData as StockComparisonData} />}
       {result.cardType === "news_impact" && <NewsImpactCard data={result.cardData as NewsImpactData} />}

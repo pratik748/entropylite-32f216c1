@@ -57,6 +57,86 @@ export class SashaPlanner {
     const nodes: ExecutionPlanNode[] = [];
 
     switch (intent.type) {
+      case "single_stock": {
+        const { ticker, benchmark = (ticker.endsWith(".NS") || ticker.endsWith(".BO") ? "^NSEI" : "SPY"), range = "6mo" } = intent;
+
+        // 1. Fetch Target Asset History
+        nodes.push({
+          id: `fetch_history_${ticker}`,
+          toolId: "market.fetch_history",
+          name: `Fetch ${ticker} Price History`,
+          description: `Download continuous daily OHLCV bars for ${ticker}`,
+          input: { ticker, range },
+          dependencies: [],
+          status: "pending",
+        });
+
+        // 2. Fetch Benchmark History
+        nodes.push({
+          id: `fetch_history_${benchmark}`,
+          toolId: "market.fetch_history",
+          name: `Fetch Benchmark (${benchmark}) History`,
+          description: `Download continuous daily OHLCV bars for benchmark ${benchmark}`,
+          input: { ticker: benchmark, range },
+          dependencies: [],
+          status: "pending",
+        });
+
+        // 3. Align Series & Calculate Continuous Returns
+        nodes.push({
+          id: "align_returns",
+          toolId: "market.calc_returns",
+          name: "Align Continuous Returns Matrix",
+          description: "Align timestamps across trading sessions and compute log return vectors",
+          input: {
+            tickers: [ticker, benchmark],
+            range,
+          },
+          dependencies: [`fetch_history_${ticker}`, `fetch_history_${benchmark}`],
+          status: "pending",
+        });
+
+        // 4. Calculate OLS Beta Regression against Benchmark
+        nodes.push({
+          id: "calc_beta_regression",
+          toolId: "quant.calc_beta_regression",
+          name: `Compute OLS Beta Regression (${ticker} vs ${benchmark})`,
+          description: "Estimate empirical market sensitivity beta, Jensen alpha, R², and correlation",
+          input: {
+            $map: {
+              assetReturns: "$output.align_returns.returnsMatrix.0",
+              benchmarkReturns: "$output.align_returns.returnsMatrix.1",
+            },
+          },
+          dependencies: ["align_returns"],
+          status: "pending",
+        });
+
+        // 5. Fetch Company Fundamentals & Valuation
+        nodes.push({
+          id: `fetch_metrics_${ticker}`,
+          toolId: "fundamentals.fetch_metrics",
+          name: `Fetch Fundamental & Multiples Telemetry for ${ticker}`,
+          description: "Balance sheet, income statement, P/E, EV/EBITDA, and margin profile",
+          input: { ticker },
+          dependencies: [],
+          status: "pending",
+        });
+
+        // 6. Fetch Ticker-Specific News & Catalysts
+        nodes.push({
+          id: "fetch_news_wires",
+          toolId: "news.fetch_wires",
+          name: `Fetch Institutional News Wires for ${ticker}`,
+          description: `Analyze news catalysts, sentiment polarity, and veracity for ${ticker}`,
+          input: { topicOrSector: `${ticker} Equity`, ticker },
+          dependencies: [],
+          status: "pending",
+        });
+
+        break;
+      }
+
       case "stock_comparison": {
         const { tickerA, tickerB, range } = intent;
 
@@ -416,6 +496,8 @@ export class SashaPlanner {
 
   private generateRationale(intent: SashaParsedIntent, nodes: ExecutionPlanNode[]): string {
     switch (intent.type) {
+      case "single_stock":
+        return `Single-equity quantitative plan: Price history extractions (${intent.ticker} & ${intent.benchmark || "SPY"}) → returns alignment → concurrent OLS beta regression, institutional fundamentals, and news catalyst ingestion.`;
       case "stock_comparison":
         return `Multi-stage statistical arbitrage plan: 2 parallel price history extractions → alignment & returns → concurrent beta regression, Engle-Granger cointegration test, rolling spread distribution, and fundamental peer comparison.`;
       case "subset_risk":

@@ -82,6 +82,7 @@ export const SashaHUD: React.FC = () => {
   );
 
   const quickPrompts = [
+    { label: "JPMorgan (JPM) Fact Sheet", query: "What about JPM?" },
     { label: "Tech subset risk", query: "Analyze my tech subset risk" },
     { label: "Compare NVDA vs AMD", query: "Compare NVDA and AMD" },
     { label: "Oil +15% stress test", query: "What happens if oil spikes 15% and Nifty drops 2%?" },

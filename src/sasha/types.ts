@@ -12,11 +12,20 @@ import type { PortfolioPosition } from "@/foresight/types";
 import type { GoogleGroundingResult } from "./googleSearchProxy";
 
 export type SashaIntentType =
+  | "single_stock"
   | "subset_risk"
   | "stock_comparison"
   | "news_impact"
   | "stress_test"
   | "llm_fallback";
+
+export interface SingleStockIntent {
+  type: "single_stock";
+  rawQuery: string;
+  ticker: string;
+  benchmark?: string;
+  range?: "1mo" | "3mo" | "6mo" | "1y" | "2y";
+}
 
 export interface SubsetRiskIntent {
   type: "subset_risk";
@@ -62,6 +71,7 @@ export interface LLMFallbackIntent {
 }
 
 export type SashaParsedIntent =
+  | SingleStockIntent
   | SubsetRiskIntent
   | StockComparisonIntent
   | NewsImpactIntent
@@ -248,6 +258,42 @@ export interface StressTestData {
   dag?: CausalTransmissionDAG;
 }
 
+export interface SingleStockData {
+  ticker: string;
+  name: string;
+  sector: string;
+  currency: string;
+  lastPrice: number;
+  periodReturnPct: number;
+  range: string;
+  benchmark: string;
+  betaRegression: {
+    beta: number;
+    alphaAnnualPct: number;
+    rSquared: number;
+    correlation: number;
+  };
+  volatilityAnnualPct: number;
+  fundamentals: {
+    marketCapBln: number;
+    peRatio: number;
+    forwardPe: number;
+    evToEbitda: number;
+    grossMarginPct: number;
+    operatingMarginPct: number;
+    revenueGrowthYoyPct: number;
+    returnOnEquityPct: number;
+    debtToEquity: number;
+    freeCashFlowYieldPct: number;
+  };
+  news: {
+    sentiment: "bullish" | "bearish" | "neutral";
+    veracityScore: number;
+    headlines: string[];
+  };
+  sparkline: number[];
+}
+
 export interface GeneralQuantData {
   headline: string;
   summary: string;
@@ -256,6 +302,7 @@ export interface GeneralQuantData {
 }
 
 export type SashaVisualCardType =
+  | "single_stock"
   | "subset_risk"
   | "stock_comparison"
   | "news_impact"
@@ -270,6 +317,7 @@ export interface SashaResult {
   headline: string;
   cardType: SashaVisualCardType;
   cardData:
+    | SingleStockData
     | SubsetRiskData
     | StockComparisonData
     | NewsImpactData

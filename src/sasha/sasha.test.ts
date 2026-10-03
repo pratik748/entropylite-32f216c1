@@ -164,6 +164,40 @@ describe("SASHA Sub-100ms Heuristic Intent Router", () => {
       expect(intent3.ticker).toBe("NVDA");
     }
   });
+
+  it("routes single stock and equity fact sheet inquiries accurately", () => {
+    const intent1 = routeSashaIntent("What about JPM?");
+    expect(intent1.type).toBe("single_stock");
+    if (intent1.type === "single_stock") {
+      expect(intent1.ticker).toBe("JPM");
+      expect(intent1.benchmark).toBe("SPY");
+    }
+
+    const intent2 = routeSashaIntent("Analyze NVDA");
+    expect(intent2.type).toBe("single_stock");
+    if (intent2.type === "single_stock") {
+      expect(intent2.ticker).toBe("NVDA");
+    }
+
+    const intent3 = routeSashaIntent("Quote for GS");
+    expect(intent3.type).toBe("single_stock");
+    if (intent3.type === "single_stock") {
+      expect(intent3.ticker).toBe("GS");
+    }
+
+    const intent4 = routeSashaIntent("Tell me about Reliance");
+    expect(intent4.type).toBe("single_stock");
+    if (intent4.type === "single_stock") {
+      expect(intent4.ticker).toBe("RELIANCE.NS");
+      expect(intent4.benchmark).toBe("^NSEI");
+    }
+
+    const intent5 = routeSashaIntent("AAPL");
+    expect(intent5.type).toBe("single_stock");
+    if (intent5.type === "single_stock") {
+      expect(intent5.ticker).toBe("AAPL");
+    }
+  });
 });
 
 describe("SASHA Sector Classification & Ticker Directory", () => {
@@ -537,5 +571,29 @@ describe("SASHA Universal Tool Registry & DAG Orchestration Engine", () => {
     const data = result.cardData as any;
     expect(Math.abs(data.portfolioDrawdownPct)).toBeGreaterThan(0);
     expect(data.worstHitAssets.length).toBeGreaterThan(0);
+  }, 20000);
+
+  it("executes end-to-end orchestration pipeline for single stock quantitative fact sheet", async () => {
+    const { result, plan, trace } = await executeSashaOrchestration("What about JPM?", {
+      userId: "test_user",
+      executionId: "exec_5",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("single_stock");
+    expect(result.receipts.length).toBeGreaterThan(0);
+    expect(result.spokenPunchline).toBeDefined();
+    expect(result.phoneticSpokenText).toBeDefined();
+
+    const data = result.cardData as any;
+    expect(data.ticker).toBe("JPM");
+    expect(data.lastPrice).toBeGreaterThan(0);
+    expect(data.betaRegression).toBeDefined();
+    expect(data.betaRegression.beta).toBeGreaterThan(0);
+    expect(data.fundamentals).toBeDefined();
+    expect(data.fundamentals.peRatio).toBeGreaterThan(0);
+    expect(data.fundamentals.marketCapBln).toBeGreaterThan(0);
   }, 20000);
 });
