@@ -30,6 +30,12 @@ const SECTOR_ALIASES: Record<string, string[]> = {
   defense: ["defense", "defence", "aerospace", "military"],
 };
 
+const STOP_WORDS = new Set([
+  "WHAT", "IS", "ARE", "AND", "OR", "TO", "THE", "IN", "ON", "AT", "BY", "FOR", "WITH",
+  "OF", "MY", "OUR", "THIS", "THAT", "AN", "A", "NEWS", "MOVING", "HEADWIND", "HEADWINDS",
+  "STRESS", "TEST", "COMPARE", "VERSUS", "PAIRS", "TRADE", "RISK", "ANALYZE", "ANALYSIS",
+]);
+
 /** Match words to canonical sector */
 export function matchSectorFromText(text: string): string | null {
   const lower = text.toLowerCase();
@@ -45,7 +51,7 @@ export function matchSectorFromText(text: string): string | null {
 /** Resolve symbol or company alias to canonical ticker */
 export function resolveSymbolCandidate(word: string): string | null {
   const clean = word.replace(/[^a-zA-Z0-9^.=-]/g, "").trim().toUpperCase();
-  if (!clean) return null;
+  if (!clean || clean.length < 2 || STOP_WORDS.has(clean)) return null;
 
   // Direct match in symbol directory
   const direct = SYMBOL_DIRECTORY.find(
@@ -64,16 +70,18 @@ export function resolveSymbolCandidate(word: string): string | null {
   const normalized = normalizeUserTicker(clean);
   if (normalized && normalized !== clean) return normalized;
 
-  // Alias / Name partial match
-  const aliasHit = SYMBOL_DIRECTORY.find((s) => {
-    if (s.name.toLowerCase().includes(lowerWord)) return true;
-    if (s.aliases?.some((a) => a.toLowerCase().includes(lowerWord) || lowerWord.includes(a.toLowerCase()))) return true;
-    return false;
-  });
-  if (aliasHit) return aliasHit.ticker;
+  // Alias / Name partial match (only for words >= 3 chars to avoid matching 'is' or 'to')
+  if (lowerWord.length >= 3) {
+    const aliasHit = SYMBOL_DIRECTORY.find((s) => {
+      if (s.name.toLowerCase() === lowerWord) return true;
+      if (s.aliases?.some((a) => a.toLowerCase() === lowerWord)) return true;
+      return false;
+    });
+    if (aliasHit) return aliasHit.ticker;
+  }
 
   if (normalized) return normalized;
-  if (/^[A-Z0-9^.-]{2,12}$/.test(clean)) {
+  if (/^[A-Z0-9^.-]{2,12}$/.test(clean) && !STOP_WORDS.has(clean)) {
     return clean;
   }
   return null;
@@ -87,12 +95,23 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
   const lower = query.toLowerCase();
 
   // ── 1. Stock Comparison & Pairs Trading ─────────────────────────────────
-  // Patterns: "compare X and Y", "X vs Y", "compare X to Y", "pairs trade X and Y", "correlation X and Y"
+  // Specific pairs trade regex
+  const pairsTradeMatch = query.match(/pairs?\s+trade\s+([\w^.-]+(?:\s+\w+)?)\s+(?:and|vs|versus|to)\s+([\w^.-]+(?:\s+\w+)?)/i);
+  if (pairsTradeMatch) {
+    const rawA = pairsTradeMatch[1].trim();
+    const rawB = pairsTradeMatch[2].trim();
+    const tickerA = resolveSymbolCandidate(rawA) || rawA.toUpperCase();
+    const tickerB = resolveSymbolCandidate(rawB) || rawB.toUpperCase();
+    if (tickerA && tickerB && tickerA !== tickerB) {
+      return { type: "stock_comparison", rawQuery: query, tickerA, tickerB, range: "6mo" };
+    }
+  }
+
+  // General compare X vs Y / compare X and Y / correlation between X and Y
   const compareMatch =
     query.match(/compare\s+([\w^.-]+(?:\s+\w+)?)\s+(?:and|vs|versus|with|to)\s+([\w^.-]+(?:\s+\w+)?)/i) ||
     query.match(/([\w^.-]+(?:\s+\w+)?)\s+(?:vs|versus)\s+([\w^.-]+(?:\s+\w+)?)/i) ||
-    query.match(/pairs?\s+trade\s+([\w^.-]+(?:\s+\w+)?)\s+(?:and|vs|to)\s+([\w^.-]+(?:\s+\w+)?)/i) ||
-    query.match(/correlation\s+between\s+([\w^.-]+(?:\s+\w+)?)\s+and\s+([\w^.-]+(?:\s+\w+)?)/i);
+    query.match(/correlation\s+(?:between\s+)?([\w^.-]+(?:\s+\w+)?)\s+and\s+([\w^.-]+(?:\s+\w+)?)/i);
 
   if (compareMatch && compareMatch[1] && compareMatch[2]) {
     const rawA = compareMatch[1].trim();
@@ -195,7 +214,7 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
     let specificTicker: string | undefined;
     for (const w of words) {
       const cand = resolveSymbolCandidate(w);
-      if (cand && cand.length >= 2 && !["NEWS", "MACRO", "FED", "WAR", "WHAT", "MOVING"].includes(cand)) {
+      if (cand && cand.length >= 2 && !STOP_WORDS.has(cand)) {
         specificTicker = cand;
         break;
       }
@@ -210,9 +229,9 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
   }
 
   // ── 4. Subset Portfolio Analysis ─────────────────────────────────────────
-  // Patterns: "analyze my banking subset", "tech subset", "high-beta positions", "energy holdings", "risk of banking"
+  // Patterns: "analyze my banking subset", "tech subset", "high-beta positions", "energy holdings", "risk of banking", "analyze my portfolio risk"
   const isSubsetQuery =
-    /\b(subset|holdings|positions|portfolio|allocation|risk|euler|var|cvar|volatility|exposure)\b/i.test(lower) ||
+    /\b(subset|holdings|positions|portfolio|portfolio risk|book risk|overall risk|allocation|risk|euler|var|cvar|volatility|exposure)\b/i.test(lower) ||
     matchSectorFromText(lower) !== null ||
     /\b(high[\s-]beta|low[\s-]beta|gainers|losers)\b/i.test(lower);
 
@@ -226,21 +245,19 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
     if (/\b(gainers|winners|profitable|in the green)\b/i.test(lower)) pnlStatus = "gainers";
     if (/\b(losers|underperformers|in the red|drag)\b/i.test(lower)) pnlStatus = "losers";
 
-    if (sector || betaThreshold || pnlStatus || /\b(subset|breakdown|euler|cvar)\b/i.test(lower)) {
-      return {
-        type: "subset_risk",
-        rawQuery: query,
-        subsetFilter: {
-          sector: sector ?? undefined,
-          betaThreshold,
-          pnlStatus,
-        },
-        range: "6mo",
-      };
-    }
+    return {
+      type: "subset_risk",
+      rawQuery: query,
+      subsetFilter: {
+        sector: sector ?? undefined,
+        betaThreshold,
+        pnlStatus,
+      },
+      range: "6mo",
+    };
   }
 
-  // ── 5. Fallback for Open-Ended Synthesis ─────────────────────────────────
+  // ── 5. LLM Fallback (General quantitative concepts & questions) ──────────
   return {
     type: "llm_fallback",
     rawQuery: query,
