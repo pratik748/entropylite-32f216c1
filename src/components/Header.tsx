@@ -130,13 +130,13 @@ const Header = ({ directProfitMode, onToggleDirectProfit }: HeaderProps) => {
             onClick={() => {
               window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", altKey: true, bubbles: true }));
             }}
-            className="pressable flex items-center gap-1.5 rounded-lg border border-border/70 bg-surface-2/60 px-2 sm:px-2.5 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
+            className="pressable hidden md:flex items-center gap-1.5 rounded-lg border border-border/70 bg-surface-2/60 px-2.5 h-8 text-[11.5px] font-semibold tracking-tight text-foreground hover:bg-surface-2 transition-colors"
             title="SASHA Voice Quant Copilot (Alt+S)"
           >
             <span className="flex h-4 w-4 items-center justify-center rounded bg-foreground text-[9px] font-serif font-bold text-background">
               S
             </span>
-            <span className="hidden sm:inline font-serif">SASHA</span>
+            <span className="hidden lg:inline">SASHA</span>
             <kbd className="hidden lg:inline text-[8.5px] font-mono text-muted-foreground/60 border border-border/50 rounded px-1 py-px">Alt+S</kbd>
           </button>
 
