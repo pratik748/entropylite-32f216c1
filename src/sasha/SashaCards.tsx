@@ -29,6 +29,7 @@ import type {
   StressTestData,
   GeneralQuantData,
 } from "./types";
+import type { GoogleGroundingResult } from "./googleSearchProxy";
 import { useSasha } from "./SashaProvider";
 import { CausalDAGViewer } from "./CausalDAGViewer";
 import { SpreadSparkline } from "./SpreadSparkline";
@@ -527,6 +528,96 @@ export const GeneralQuantCard: React.FC<{ data: GeneralQuantData }> = ({ data })
   );
 };
 
+// ── 6. Google & Financial Web AI Grounding Drawer ───────────────────────────
+
+export const GoogleGroundingView: React.FC<{ grounding: GoogleGroundingResult }> = ({ grounding }) => {
+  const [expanded, setExpanded] = React.useState(false);
+
+  return (
+    <div className="rounded-lg border border-border/80 bg-surface-1/90 p-3 space-y-2.5 text-left">
+      <div className="flex items-center justify-between border-b border-border/60 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-4 w-4 items-center justify-center rounded bg-foreground text-[8px] font-bold font-serif text-background">
+            G
+          </span>
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-foreground font-mono">
+            Google & Wire AI Grounding
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-mono text-emerald-400 font-medium">
+            Veracity: {grounding.veracityScore}%
+          </span>
+          <span className="text-muted-foreground/40">•</span>
+          <span className="text-[9px] font-mono text-muted-foreground">
+            {grounding.elapsedMs}ms
+          </span>
+        </div>
+      </div>
+
+      <p className="text-[11.5px] leading-relaxed text-foreground font-serif">
+        {grounding.groundedSummary}
+      </p>
+
+      {/* Metric Pills */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[9.5px] font-mono">
+        {grounding.keyFacts.map((fact, idx) => (
+          <div key={idx} className="bg-surface-2/60 p-1.5 rounded border border-border/60">
+            <span className="block text-muted-foreground text-[8.5px]">{fact.label}</span>
+            <span className="text-foreground font-medium">{fact.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Sources list toggle */}
+      {grounding.sources.length > 0 && (
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="pressable flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span>{expanded ? "Hide" : "View"} {grounding.sources.length} Verified Sources & Citations</span>
+            <ChevronRight className={`h-3 w-3 transform transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </button>
+
+          {expanded && (
+            <div className="mt-2 space-y-1.5 pl-1 border-l border-border/60">
+              {grounding.sources.map((src, i) => (
+                <a
+                  key={i}
+                  href={src.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-1.5 rounded bg-surface-2/40 hover:bg-surface-2 transition-colors group"
+                >
+                  <div className="flex items-center justify-between text-[9px] font-mono">
+                    <span className="text-muted-foreground group-hover:text-foreground font-medium flex items-center gap-1">
+                      {src.source}
+                      {src.tier === 1 && (
+                        <span className="text-[8px] bg-foreground text-background px-1 rounded font-bold">
+                          TIER 1
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-muted-foreground/60 flex items-center gap-0.5">
+                      {src.timeAgo}
+                      <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100" />
+                    </span>
+                  </div>
+                  <div className="text-[10.5px] text-foreground font-serif line-clamp-1 group-hover:underline">
+                    {src.title}
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Root Card Dispatcher ────────────────────────────────────────────────────
 
 export const SashaVisualCard: React.FC<{ result: SashaResult }> = ({ result }) => {
@@ -566,6 +657,9 @@ export const SashaVisualCard: React.FC<{ result: SashaResult }> = ({ result }) =
       {result.cardType === "news_impact" && <NewsImpactCard data={result.cardData as NewsImpactData} />}
       {result.cardType === "stress_test" && <StressTestCard data={result.cardData as StressTestData} />}
       {result.cardType === "general_quant" && <GeneralQuantCard data={result.cardData as GeneralQuantData} />}
+
+      {/* Google & Web AI Grounding Panel */}
+      {result.googleGrounding && <GoogleGroundingView grounding={result.googleGrounding} />}
     </div>
   );
 };

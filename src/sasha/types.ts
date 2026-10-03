@@ -9,6 +9,7 @@
  */
 
 import type { PortfolioPosition } from "@/foresight/types";
+import type { GoogleGroundingResult } from "./googleSearchProxy";
 
 export type SashaIntentType =
   | "subset_risk"
@@ -276,6 +277,7 @@ export interface SashaResult {
     | GeneralQuantData;
   executionTimeMs: number;
   receipts: SashaReceipt[];
+  googleGrounding?: GoogleGroundingResult;
   source: string;
   facts: Array<{ label: string; value: string | number; unit?: string }>;
   timestamp: number;

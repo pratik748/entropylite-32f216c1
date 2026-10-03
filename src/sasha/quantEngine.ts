@@ -13,6 +13,7 @@ import { cointegrationEG, ouFit, mean, stddev } from "@/lib/statarb-math";
 import { SYMBOL_DIRECTORY, SymbolEntry } from "@/lib/symbolDirectory";
 import { governedInvoke } from "@/lib/apiGovernor";
 import { toInstitutionalPhonetics } from "./sashaPhonetics";
+import { searchGoogleGrounding, type GoogleGroundingResult } from "./googleSearchProxy";
 
 /** Safe bounded invocation to prevent network hangs in headless or offline environments */
 async function safeGovernedInvoke<T>(
@@ -775,6 +776,24 @@ export async function executeNewsImpact(
         },
       ];
 
+  // Live Google & Web AI Search Grounding proxy
+  let googleGrounding: GoogleGroundingResult | undefined;
+  try {
+    const searchTarget = ticker ? `${ticker} ${topicOrSector} stock market news` : `${topicOrSector} market news impact`;
+    googleGrounding = await searchGoogleGrounding(searchTarget, { timeoutMs: 300 });
+    if (googleGrounding && googleGrounding.sources.length > 0) {
+      receipts.push({
+        id: "google-grounding",
+        label: "Google AI Grounding & Web Scourer",
+        elapsedMs: googleGrounding.elapsedMs,
+        badge: `${googleGrounding.sources.length} Sources (${googleGrounding.veracityScore}%)`,
+        status: "success",
+      });
+    }
+  } catch {
+    // Non-blocking
+  }
+
   receipts.push({
     id: "news-ingest",
     label: "Live Wire & Filings Ingestion",
@@ -863,6 +882,7 @@ export async function executeNewsImpact(
     cardData: data,
     executionTimeMs: elapsed,
     receipts,
+    googleGrounding,
     source: "news-pipeline:causal-filter",
     facts: [
       { label: "Signal-to-Noise Score", value: `${signalScore}/100` },
@@ -1163,6 +1183,23 @@ export async function executeLLMFallback(
     // Fallback
   }
 
+  // Perform Google & Web AI Search Grounding proxy
+  let googleGrounding: GoogleGroundingResult | undefined;
+  try {
+    googleGrounding = await searchGoogleGrounding(query, { timeoutMs: 350 });
+    if (googleGrounding && googleGrounding.sources.length > 0) {
+      receipts.push({
+        id: "google-ai-mode",
+        label: "Google AI Grounding Proxy",
+        elapsedMs: googleGrounding.elapsedMs,
+        badge: `${googleGrounding.sources.length} Sources (${googleGrounding.veracityScore}%)`,
+        status: "success",
+      });
+    }
+  } catch {
+    // Non-blocking
+  }
+
   let headline = "Quantitative Factor Review";
   let summary = `Evaluated "${query}" across active holdings (${tickers.join(", ") || "General Book"}). Risk metrics indicate balanced factor exposure with primary volatility anchored to mega-cap equities.`;
   let spokenPunchline = `Cross-referencing your portfolio against quantitative factors indicates resilient positioning with manageable tail exposure across active holdings.`;
@@ -1183,6 +1220,10 @@ export async function executeLLMFallback(
     headline = "Value at Risk & Expected Shortfall";
     summary = `1-day CVaR95 computes the conditional expectation of loss exceeding the 95th percentile Value-at-Risk threshold, capturing extreme tail distribution risk.`;
     spokenPunchline = `Expected Shortfall measures average loss beyond the 95% threshold, giving a stricter tail assessment than conventional VaR.`;
+  } else if (googleGrounding && googleGrounding.sources.length > 0) {
+    headline = `Google Grounded Synthesis: ${query.slice(0, 40)}`;
+    summary = googleGrounding.groundedSummary;
+    spokenPunchline = googleGrounding.spokenSynthesis;
   }
 
   const phoneticSpokenText = toInstitutionalPhonetics(spokenPunchline);
@@ -1194,7 +1235,7 @@ export async function executeLLMFallback(
     metrics: [
       { label: "Book Positions", value: tickers.length, tone: "neutral" },
       { label: "Total Book Value", value: `$${Math.round(totalValue).toLocaleString()}`, tone: "neutral" },
-      { label: "Execution Standard", value: "Deterministic Mathematical Core", tone: "gain" },
+      { label: "Google Grounding", value: googleGrounding ? `${googleGrounding.veracityScore}% Veracity` : "Standard Core", tone: "gain" },
     ],
   };
 
@@ -1208,7 +1249,8 @@ export async function executeLLMFallback(
     cardData: data,
     executionTimeMs: elapsed,
     receipts,
-    source: "entropy-quant:synthesis",
+    googleGrounding,
+    source: googleGrounding ? "google-proxy:ai-grounding" : "entropy-quant:synthesis",
     facts: [
       { label: "Subject", value: headline },
       { label: "Active Holdings", value: tickers.length },

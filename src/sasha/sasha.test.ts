@@ -26,6 +26,7 @@ import {
   getAssetCurrency,
 } from "./quantEngine";
 import { toInstitutionalPhonetics } from "./sashaPhonetics";
+import { searchGoogleGrounding } from "./googleSearchProxy";
 import type { PortfolioPosition } from "@/foresight/types";
 
 describe("SASHA Sub-100ms Heuristic Intent Router", () => {
@@ -397,5 +398,39 @@ describe("SASHA Quantitative Execution Engines", () => {
     expect(result.headline).toContain("Euler");
     expect(result.spokenPunchline).toContain("Euler risk");
     expect(result.receipts.length).toBeGreaterThan(0);
+  });
+
+  it("grounds real-time web intelligence via Google Search & AI mode proxy with source verification", async () => {
+    const resOil = await searchGoogleGrounding("Brent crude oil OPEC supply cut impact");
+    expect(resOil.sources.length).toBeGreaterThan(0);
+    expect(resOil.veracityScore).toBeGreaterThanOrEqual(80);
+    expect(resOil.signalToNoiseScore).toBeGreaterThanOrEqual(70);
+    expect(resOil.groundedSummary).toBeDefined();
+    expect(resOil.spokenSynthesis).toBeDefined();
+    expect(resOil.keyFacts.length).toBeGreaterThan(0);
+
+    const resRates = await searchGoogleGrounding("Federal reserve interest rate cuts inflation");
+    expect(resRates.sources.length).toBeGreaterThan(0);
+    expect(resRates.sources.some((s) => s.tier === 1 || s.tier === 2)).toBe(true);
+    expect(resRates.sentiment).toBeDefined();
+  });
+
+  it("attaches Google AI grounding telemetry to news impact execution", async () => {
+    const intent = routeSashaIntent("Breaking news on chip export restrictions");
+    expect(intent.type).toBe("news_impact");
+    if (intent.type === "news_impact") {
+      const result = await executeNewsImpact(intent, samplePositions);
+      expect(result.googleGrounding).toBeDefined();
+      expect(result.googleGrounding?.sources.length).toBeGreaterThan(0);
+      expect(result.googleGrounding?.veracityScore).toBeGreaterThanOrEqual(80);
+    }
+  });
+
+  it("invokes Google AI grounding proxy on qualitative LLM fallback queries", async () => {
+    const intent = { type: "llm_fallback" as const, rawQuery: "What is the latest geopolitical impact on semiconductor supply chains?" };
+    const result = await executeLLMFallback(intent, samplePositions);
+    expect(result.googleGrounding).toBeDefined();
+    expect(result.googleGrounding?.sources.length).toBeGreaterThan(0);
+    expect(result.spokenPunchline).toBeDefined();
   });
 });
