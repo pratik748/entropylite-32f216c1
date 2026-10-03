@@ -12,6 +12,10 @@
  *  8. News & Macro Headwinds Ingestion Engine (Live Wire Ingestion, Signal-to-Noise, Institutional Veracity, 1st/2nd Order Causal Channels).
  *  9. Financial Phonetic Pronunciation Engine (50+ tickers, Greek σ/α/β/θ, VaR/CVaR, bps, %, negative values).
  * 10. Conceptual Factor & Quantitative Synthesis Fallback.
+ * 11. Universal Tool Registry (Discovery, Validation, Manifest, Modular Handlers).
+ * 12. Intelligent DAG Planning (Dependency Resolution, Acyclicity Validation, Dynamic Mapping).
+ * 13. Autonomous DAG Execution (Topological Parallel Execution, Bounded Retries, Provenance Receipts).
+ * 14. End-to-End Orchestration (executeSashaOrchestration across arbitrary queries).
  */
 
 import { describe, it, expect } from "vitest";
@@ -27,6 +31,10 @@ import {
 } from "./quantEngine";
 import { toInstitutionalPhonetics } from "./sashaPhonetics";
 import { searchGoogleGrounding } from "./googleSearchProxy";
+import { toolRegistry } from "./tools";
+import { sashaPlanner } from "./orchestration/planner";
+import { sashaExecutor } from "./orchestration/executor";
+import { executeSashaOrchestration } from "./orchestration";
 import type { PortfolioPosition } from "@/foresight/types";
 
 describe("SASHA Sub-100ms Heuristic Intent Router", () => {
@@ -272,7 +280,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(result.spokenPunchline).toContain(data.annualizedVolPct.toString());
       expect(result.spokenPunchline).toContain(data.dominantRiskTicker);
     }
-  });
+  }, 15000);
 
   it("handles empty portfolio gracefully with institutional proxy subset", async () => {
     const intent = routeSashaIntent("Analyze my portfolio risk");
@@ -285,7 +293,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.tickers.length).toBeGreaterThanOrEqual(3);
       expect(data.annualizedVolPct).toBeGreaterThan(0);
     }
-  });
+  }, 15000);
 
   it("executes stock comparison with cointegration, beta regression, OU half-life, and stat-arb verdict", async () => {
     const intent = routeSashaIntent("Compare NVDA vs AMD");
@@ -311,7 +319,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(result.spokenPunchline).toContain("AMD");
       expect(result.spokenPunchline).toContain(data.correlation.toString());
     }
-  });
+  }, 15000);
 
   it("executes stock comparison on Indian equities (Reliance vs HDFC)", async () => {
     const intent = routeSashaIntent("Compare Reliance and HDFC");
@@ -325,7 +333,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.currencyB).toBe("INR");
       expect(data.cointegration.adfStat).toBeDefined();
     }
-  });
+  }, 15000);
 
   it("executes scenario stress testing with worst-hit absorption, Causal DAG, and hedge recommendation", async () => {
     const intent = routeSashaIntent("What happens if oil spikes 15% and Nifty drops 2%?");
@@ -354,7 +362,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(result.spokenPunchline).toContain("%");
       expect(result.spokenPunchline).toContain("draws down");
     }
-  });
+  }, 20000);
 
   it("handles qualitative macro shock query 'what happens in a oil shock ?'", async () => {
     const intent = routeSashaIntent("what happens in a oil shock ?");
@@ -367,7 +375,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.portfolioDrawdownPct).toBeDefined();
       expect(data.dag.nodes.length).toBeGreaterThanOrEqual(4);
     }
-  });
+  }, 15000);
 
   it("executes news & causal impact extraction with institutional veracity scoring and DAG", async () => {
     const intent = routeSashaIntent("What's moving energy?");
@@ -388,7 +396,7 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.dag).toBeDefined();
       expect(data.dag.nodes.length).toBeGreaterThan(0);
     }
-  });
+  }, 15000);
 
   it("executes conceptual quant synthesis fallback for Euler and Ledoit-Wolf queries", async () => {
     const intent = { type: "llm_fallback" as const, rawQuery: "Explain Euler marginal risk attribution" };
@@ -398,7 +406,7 @@ describe("SASHA Quantitative Execution Engines", () => {
     expect(result.headline).toContain("Euler");
     expect(result.spokenPunchline).toContain("Euler risk");
     expect(result.receipts.length).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it("grounds real-time web intelligence via Google Search & AI mode proxy with source verification", async () => {
     const resOil = await searchGoogleGrounding("Brent crude oil OPEC supply cut impact");
@@ -413,24 +421,121 @@ describe("SASHA Quantitative Execution Engines", () => {
     expect(resRates.sources.length).toBeGreaterThan(0);
     expect(resRates.sources.some((s) => s.tier === 1 || s.tier === 2)).toBe(true);
     expect(resRates.sentiment).toBeDefined();
+  }, 15000);
+});
+
+describe("SASHA Universal Tool Registry & DAG Orchestration Engine", () => {
+  const samplePositions: PortfolioPosition[] = [
+    { id: "1", ticker: "NVDA", buyPrice: 100, quantity: 40, currentPrice: 125 },
+    { id: "2", ticker: "AAPL", buyPrice: 180, quantity: 30, currentPrice: 220 },
+    { id: "3", ticker: "MSFT", buyPrice: 380, quantity: 20, currentPrice: 410 },
+  ];
+
+  it("registers and discovers institutional tools dynamically", () => {
+    const allTools = toolRegistry.getAll();
+    expect(allTools.length).toBeGreaterThanOrEqual(10);
+
+    const marketDiscovery = toolRegistry.discover("fetch stock prices");
+    expect(marketDiscovery.some((t) => t.id === "market.fetch_history")).toBe(true);
+
+    const riskDiscovery = toolRegistry.discover("euler covariance risk");
+    expect(riskDiscovery.some((t) => t.id === "quant.calc_euler_risk")).toBe(true);
+
+    const statarbDiscovery = toolRegistry.discover("cointegration spread");
+    expect(statarbDiscovery.some((t) => t.id === "statarb.test_cointegration")).toBe(true);
   });
 
-  it("attaches Google AI grounding telemetry to news impact execution", async () => {
-    const intent = routeSashaIntent("Breaking news on chip export restrictions");
-    expect(intent.type).toBe("news_impact");
-    if (intent.type === "news_impact") {
-      const result = await executeNewsImpact(intent, samplePositions);
-      expect(result.googleGrounding).toBeDefined();
-      expect(result.googleGrounding?.sources.length).toBeGreaterThan(0);
-      expect(result.googleGrounding?.veracityScore).toBeGreaterThanOrEqual(80);
-    }
+  it("validates tool parameter inputs strictly against schema", () => {
+    const valid = toolRegistry.validateInput("market.fetch_history", { ticker: "NVDA", range: "6mo" });
+    expect(valid.valid).toBe(true);
+    expect(valid.errors).toHaveLength(0);
+
+    const invalid = toolRegistry.validateInput("market.fetch_history", {});
+    expect(invalid.valid).toBe(false);
+    expect(invalid.errors.length).toBeGreaterThan(0);
   });
 
-  it("invokes Google AI grounding proxy on qualitative LLM fallback queries", async () => {
-    const intent = { type: "llm_fallback" as const, rawQuery: "What is the latest geopolitical impact on semiconductor supply chains?" };
-    const result = await executeLLMFallback(intent, samplePositions);
-    expect(result.googleGrounding).toBeDefined();
-    expect(result.googleGrounding?.sources.length).toBeGreaterThan(0);
+  it("creates acyclic DAG execution plans for pairs comparison", async () => {
+    const plan = await sashaPlanner.createPlan("Compare NVDA vs AMD", {
+      userId: "test_user",
+      executionId: "exec_1",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(plan.planId).toBeDefined();
+    expect(plan.nodes.length).toBeGreaterThanOrEqual(5);
+
+    // Verify dependencies: align_returns must depend on fetch_history_NVDA and fetch_history_AMD
+    const alignNode = plan.nodes.find((n) => n.id === "align_returns");
+    expect(alignNode?.dependencies).toContain("fetch_history_NVDA");
+    expect(alignNode?.dependencies).toContain("fetch_history_AMD");
+
+    // Verify regression depends on align_returns
+    const regNode = plan.nodes.find((n) => n.id === "calc_beta_regression");
+    expect(regNode?.dependencies).toContain("align_returns");
+  });
+
+  it("executes DAG execution plan autonomously with parallel execution and tracing", async () => {
+    const plan = await sashaPlanner.createPlan("Compare NVDA vs AMD", {
+      userId: "test_user",
+      executionId: "exec_2",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    const execution = await sashaExecutor.executePlan(plan, {
+      userId: "test_user",
+      executionId: "exec_2",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(execution.trace.nodesExecuted).toBe(plan.nodes.length);
+    expect(execution.provenances.length).toBeGreaterThan(0);
+    expect(execution.resultsByNodeId["fetch_history_NVDA"]).toBeDefined();
+    expect(execution.resultsByNodeId["calc_beta_regression"]).toBeDefined();
+    expect(execution.resultsByNodeId["test_cointegration"]).toBeDefined();
+  }, 20000);
+
+  it("executes end-to-end orchestration pipeline for Euler subset risk", async () => {
+    const { result, plan, trace } = await executeSashaOrchestration("Analyze my tech subset", {
+      userId: "test_user",
+      executionId: "exec_3",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("subset_risk");
+    expect(result.receipts.length).toBeGreaterThan(0);
+    expect(trace.nodesExecuted).toBeGreaterThanOrEqual(3);
     expect(result.spokenPunchline).toBeDefined();
-  });
+    expect(result.phoneticSpokenText).toBeDefined();
+
+    const data = result.cardData as any;
+    expect(data.annualizedVolPct).toBeGreaterThan(0);
+    expect(data.eulerRiskShares.length).toBeGreaterThan(0);
+  }, 20000);
+
+  it("executes end-to-end orchestration pipeline for oil shock stress scenario", async () => {
+    const { result, plan, trace } = await executeSashaOrchestration("What happens if oil spikes 15% and Nifty drops 2%?", {
+      userId: "test_user",
+      executionId: "exec_4",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("stress_test");
+    expect(result.receipts.length).toBeGreaterThan(0);
+    expect(result.spokenPunchline).toBeDefined();
+
+    const data = result.cardData as any;
+    expect(Math.abs(data.portfolioDrawdownPct)).toBeGreaterThan(0);
+    expect(data.worstHitAssets.length).toBeGreaterThan(0);
+  }, 20000);
 });

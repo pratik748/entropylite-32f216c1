@@ -4,8 +4,8 @@
  * Tier-1 Institutional Hands-Free Voice Subsystem:
  *  - Crisp Web Speech Synthesis (TTS) with priority interrupt & natural voice picker.
  *  - Financial phonetic translation for zero-glitch ticker and Greek pronunciation.
- *  - Error-resilient Web Speech Recognition (STT) with continuous wake-word
- *    listening ("Hey Sasha" / "Sasha").
+ *  - Error-resilient Web Speech Recognition (STT) with continuous wake-word listening ("Hey Sasha" / "Sasha").
+ *  - 1800ms silence debounce window preventing premature sentence truncation during conversational pauses.
  *  - Web Audio API real-time microphone energy analyzer for live reactive waveforms.
  */
 
@@ -160,6 +160,11 @@ export class SashaSpeechController {
   private onEnergyCallback: ((energy: number) => void) | null = null;
   private onFrequencyDataCallback: ((freqs: Uint8Array) => void) | null = null;
 
+  // Silence debounce timer to prevent premature sentence truncation
+  private silenceDebounceTimer: any = null;
+  private accumulatedTranscript = "";
+  private readonly DEBOUNCE_MS = 1800; // 1.8 seconds natural pause allowance
+
   constructor() {
     try {
       this.isWakeWordActive = localStorage.getItem(WAKE_WORD_KEY) === "1";
@@ -218,39 +223,37 @@ export class SashaSpeechController {
 
       this.recognition.onresult = (event: SpeechRecognitionEventLike) => {
         let interim = "";
-        let final = "";
+        let finalSegment = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const item = event.results[i];
           const transcript = item[0]?.transcript || "";
           if (item.isFinal) {
-            final += transcript;
+            finalSegment += " " + transcript;
           } else {
-            interim += transcript;
+            interim += " " + transcript;
           }
         }
 
-        const currentText = (final || interim).trim();
-        if (!currentText) return;
+        if (finalSegment.trim()) {
+          this.accumulatedTranscript += " " + finalSegment.trim();
+        }
+
+        const currentActiveText = (this.accumulatedTranscript + " " + interim).trim();
+        if (!currentActiveText) return;
 
         // Wake word pattern: "Hey Sasha", "Sasha", "Ok Sasha"
         const wakeWordRegex = /^(?:hey\s+sasha|sasha|ok\s+sasha|sasha,)\s*(.*)$/i;
-        const match = currentText.match(wakeWordRegex);
+        const match = currentActiveText.match(wakeWordRegex);
 
         if (match) {
           const remainder = match[1]?.trim();
-          if (remainder && remainder.length > 2 && final) {
-            // Full command with wake word
-            this.handler?.onFinalTranscript(remainder);
-          } else {
-            this.handler?.onWakeWordDetected(remainder);
-          }
-        } else if (this.isExplicitListening) {
-          if (final) {
-            this.handler?.onFinalTranscript(final.trim());
-          } else if (interim) {
-            this.handler?.onInterimTranscript?.(interim.trim());
-          }
+          this.handler?.onWakeWordDetected(remainder);
+          this.accumulatedTranscript = remainder || "";
+          this.scheduleSilenceCommit();
+        } else if (this.isExplicitListening || this.accumulatedTranscript) {
+          this.handler?.onInterimTranscript?.(currentActiveText);
+          this.scheduleSilenceCommit();
         }
       };
 
@@ -286,9 +289,41 @@ export class SashaSpeechController {
     }
   }
 
+  private scheduleSilenceCommit(): void {
+    if (this.silenceDebounceTimer) {
+      clearTimeout(this.silenceDebounceTimer);
+    }
+
+    this.silenceDebounceTimer = setTimeout(() => {
+      const textToCommit = this.accumulatedTranscript.trim();
+      if (textToCommit && textToCommit.length > 1) {
+        this.handler?.onFinalTranscript(textToCommit);
+        this.accumulatedTranscript = "";
+      }
+    }, this.DEBOUNCE_MS);
+  }
+
+  public flushTranscriptNow(): void {
+    if (this.silenceDebounceTimer) {
+      clearTimeout(this.silenceDebounceTimer);
+      this.silenceDebounceTimer = null;
+    }
+    const textToCommit = this.accumulatedTranscript.trim();
+    if (textToCommit && textToCommit.length > 1) {
+      this.handler?.onFinalTranscript(textToCommit);
+      this.accumulatedTranscript = "";
+    }
+  }
+
   public stopContinuousListening(): void {
     this.shouldKeepListening = false;
     this.isExplicitListening = false;
+    if (this.silenceDebounceTimer) {
+      clearTimeout(this.silenceDebounceTimer);
+      this.silenceDebounceTimer = null;
+    }
+    this.accumulatedTranscript = "";
+
     if (this.recognition) {
       try {
         this.recognition.stop();
@@ -303,6 +338,7 @@ export class SashaSpeechController {
   public triggerExplicitListening(): void {
     this.isExplicitListening = true;
     this.shouldKeepListening = true;
+    this.accumulatedTranscript = "";
     this.startContinuousListening();
     this.handler?.onListeningChange?.(true);
   }

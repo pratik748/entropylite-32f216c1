@@ -4,7 +4,7 @@
  * Connects the voice quant copilot subsystem to React context, host application state,
  * global keyboard shortcuts, and HUD lifecycle.
  *
- * Maintains full multi-turn conversation history (SashaMessage[]) and zero-glitch voice execution.
+ * Powered by SASHA Universal Tool Registry & DAG Orchestration Engine.
  */
 
 import React, {
@@ -21,17 +21,9 @@ import type {
   SashaContextValue,
   SashaResult,
   SashaVoiceState,
-  SashaParsedIntent,
   SashaMessage,
 } from "./types";
-import { routeSashaIntent } from "./intentRouter";
-import {
-  executeSubsetRisk,
-  executeStockComparison,
-  executeNewsImpact,
-  executeStressTest,
-  executeLLMFallback,
-} from "./quantEngine";
+import { executeSashaOrchestration } from "./orchestration";
 import {
   SashaSpeechController,
   speakPunchline,
@@ -172,7 +164,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [voiceState, isOpen]);
 
-  // Execute quantitative query with sub-100ms routing and conversational record
+  // Execute quantitative query with universal tool orchestration and DAG planning
   const handleExecuteQuery = useCallback(
     async (query: string): Promise<SashaResult> => {
       const trimmed = query.trim();
@@ -196,34 +188,23 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
       ]);
 
       const positions: PortfolioPosition[] = hostRef.current?.getPositions() || [];
-      const parsedIntent: SashaParsedIntent = routeSashaIntent(trimmed);
 
       let result: SashaResult;
       try {
-        switch (parsedIntent.type) {
-          case "subset_risk":
-            result = await executeSubsetRisk(parsedIntent, positions);
-            break;
-          case "stock_comparison":
-            result = await executeStockComparison(parsedIntent);
-            break;
-          case "news_impact":
-            result = await executeNewsImpact(parsedIntent, positions);
-            break;
-          case "stress_test":
-            result = await executeStressTest(parsedIntent, positions);
-            break;
-          case "llm_fallback":
-          default:
-            result = await executeLLMFallback(parsedIntent, positions);
-            break;
-        }
+        const orchestration = await executeSashaOrchestration(trimmed, {
+          userId: "current_user",
+          executionId: `exec_${Date.now()}`,
+          positions,
+          portfolioValue: positions.reduce((acc, p) => acc + (p.currentPrice || p.buyPrice || 100) * (p.quantity || 1), 0) || 100000,
+          timestamp: Date.now(),
+        });
+        result = orchestration.result;
       } catch (err: any) {
         result = {
           id: crypto.randomUUID(),
-          intent: parsedIntent,
-          spokenPunchline: "Encountered a calculation threshold issue; reviewing portfolio risk metrics on screen.",
-          phoneticSpokenText: "Encountered a calculation threshold issue; reviewing portfolio risk metrics on screen.",
+          intent: { type: "llm_fallback", rawQuery: trimmed },
+          spokenPunchline: "Encountered an execution threshold issue; reviewing quantitative metrics on screen.",
+          phoneticSpokenText: "Encountered an execution threshold issue; reviewing quantitative metrics on screen.",
           headline: "Quantitative Diagnostic",
           cardType: "general_quant",
           cardData: {
