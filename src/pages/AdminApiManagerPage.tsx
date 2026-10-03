@@ -4,6 +4,17 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
 import { Loader2, KeyRound, Plus, Trash2, RotateCw, ShieldCheck, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Switch } from "@/components/ui/switch";
+
+const FUNCTIONS = [
+  "foresight-plan", "analyze-stock", "strategy-generate", "strategy-evolution", "causal-effects",
+  "derivatives-intelligence", "direct-profit", "desirable-assets", "opportunity-engine", "deep-intelligence",
+  "company-intelligence", "crown-intelligence", "flow-intelligence", "portfolio-intelligence", "portfolio-sentinel",
+  "risk-intelligence", "macro-intelligence", "monte-carlo-intelligence", "fortress-intelligence", "reflexivity-engine",
+  "clank-detection", "continuous-simulation", "sentiment-intel", "geopolitical-data", "geo-events",
+  "fetch-news", "market-data", "price-feed", "historical-prices", "fx-rates", "symbol-search",
+  "institutional-flows", "polymarket-signals", "tactical-movement", "trade-lesson", "entropy-brief",
+];
 
 type Credential = {
   id: string;
@@ -171,6 +182,42 @@ export default function AdminApiManagerPage() {
     [rows],
   );
 
+  // Paused manager keys drop out of the live chain; keep them visible so they can be switched back on.
+  const chain = useMemo<Lane[]>(() => {
+    const extra = rows
+      .filter((r) => !lanes.some((l) => l.name === r.name))
+      .map((r) => ({ order: 0, name: r.name, provider: r.provider || "custom", source: "manager" as const }));
+    return [...lanes, ...extra];
+  }, [lanes, rows]);
+
+  const [fnResults, setFnResults] = useState<Record<string, { status: number; ms: number; error?: string }>>({});
+  const [fnRunning, setFnRunning] = useState(false);
+  const fnDone = Object.keys(fnResults).length > 0 && !fnRunning;
+  const fnUp = Object.values(fnResults).filter((r) => r.status > 0 && r.status < 500).length;
+
+  const runFn = async (f: string) => {
+    setFnResults((p) => ({ ...p, [f]: { status: -1, ms: 0 } }));
+    const t0 = performance.now();
+    let status = 200; let error: string | undefined;
+    try {
+      const { error: e } = await supabase.functions.invoke(f, { body: { healthcheck: true } });
+      if (e) {
+        const ctx = (e as any).context;
+        status = typeof ctx?.status === "number" ? ctx.status : 0;
+        try { const j = await ctx?.json?.(); error = j?.error || e.message; } catch { error = e.message; }
+      }
+    } catch (e) { status = 0; error = e instanceof Error ? e.message : "No reply"; }
+    setFnResults((p) => ({ ...p, [f]: { status, ms: Math.round(performance.now() - t0), error } }));
+  };
+
+  const testFunctions = async () => {
+    setFnRunning(true);
+    const queue = [...FUNCTIONS];
+    const worker = async () => { while (queue.length) await runFn(queue.shift()!); };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    setFnRunning(false);
+  };
+
   const save = async () => {
     const n = name.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
     if (!n || !value.trim()) { toast.error("Name and key value are required"); return; }
@@ -326,6 +373,7 @@ export default function AdminApiManagerPage() {
             <table className="w-full text-[12px]">
               <thead className="text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
                 <tr className="border-b border-border/60">
+                  <th className="px-3 py-2 text-left font-medium">On</th>
                   <th className="px-3 py-2 text-left font-medium">#</th>
                   <th className="px-3 py-2 text-left font-medium">Key</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
@@ -336,16 +384,25 @@ export default function AdminApiManagerPage() {
                 </tr>
               </thead>
               <tbody>
-                {lanes.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-5 text-muted-foreground">No AI keys found. Add one above.</td></tr>
+                {chain.length === 0 && (
+                  <tr><td colSpan={8} className="px-3 py-5 text-muted-foreground">No AI keys found. Add one above.</td></tr>
                 )}
-                {lanes.map((l) => {
+                {chain.map((l) => {
                   const h = health[l.name];
-                  const ok = h?.last_status === "ok";
-                  const bad = h?.last_status === "error";
+                  const row = rows.find((r) => r.name === l.name);
+                  const paused = row ? !row.is_active : false;
+                  const ok = !paused && h?.last_status === "ok";
+                  const bad = !paused && h?.last_status === "error";
                   return (
-                    <tr key={l.name} className="border-b border-border/40 align-top last:border-0">
-                      <td className="px-3 py-2.5 font-mono text-muted-foreground">{l.order}</td>
+                    <tr key={l.name} className={`border-b border-border/40 align-top last:border-0 ${paused ? "opacity-50" : ""}`}>
+                      <td className="px-3 py-2.5">
+                        {row ? (
+                          <Switch checked={row.is_active} onCheckedChange={() => void toggle(row)} aria-label={`Enable ${l.name}`} />
+                        ) : (
+                          <span className="text-[10.5px] text-muted-foreground" title="Set in server settings, cannot be paused here">Server</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-muted-foreground">{l.order || "--"}</td>
                       <td className="px-3 py-2.5">
                         <p className="font-mono font-medium">{l.name}</p>
                         <p className="text-[11px] text-muted-foreground">{l.provider} · {l.source === "manager" ? "API Manager" : "server setting"}</p>
@@ -353,24 +410,18 @@ export default function AdminApiManagerPage() {
                       <td className="px-3 py-2.5 max-w-[260px]">
                         <span className={`inline-flex items-center gap-1.5 font-semibold ${ok ? "text-gain" : bad ? "text-loss" : "text-muted-foreground"}`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-gain" : bad ? "bg-loss" : "bg-muted-foreground"}`} />
-                          {ok ? "Working" : bad ? "Failing" : "Untested"}
+                          {paused ? "Paused" : ok ? "Working" : bad ? "Failing" : "Untested"}
                         </span>
                         {bad && h?.last_error && <p className="mt-0.5 text-[11px] text-muted-foreground break-words">{h.last_error.slice(0, 140)}</p>}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">{h?.last_latency_ms != null ? `${h.last_latency_ms} ms` : "--"}</td>
                       <td className="px-3 py-2.5 text-right font-mono">{h ? `${h.success_count} / ${h.failure_count}` : "--"}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{ago(h?.last_used_at)}</td>
-                      <td className="px-3 py-2.5 text-right space-x-2">
+                      <td className="px-3 py-2.5 text-right space-x-2 whitespace-nowrap">
                         {bad && (
-                          <button
-                            onClick={() => void resetHealth(l.name)}
-                            className="text-[12px] font-semibold text-loss hover:underline"
-                            title="Clear error lockout / cooldown"
-                          >
-                            Reset
-                          </button>
+                          <button onClick={() => void resetHealth(l.name)} className="text-[12px] font-semibold text-loss hover:underline" title="Clear cooldown">Reset</button>
                         )}
-                        <button onClick={() => void test(l.name)} disabled={!!testing} className="text-[12px] font-semibold text-primary disabled:opacity-50">
+                        <button onClick={() => void test(l.name)} disabled={!!testing || paused} className="text-[12px] font-semibold text-primary disabled:opacity-50">
                           {testing === l.name ? <Loader2 className="h-3 w-3 animate-spin" /> : "Test"}
                         </button>
                       </td>
@@ -380,7 +431,39 @@ export default function AdminApiManagerPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-[11.5px] text-muted-foreground">Failing keys rest automatically (dead keys 30 min, rate-limited 90 s) so engines skip straight to a working one.</p>
+          <p className="text-[11.5px] text-muted-foreground">Switch a key off to take it out of the chain instantly. Failing keys rest automatically (dead keys 30 min, rate-limited 90 s).</p>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Engines ({FUNCTIONS.length}){fnDone ? `, ${fnUp} responding` : ""}
+            </h2>
+            <button onClick={() => void testFunctions()} disabled={fnRunning} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary disabled:opacity-50">
+              {fnRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />} Test all engines
+            </button>
+          </div>
+          <div className="grid gap-px overflow-hidden rounded-xl border border-border/60 bg-border/40 sm:grid-cols-2">
+            {FUNCTIONS.map((f) => {
+              const r = fnResults[f];
+              const up = r && r.status > 0 && r.status < 500;
+              return (
+                <div key={f} className="flex items-center justify-between gap-3 bg-background px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[12px] font-medium truncate">{f}</p>
+                    {r && !up && <p className="text-[11px] text-muted-foreground truncate">{r.error || `HTTP ${r.status}`}</p>}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={`text-[11px] font-mono ${!r ? "text-muted-foreground" : up ? "text-gain" : "text-loss"}`}>
+                      {!r ? "--" : r.status === -1 ? "..." : `${r.status || "ERR"} · ${r.ms} ms`}
+                    </span>
+                    <button onClick={() => void runFn(f)} disabled={fnRunning} className="text-[12px] font-semibold text-primary disabled:opacity-50">Test</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[11.5px] text-muted-foreground">Any reply under 500 means the engine is online. 500 or no reply means it is down or out of working keys.</p>
         </section>
 
         <section className="space-y-3">
