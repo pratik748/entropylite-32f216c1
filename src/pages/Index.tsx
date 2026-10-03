@@ -54,6 +54,7 @@ import ForesightSurface from "@/foresight/ui/ForesightSurface";
 import Spotlight from "@/foresight/ui/Spotlight";
 import { onUIEvent } from "@/foresight/uiBus";
 import type { HostAdapter } from "@/foresight/types";
+import { SashaProvider, SashaHUD } from "@/sasha";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system";
 
@@ -493,6 +494,11 @@ const IndexContent = () => {
 
   return (
     <ForesightProvider host={foresightHost}>
+    <SashaProvider
+      host={foresightHost}
+      onNavigateTab={(id) => handleTabSwitch(id as Tab)}
+      onOpenWorkstation={(ticker) => navigate(`/company/${encodeURIComponent(ticker)}`)}
+    >
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header
         directProfitMode={directProfitMode}
@@ -843,6 +849,8 @@ const IndexContent = () => {
       )}
     </div>
     <Spotlight />
+    <SashaHUD />
+    </SashaProvider>
     </ForesightProvider>
   );
 };

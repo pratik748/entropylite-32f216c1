@@ -84,6 +84,18 @@ const CommandPalette = ({ tabs, onSelectTab, onOpenBrief, onToggleDirectProfit, 
         )}
         <CommandSeparator />
         <CommandGroup heading="Actions">
+          <CommandItem
+            value="Talk to Sasha Voice Quant Copilot"
+            onSelect={() => run(() => {
+              window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", altKey: true, bubbles: true }));
+            })}
+          >
+            <span className="mr-2 flex h-4 w-4 items-center justify-center rounded bg-foreground text-[9px] font-serif font-bold text-background">
+              S
+            </span>
+            Talk to Sasha (Voice Quant)
+            <CommandShortcut>Alt+S</CommandShortcut>
+          </CommandItem>
           <CommandItem value="Ask Foresight" onSelect={() => run(() => emitUIEvent("open_surface", {}))}>
             <Command className="mr-2 h-4 w-4 text-muted-foreground" />
             Ask Foresight
