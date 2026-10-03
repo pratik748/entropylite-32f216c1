@@ -112,10 +112,11 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
   }
 
   // ── 2. Scenario Stress Tests ────────────────────────────────────────────
-  // Patterns: "what happens if oil spikes 15% and Nifty drops 2%?", "what if oil spikes 15%", "stress test +20% vix"
+  // Patterns: "what happens in a oil shock?", "what happens if oil spikes 15% and Nifty drops 2%?", "what if oil spikes 15%", "stress test +20% vix", "market crash"
   const isStressQuery =
-    /\b(what happens if|what if|stress test|simulate|shock|spikes|drops|plunges|crashes|scenario)\b/i.test(lower) &&
-    /(\d+%\s*|\d+\s*bps|\d+\s*percent)/i.test(lower);
+    /\b(what happens (?:in|if|during)|what if|stress test|simulate|shock|spikes?|drops?|plunges?|crashes?|scenario|drawdown under|impact of)\b/i.test(lower) &&
+    (/(?:oil|crude|petroleum|market|nifty|sp500|s&p|vix|rate|rates|yield|recession|crash|inflation|tariff)/i.test(lower) ||
+     /(\d+%\s*|\d+\s*bps|\d+\s*percent)/i.test(lower));
 
   if (isStressQuery) {
     let marketShockPct: number | undefined;
@@ -123,18 +124,25 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
     let vixShockPct: number | undefined;
     let interestRateShockBps: number | undefined;
 
-    // Detect oil shock (e.g. "oil spikes 15%", "oil up 10%")
-    const oilMatch = lower.match(/oil\s+(?:spikes|surges|jumps|up|rises)\s+(\d+(?:\.\d+)?)\s*%/i) ||
-      lower.match(/(\d+(?:\.\d+)?)\s*%\s*(?:oil\s+spike|oil\s+jump)/i);
-    if (oilMatch) {
-      commodityShockPct = { commodity: "Brent Crude Oil", shockPct: parseFloat(oilMatch[1]) };
+    // Detect oil / crude shock (e.g. "oil spikes 15%", "what happens in a oil shock", "crude surge")
+    const oilPctMatch = lower.match(/(?:oil|crude|petroleum)\s+(?:spikes|surges|jumps|up|rises|shock)\s+(\d+(?:\.\d+)?)\s*%/i) ||
+      lower.match(/(\d+(?:\.\d+)?)\s*%\s*(?:oil|crude)\s*(?:spike|jump|surge|shock)/i);
+    if (oilPctMatch) {
+      commodityShockPct = { commodity: "Brent Crude Oil", shockPct: parseFloat(oilPctMatch[1]) };
+    } else if (/\b(oil|crude|petroleum)\s*(?:shock|spike|surge|crisis|jump)?\b/i.test(lower)) {
+      // Standard calibrated institutional oil shock scenario (+15% crude, -2.5% market)
+      commodityShockPct = { commodity: "Brent Crude Oil", shockPct: 15 };
+      if (marketShockPct === undefined) marketShockPct = -2.5;
     }
 
-    // Detect market / index drops (e.g. "nifty drops 2%", "s&p drops 5%", "market down 3%")
-    const marketMatch = lower.match(/(?:nifty|sp500|s&p|market|index)\s+(?:drops|falls|down|plunges|slumps)\s+(\d+(?:\.\d+)?)\s*%/i) ||
+    // Detect market / index drops (e.g. "nifty drops 2%", "s&p drops 5%", "market crash")
+    const marketMatch = lower.match(/(?:nifty|sp500|s&p|market|index)\s+(?:drops|falls|down|plunges|slumps|crashes)\s+(\d+(?:\.\d+)?)\s*%/i) ||
       lower.match(/(?:drops|falls|down|plunges)\s+(\d+(?:\.\d+)?)\s*%/i);
     if (marketMatch) {
       marketShockPct = -Math.abs(parseFloat(marketMatch[1]));
+    } else if (/\b(market crash|recession|liquidity crunch|flash crash)\b/i.test(lower)) {
+      marketShockPct = -10;
+      if (vixShockPct === undefined) vixShockPct = 35;
     }
 
     // Detect VIX spike
@@ -142,12 +150,17 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
       lower.match(/\+\s*(\d+(?:\.\d+)?)\s*%\s*vix/i);
     if (vixMatch) {
       vixShockPct = parseFloat(vixMatch[1]);
+    } else if (/\b(vix spike|volatility spike)\b/i.test(lower)) {
+      vixShockPct = 25;
     }
 
-    // Detect Rate hike (e.g. "rates rise 50 bps", "rate hike 75 bps")
+    // Detect Rate hike (e.g. "rates rise 50 bps", "rate hike 75 bps", "interest rate hike")
     const rateMatch = lower.match(/(?:rates?|interest\s*rates?)\s+(?:rise|hike|increase|up)\s*(\d+)\s*bps/i);
     if (rateMatch) {
       interestRateShockBps = parseInt(rateMatch[1], 10);
+    } else if (/\b(rate hike|interest rate hike|tightening)\b/i.test(lower)) {
+      interestRateShockBps = 50;
+      if (marketShockPct === undefined) marketShockPct = -2;
     }
 
     // Default market shock if only custom description was given

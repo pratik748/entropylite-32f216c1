@@ -81,6 +81,14 @@ describe("SASHA Sub-100ms Heuristic Intent Router", () => {
     if (intent2.type === "stress_test") {
       expect(intent2.vixShockPct).toBe(20);
     }
+
+    const intent3 = routeSashaIntent("what happens in a oil shock ?");
+    expect(intent3.type).toBe("stress_test");
+    if (intent3.type === "stress_test") {
+      expect(intent3.commodityShockPct?.commodity).toBe("Brent Crude Oil");
+      expect(intent3.commodityShockPct?.shockPct).toBe(15);
+      expect(intent3.marketShockPct).toBe(-2.5);
+    }
   });
 
   it("routes news & macro ingestion queries", () => {
