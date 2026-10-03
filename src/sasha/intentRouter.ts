@@ -15,6 +15,7 @@ import type {
   StockComparisonIntent,
   NewsImpactIntent,
   StressTestIntent,
+  NavigationIntent,
   LLMFallbackIntent,
 } from "./types";
 
@@ -162,6 +163,72 @@ export function extractSingleStockCandidate(query: string): string | null {
 export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
   const query = rawQuery.trim();
   const lower = query.toLowerCase();
+
+  // ── 0. Navigation & Ambient Workspace Actions ────────────────────────────
+  // Patterns: "take me to risk", "navigate to market", "open NVDA workstation", "go to sandbox", "show statarb", "switch tab to geopolitical"
+  const isExplicitNav = /\b(take me to|navigate to|go to|open|switch to|show me the|jump to)\b/i.test(lower) ||
+    /\b(tab|page|workstation|lab|terminal for)\b/i.test(lower);
+
+  if (isExplicitNav && !/\b(what happens|simulate|stress test|correlation|pairs trade|compare|euler risk|shrinkage)\b/i.test(lower)) {
+    // Check if targeting a specific company workstation
+    const workstationTickerMatch =
+      query.match(/\b(?:workstation|company page|stock page|terminal for|page for)\s+([A-Za-z0-9^.=-]+)/i) ||
+      query.match(/\b(?:take me to|navigate to|go to|open)\s+([A-Za-z0-9^.=-]+)\s+(?:workstation|terminal|page)/i);
+
+    if (workstationTickerMatch && workstationTickerMatch[1]) {
+      const cand = resolveSymbolCandidate(workstationTickerMatch[1]);
+      if (cand) {
+        return {
+          type: "navigation",
+          rawQuery: query,
+          target: "workstation",
+          ticker: cand,
+          destinationLabel: `${cand} Workstation`,
+        };
+      }
+    }
+
+    // Check if targeting a specific tab
+    const tabMap: Record<string, "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system"> = {
+      "risk lab": "risk",
+      "risk engine": "risk",
+      risk: "risk",
+      "market overview": "market",
+      market: "market",
+      markets: "market",
+      screener: "market",
+      sandbox: "sandbox",
+      crucible: "sandbox",
+      simulation: "sandbox",
+      "stat-arb": "statarb",
+      "stat arb": "statarb",
+      statarb: "statarb",
+      augment: "augment",
+      copilot: "augment",
+      geopolitical: "geopolitical",
+      chokepoints: "geopolitical",
+      desirable: "desirable",
+      alpha: "desirable",
+      dashboard: "dashboard",
+      home: "dashboard",
+      fortress: "fortress",
+      system: "system",
+      settings: "system",
+    };
+
+    for (const [key, tabId] of Object.entries(tabMap)) {
+      const regex = new RegExp(`\\b${key}\\b`, "i");
+      if (regex.test(lower)) {
+        return {
+          type: "navigation",
+          rawQuery: query,
+          target: "tab",
+          tabId,
+          destinationLabel: tabId.charAt(0).toUpperCase() + tabId.slice(1),
+        };
+      }
+    }
+  }
 
   // ── 1. Stock Comparison & Pairs Trading ─────────────────────────────────
   // Specific pairs trade regex

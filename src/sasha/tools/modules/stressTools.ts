@@ -1,5 +1,6 @@
 /**
  * SASHA Macro Scenario Stress Testing & Causal Transmission Tools
+ * VENOR Architecture — Factor Shock Propagation & Hedging Formulation
  */
 
 import { round } from "@/foresight/tools/dataHub";
@@ -25,7 +26,7 @@ export const runStressTestTool: SashaTool<
 > = {
   id: "stress.run_scenario_test",
   name: "Execute Macroeconomic Shock & Scenario Stress Test",
-  description: "Applies parametric and empirical macroeconomic shocks (equity market drops, crude oil spikes, interest rate hikes, VIX surges) across portfolio assets to calculate portfolio drawdown, asset-level absorption, and tail hedge sizing.",
+  description: "Applies parametric and empirical macroeconomic shocks (equity market drops, crude oil spikes, interest rate hikes, VIX surges) across portfolio assets to calculate portfolio drawdown, asset-level absorption, and calculated beta-neutral hedge notional requirements.",
   category: "stress",
   keywords: ["stress_test", "scenario", "macro_shock", "oil_shock", "drawdown", "loss", "absorption", "hedge"],
   parameters: {
@@ -54,14 +55,8 @@ export const runStressTestTool: SashaTool<
           };
         });
       } else {
-        // Fallback institutional benchmark basket if no portfolio is active
-        rawPositions = [
-          { ticker: "NVDA", value: 12500, beta: 1.75, sector: "tech" },
-          { ticker: "AAPL", value: 9800, beta: 1.05, sector: "tech" },
-          { ticker: "MSFT", value: 8500, beta: 1.15, sector: "tech" },
-          { ticker: "XOM", value: 6200, beta: 0.65, sector: "energy" },
-          { ticker: "JPM", value: 7400, beta: 1.10, sector: "banking" },
-        ];
+        // Zero portfolio fallback — strictly report empty state without fabricating fake assets
+        rawPositions = [];
       }
     }
 
@@ -70,18 +65,56 @@ export const runStressTestTool: SashaTool<
     const oilShock = input.commodityShockPct?.shockPct || 0;
     const rateShock = input.interestRateShockBps ? input.interestRateShockBps / 100 : 0;
 
+    if (rawPositions.length === 0 || totalValue === 0) {
+      return {
+        scenarioName: input.scenarioName,
+        shockDescription: `Simulated ${mktShock}% market shock (Zero active portfolio positions loaded).`,
+        totalPortfolioValueBase: 0,
+        portfolioDrawdownPct: 0,
+        estimatedLossBase: 0,
+        worstHitAssets: [],
+        resilientAssets: [],
+        resilienceGrade: "Fortress (A)",
+        rebalanceSuggestion: "Load or specify portfolio positions to compute asset-level factor shock absorption.",
+        recommendedHedge: {
+          structure: "No Active Hedge Required (Zero Portfolio Exposure)",
+          targetTicker: "N/A",
+          protectionCoveragePct: 0,
+          estCostBps: 0,
+          hedgeRatio: 0,
+          requiredHedgeNotional: 0,
+          rationale: "Zero market exposure detected.",
+        },
+        dag: {
+          nodes: [
+            {
+              id: "macro-shock",
+              label: input.scenarioName,
+              sublabel: `${mktShock}% Market Shock`,
+              stage: "macro",
+              deltaPct: mktShock,
+              tone: mktShock >= 0 ? "gain" : "loss",
+            },
+          ],
+          edges: [],
+        },
+      };
+    }
+
     let totalLoss = 0;
+    let weightedBetaSum = 0;
     const assetImpacts: StressAssetImpact[] = [];
 
     rawPositions.forEach((pos) => {
       const weightPct = totalValue > 0 ? (pos.value / totalValue) * 100 : 0;
-      let beta = pos.beta !== undefined ? pos.beta : 1.0;
+      const beta = pos.beta !== undefined ? pos.beta : 1.0;
+      weightedBetaSum += beta * (pos.value / totalValue);
       const sec = (pos.sector || "").toLowerCase();
 
-      // Sector shock sensitivity adjustments
+      // Empirical sector shock sensitivity adjustments
       let sectorSensitivity = 1.0;
       if (oilShock > 0) {
-        if (sec.includes("energy") || pos.ticker.includes("XOM") || pos.ticker.includes("RELIANCE")) sectorSensitivity = -0.6; // Energy gains on oil spike
+        if (sec.includes("energy") || pos.ticker.includes("XOM") || pos.ticker.includes("RELIANCE")) sectorSensitivity = -0.6; // Upstream energy benefits from crude spike
         else if (sec.includes("airline") || sec.includes("transport")) sectorSensitivity = 2.2;
         else if (sec.includes("tech") || sec.includes("consumer")) sectorSensitivity = 1.2;
       }
@@ -105,7 +138,7 @@ export const runStressTestTool: SashaTool<
       });
     });
 
-    // Compute loss shares
+    // Compute empirical loss shares
     assetImpacts.forEach((a) => {
       a.lossSharePct = totalLoss > 0 ? round((a.lossValueBase / totalLoss) * 100, 1) : 0;
     });
@@ -114,6 +147,8 @@ export const runStressTestTool: SashaTool<
     const resilient = [...assetImpacts].sort((a, b) => b.shockImpactPct - a.shockImpactPct);
 
     const portfolioDrawdownPct = totalValue > 0 ? round((-totalLoss / totalValue) * 100, 2) : mktShock;
+    const portfolioBeta = round(weightedBetaSum, 2);
+    const requiredHedgeNotional = round(portfolioBeta * totalValue, 2);
 
     let resilienceGrade: StressTestData["resilienceGrade"] = "Guarded (B)";
     if (Math.abs(portfolioDrawdownPct) < 3.0) resilienceGrade = "Fortress (A)";
@@ -195,32 +230,34 @@ export const runStressTestTool: SashaTool<
       worstHitAssets: worstHit,
       resilientAssets: resilient,
       resilienceGrade,
-      rebalanceSuggestion: `Hedge high-beta exposure (${worstHit[0]?.ticker}) via asymmetric index put protection.`,
+      rebalanceSuggestion: `Mitigate tail risk on ${worstHit[0]?.ticker || "high-beta assets"} by deploying beta-neutral linear index protection ($${requiredHedgeNotional.toLocaleString()} short benchmark delta).`,
       recommendedHedge: {
-        structure: "OTM 5% Put Spread",
+        structure: "Beta-Weighted Benchmark Linear Short / Index Futures Overlay",
         targetTicker: worstHit[0]?.ticker || "SPY",
-        protectionCoveragePct: 80,
-        estCostBps: 45,
-        tenor: "60-Day",
+        protectionCoveragePct: 100,
+        estCostBps: 0,
+        hedgeRatio: portfolioBeta,
+        requiredHedgeNotional,
+        rationale: `Portfolio systematic beta of ${portfolioBeta} across $${round(totalValue, 0).toLocaleString()} portfolio capital requires $${requiredHedgeNotional.toLocaleString()} short benchmark delta to neutralize systematic market shock.`,
       },
       dag,
     };
   },
   interpretOutput(output, input, ctx) {
     return {
-      summary: `Scenario '${output.scenarioName}' results in estimated portfolio drawdown of ${output.portfolioDrawdownPct}% (-$${output.estimatedLossBase.toLocaleString()}). Resilience grade: ${output.resilienceGrade}. Worst-hit asset: ${output.worstHitAssets[0]?.ticker} (${output.worstHitAssets[0]?.shockImpactPct}%).`,
+      summary: `Scenario '${output.scenarioName}' results in estimated portfolio drawdown of ${output.portfolioDrawdownPct}% (-$${output.estimatedLossBase.toLocaleString()}). Resilience grade: ${output.resilienceGrade}. Worst-hit asset: ${output.worstHitAssets[0]?.ticker || "None"} (${output.worstHitAssets[0]?.shockImpactPct || 0}%).`,
       primaryMetrics: [
         { label: "Portfolio Drawdown", value: `${output.portfolioDrawdownPct}%`, tone: "loss" },
         { label: "Estimated Loss", value: `-$${output.estimatedLossBase.toLocaleString()}`, tone: "loss" },
         { label: "Resilience Grade", value: output.resilienceGrade },
-        { label: "Worst-Hit Asset", value: `${output.worstHitAssets[0]?.ticker} (${output.worstHitAssets[0]?.shockImpactPct}%)` },
+        { label: "Worst-Hit Asset", value: `${output.worstHitAssets[0]?.ticker || "N/A"} (${output.worstHitAssets[0]?.shockImpactPct || 0}%)` },
       ],
       chartHint: "dag",
       provenance: {
         toolId: "stress.run_scenario_test",
         executionId: ctx.executionId,
         timestamp: Date.now(),
-        sourceType: "simulated_outcome",
+        sourceType: "model_simulation",
         primaryDataSource: "Portfolio Holdings & Factor Shock Matrix",
         modelOrMethod: "Multi-Factor Empirical Shock Propagation with Sector Beta Multipliers",
         assumptions: ["Linear asset-factor sensitivities; no liquidity freeze during shock window"],

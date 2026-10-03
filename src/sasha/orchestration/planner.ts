@@ -234,7 +234,7 @@ export class SashaPlanner {
           toolId: "fundamentals.compare_peers",
           name: "Compare Peer Fundamentals & Multiples",
           description: "Head-to-head analysis of P/E, EV/EBITDA, Gross Margin, and ROE",
-          input: { tickerA, tickerB },
+          input: { ticker: tickerA, peers: [tickerB] },
           dependencies: [],
           status: "pending",
         });
@@ -406,6 +406,20 @@ export class SashaPlanner {
         break;
       }
 
+      case "navigation": {
+        // Direct UI routing / workstation navigation node
+        nodes.push({
+          id: "navigate_destination",
+          toolId: "macro.fetch_indicators",
+          name: `Prepare Navigation to ${intent.destinationLabel}`,
+          description: `Route active UI context to ${intent.destinationLabel}`,
+          input: {},
+          dependencies: [],
+          status: "pending",
+        });
+        break;
+      }
+
       case "llm_fallback":
       default: {
         // 1. Google Web Grounding
@@ -506,6 +520,8 @@ export class SashaPlanner {
         return `Macro stress simulation plan: Live position book extraction & macro benchmark retrieval → multi-stage causal shock propagation and tail hedge optimization.`;
       case "news_impact":
         return `Real-time intelligence plan: News wire extraction, veracity scoring, and causal transmission DAG synthesis.`;
+      case "navigation":
+        return `Ambient VIP navigation plan: Telemetry synchronization and seamless viewport navigation to ${intent.destinationLabel}.`;
       default:
         return `Direct web grounding & macro benchmark synthesis.`;
     }

@@ -368,14 +368,14 @@ export class SashaSpeechController {
             }
           })
           .catch(() => {
-            // Fallback to synthetic energy loop
-            this.startSyntheticEnergyLoop();
+            // Real audio stream unavailable — strictly zero energy, zero fabrication
+            this.onEnergyCallback?.(0);
           });
       } else {
-        this.startSyntheticEnergyLoop();
+        this.onEnergyCallback?.(0);
       }
     } catch {
-      this.startSyntheticEnergyLoop();
+      this.onEnergyCallback?.(0);
     }
   }
 
@@ -405,26 +405,6 @@ export class SashaSpeechController {
       this.animFrameId = requestAnimationFrame(check);
     };
 
-    check();
-  }
-
-  private startSyntheticEnergyLoop(): void {
-    let tick = 0;
-    const dummyFreqs = new Uint8Array(24);
-    const check = () => {
-      if (!this.shouldKeepListening) {
-        this.onEnergyCallback?.(0);
-        return;
-      }
-      tick += 0.1;
-      const energy = 0.2 + 0.15 * Math.sin(tick) + 0.1 * Math.cos(tick * 1.5);
-      for (let i = 0; i < 24; i++) {
-        dummyFreqs[i] = Math.floor(Math.abs(Math.sin(tick + i * 0.4)) * 200 * energy);
-      }
-      this.onFrequencyDataCallback?.(dummyFreqs);
-      this.onEnergyCallback?.(energy);
-      this.animFrameId = requestAnimationFrame(check);
-    };
     check();
   }
 

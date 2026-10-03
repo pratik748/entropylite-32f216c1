@@ -28,6 +28,7 @@ import type {
   StockComparisonData,
   NewsImpactData,
   StressTestData,
+  NavigationCardData,
   GeneralQuantData,
 } from "./types";
 import type { GoogleGroundingResult } from "./googleSearchProxy";
@@ -92,12 +93,12 @@ export const SubsetRiskCard: React.FC<{ data: SubsetRiskData }> = ({ data }) => 
         dominantTicker={data.dominantRiskTicker}
       />
 
-      {/* CLANK Structural Constraints */}
+      {/* Quantitative Risk Constraints */}
       {data.clankConstraints && data.clankConstraints.length > 0 && (
         <div className="rounded-lg border border-border/80 bg-surface-1/90 p-2.5 space-y-1.5">
           <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono border-b border-border/50 pb-1">
-            <span>CLANK Structural Constraints</span>
-            <span className="text-muted-foreground/60 font-mono">Kinetic Liquidity</span>
+            <span>Quantitative Risk Constraints</span>
+            <span className="text-muted-foreground/60 font-mono">Concentration & Liquidity</span>
           </div>
           <div className="space-y-1">
             {data.clankConstraints.map((c) => (
@@ -162,23 +163,15 @@ export const SubsetRiskCard: React.FC<{ data: SubsetRiskData }> = ({ data }) => 
         </div>
       )}
 
-      {/* 1-Click Interactive Actions */}
+      {/* Interactive Actions */}
       <div className="flex items-center gap-2 pt-1">
         <button
           type="button"
           onClick={() => handleAction("risk_lab")}
-          className="pressable flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-surface-3 transition-colors"
+          className="pressable w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-surface-3 transition-colors"
         >
           <Sliders className="h-3 w-3 text-muted-foreground" />
-          Inspect in Risk Lab
-        </button>
-        <button
-          type="button"
-          onClick={() => handleAction("fortress")}
-          className="pressable flex items-center justify-center gap-1.5 rounded-lg border border-border/80 bg-surface-1 px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-surface-2 transition-colors"
-        >
-          <ShieldCheck className="h-3 w-3 text-emerald-400" />
-          Fortress Stress Mode
+          Inspect Portfolio in Risk Lab
         </button>
       </div>
     </div>
@@ -484,23 +477,28 @@ export const StressTestCard: React.FC<{ data: StressTestData }> = ({ data }) => 
         <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="text-[11px] leading-snug text-foreground">
-            <strong className="text-foreground">Tail Hedge Recommendation:</strong> {data.recommendedHedge.structure} on {data.recommendedHedge.targetTicker} ({data.recommendedHedge.protectionCoveragePct}% coverage @ ~{data.recommendedHedge.estCostBps} bps).
+            <strong className="text-foreground">Linear Tail Hedge:</strong> {data.recommendedHedge.structure}
+            {data.recommendedHedge.requiredHedgeNotional !== undefined && data.recommendedHedge.requiredHedgeNotional > 0 && (
+              <span className="font-mono text-muted-foreground ml-1">
+                (Notional: ${data.recommendedHedge.requiredHedgeNotional.toLocaleString()} short delta, β={data.recommendedHedge.hedgeRatio ?? 1.0})
+              </span>
+            )}
           </p>
           <p className="text-[10px] text-muted-foreground font-serif">
-            {data.rebalanceSuggestion}
+            {data.recommendedHedge.rationale || data.rebalanceSuggestion}
           </p>
         </div>
       </div>
 
-      {/* 1-Click Interactive Action */}
+      {/* Interactive Actions */}
       <div className="pt-1">
         <button
           type="button"
-          onClick={() => handleAction("fortress")}
+          onClick={() => handleAction("risk_lab")}
           className="pressable w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-surface-3 transition-colors"
         >
-          <ShieldCheck className="h-3 w-3 text-emerald-400" />
-          Execute Hedging Strategy via Fortress
+          <Sliders className="h-3 w-3 text-muted-foreground" />
+          Inspect Factor Sensitivities in Risk Lab
         </button>
       </div>
     </div>
@@ -810,6 +808,55 @@ export const GoogleGroundingView: React.FC<{ grounding: GoogleGroundingResult }>
   );
 };
 
+// ── 7. Ambient Navigation & Workstation Dispatch Card ──────────────────────────
+
+export const NavigationCard: React.FC<{ data: NavigationCardData }> = ({ data }) => {
+  const { handleAction } = useSasha();
+
+  return (
+    <div className="space-y-3 text-left">
+      <div className="rounded-lg border border-border/80 bg-surface-2/40 p-3 space-y-1.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded bg-foreground/10 text-[10px] font-mono font-bold text-foreground">
+              NAV
+            </span>
+            <span className="font-mono text-[13px] font-semibold text-foreground">
+              {data.destinationLabel}
+            </span>
+          </div>
+          <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground uppercase">
+            {data.target === "workstation" ? "Terminal Workstation" : "Viewport"}
+          </span>
+        </div>
+        <p className="text-[11.5px] text-muted-foreground font-serif leading-relaxed">
+          {data.description}
+        </p>
+      </div>
+
+      {/* Quick Launch Actions */}
+      <div className="space-y-1.5">
+        <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground font-mono">
+          Quick Viewport Links
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          {data.quickLinks.map((link, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleAction(link.actionType, link.payload)}
+              className="pressable flex items-center justify-between rounded-lg border border-border/80 bg-surface-1/90 px-2.5 py-2 text-[11px] font-medium text-foreground hover:bg-surface-2 transition-colors text-left"
+            >
+              <span>{link.label}</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Root Card Dispatcher ────────────────────────────────────────────────────
 
 export const SashaVisualCard: React.FC<{ result: SashaResult }> = ({ result }) => {
@@ -849,6 +896,7 @@ export const SashaVisualCard: React.FC<{ result: SashaResult }> = ({ result }) =
       {result.cardType === "stock_comparison" && <StockComparisonCard data={result.cardData as StockComparisonData} />}
       {result.cardType === "news_impact" && <NewsImpactCard data={result.cardData as NewsImpactData} />}
       {result.cardType === "stress_test" && <StressTestCard data={result.cardData as StressTestData} />}
+      {result.cardType === "navigation" && <NavigationCard data={result.cardData as NavigationCardData} />}
       {result.cardType === "general_quant" && <GeneralQuantCard data={result.cardData as GeneralQuantData} />}
 
       {/* Google & Web AI Grounding Panel */}
