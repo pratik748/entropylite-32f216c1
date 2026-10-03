@@ -196,7 +196,7 @@ describe("SASHA Quantitative Execution Engines", () => {
     }
   });
 
-  it("executes scenario stress testing with worst-hit absorption and hedge recommendation", async () => {
+  it("executes scenario stress testing with worst-hit absorption, Causal DAG, and hedge recommendation", async () => {
     const intent = routeSashaIntent("What happens if oil spikes 15% and Nifty drops 2%?");
     expect(intent.type).toBe("stress_test");
 
@@ -214,13 +214,31 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.recommendedHedge).toBeDefined();
       expect(data.recommendedHedge.structure).toBeDefined();
 
+      // Causal Transmission DAG verification
+      expect(data.dag).toBeDefined();
+      expect(data.dag.nodes.length).toBeGreaterThan(0);
+      expect(data.dag.edges.length).toBeGreaterThan(0);
+
       // Punchline verification
       expect(result.spokenPunchline).toContain("%");
       expect(result.spokenPunchline).toContain("draws down");
     }
   });
 
-  it("executes news & causal impact extraction with institutional veracity scoring", async () => {
+  it("handles qualitative macro shock query 'what happens in a oil shock ?'", async () => {
+    const intent = routeSashaIntent("what happens in a oil shock ?");
+    expect(intent.type).toBe("stress_test");
+
+    if (intent.type === "stress_test") {
+      const result = await executeStressTest(intent, samplePositions);
+      expect(result.cardType).toBe("stress_test");
+      const data = result.cardData as any;
+      expect(data.portfolioDrawdownPct).toBeDefined();
+      expect(data.dag.nodes.length).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("executes news & causal impact extraction with institutional veracity scoring and DAG", async () => {
     const intent = routeSashaIntent("What's moving energy?");
     expect(intent.type).toBe("news_impact");
 
@@ -236,6 +254,8 @@ describe("SASHA Quantitative Execution Engines", () => {
       expect(data.firstOrderMacro).toBeDefined();
       expect(data.secondOrderTransmission).toBeDefined();
       expect(data.articles.length).toBeGreaterThan(0);
+      expect(data.dag).toBeDefined();
+      expect(data.dag.nodes.length).toBeGreaterThan(0);
     }
   });
 });

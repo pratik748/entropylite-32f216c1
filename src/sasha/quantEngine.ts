@@ -649,6 +649,49 @@ export async function executeNewsImpact(
     },
   ];
 
+  // Build dynamic 3-stage Causal Transmission DAG for News Impact
+  const dagNodes: CausalDAGNode[] = [
+    {
+      id: "macro-headline",
+      label: topicOrSector.toUpperCase(),
+      sublabel: dominantHeadwind,
+      stage: "macro",
+      deltaPct: round(sentimentScore * 10, 1),
+      tone: sentimentScore >= 0 ? "gain" : "loss",
+    },
+    {
+      id: "trans-1",
+      label: "1st-Order Channel",
+      sublabel: firstOrderMacro,
+      stage: "transmission",
+      tone: sentimentScore >= 0 ? "gain" : "loss",
+    },
+    {
+      id: "trans-2",
+      label: "2nd-Order Transmission",
+      sublabel: secondOrderTransmission,
+      stage: "transmission",
+      tone: sentimentScore >= 0 ? "gain" : "loss",
+    },
+  ];
+
+  const dagEdges: CausalDAGEdge[] = [
+    { from: "macro-headline", to: "trans-1", label: "Causal Impulse" },
+    { from: "trans-1", to: "trans-2", label: "Sector Spillover" },
+  ];
+
+  exposedPositionsInPortfolio.slice(0, 4).forEach((exp) => {
+    const assetId = `asset-${exp.ticker}`;
+    dagNodes.push({
+      id: assetId,
+      label: exp.ticker,
+      sublabel: `${exp.estimatedSensitivity.toUpperCase()} Sensitivity (${exp.exposureWeightPct}% weight)`,
+      stage: "asset",
+      tone: sentimentScore >= 0 ? "gain" : "loss",
+    });
+    dagEdges.push({ from: "trans-2", to: assetId });
+  });
+
   const data: NewsImpactData = {
     topicOrSector,
     sentimentScore: round(sentimentScore, 2),
@@ -660,6 +703,7 @@ export async function executeNewsImpact(
     secondOrderTransmission,
     exposedPositionsInPortfolio,
     articles,
+    dag: { nodes: dagNodes, edges: dagEdges },
   };
 
   const spokenPunchline = `${topicOrSector} headlines show ${sentimentScore > 0 ? "bullish" : "defensive"} signal: 1st-order impact indicates ${firstOrderMacro.toLowerCase()}, while 2nd-order transmission ${secondOrderTransmission.toLowerCase()}.`;
@@ -800,6 +844,69 @@ export async function executeStressTest(
     status: grade.startsWith("Fortress") || grade.startsWith("Guarded") ? "success" : "warning",
   });
 
+  // Build dynamic multi-stage Causal Transmission DAG for Stress Testing
+  const dagNodes: CausalDAGNode[] = [
+    {
+      id: "macro-shock",
+      label: commodityShockPct
+        ? `${commodityShockPct.commodity} +${commodityShockPct.shockPct}%`
+        : interestRateShockBps
+        ? `Rates +${interestRateShockBps}bps`
+        : vixShockPct
+        ? `VIX +${vixShockPct}%`
+        : `Market ${marketShockPct}%`,
+      sublabel: "Macro Shock Vector",
+      stage: "macro",
+      deltaPct: commodityShockPct ? commodityShockPct.shockPct : marketShockPct,
+      tone: "loss",
+    },
+    {
+      id: "trans-channel",
+      label: commodityShockPct
+        ? "Cost Escalation & Multiple Contraction"
+        : interestRateShockBps
+        ? "Discount Rate Multiple Expansion"
+        : "Liquidity Drain & Margin Compression",
+      sublabel: "Transmission Channel",
+      stage: "transmission",
+      tone: "loss",
+    },
+  ];
+
+  const dagEdges: CausalDAGEdge[] = [
+    { from: "macro-shock", to: "trans-channel", label: "Direct Shock" },
+  ];
+
+  const affectedSectors = Array.from(new Set(tickers.map((t) => getAssetSector(t))));
+  affectedSectors.forEach((sec) => {
+    const secId = `sec-${sec}`;
+    const secAssets = worstHitAssets.filter((a) => getAssetSector(a.ticker) === sec);
+    const avgImpact = secAssets.reduce((s, a) => s + a.shockImpactPct, 0) / Math.max(1, secAssets.length);
+    dagNodes.push({
+      id: secId,
+      label: `${sec.toUpperCase()}`,
+      sublabel: `${avgImpact > 0 ? "+" : ""}${round(avgImpact, 1)}% Sector Shift`,
+      stage: "sector",
+      deltaPct: round(avgImpact, 1),
+      tone: avgImpact >= 0 ? "gain" : "loss",
+    });
+    dagEdges.push({ from: "trans-channel", to: secId, label: "Beta Spread" });
+
+    secAssets.slice(0, 2).forEach((a) => {
+      const assetId = `asset-${a.ticker}`;
+      dagNodes.push({
+        id: assetId,
+        label: a.ticker,
+        sublabel: `${a.shockImpactPct > 0 ? "+" : ""}${round(a.shockImpactPct, 1)}% (-$${Math.round(a.lossValueBase).toLocaleString()})`,
+        stage: "asset",
+        deltaPct: a.shockImpactPct,
+        deltaValueBase: a.lossValueBase,
+        tone: a.shockImpactPct >= 0 ? "gain" : "loss",
+      });
+      dagEdges.push({ from: secId, to: assetId });
+    });
+  });
+
   const data: StressTestData = {
     scenarioName: shockDescription,
     shockDescription: shockDescription,
@@ -815,7 +922,10 @@ export async function executeStressTest(
       targetTicker: worstAsset.ticker,
       protectionCoveragePct: 85,
       estCostBps: 42,
+      tenor: "45-day",
+      rationale: `Mitigates ${Math.abs(round(portfolioDrawdownPct, 1))}% tail drawdown by capping downside on ${worstAsset.ticker}.`,
     },
+    dag: { nodes: dagNodes, edges: dagEdges },
   };
 
   const spokenPunchline = `Under this scenario, your book draws down by ${Math.abs(data.portfolioDrawdownPct)}% (est. ${data.estimatedLossBase.toLocaleString()} base currency loss), with ${worstAsset.ticker} absorbing ${worstAsset.lossSharePct}% of the downside.`;
@@ -844,7 +954,7 @@ export async function executeStressTest(
   };
 }
 
-// ── 5. LLM Fallback Reasoning Chain ─────────────────────────────────────────
+// ── 5. LLM & Conceptual Quant Synthesis ────────────────────────────────────
 
 export async function executeLLMFallback(
   intent: LLMFallbackIntent,
@@ -852,9 +962,10 @@ export async function executeLLMFallback(
 ): Promise<SashaResult> {
   const t0 = performance.now();
   const query = intent.rawQuery;
+  const lower = query.toLowerCase();
   const receipts: SashaReceipt[] = [];
 
-  const { tickers, totalValue } = positionWeights(positions);
+  const { tickers, weights, totalValue } = positionWeights(positions);
 
   receipts.push({
     id: "qual-synth",
@@ -864,9 +975,28 @@ export async function executeLLMFallback(
     status: "success",
   });
 
-  const headline = "Quantitative Synthesis & Structural Review";
-  const summary = `Evaluated "${query}" across current portfolio holdings (${tickers.join(", ") || "General Book"}). Risk metrics indicate balanced factor exposure with primary volatility anchored to mega-cap equities.`;
-  const spokenPunchline = `Cross-referencing your portfolio against quantitative factors indicates resilient positioning with manageable tail exposure across active holdings.`;
+  let headline = "Quantitative Factor Review";
+  let summary = `Evaluated "${query}" across active holdings (${tickers.join(", ") || "General Book"}). Risk metrics indicate balanced factor exposure with primary volatility anchored to mega-cap equities.`;
+  let spokenPunchline = `Cross-referencing your portfolio against quantitative factors indicates resilient positioning with manageable tail exposure across active holdings.`;
+
+  if (/euler|marginal risk|risk contribution|risk attribution/i.test(lower)) {
+    headline = "Euler Marginal Risk Attribution";
+    summary = `Euler risk decomposition attributes total portfolio variance across individual holdings: PCR_i = (w_i * (Sigma * w)_i) / sigma_p^2. For your portfolio, risk is dominated by your highest-volatility positions.`;
+    spokenPunchline = `Euler risk decomposes portfolio volatility so the sum of marginal percentage contributions exactly equals 100% of book variance.`;
+  } else if (/ledoit|shrinkage|covariance/i.test(lower)) {
+    headline = "Ledoit–Wolf Covariance Shrinkage";
+    summary = `Ledoit–Wolf analytically calculates an optimal convex combination Sigma = delta* F + (1-delta*) S between the sample covariance and a constant-correlation target, eliminating inverted eigenvalue noise.`;
+    spokenPunchline = `Ledoit–Wolf shrinkage regularizes empirical asset covariance to prevent ill-conditioned matrix inversion in portfolio risk models.`;
+  } else if (/cointegration|engle|statarb|pairs|mean reversion/i.test(lower)) {
+    headline = "Engle–Granger Cointegration & Stat-Arb";
+    summary = `Tests stationarity of the linear spread S_t = P_A - beta * P_B using Augmented Dickey-Fuller unit-root statistics and Ornstein–Uhlenbeck mean-reversion drift half-life.`;
+    spokenPunchline = `Cointegration identifies mean-reverting stationary spreads between price series for statistical arbitrage execution.`;
+  } else if (/var|cvar|expected shortfall|tail risk/i.test(lower)) {
+    headline = "Value at Risk & Expected Shortfall";
+    summary = `1-day CVaR95 computes the conditional expectation of loss exceeding the 95th percentile Value-at-Risk threshold, capturing extreme tail distribution risk.`;
+    spokenPunchline = `Expected Shortfall measures average loss beyond the 95% threshold, giving a stricter tail assessment than conventional VaR.`;
+  }
+
   const phoneticSpokenText = toInstitutionalPhonetics(spokenPunchline);
 
   const data: GeneralQuantData = {
@@ -874,14 +1004,14 @@ export async function executeLLMFallback(
     summary,
     metrics: [
       { label: "Book Positions", value: tickers.length, tone: "neutral" },
-      { label: "Total Book Value", value: `$${totalValue.toLocaleString()}`, tone: "gain" },
+      { label: "Total Book Value", value: `$${Math.round(totalValue).toLocaleString()}`, tone: "gain" },
       { label: "Factor Exposure", value: "Multi-Asset Equities", tone: "neutral" },
-      { label: "Regime Alignment", value: "Expansion / High Vol", tone: "neutral" },
+      { label: "Regime Alignment", value: "Quantitative Verification", tone: "neutral" },
     ],
-    breakdown: tickers.slice(0, 4).map((t) => ({
+    breakdown: tickers.slice(0, 4).map((t, idx) => ({
       name: t,
-      sharePct: round(100 / Math.max(1, tickers.length), 1),
-      note: "Factor Active",
+      sharePct: round((weights[idx] || (1 / Math.max(1, tickers.length))) * 100, 1),
+      note: "Active Holding",
     })),
   };
 
