@@ -164,6 +164,40 @@ describe("SASHA Sub-100ms Heuristic Intent Router", () => {
       expect(intent3.ticker).toBe("NVDA");
     }
   });
+
+  it("routes single stock and equity fact sheet inquiries accurately", () => {
+    const intent1 = routeSashaIntent("What about JPM?");
+    expect(intent1.type).toBe("single_stock");
+    if (intent1.type === "single_stock") {
+      expect(intent1.ticker).toBe("JPM");
+      expect(intent1.benchmark).toBe("SPY");
+    }
+
+    const intent2 = routeSashaIntent("Analyze NVDA");
+    expect(intent2.type).toBe("single_stock");
+    if (intent2.type === "single_stock") {
+      expect(intent2.ticker).toBe("NVDA");
+    }
+
+    const intent3 = routeSashaIntent("Quote for GS");
+    expect(intent3.type).toBe("single_stock");
+    if (intent3.type === "single_stock") {
+      expect(intent3.ticker).toBe("GS");
+    }
+
+    const intent4 = routeSashaIntent("Tell me about Reliance");
+    expect(intent4.type).toBe("single_stock");
+    if (intent4.type === "single_stock") {
+      expect(intent4.ticker).toBe("RELIANCE.NS");
+      expect(intent4.benchmark).toBe("^NSEI");
+    }
+
+    const intent5 = routeSashaIntent("AAPL");
+    expect(intent5.type).toBe("single_stock");
+    if (intent5.type === "single_stock") {
+      expect(intent5.ticker).toBe("AAPL");
+    }
+  });
 });
 
 describe("SASHA Sector Classification & Ticker Directory", () => {
@@ -538,4 +572,167 @@ describe("SASHA Universal Tool Registry & DAG Orchestration Engine", () => {
     expect(Math.abs(data.portfolioDrawdownPct)).toBeGreaterThan(0);
     expect(data.worstHitAssets.length).toBeGreaterThan(0);
   }, 20000);
+
+  it("executes end-to-end orchestration pipeline for single stock quantitative fact sheet", async () => {
+    const { result, plan, trace } = await executeSashaOrchestration("What about JPM?", {
+      userId: "test_user",
+      executionId: "exec_5",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("single_stock");
+    expect(result.receipts.length).toBeGreaterThan(0);
+    expect(result.spokenPunchline).toBeDefined();
+    expect(result.phoneticSpokenText).toBeDefined();
+
+    const data = result.cardData as any;
+    expect(data.ticker).toBe("JPM");
+    expect(data.lastPrice).toBeGreaterThan(0);
+    expect(data.betaRegression).toBeDefined();
+    expect(data.betaRegression.beta).toBeGreaterThan(0);
+    expect(data.fundamentals).toBeDefined();
+    expect(data.fundamentals.peRatio).toBeGreaterThan(0);
+    expect(data.fundamentals.marketCapBln).toBeGreaterThan(0);
+  }, 20000);
+});
+
+describe("SASHA VENOR Institutional Invariants & Regression Suite", () => {
+  const samplePortfolio: PortfolioPosition[] = [
+    { id: "1", ticker: "NVDA", buyPrice: 120, quantity: 100, currentPrice: 130 },
+    { id: "2", ticker: "MSFT", buyPrice: 400, quantity: 50, currentPrice: 420 },
+    { id: "3", ticker: "JPM", buyPrice: 190, quantity: 80, currentPrice: 200 },
+  ];
+
+  it("enforces Euler Percentage Contribution to Risk sum invariant (sum(PCR_i) = 100% within numerical tolerance)", async () => {
+    const { result } = await executeSashaOrchestration("Analyze my portfolio risk", {
+      userId: "inst_user",
+      executionId: "exec_euler_inv",
+      positions: samplePortfolio,
+      portfolioValue: samplePortfolio.reduce((acc, p) => acc + (p.currentPrice || p.buyPrice) * p.quantity, 0),
+      timestamp: Date.now(),
+    });
+
+    const data = result.cardData as any;
+    expect(data.eulerRiskShares).toBeDefined();
+    expect(data.eulerRiskShares.length).toBe(samplePortfolio.length);
+
+    const sumPcr = data.eulerRiskShares.reduce((acc: number, item: any) => acc + item.eulerRiskSharePct, 0);
+    expect(Math.abs(sumPcr - 100.0)).toBeLessThan(0.1);
+  });
+
+  it("enforces cryptographic execution provenance on all quantitative metrics", async () => {
+    const { result } = await executeSashaOrchestration("Compare NVDA vs AMD", {
+      userId: "inst_user",
+      executionId: "exec_prov_inv",
+      positions: samplePortfolio,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.receipts).toBeDefined();
+    expect(result.receipts.length).toBeGreaterThan(0);
+    result.receipts.forEach((r) => {
+      expect(r.id).toBeDefined();
+      expect(r.label).toBeDefined();
+      expect(r.elapsedMs).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  it("enforces zero fabrication of accounting multiples for unlisted assets", async () => {
+    const unlisted = await toolRegistry.get("fundamentals.fetch_metrics")?.execute({ ticker: "UNKNOWN_XYZ_99" }, {
+      userId: "test",
+      executionId: "exec_unlisted",
+      positions: [],
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(unlisted?.dataAvailable).toBe(false);
+    expect(unlisted?.peRatio).toBe(0);
+    expect(unlisted?.marketCapBln).toBe(0);
+  });
+
+  it("enforces calculated linear beta hedging notional without hardcoded option percentages", async () => {
+    const portfolioTotalVal = samplePortfolio.reduce((acc, p) => acc + (p.currentPrice || p.buyPrice) * p.quantity, 0);
+    const stressResult = await toolRegistry.get("stress.run_scenario_test")?.execute({
+      scenarioName: "Oil Spike Shock",
+      marketShockPct: -5,
+      commodityShockPct: { commodity: "oil", shockPct: 15 },
+      interestRateShockBps: 50,
+      positions: samplePortfolio.map((p) => ({
+        ticker: p.ticker,
+        value: (p.currentPrice || p.buyPrice) * p.quantity,
+        beta: 1.1,
+        sector: "tech",
+      })),
+    }, {
+      userId: "test",
+      executionId: "exec_hedge",
+      positions: samplePortfolio,
+      portfolioValue: portfolioTotalVal,
+      timestamp: Date.now(),
+    });
+
+    expect(stressResult?.recommendedHedge).toBeDefined();
+    expect(stressResult?.recommendedHedge.requiredHedgeNotional).toBeGreaterThan(0);
+    expect(stressResult?.recommendedHedge.hedgeRatio).toBeGreaterThan(0);
+    // Calculated notional = beta * portfolioValue
+    const expectedNotional = Math.round(stressResult!.recommendedHedge.hedgeRatio * portfolioTotalVal);
+    expect(stressResult?.recommendedHedge.requiredHedgeNotional).toBe(expectedNotional);
+  });
+
+  it("transitions through 9-stage deterministic state machine correctly during orchestration", async () => {
+    const observedStates: string[] = [];
+    await executeSashaOrchestration(
+      "Compare JPM vs BAC",
+      {
+        userId: "test",
+        executionId: "exec_states",
+        positions: samplePortfolio,
+        portfolioValue: 100000,
+        timestamp: Date.now(),
+      },
+      (state) => {
+        observedStates.push(state);
+      }
+    );
+
+    expect(observedStates).toContain("UNDERSTANDING");
+    expect(observedStates).toContain("PLANNING");
+    expect(observedStates).toContain("EXECUTING");
+    expect(observedStates).toContain("VERIFYING");
+    expect(observedStates).toContain("RESPONDING");
+  });
+
+  it("routes conversational navigation intents and orchestrates viewport transitions", async () => {
+    const navRisk = routeSashaIntent("Take me to Risk Lab");
+    expect(navRisk.type).toBe("navigation");
+    if (navRisk.type === "navigation") {
+      expect(navRisk.target).toBe("tab");
+      expect(navRisk.tabId).toBe("risk");
+    }
+
+    const navWorkstation = routeSashaIntent("Open NVDA workstation");
+    expect(navWorkstation.type).toBe("navigation");
+    if (navWorkstation.type === "navigation") {
+      expect(navWorkstation.target).toBe("workstation");
+      expect(navWorkstation.ticker).toBe("NVDA");
+    }
+
+    const { result } = await executeSashaOrchestration("Take me to Risk Lab", {
+      userId: "test",
+      executionId: "exec_nav",
+      positions: samplePortfolio,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("navigation");
+    expect(result.spokenPunchline).toContain("Risk");
+    const navData = result.cardData as any;
+    expect(navData.destinationLabel).toBe("Risk");
+    expect(navData.quickLinks.length).toBeGreaterThan(0);
+  });
 });

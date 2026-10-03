@@ -21,6 +21,7 @@ import type {
   SashaContextValue,
   SashaResult,
   SashaVoiceState,
+  SashaExecutionState,
   SashaMessage,
 } from "./types";
 import { executeSashaOrchestration } from "./orchestration";
@@ -62,6 +63,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   const onOpenWorkstationRef = useRef(onOpenWorkstation);
   onOpenWorkstationRef.current = onOpenWorkstation;
 
+  const [executionState, setExecutionState] = useState<SashaExecutionState>("IDLE");
   const [voiceState, setVoiceState] = useState<SashaVoiceState>("idle");
   const [isWakeWordActive, setWakeWordActiveState] = useState(false);
   const [isVoiceMuted, setVoiceMutedState] = useState(false);
@@ -70,7 +72,9 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   const [history, setHistory] = useState<SashaResult[]>([]);
   const [messages, setMessages] = useState<SashaMessage[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [queryInput, setQueryInput] = useState("");
+  const [activeContextTicker, setActiveContextTicker] = useState<string | null>(null);
 
   const speechControllerRef = useRef<SashaSpeechController | null>(null);
 
@@ -93,6 +97,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
           handleExecuteQuery(remainder.trim());
         } else {
           setVoiceState("listening");
+          setExecutionState("LISTENING");
         }
       },
       onFinalTranscript: (transcript) => {
@@ -103,15 +108,24 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
       },
       onInterimTranscript: (interim) => {
         setQueryInput(interim);
+        setExecutionState("TRANSCRIBING");
       },
       onListeningChange: (listening) => {
         setVoiceState((prev) => {
-          if (listening) return "listening";
-          return prev === "listening" ? "idle" : prev;
+          if (listening) {
+            setExecutionState("LISTENING");
+            return "listening";
+          }
+          if (prev === "listening") {
+            setExecutionState("IDLE");
+            return "idle";
+          }
+          return prev;
         });
       },
       onError: () => {
         setVoiceState("idle");
+        setExecutionState("IDLE");
       },
     });
 
@@ -143,9 +157,11 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
         if (voiceState === "listening") {
           speechControllerRef.current?.stopContinuousListening();
           setVoiceState("idle");
+          setExecutionState("IDLE");
         } else {
           speechControllerRef.current?.triggerExplicitListening();
           setVoiceState("listening");
+          setExecutionState("LISTENING");
         }
       }
 
@@ -154,6 +170,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
         if (voiceState === "speaking") {
           stopSpeaking();
           setVoiceState("idle");
+          setExecutionState("IDLE");
         } else if (isOpen) {
           setIsOpen(false);
         }
@@ -173,6 +190,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
       }
 
       setVoiceState("processing");
+      setExecutionState("UNDERSTANDING");
       stopSpeaking();
 
       // Add user message to conversation thread
@@ -191,15 +209,22 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
 
       let result: SashaResult;
       try {
-        const orchestration = await executeSashaOrchestration(trimmed, {
-          userId: "current_user",
-          executionId: `exec_${Date.now()}`,
-          positions,
-          portfolioValue: positions.reduce((acc, p) => acc + (p.currentPrice || p.buyPrice || 100) * (p.quantity || 1), 0) || 100000,
-          timestamp: Date.now(),
-        });
+        const orchestration = await executeSashaOrchestration(
+          trimmed,
+          {
+            userId: "current_user",
+            executionId: `exec_${Date.now()}`,
+            positions,
+            portfolioValue: positions.reduce((acc, p) => acc + (p.currentPrice || p.buyPrice || 100) * (p.quantity || 1), 0) || 100000,
+            timestamp: Date.now(),
+          },
+          (state) => {
+            setExecutionState(state);
+          }
+        );
         result = orchestration.result;
       } catch (err: any) {
+        setExecutionState("ERROR");
         result = {
           id: crypto.randomUUID(),
           intent: { type: "llm_fallback", rawQuery: trimmed },
@@ -238,14 +263,29 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
       setActiveResult(result);
       setHistory((prev) => [result, ...prev.slice(0, 30)]);
       setIsOpen(true);
+      setIsMinimized(false);
       setQueryInput("");
+
+      // Ambient Auto-Navigation Trigger for VIP experience
+      if (result.intent.type === "navigation") {
+        if (result.intent.target === "workstation" && result.intent.ticker) {
+          setActiveContextTicker(result.intent.ticker);
+          onOpenWorkstationRef.current?.(result.intent.ticker);
+        } else if (result.intent.target === "tab" && result.intent.tabId) {
+          onNavigateTabRef.current?.(result.intent.tabId);
+        }
+      } else if (result.intent.type === "single_stock") {
+        setActiveContextTicker(result.intent.ticker);
+      }
 
       // Speak punchline with institutional phonetics
       setVoiceState("speaking");
+      setExecutionState("RESPONDING");
       speakPunchline(
         result.spokenPunchline,
         () => {
           setVoiceState("idle");
+          setExecutionState("IDLE");
         },
         result.phoneticSpokenText,
       );
@@ -255,17 +295,33 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     []
   );
 
-  const handleAction = useCallback((actionType: "risk_lab" | "workstation" | "fortress" | "screener", payload?: any) => {
+  const handleAction = useCallback((actionType: "risk_lab" | "workstation" | "screener" | "tab", payload?: any) => {
     if (actionType === "risk_lab") {
       onNavigateTabRef.current?.("risk");
     } else if (actionType === "workstation" && payload?.ticker) {
+      setActiveContextTicker(payload.ticker);
       onOpenWorkstationRef.current?.(payload.ticker);
-    } else if (actionType === "fortress") {
-      onNavigateTabRef.current?.("fortress");
     } else if (actionType === "screener") {
       onNavigateTabRef.current?.("desirable");
+    } else if (actionType === "tab" && payload?.tabId) {
+      onNavigateTabRef.current?.(payload.tabId);
     }
   }, []);
+
+  const navigateTo = useCallback(
+    (
+      destination: "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system",
+      ticker?: string
+    ) => {
+      if (ticker) {
+        setActiveContextTicker(ticker);
+        onOpenWorkstationRef.current?.(ticker);
+      } else if (destination) {
+        onNavigateTabRef.current?.(destination);
+      }
+    },
+    []
+  );
 
   const setWakeWordActive = useCallback((enabled: boolean) => {
     setWakeWordActiveState(enabled);
@@ -283,17 +339,20 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   const startListening = useCallback(() => {
     speechControllerRef.current?.triggerExplicitListening();
     setVoiceState("listening");
+    setExecutionState("LISTENING");
     setIsOpen(true);
   }, []);
 
   const stopListening = useCallback(() => {
     speechControllerRef.current?.stopContinuousListening();
     setVoiceState("idle");
+    setExecutionState("IDLE");
   }, []);
 
   const cancelSpeech = useCallback(() => {
     stopSpeaking();
     setVoiceState("idle");
+    setExecutionState("IDLE");
   }, []);
 
   const clearHistory = useCallback(() => {
@@ -303,6 +362,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   }, []);
 
   const value: SashaContextValue = {
+    executionState,
     voiceState,
     isListening: voiceState === "listening",
     isSpeaking: voiceState === "speaking",
@@ -313,9 +373,12 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     history,
     messages,
     isOpen,
+    isMinimized,
     queryInput,
+    activeContextTicker,
     setQueryInput,
     setIsOpen,
+    setIsMinimized,
     setWakeWordActive,
     setVoiceMuted,
     startListening,
@@ -324,6 +387,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     cancelSpeech,
     clearHistory,
     handleAction,
+    navigateTo,
   };
 
   return (

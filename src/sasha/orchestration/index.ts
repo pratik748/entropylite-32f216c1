@@ -8,7 +8,7 @@ import { sashaPlanner } from "./planner";
 import { sashaExecutor } from "./executor";
 import { sashaSynthesizer } from "./synthesizer";
 import type { ToolExecutionContext } from "../tools/types";
-import type { SashaResult } from "../types";
+import type { SashaResult, SashaExecutionState } from "../types";
 import type { ExecutionPlan, ExecutionTrace } from "./types";
 
 export interface OrchestrationResult {
@@ -19,7 +19,8 @@ export interface OrchestrationResult {
 
 export async function executeSashaOrchestration(
   query: string,
-  ctx?: ToolExecutionContext
+  ctx?: ToolExecutionContext,
+  onStateChange?: (state: SashaExecutionState) => void
 ): Promise<OrchestrationResult> {
   const executionContext: ToolExecutionContext = {
     userId: ctx?.userId || "user_default",
@@ -30,16 +31,21 @@ export async function executeSashaOrchestration(
     timestamp: Date.now(),
   };
 
+  onStateChange?.("UNDERSTANDING");
+
   // 1. Intelligent Planning (DAG construction & validation)
+  onStateChange?.("PLANNING");
   const plan = await sashaPlanner.createPlan(query, executionContext);
 
   // 2. Autonomous Execution (topological resolution & parallel execution)
+  onStateChange?.("EXECUTING");
   const { trace, resultsByNodeId, provenances } = await sashaExecutor.executePlan(
     plan,
     executionContext
   );
 
-  // 3. Evidence-grounded Synthesis & Provenance Assembly
+  // 3. Evidence-grounded Synthesis & Provenance Verification
+  onStateChange?.("VERIFYING");
   const result = sashaSynthesizer.synthesize(
     plan,
     trace,
@@ -47,6 +53,8 @@ export async function executeSashaOrchestration(
     provenances,
     executionContext
   );
+
+  onStateChange?.("RESPONDING");
 
   return {
     result,

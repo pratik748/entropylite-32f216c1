@@ -1,11 +1,12 @@
 /**
  * SASHA Portfolio Context & Allocation Tools
+ * VENOR Architecture — Position Aggregation & Concentration Analysis
  */
 
 import { round } from "@/foresight/tools/dataHub";
 import { getAssetSector } from "../../quantEngine";
 import type { SashaTool, ToolExecutionContext } from "../types";
-import type { ClankConstraintFlag } from "../../types";
+import type { QuantitativeConstraintViolation } from "../../types";
 
 export const getPositionsTool: SashaTool<
   { sectorFilter?: string; minWeightPct?: number },
@@ -28,16 +29,7 @@ export const getPositionsTool: SashaTool<
   dependencies: [],
   permission: "read",
   async execute(input, ctx) {
-    let raw = ctx.positions || [];
-    if (raw.length === 0) {
-      // Dynamic proxy benchmark portfolio if user has no positions loaded
-      raw = [
-        { id: "1", ticker: "NVDA", buyPrice: 120, quantity: 50, currentPrice: 128 },
-        { id: "2", ticker: "AAPL", buyPrice: 220, quantity: 30, currentPrice: 228 },
-        { id: "3", ticker: "MSFT", buyPrice: 410, quantity: 20, currentPrice: 425 },
-        { id: "4", ticker: "GOOGL", buyPrice: 160, quantity: 40, currentPrice: 168 },
-      ];
-    }
+    const raw = ctx.positions || [];
 
     let positionsWithVals = raw.map((p) => {
       const px = p.currentPrice || p.buyPrice || 100;
@@ -64,7 +56,7 @@ export const getPositionsTool: SashaTool<
 
     const totalValue = positionsWithVals.reduce((acc, p) => acc + p.value, 0);
     positionsWithVals.forEach((p) => {
-      p.weightPct = totalValue > 0 ? round((p.value / totalValue) * 100, 2) : round(100 / positionsWithVals.length, 2);
+      p.weightPct = totalValue > 0 ? round((p.value / totalValue) * 100, 2) : 0;
     });
 
     return {
@@ -75,7 +67,9 @@ export const getPositionsTool: SashaTool<
   },
   interpretOutput(output, input, ctx) {
     return {
-      summary: `Portfolio book contains ${output.count} positions with total value of $${output.totalValue.toLocaleString()}.`,
+      summary: output.count > 0
+        ? `Portfolio book contains ${output.count} positions with total value of $${output.totalValue.toLocaleString()}.`
+        : "Portfolio book has 0 active positions loaded.",
       primaryMetrics: [
         { label: "Positions", value: output.count },
         { label: "Total Value", value: `$${output.totalValue.toLocaleString()}` },
@@ -85,7 +79,7 @@ export const getPositionsTool: SashaTool<
         executionId: ctx.executionId,
         timestamp: Date.now(),
         sourceType: "retrieved_fact",
-        primaryDataSource: "EntropyLite Cloud Portfolio & Host Context",
+        primaryDataSource: "EntropyLite Verified Host Portfolio State",
         modelOrMethod: "Realized Position Aggregation",
         assumptions: [],
         computationTimeMs: 2,
@@ -99,15 +93,15 @@ export const getSectorAllocationTool: SashaTool<
   Record<string, never>,
   {
     sectorBreakdown: Array<{ sector: string; value: number; weightPct: number; tickers: string[] }>;
-    clankConstraints: ClankConstraintFlag[];
+    clankConstraints: QuantitativeConstraintViolation[];
     herfindahlIndex: number;
   }
 > = {
   id: "portfolio.get_sector_allocation",
-  name: "Calculate Sector Allocation & CLANK Liquidity Constraints",
-  description: "Aggregates portfolio positions by industry sector, computes the Herfindahl-Hirschman concentration index (HHI), and flags CLANK structural liquidity constraints.",
+  name: "Calculate Sector Allocation & Concentration Constraints",
+  description: "Aggregates portfolio positions by industry sector, computes the Herfindahl-Hirschman concentration index (HHI), and flags structural risk constraints.",
   category: "portfolio",
-  keywords: ["sector", "allocation", "concentration", "clank", "hhi", "liquidity"],
+  keywords: ["sector", "allocation", "concentration", "hhi", "liquidity", "constraints"],
   parameters: {},
   requiredData: ["portfolio_state"],
   dependencies: ["portfolio.get_positions"],
@@ -116,6 +110,14 @@ export const getSectorAllocationTool: SashaTool<
     const posRes = await getPositionsTool.execute({}, ctx);
     const positions = posRes.positions;
     const totalVal = posRes.totalValue;
+
+    if (positions.length === 0 || totalVal === 0) {
+      return {
+        sectorBreakdown: [],
+        clankConstraints: [],
+        herfindahlIndex: 0,
+      };
+    }
 
     const sectorMap = new Map<string, { value: number; tickers: string[] }>();
     positions.forEach((p) => {
@@ -142,11 +144,11 @@ export const getSectorAllocationTool: SashaTool<
 
     breakdown.sort((a, b) => b.weightPct - a.weightPct);
 
-    // Check CLANK structural constraints
-    const clankConstraints: ClankConstraintFlag[] = [];
+    // Check institutional quantitative risk constraints
+    const clankConstraints: QuantitativeConstraintViolation[] = [];
     if (breakdown[0] && breakdown[0].weightPct > 45) {
       clankConstraints.push({
-        id: "clank-sector-concentration",
+        id: "sector-concentration-clamp",
         label: "Sector Concentration Clamp",
         severity: "high",
         detail: `${breakdown[0].sector} allocation exceeds institutional 45% concentration ceiling.`,
@@ -156,7 +158,7 @@ export const getSectorAllocationTool: SashaTool<
 
     if (hhi > 0.35) {
       clankConstraints.push({
-        id: "clank-hhi-risk",
+        id: "hhi-risk-alert",
         label: "Herfindahl Concentration Alert",
         severity: "medium",
         detail: "Portfolio concentration index indicates high idiosyncratic single-sector vulnerability.",
@@ -173,12 +175,14 @@ export const getSectorAllocationTool: SashaTool<
   interpretOutput(output, input, ctx) {
     const top = output.sectorBreakdown[0];
     return {
-      summary: `Top sector is ${top ? `${top.sector} (${top.weightPct}%)` : "Equities"}. Herfindahl Index is ${output.herfindahlIndex} with ${output.clankConstraints.length} active CLANK constraints.`,
+      summary: top
+        ? `Top sector is ${top.sector} (${top.weightPct}%). Herfindahl Index is ${output.herfindahlIndex} with ${output.clankConstraints.length} active risk constraints.`
+        : "Portfolio has no sector allocations (zero active positions).",
       primaryMetrics: [
-        { label: "Top Sector", value: top ? top.sector : "N/A" },
+        { label: "Top Sector", value: top ? top.sector : "None" },
         { label: "Top Weight", value: top ? `${top.weightPct}%` : "0%" },
         { label: "HHI Index", value: output.herfindahlIndex },
-        { label: "CLANK Flags", value: output.clankConstraints.length },
+        { label: "Risk Constraints", value: output.clankConstraints.length },
       ],
       chartHint: "table",
       provenance: {
@@ -187,7 +191,7 @@ export const getSectorAllocationTool: SashaTool<
         timestamp: Date.now(),
         sourceType: "calculated_metric",
         primaryDataSource: "Portfolio Sector Holdings",
-        modelOrMethod: "Herfindahl-Hirschman Index & CLANK Liquidity Clamp",
+        modelOrMethod: "Herfindahl-Hirschman Concentration Index & Threshold Clamping",
         assumptions: [],
         computationTimeMs: 5,
       },

@@ -10,10 +10,12 @@ import { normalizeUserTicker } from "@/lib/ticker";
 import { SYMBOL_DIRECTORY } from "@/lib/symbolDirectory";
 import type {
   SashaParsedIntent,
+  SingleStockIntent,
   SubsetRiskIntent,
   StockComparisonIntent,
   NewsImpactIntent,
   StressTestIntent,
+  NavigationIntent,
   LLMFallbackIntent,
 } from "./types";
 
@@ -34,6 +36,9 @@ const STOP_WORDS = new Set([
   "WHAT", "IS", "ARE", "AND", "OR", "TO", "THE", "IN", "ON", "AT", "BY", "FOR", "WITH",
   "OF", "MY", "OUR", "THIS", "THAT", "AN", "A", "NEWS", "MOVING", "HEADWIND", "HEADWINDS",
   "STRESS", "TEST", "COMPARE", "VERSUS", "PAIRS", "TRADE", "RISK", "ANALYZE", "ANALYSIS",
+  "LEDOIT", "WOLF", "EULER", "SHRINKAGE", "PORTFOLIO", "HOLDINGS", "SUBSET", "SHARPE",
+  "VAR", "CVAR", "EXPLAIN", "TELL", "HOW", "WHY", "DOES", "WORK", "THEORY", "FORMULA",
+  "CALCULATE", "COMPUTE", "OVERALL", "ENTIRE", "BOOK", "ALLOCATION", "FACT", "FACTS",
 ]);
 
 /** Match words to canonical sector */
@@ -50,8 +55,9 @@ export function matchSectorFromText(text: string): string | null {
 
 /** Resolve symbol or company alias to canonical ticker */
 export function resolveSymbolCandidate(word: string): string | null {
-  const clean = word.replace(/[^a-zA-Z0-9^.=-]/g, "").trim().toUpperCase();
-  if (!clean || clean.length < 2 || STOP_WORDS.has(clean)) return null;
+  const trimmed = word.trim();
+  const clean = trimmed.replace(/[^a-zA-Z0-9^.=-]/g, "").trim().toUpperCase();
+  if (!clean || clean.length < 1 || STOP_WORDS.has(clean)) return null;
 
   // Direct match in symbol directory
   const direct = SYMBOL_DIRECTORY.find(
@@ -60,7 +66,7 @@ export function resolveSymbolCandidate(word: string): string | null {
   if (direct) return direct.ticker;
 
   // Exact alias / name match in symbol directory
-  const lowerWord = word.toLowerCase().trim();
+  const lowerWord = trimmed.toLowerCase();
   const exactAlias = SYMBOL_DIRECTORY.find(
     (s) => s.aliases?.some((a) => a.toLowerCase() === lowerWord) || s.name.toLowerCase() === lowerWord
   );
@@ -70,7 +76,7 @@ export function resolveSymbolCandidate(word: string): string | null {
   const normalized = normalizeUserTicker(clean);
   if (normalized && normalized !== clean) return normalized;
 
-  // Alias / Name partial match (only for words >= 3 chars to avoid matching 'is' or 'to')
+  // Alias / Name partial match (only for words >= 3 chars)
   if (lowerWord.length >= 3) {
     const aliasHit = SYMBOL_DIRECTORY.find((s) => {
       if (s.name.toLowerCase() === lowerWord) return true;
@@ -80,10 +86,74 @@ export function resolveSymbolCandidate(word: string): string | null {
     if (aliasHit) return aliasHit.ticker;
   }
 
-  if (normalized) return normalized;
-  if (/^[A-Z0-9^.-]{2,12}$/.test(clean) && !STOP_WORDS.has(clean)) {
+  // Pure single-ticker syntax: 1-5 alphabetic chars (e.g. AAPL, NVDA, GS, JPM)
+  if (/^[A-Z]{1,5}$/.test(clean) && !STOP_WORDS.has(clean)) {
     return clean;
   }
+
+  // Tickers with standard financial suffixes/prefixes (e.g. ^NSEI, BTC-USD, EURUSD=X, RELIANCE.NS)
+  if (/^(\^[A-Z0-9]{3,8}|[A-Z0-9]{2,10}-[A-Z0-9]{2,5}|[A-Z0-9]{3,8}=X|[A-Z0-9]{2,12}\.(?:NS|BO|L|TO|PA|DE))$/.test(clean) && !STOP_WORDS.has(clean)) {
+    return clean;
+  }
+
+  return null;
+}
+
+/**
+ * Extract a single stock candidate ticker from natural language query.
+ */
+export function extractSingleStockCandidate(query: string): string | null {
+  const clean = query.trim().replace(/[?!.,;]+$/, "");
+  const lower = clean.toLowerCase();
+
+  // If query is an explicit portfolio/risk/theory query, don't treat as single stock
+  if (/\b(my portfolio|our portfolio|my book|my holdings|our holdings|whole book|overall portfolio|entire portfolio|subset risk|ledoit|euler|shrinkage|covariance|sharpe|var|cvar)\b/i.test(lower)) {
+    return null;
+  }
+
+  // 1. Direct single-token or ticker check (e.g. "NVDA", "JPM", "Goldman Sachs", "AAPL")
+  const tokens = clean.split(/\s+/);
+  if (tokens.length <= 2) {
+    const direct = resolveSymbolCandidate(clean);
+    if (direct) return direct;
+  }
+
+  // 2. Targeted phrases (e.g. "what about JPM", "how is NVDA doing", "analyze AAPL", "quote for GS", "tell me about TSLA", "valuation of MSFT")
+  const targetedPatterns = [
+    /(?:what about|how is|how's|analyze|analysis (?:of|on)|tell me about|look at|check|quote(?: for)?|metrics (?:for|of)|valuation (?:for|of)|beta (?:of|for)|fundamentals (?:for|of)|performance (?:of|for)|view on|opinion on|deep dive on)\s+([A-Za-z0-9^.=-]+(?:\s+[A-Za-z0-9^.=-]+)?)/i,
+    /([A-Za-z0-9^.=-]+(?:\s+[A-Za-z0-9^.=-]+)?)\s+(?:stock|equity|ticker|valuation|metrics|beta|fundamentals|earnings|shares|performance|overview|deep dive|fact sheet)/i,
+    /(?:is|about|on)\s+([A-Za-z0-9^.=-]+)\s+(?:a buy|a sell|bullish|bearish|good|overvalued|undervalued)/i,
+  ];
+
+  for (const pat of targetedPatterns) {
+    const match = clean.match(pat);
+    if (match && match[1]) {
+      const candidate = resolveSymbolCandidate(match[1].trim());
+      if (candidate && !STOP_WORDS.has(candidate)) {
+        // Ensure it's not just a generic sector word unless it's a known ticker
+        if (!matchSectorFromText(match[1]) || candidate.includes(".")) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  // 3. Scan words for a strong ticker match in SYMBOL_DIRECTORY or uppercase ticker
+  for (const w of tokens) {
+    const candidate = resolveSymbolCandidate(w);
+    if (candidate && !STOP_WORDS.has(candidate)) {
+      // Ensure it's not just a generic sector word
+      if (!matchSectorFromText(w) || w.toUpperCase() === candidate) {
+        const inDir = SYMBOL_DIRECTORY.some(
+          (s) => s.ticker === candidate || s.name.toLowerCase() === w.toLowerCase() || s.aliases?.includes(w.toLowerCase())
+        );
+        if (inDir || (w === w.toUpperCase() && /^[A-Z]{1,5}$/.test(w))) {
+          return candidate;
+        }
+      }
+    }
+  }
+
   return null;
 }
 
@@ -93,6 +163,72 @@ export function resolveSymbolCandidate(word: string): string | null {
 export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
   const query = rawQuery.trim();
   const lower = query.toLowerCase();
+
+  // ── 0. Navigation & Ambient Workspace Actions ────────────────────────────
+  // Patterns: "take me to risk", "navigate to market", "open NVDA workstation", "go to sandbox", "show statarb", "switch tab to geopolitical"
+  const isExplicitNav = /\b(take me to|navigate to|go to|open|switch to|show me the|jump to)\b/i.test(lower) ||
+    /\b(tab|page|workstation|lab|terminal for)\b/i.test(lower);
+
+  if (isExplicitNav && !/\b(what happens|simulate|stress test|correlation|pairs trade|compare|euler risk|shrinkage)\b/i.test(lower)) {
+    // Check if targeting a specific company workstation
+    const workstationTickerMatch =
+      query.match(/\b(?:workstation|company page|stock page|terminal for|page for)\s+([A-Za-z0-9^.=-]+)/i) ||
+      query.match(/\b(?:take me to|navigate to|go to|open)\s+([A-Za-z0-9^.=-]+)\s+(?:workstation|terminal|page)/i);
+
+    if (workstationTickerMatch && workstationTickerMatch[1]) {
+      const cand = resolveSymbolCandidate(workstationTickerMatch[1]);
+      if (cand) {
+        return {
+          type: "navigation",
+          rawQuery: query,
+          target: "workstation",
+          ticker: cand,
+          destinationLabel: `${cand} Workstation`,
+        };
+      }
+    }
+
+    // Check if targeting a specific tab
+    const tabMap: Record<string, "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system"> = {
+      "risk lab": "risk",
+      "risk engine": "risk",
+      risk: "risk",
+      "market overview": "market",
+      market: "market",
+      markets: "market",
+      screener: "market",
+      sandbox: "sandbox",
+      crucible: "sandbox",
+      simulation: "sandbox",
+      "stat-arb": "statarb",
+      "stat arb": "statarb",
+      statarb: "statarb",
+      augment: "augment",
+      copilot: "augment",
+      geopolitical: "geopolitical",
+      chokepoints: "geopolitical",
+      desirable: "desirable",
+      alpha: "desirable",
+      dashboard: "dashboard",
+      home: "dashboard",
+      fortress: "fortress",
+      system: "system",
+      settings: "system",
+    };
+
+    for (const [key, tabId] of Object.entries(tabMap)) {
+      const regex = new RegExp(`\\b${key}\\b`, "i");
+      if (regex.test(lower)) {
+        return {
+          type: "navigation",
+          rawQuery: query,
+          target: "tab",
+          tabId,
+          destinationLabel: tabId.charAt(0).toUpperCase() + tabId.slice(1),
+        };
+      }
+    }
+  }
 
   // ── 1. Stock Comparison & Pairs Trading ─────────────────────────────────
   // Specific pairs trade regex
@@ -257,7 +393,20 @@ export function routeSashaIntent(rawQuery: string): SashaParsedIntent {
     };
   }
 
-  // ── 5. LLM Fallback (General quantitative concepts & questions) ──────────
+  // ── 5. Single Stock Inquiries (e.g. "what about JPM", "how is NVDA", "JPM", "analyze Goldman Sachs")
+  const singleTicker = extractSingleStockCandidate(query);
+  if (singleTicker) {
+    const isIndia = singleTicker.endsWith(".NS") || singleTicker.endsWith(".BO");
+    return {
+      type: "single_stock",
+      rawQuery: query,
+      ticker: singleTicker,
+      benchmark: isIndia ? "^NSEI" : "SPY",
+      range: "6mo",
+    };
+  }
+
+  // ── 6. LLM Fallback (General quantitative concepts & questions) ──────────
   return {
     type: "llm_fallback",
     rawQuery: query,
