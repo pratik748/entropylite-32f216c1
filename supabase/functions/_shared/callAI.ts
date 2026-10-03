@@ -604,6 +604,9 @@ export function detectProvider(name: string, value: string, hint?: string | null
   return inferProvider(value);
 }
 
+const probedProvider = new Map<string, string>();
+const PROBE_ORDER = ["mistral", "openai", "groq", "openrouter", "gemini", "anthropic", "nvidia", "deepseek", "xai", "together"];
+
 function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
   const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
   switch (provider) {
@@ -620,6 +623,40 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
       return mk((o) => callOpenAICompatible(o, key, `https://api.cloudflare.com/client/v4/accounts/${acct}/ai/v1/chat/completions`, ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct"], reported));
     }
     case "1minai": return getKeySync("ONEMIN_AI_ENABLED") === "1" ? mk((o) => callOneMinAI(o, reported)) : null;
+    case "deepseek": return mk((o) => callOpenAICompatible(o, key, "https://api.deepseek.com/chat/completions", ["deepseek-chat"], reported));
+    case "xai": return mk((o) => callOpenAICompatible(o, key, "https://api.x.ai/v1/chat/completions", ["grok-3-mini", "grok-2-latest"], reported));
+    case "together": return mk((o) => callOpenAICompatible(o, key, "https://api.together.xyz/v1/chat/completions", ["meta-llama/Llama-3.3-70B-Instruct-Turbo"], reported));
+    case "auto": {
+      // Unrecognised key shape: probe each provider once, then pin the one that accepts it.
+      const cacheKey = `${name}:${key.length}:${key.slice(-4)}`;
+      return {
+        name, provider: probedProvider.get(cacheKey) || "auto", source,
+        call: async (o) => {
+          const pinned = probedProvider.get(cacheKey);
+          const order = pinned ? [pinned] : PROBE_ORDER;
+          let lastErr: unknown = null;
+          for (const p of order) {
+            const l = laneFor(name, p, key, source, reported);
+            if (!l) continue;
+            try {
+              const r = await l.call(o);
+              probedProvider.set(cacheKey, p);
+              return r;
+            } catch (e) {
+              lastErr = e;
+              const msg = e instanceof Error ? e.message : String(e);
+              // Auth rejection means wrong provider, keep probing. Anything else means
+              // the provider accepted the key (rate limit, model, quota), so pin it.
+              if (!/\b(401|403)\b|unauthor|invalid.*(api|key)|authentication|incorrect api key|user not found/i.test(msg)) {
+                probedProvider.set(cacheKey, p);
+                throw e;
+              }
+            }
+          }
+          throw lastErr instanceof Error ? lastErr : new Error("Key was rejected by every supported provider");
+        },
+      };
+    }
     default: return null;
   }
 }
