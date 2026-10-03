@@ -691,6 +691,167 @@ export function stressTest(
   return { portfolioImpact, assetImpacts };
 }
 
+// ─── 8b. Cointegration & Ornstein–Uhlenbeck ──────────────────────────
+
+export interface CointegrationResult {
+  cointegrated: boolean;
+  tStat: number;
+  pValue: number;
+  hedgeRatio: number;
+  alpha: number;
+  crit1Pct: number;
+  crit5Pct: number;
+  crit10Pct: number;
+  residuals: number[];
+}
+
+/**
+ * Engle-Granger two-step cointegration test with Augmented Dickey-Fuller (ADF).
+ */
+export function cointegrationEG(pricesA: number[], pricesB: number[]): CointegrationResult {
+  const n = Math.min(pricesA.length, pricesB.length);
+  if (n < 10) {
+    return {
+      cointegrated: false,
+      tStat: 0,
+      pValue: 1.0,
+      hedgeRatio: 1.0,
+      alpha: 0,
+      crit1Pct: -3.90,
+      crit5Pct: -3.34,
+      crit10Pct: -3.04,
+      residuals: [],
+    };
+  }
+
+  const y = pricesA.slice(-n);
+  const x = pricesB.slice(-n);
+
+  // Step 1: OLS y = alpha + beta * x
+  const meanX = mean(x);
+  const meanY = mean(y);
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (x[i] - meanX) * (y[i] - meanY);
+    den += (x[i] - meanX) ** 2;
+  }
+  const hedgeRatio = den > 0 ? num / den : 1.0;
+  const alpha = meanY - hedgeRatio * meanX;
+
+  const residuals: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    residuals[i] = y[i] - (alpha + hedgeRatio * x[i]);
+  }
+
+  // Step 2: ADF on residuals: Delta e_t = gamma * e_{t-1} + u_t
+  const deltaE: number[] = [];
+  const lagE: number[] = [];
+  for (let t = 1; t < n; t++) {
+    deltaE.push(residuals[t] - residuals[t - 1]);
+    lagE.push(residuals[t - 1]);
+  }
+
+  const mDelta = mean(deltaE);
+  const mLag = mean(lagE);
+  let covNum = 0, varDen = 0;
+  for (let i = 0; i < deltaE.length; i++) {
+    covNum += (lagE[i] - mLag) * (deltaE[i] - mDelta);
+    varDen += (lagE[i] - mLag) ** 2;
+  }
+  const gamma = varDen > 0 ? covNum / varDen : 0;
+
+  // Standard error of gamma
+  let ssRes = 0;
+  const mAlpha = mDelta - gamma * mLag;
+  for (let i = 0; i < deltaE.length; i++) {
+    const fitted = mAlpha + gamma * lagE[i];
+    ssRes += (deltaE[i] - fitted) ** 2;
+  }
+  const df = deltaE.length - 2;
+  const s2 = df > 0 ? ssRes / df : 1e-6;
+  const seGamma = varDen > 0 ? Math.sqrt(s2 / varDen) : 1e-6;
+  const tStat = seGamma > 0 ? gamma / seGamma : 0;
+
+  // MacKinnon critical values for EG 2-variable test
+  const crit1Pct = -3.90;
+  const crit5Pct = -3.34;
+  const crit10Pct = -3.04;
+
+  const cointegrated = tStat < crit5Pct;
+
+  let pValue: number;
+  if (tStat <= crit1Pct) {
+    pValue = Math.max(0.001, 0.01 * Math.exp((tStat - crit1Pct) * 0.8));
+  } else if (tStat <= crit5Pct) {
+    pValue = 0.01 + 0.04 * ((tStat - crit1Pct) / (crit5Pct - crit1Pct));
+  } else if (tStat <= crit10Pct) {
+    pValue = 0.05 + 0.05 * ((tStat - crit5Pct) / (crit10Pct - crit5Pct));
+  } else {
+    pValue = Math.min(0.999, 0.10 + 0.90 / (1 + Math.exp(-(tStat - crit10Pct) * 1.5)));
+  }
+
+  return {
+    cointegrated,
+    tStat,
+    pValue,
+    hedgeRatio,
+    alpha,
+    crit1Pct,
+    crit5Pct,
+    crit10Pct,
+    residuals,
+  };
+}
+
+export interface OUFitResult {
+  theta: number;
+  mu: number;
+  sigma: number;
+  halfLife: number;
+}
+
+/**
+ * Ornstein-Uhlenbeck parameter estimation via AR(1) discrete exact solution.
+ */
+export function ouFit(spread: number[], dt = 1 / 252): OUFitResult {
+  const n = spread.length;
+  if (n < 5) {
+    return { theta: 0.1, mu: 0, sigma: 0.1, halfLife: 10 };
+  }
+
+  const y = spread.slice(1);
+  const x = spread.slice(0, -1);
+  const mX = mean(x);
+  const mY = mean(y);
+
+  let num = 0, den = 0;
+  for (let i = 0; i < x.length; i++) {
+    num += (x[i] - mX) * (y[i] - mY);
+    den += (x[i] - mX) ** 2;
+  }
+
+  const a = den > 0 ? Math.max(0.0001, Math.min(0.9999, num / den)) : 0.95;
+  const b = mY - a * mX;
+
+  const theta = -Math.log(a) / dt;
+  const mu = b / (1 - a);
+
+  let ss = 0;
+  for (let i = 0; i < x.length; i++) {
+    ss += (y[i] - (a * x[i] + b)) ** 2;
+  }
+  const varEta = ss / (x.length - 2 || 1);
+  const sigma = Math.sqrt(Math.max(1e-8, (varEta * 2 * theta) / (1 - Math.exp(-2 * theta * dt))));
+  const halfLife = Math.max(0.5, Math.log(2) / (-Math.log(a)));
+
+  return {
+    theta,
+    mu,
+    sigma,
+    halfLife,
+  };
+}
+
 // ─── 9. Structural Flow Detection ───────────────────────────────────
 
 export interface FlowSignal {
