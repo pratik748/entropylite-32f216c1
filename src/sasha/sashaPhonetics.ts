@@ -126,10 +126,6 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bOLS\b/g, "O-L-S"],
   [/\bR\^2\b/g, "R squared"],
   [/\bR²\b/g, "R squared"],
-  [/\bσ\b/g, "sigma"], // Greek sigma σ
-  [/\bβ\b/g, "beta"],  // Greek beta β
-  [/\bμ\b/g, "mu"],    // Greek mu μ
-  [/\bτ\b/g, "tau"],   // Greek tau τ
 
   // Time periods
   [/\b1d\b/gi, "one day"],
@@ -180,11 +176,16 @@ export function toInstitutionalPhonetics(rawText: string): string {
     text = text.replace(pattern, replacement);
   }
 
-  // Handle Greek characters directly (Unicode chars don't match ASCII \b)
+  // Handle Greek characters directly (Unicode characters don't match ASCII word boundaries)
+  text = text.replace(/α/g, "alpha");
   text = text.replace(/σ/g, "sigma");
   text = text.replace(/β/g, "beta");
+  text = text.replace(/θ/g, "theta");
+  text = text.replace(/λ/g, "lambda");
   text = text.replace(/μ/g, "mu");
   text = text.replace(/τ/g, "tau");
+  text = text.replace(/δ/g, "delta");
+  text = text.replace(/ρ/g, "rho");
 
   // Handle currency signs smoothly for TTS
   text = text.replace(/\$(\d+(?:,\d+)*(?:\.\d+)?)/g, "$1 dollars");
@@ -192,11 +193,13 @@ export function toInstitutionalPhonetics(rawText: string): string {
   text = text.replace(/€(\d+(?:,\d+)*(?:\.\d+)?)/g, "$1 euros");
   text = text.replace(/£(\d+(?:,\d+)*(?:\.\d+)?)/g, "$1 pounds");
 
-  // Handle minus percentages smoothly (e.g. "-2.5%" -> "down 2.5 percent" or "minus 2.5 percent")
+  // Handle minus percentages smoothly (e.g. "-2.5%" -> "minus 2.5 percent")
   text = text.replace(/-\s*(\d+(?:\.\d+)?)\s*%/g, "minus $1 percent");
   text = text.replace(/\+\s*(\d+(?:\.\d+)?)\s*%/g, "plus $1 percent");
   text = text.replace(/(\d+(?:\.\d+)?)\s*%/g, "$1 percent");
 
   // Clean double spaces
-  return text.replace(/\s+/g, " ").trim();
+  text = text.replace(/\s+/g, " ").trim();
+
+  return text;
 }

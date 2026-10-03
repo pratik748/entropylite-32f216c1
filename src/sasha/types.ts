@@ -1,14 +1,15 @@
 /**
  * SASHA (Structural Analysis & Synthesis Heuristic Agent)
- * Tier-1 Institutional Voice Quant Copilot Types
+ * Tier-1 Institutional Quantitative Voice & Terminal Intelligence Types
  *
- * Core architectural principle: Direct engine orchestration with zero hallucination.
+ * Core architectural principle: Direct mathematical execution with zero hallucination.
  * Quantitative queries resolve through EntropyLite's real mathematical engines;
- * responses pair a concise 1-2 sentence spoken punchline with a high-density
- * parallel visual card and verified proof-of-work receipts.
+ * responses pair a concise 1-2 sentence spoken punchline with high-density
+ * parallel visual diagrams, interactive SVG DAG causal flowcharts, and verified proof-of-work receipts.
  */
 
 import type { PortfolioPosition } from "@/foresight/types";
+import type { GoogleGroundingResult } from "./googleSearchProxy";
 
 export type SashaIntentType =
   | "subset_risk"
@@ -77,6 +78,30 @@ export interface SashaReceipt {
   status: "success" | "warning" | "neutral";
 }
 
+// ── Causal Transmission DAG ──────────────────────────────────────────────────
+
+export interface CausalDAGNode {
+  id: string;
+  label: string;
+  sublabel?: string;
+  stage: "macro" | "transmission" | "sector" | "asset";
+  deltaPct?: number;
+  deltaValueBase?: number;
+  tone: "gain" | "loss" | "neutral";
+}
+
+export interface CausalDAGEdge {
+  from: string;
+  to: string;
+  label?: string;
+  strength?: number; // 0 to 1
+}
+
+export interface CausalTransmissionDAG {
+  nodes: CausalDAGNode[];
+  edges: CausalDAGEdge[];
+}
+
 // ── Card Data Models ────────────────────────────────────────────────────────
 
 export interface EulerRiskShare {
@@ -118,14 +143,12 @@ export interface SubsetRiskData {
 export interface CointegrationStats {
   isCointegrated: boolean;
   adfStat: number;
-  criticalValues: { p1: number; p5: number; p10: number };
   pValue: number;
-  hedgeRatio: number; // Beta (OLS / EG)
-  halfLifeDays: number; // Ornstein-Uhlenbeck tau
-  spreadZScore: number;
-  stationarityConfidencePct: number;
-  spreadVerdict: "long_b_short_a" | "long_a_short_b" | "equilibrium";
-  spreadVerdictText: string;
+  criticalValues: { "1%": number; "5%": number; "10%": number };
+  halfLifeDays: number;
+  reversionSpeed: number; // theta in dS = theta*(mu - S)*dt
+  currentZScore: number;
+  spreadVerdict: "mean_reverting" | "diverging" | "random_walk" | "equilibrium";
 }
 
 export interface StockComparisonData {
@@ -182,7 +205,7 @@ export interface NewsImpactData {
   sentimentScore: number; // -1 to +1
   signalToNoiseScore: number; // 0 to 100
   veracityScore: number; // 0 to 100
-  narrativeDivergencePct: number; // Divergence between velocity & price
+  narrativeDivergencePct: number;
   dominantHeadwindOrTailwind: string;
   firstOrderMacro: string;
   secondOrderTransmission: string;
@@ -192,6 +215,7 @@ export interface NewsImpactData {
     estimatedSensitivity: "high" | "medium" | "low";
   }>;
   articles: NewsImpactItem[];
+  dag?: CausalTransmissionDAG;
 }
 
 export interface StressAssetImpact {
@@ -218,13 +242,16 @@ export interface StressTestData {
     targetTicker: string;
     protectionCoveragePct: number;
     estCostBps: number;
+    tenor?: string;
+    rationale?: string;
   };
+  dag?: CausalTransmissionDAG;
 }
 
 export interface GeneralQuantData {
   headline: string;
   summary: string;
-  metrics: Array<{ label: string; value: string | number; change?: string; tone?: "gain" | "loss" | "neutral" }>;
+  metrics: Array<{ label: string; value: string | number; tone?: "gain" | "loss" | "neutral" }>;
   breakdown?: Array<{ name: string; sharePct: number; note?: string }>;
 }
 
@@ -250,17 +277,25 @@ export interface SashaResult {
     | GeneralQuantData;
   executionTimeMs: number;
   receipts: SashaReceipt[];
+  googleGrounding?: GoogleGroundingResult;
   source: string;
   facts: Array<{ label: string; value: string | number; unit?: string }>;
   timestamp: number;
 }
 
-export type SashaVoiceState =
-  | "idle"
-  | "listening"
-  | "processing"
-  | "speaking"
-  | "error";
+// ── Multi-Turn Conversation Message ─────────────────────────────────────────
+
+export interface SashaMessage {
+  id: string;
+  role: "user" | "sasha";
+  text: string;
+  result?: SashaResult;
+  timestamp: number;
+}
+
+// ── Voice & Context State ───────────────────────────────────────────────────
+
+export type SashaVoiceState = "idle" | "listening" | "processing" | "speaking" | "error";
 
 export interface SashaContextValue {
   voiceState: SashaVoiceState;
@@ -268,15 +303,16 @@ export interface SashaContextValue {
   isSpeaking: boolean;
   isWakeWordActive: boolean;
   isVoiceMuted: boolean;
-  audioEnergy: number; // 0 to 1 for waveform
+  audioEnergy: number;
   activeResult: SashaResult | null;
   history: SashaResult[];
+  messages: SashaMessage[];
   isOpen: boolean;
   queryInput: string;
-  setQueryInput: (s: string) => void;
-  setIsOpen: (b: boolean) => void;
-  setWakeWordActive: (b: boolean) => void;
-  setVoiceMuted: (b: boolean) => void;
+  setQueryInput: (val: string) => void;
+  setIsOpen: (open: boolean) => void;
+  setWakeWordActive: (active: boolean) => void;
+  setVoiceMuted: (muted: boolean) => void;
   startListening: () => void;
   stopListening: () => void;
   submitQuery: (query: string) => Promise<SashaResult>;

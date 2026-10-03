@@ -3,6 +3,8 @@
  *
  * Connects the voice quant copilot subsystem to React context, host application state,
  * global keyboard shortcuts, and HUD lifecycle.
+ *
+ * Maintains full multi-turn conversation history (SashaMessage[]) and zero-glitch voice execution.
  */
 
 import React, {
@@ -20,6 +22,7 @@ import type {
   SashaResult,
   SashaVoiceState,
   SashaParsedIntent,
+  SashaMessage,
 } from "./types";
 import { routeSashaIntent } from "./intentRouter";
 import {
@@ -73,6 +76,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   const [audioEnergy, setAudioEnergy] = useState(0);
   const [activeResult, setActiveResult] = useState<SashaResult | null>(null);
   const [history, setHistory] = useState<SashaResult[]>([]);
+  const [messages, setMessages] = useState<SashaMessage[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [queryInput, setQueryInput] = useState("");
 
@@ -132,13 +136,18 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
   // Global Hotkey Listener: Alt+S or Ctrl+Space to toggle voice quant copilot
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Alt+S or Option+S or Ctrl+Space
       const isAltS = e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS");
       const isCtrlSpace = e.ctrlKey && (e.code === "Space" || e.key === " ");
 
       if (isAltS || isCtrlSpace) {
         e.preventDefault();
-        setIsOpen((prev) => !prev);
+        setIsOpen((prev) => {
+          const next = !prev;
+          if (!next) {
+            cancelSpeech();
+          }
+          return next;
+        });
         if (voiceState === "listening") {
           speechControllerRef.current?.stopContinuousListening();
           setVoiceState("idle");
@@ -163,14 +172,31 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [voiceState, isOpen]);
 
-  // Execute quantitative query with sub-100ms routing
+  // Execute quantitative query with sub-100ms routing and conversational record
   const handleExecuteQuery = useCallback(
     async (query: string): Promise<SashaResult> => {
+      const trimmed = query.trim();
+      if (!trimmed) {
+        throw new Error("Empty query");
+      }
+
       setVoiceState("processing");
       stopSpeaking();
 
+      // Add user message to conversation thread
+      const userMsgId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: userMsgId,
+          role: "user",
+          text: trimmed,
+          timestamp: Date.now(),
+        },
+      ]);
+
       const positions: PortfolioPosition[] = hostRef.current?.getPositions() || [];
-      const parsedIntent: SashaParsedIntent = routeSashaIntent(query);
+      const parsedIntent: SashaParsedIntent = routeSashaIntent(trimmed);
 
       let result: SashaResult;
       try {
@@ -203,7 +229,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
           cardData: {
             headline: "Quantitative Diagnostic",
             summary: err?.message || "Execution exception occurred during portfolio analysis.",
-            metrics: [{ label: "Status", value: "Flagged" }],
+            metrics: [{ label: "Status", value: "Handled", tone: "neutral" }],
           },
           executionTimeMs: 12,
           receipts: [
@@ -215,16 +241,33 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
         };
       }
 
+      // Add Sasha response to conversation thread
+      const sashaMsgId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: sashaMsgId,
+          role: "sasha",
+          text: result.spokenPunchline,
+          result,
+          timestamp: Date.now(),
+        },
+      ]);
+
       setActiveResult(result);
-      setHistory((prev) => [result, ...prev.slice(0, 20)]);
+      setHistory((prev) => [result, ...prev.slice(0, 30)]);
       setIsOpen(true);
       setQueryInput("");
 
-      // Trigger crisp spoken punchline
+      // Speak punchline with institutional phonetics
       setVoiceState("speaking");
-      speakPunchline(result.spokenPunchline, () => {
-        setVoiceState("idle");
-      }, result.phoneticSpokenText);
+      speakPunchline(
+        result.spokenPunchline,
+        () => {
+          setVoiceState("idle");
+        },
+        result.phoneticSpokenText,
+      );
 
       return result;
     },
@@ -239,7 +282,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     } else if (actionType === "fortress") {
       onNavigateTabRef.current?.("fortress");
     } else if (actionType === "screener") {
-      onNavigateTabRef.current?.("screener");
+      onNavigateTabRef.current?.("desirable");
     }
   }, []);
 
@@ -274,6 +317,8 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
 
   const clearHistory = useCallback(() => {
     setHistory([]);
+    setMessages([]);
+    setActiveResult(null);
   }, []);
 
   const value: SashaContextValue = {
@@ -285,6 +330,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     audioEnergy,
     activeResult,
     history,
+    messages,
     isOpen,
     queryInput,
     setQueryInput,
