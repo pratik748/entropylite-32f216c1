@@ -549,7 +549,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
         const err = { status: res.status, message: `Gemini ${model} ${res.status}: ${errBody.slice(0, 200)}` };
         if (!lastErr || lastErr.status === 404) lastErr = err;
         if (res.status === 404 || res.status === 400) continue;
-        throw lastErr;
+        throw err;
       }
       const data = await res.json();
       const parts = data?.candidates?.[0]?.content?.parts;
