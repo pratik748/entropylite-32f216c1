@@ -512,8 +512,8 @@ const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5
 const GEMINI_MODELS = [
   GEMINI_DEFAULT_MODEL,
   "gemini-2.5-flash",
+  "gemini-flash-latest",
   "gemini-2.0-flash",
-  "gemini-1.5-flash",
 ];
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
@@ -525,7 +525,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 
   for (const model of GEMINI_MODELS) {
     const body: Record<string, any> = {
-      systemInstruction: { role: "system", parts: [{ text: systemText }] },
+      systemInstruction: { parts: [{ text: systemText }] },
       contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
       generationConfig: {
         temperature: opts.temperature ?? 0.6,
@@ -545,7 +545,9 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
 
       if (!res.ok) {
         const errBody = await res.text();
-        lastErr = { status: res.status, message: `Gemini ${model} ${res.status}: ${errBody.slice(0, 200)}` };
+        // Keep the first real (non-404) error; a retired fallback model must not mask it.
+        const err = { status: res.status, message: `Gemini ${model} ${res.status}: ${errBody.slice(0, 200)}` };
+        if (!lastErr || lastErr.status === 404) lastErr = err;
         if (res.status === 404 || res.status === 400) continue;
         throw lastErr;
       }
