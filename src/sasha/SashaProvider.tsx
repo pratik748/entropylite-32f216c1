@@ -212,22 +212,6 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
     },
     []
   );
-  const _unused = useCallback(
-    async (result: SashaResult) => {
-      setActiveResult(result);
-      setHistory((prev) => [result, ...prev.slice(0, 20)]);
-      setQueryInput("");
-      // Trigger crisp spoken punchline
-      setVoiceState("speaking");
-      speakPunchline(result.spokenPunchline, () => {
-        setVoiceState("idle");
-      }, result.phoneticSpokenText);
-
-      return result;
-    },
-    []
-  );
-
   const handleAction = useCallback((actionType: "risk_lab" | "workstation" | "fortress" | "screener", payload?: any) => {
     if (actionType === "risk_lab") {
       onNavigateTabRef.current?.("risk");
