@@ -247,6 +247,9 @@ export class SashaSpeechController {
           }
         } else if (this.isExplicitListening) {
           if (final) {
+            // One explicit utterance per mic press; drop back to wake-word or off.
+            this.isExplicitListening = false;
+            if (!this.isWakeWordActive) this.stopContinuousListening();
             this.handler?.onFinalTranscript(final.trim());
           } else if (interim) {
             this.handler?.onInterimTranscript?.(interim.trim());
@@ -256,8 +259,12 @@ export class SashaSpeechController {
 
       this.recognition.onerror = (e) => {
         const err = e.error || "unknown";
-        if (err !== "no-speech" && err !== "aborted") {
-          // Non-fatal recognition error
+        if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+          // Permission denied or no microphone: stop the restart loop and surface it.
+          this.shouldKeepListening = false;
+          this.isExplicitListening = false;
+          this.stopAudioAnalyser();
+          this.handler?.onError?.(err);
         }
       };
 
@@ -300,11 +307,16 @@ export class SashaSpeechController {
     this.handler?.onListeningChange?.(false);
   }
 
-  public triggerExplicitListening(): void {
+  public triggerExplicitListening(): boolean {
+    if (!getSpeechRecognitionCtor()) {
+      this.handler?.onError?.("unsupported");
+      return false;
+    }
     this.isExplicitListening = true;
     this.shouldKeepListening = true;
     this.startContinuousListening();
     this.handler?.onListeningChange?.(true);
+    return true;
   }
 
   // ── Audio Energy Analyser (Web Audio API) ──────────────────────────────────
