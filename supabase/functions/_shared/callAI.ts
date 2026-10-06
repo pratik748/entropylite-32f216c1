@@ -682,8 +682,7 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   for (const [name, raw] of Object.entries(managed)) {
     const v = (raw || "").trim();
     if (!v || NON_LLM_NAME.test(name) || seen.has(v)) continue;
-    const provider = detectProvider(name, v, hints[name]);
-    if (!provider) continue;
+    const provider = detectProvider(name, v, hints[name]) || "auto";
     const lane = laneFor(name, provider, v, "manager", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
@@ -702,8 +701,7 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
     if (envNames.has(name) || managed[name]) continue;
     const v = (Deno.env.get(name) || "").trim();
     if (!v || seen.has(v)) continue;
-    const provider = detectProvider(name, v);
-    if (!provider) continue;
+    const provider = detectProvider(name, v) || "auto";
     const lane = laneFor(name, provider, v, "environment", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
