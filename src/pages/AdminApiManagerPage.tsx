@@ -185,7 +185,7 @@ export default function AdminApiManagerPage() {
   // Paused manager keys drop out of the live chain; keep them visible so they can be switched back on.
   const chain = useMemo<Lane[]>(() => {
     const extra = rows
-      .filter((r) => !lanes.some((l) => l.name === r.name))
+      .filter((r) => r.name !== "LOVABLE_AI_ENABLED" && !lanes.some((l) => l.name === r.name))
       .map((r) => ({ order: 0, name: r.name, provider: r.provider || "custom", source: "manager" as const }));
     return [...lanes, ...extra];
   }, [lanes, rows]);
@@ -216,6 +216,20 @@ export default function AdminApiManagerPage() {
     const worker = async () => { while (queue.length) await runFn(queue.shift()!); };
     await Promise.all([worker(), worker(), worker(), worker()]);
     setFnRunning(false);
+  };
+
+  const lovableRow = rows.find((r) => r.name === "LOVABLE_AI_ENABLED");
+  const lovableOn = !!lovableRow?.is_active;
+  const lovableHealth = health["LOVABLE_AI"];
+  const toggleLovable = async (on: boolean) => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const { error } = await (supabase as any).from("api_credentials").upsert(
+      { name: "LOVABLE_AI_ENABLED", value: "1", label: "Lovable AI demo switch", provider: "lovable", is_active: on, created_by: userRes?.user?.id ?? null },
+      { onConflict: "name" },
+    );
+    if (error) { toast.error(error.message); return; }
+    toast.success(on ? "Lovable AI is on for every engine" : "Lovable AI is off");
+    await load(); void loadStatus();
   };
 
   const save = async () => {
@@ -303,6 +317,24 @@ export default function AdminApiManagerPage() {
             precedence over deployment environment values. Changes propagate
             within 60 seconds without a redeploy.
           </p>
+        </section>
+
+        <section className="rounded-xl border border-border/60 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-semibold">Lovable AI</p>
+              <p className="text-[12px] text-muted-foreground">Turn on for demos. When on, every engine uses it first; turn off afterwards so the workspace balance is not spent.</p>
+            </div>
+            <Switch checked={lovableOn} onCheckedChange={(v) => void toggleLovable(v)} aria-label="Enable Lovable AI" />
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-[12px]">
+            <div><p className="text-muted-foreground">Status</p><p className={`font-semibold ${lovableOn ? (lovableHealth?.last_status === "error" ? "text-loss" : "text-gain") : "text-muted-foreground"}`}>{!lovableOn ? "Off" : lovableHealth?.last_status === "error" ? "Failing" : "On"}</p></div>
+            <div><p className="text-muted-foreground">Requests served</p><p className="font-mono">{lovableHealth ? `${lovableHealth.success_count} ok / ${lovableHealth.failure_count} failed` : "0"}</p></div>
+            <div><p className="text-muted-foreground">Last used</p><p className="font-mono">{ago(lovableHealth?.last_used_at)}</p></div>
+          </div>
+          {lovableOn && lovableHealth?.last_status === "error" && lovableHealth.last_error && (
+            <p className="text-[11px] text-loss break-words">{lovableHealth.last_error.slice(0, 160)}</p>
+          )}
         </section>
 
         <section className="space-y-4">
@@ -474,7 +506,7 @@ export default function AdminApiManagerPage() {
             {rows.length === 0 && (
               <p className="py-6 text-[13px] text-muted-foreground">No keys stored yet.</p>
             )}
-            {rows.map((r) => (
+            {rows.filter((r) => r.name !== "LOVABLE_AI_ENABLED").map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-4 border-b border-border/60 py-3.5">
                 <div className="min-w-0">
                   <p className="text-[13px] font-mono font-medium truncate">{r.name}</p>
