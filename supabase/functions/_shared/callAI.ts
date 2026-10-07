@@ -606,6 +606,34 @@ export function detectProvider(name: string, value: string, hint?: string | null
   return inferProvider(value);
 }
 
+/** Lovable AI lane, only active while the admin demo toggle is on. */
+async function callLovableAI(opts: CallAIOptions, reported?: AIResult["provider"]): Promise<AIResult> {
+  const key = Deno.env.get("LOVABLE_API_KEY");
+  if (!key) throw { status: 401, message: "Lovable AI key is not configured" };
+  const body: Record<string, any> = {
+    model: "openai/gpt-6-astra",
+    reasoning_effort: "low",
+    messages: [
+      { role: "system", content: hardenSystemPrompt(opts.systemPrompt, opts.skipHardening) },
+      { role: "user", content: opts.jsonMode ? `${opts.userPrompt}\n\nRespond with a single JSON object.` : opts.userPrompt },
+    ],
+  };
+  if (opts.jsonMode) body.response_format = { type: "json_object" };
+  const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Lovable-AIG-SDK": "fetch" },
+    body: JSON.stringify(body),
+  }, 90000);
+  if (!res.ok) {
+    const t = await res.text();
+    throw { status: res.status, message: `Lovable AI ${res.status}: ${t.slice(0, 200)}` };
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Empty Lovable AI response");
+  return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || ("lovable" as any) };
+}
+
 const probedProvider = new Map<string, string>();
 const PROBE_ORDER = ["mistral", "openai", "groq", "openrouter", "gemini", "anthropic", "nvidia", "deepseek", "xai", "together"];
 
@@ -671,7 +699,7 @@ export const ENV_AI_KEYS: Array<[string, string]> = [
   ["OPENROUTER_API_KEY", "openrouter"], ["GROQ_API_KEY", "groq"], ["NVIDIA_API_KEY", "nvidia"],
   ["CLOUDFLARE_API_TOKEN", "cloudflare"], ["ONEMIN_AI_API_KEY", "1minai"],
 ];
-const NON_LLM_NAME = /(SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$)/i;
+const NON_LLM_NAME = /(LOVABLE_AI_ENABLED|SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$)/i;
 
 export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   const lanes: Lane[] = [];
@@ -679,6 +707,11 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   const managed = getManagedSnapshot();
   const hints = getProviderHints();
   const envNames = new Set(ENV_AI_KEYS.map(([n]) => n));
+
+  // 0. Demo toggle: the admin switches Lovable AI on in the API Manager and it leads the chain.
+  if (managed["LOVABLE_AI_ENABLED"] && Deno.env.get("LOVABLE_API_KEY")) {
+    lanes.push({ name: "LOVABLE_AI", provider: "lovable", source: "environment", call: (o) => callLovableAI(o, reported) });
+  }
 
   // 1. API Manager keys (admin-added, any name). Declared provider wins, else inferred from name/shape.
   for (const [name, raw] of Object.entries(managed)) {
