@@ -721,25 +721,7 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
     const lane = laneFor(name, provider, v, "manager", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
-  // 2. Environment keys not overridden by the manager.
-  for (const [name, defaultProvider] of ENV_AI_KEYS) {
-    if (managed[name]) continue;
-    const v = (Deno.env.get(name) || "").trim();
-    if (!v || seen.has(v)) continue;
-    const provider = detectProvider(name, v, defaultProvider);
-    if (!provider) continue;
-    const lane = laneFor(name, provider, v, "environment", reported);
-    if (lane) { lanes.push(lane); seen.add(v); }
-  }
-  // 3. Any other env secret that looks like an LLM key (e.g. a test key).
-  for (const name of ["AI_TEST_API_KEY"]) {
-    if (envNames.has(name) || managed[name]) continue;
-    const v = (Deno.env.get(name) || "").trim();
-    if (!v || seen.has(v)) continue;
-    const provider = detectProvider(name, v) || "auto";
-    const lane = laneFor(name, provider, v, "environment", reported);
-    if (lane) { lanes.push(lane); seen.add(v); }
-  }
+  // Server-side environment keys are retired: the API Manager is the only key source.
   return lanes;
 }
 

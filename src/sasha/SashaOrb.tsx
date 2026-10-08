@@ -87,15 +87,15 @@ export const SashaOrb: React.FC<SashaOrbProps> = ({ onToggleExpand, isExpanded }
 
         // Color coding by state
         if (voiceState === "listening") {
-          ctx.fillStyle = "hsl(var(--loss, 0 84% 60%))";
+          ctx.fillStyle = "hsl(var(--foreground) / 0.95)";
         } else if (voiceState === "speaking") {
-          ctx.fillStyle = "hsl(var(--gain, 142 71% 45%))";
+          ctx.fillStyle = "hsl(var(--foreground) / 0.8)";
         } else if (voiceState === "processing") {
-          ctx.fillStyle = "hsl(var(--info, 217 91% 60%))";
+          ctx.fillStyle = "hsl(var(--foreground) / 0.6)";
         } else if (isWakeWordActive) {
-          ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+          ctx.fillStyle = "hsl(var(--foreground) / 0.4)";
         } else {
-          ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+          ctx.fillStyle = "hsl(var(--foreground) / 0.2)";
         }
 
         ctx.beginPath();
@@ -113,7 +113,7 @@ export const SashaOrb: React.FC<SashaOrbProps> = ({ onToggleExpand, isExpanded }
   return (
     <motion.div
       layout
-      className="pointer-events-auto flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950/90 p-1.5 pl-2 backdrop-blur-2xl shadow-2xl hover:border-zinc-700 transition-all cursor-pointer group select-none"
+      className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/40 bg-background/60 p-1 pl-1.5 backdrop-blur-xl opacity-60 hover:opacity-100 hover:border-border transition-all cursor-pointer group select-none"
       onClick={() => {
         if (!isExpanded) {
           onToggleExpand();
@@ -124,20 +124,20 @@ export const SashaOrb: React.FC<SashaOrbProps> = ({ onToggleExpand, isExpanded }
       }}
     >
       {/* SASHA Monogram with Status Pip */}
-      <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-[11px] font-bold font-serif text-background shrink-0 shadow-inner">
+      <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background shrink-0 shadow-inner">
         S
         {/* Status Pip */}
         <span
-          className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 transition-colors ${
+          className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background transition-colors ${
             voiceState === "listening"
-              ? "bg-amber-400 animate-ping"
+              ? "bg-foreground animate-pulse"
               : voiceState === "speaking"
-              ? "bg-emerald-400 animate-pulse"
+              ? "bg-foreground/80 animate-pulse"
               : voiceState === "processing"
-              ? "bg-blue-400 animate-spin"
+              ? "bg-foreground/60 animate-pulse"
               : isWakeWordActive
-              ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
-              : "bg-zinc-600"
+              ? "bg-foreground/50"
+              : "bg-muted-foreground/40"
           }`}
           title={`SASHA: ${voiceState.toUpperCase()} ${isWakeWordActive ? '(Wake-Word Active)' : ''}`}
         />

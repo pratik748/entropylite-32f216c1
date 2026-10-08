@@ -55,7 +55,7 @@ export function useContinuousSimulation(stocks: PortfolioStock[], refreshKey: nu
     };
 
     run();
-    intervalRef.current = setInterval(run, 60_000); // 60s loop
+    // No background loop: runs on load and on explicit refresh only.
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [portfolio.length, refreshKey]);
 
