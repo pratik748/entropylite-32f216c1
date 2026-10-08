@@ -3,7 +3,7 @@
  *
  * Tier-1 Institutional Ambient Quant Copilot Capsule:
  *  - Pinned at bottom-6 right-6.
- *  - Obsidian / Zinc glassmorphic styling: bg-zinc-950/90 border border-zinc-800 rounded-full shadow-2xl.
+ *  - Obsidian / Zinc glassmorphic styling: bg-background/90 border border-border rounded-full shadow-2xl.
  *  - Integrated 24-band live canvas audio waveform.
  *  - Status Pip:
  *    • Amber ping: LISTENING
@@ -164,7 +164,7 @@ export const SashaOrb: React.FC<SashaOrbProps> = ({ onToggleExpand, isExpanded }
             ? "Computing…"
             : "SASHA"}
         </span>
-        <kbd className="rounded border border-zinc-800 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400">
+        <kbd className="rounded border border-border bg-background/90 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground">
           Alt+S
         </kbd>
       </div>
@@ -176,11 +176,11 @@ export const SashaOrb: React.FC<SashaOrbProps> = ({ onToggleExpand, isExpanded }
           e.stopPropagation();
           setVoiceMuted(!isVoiceMuted);
         }}
-        className="pressable rounded-full p-1.5 text-zinc-400 hover:text-foreground hover:bg-zinc-800/60 transition-colors"
+        className="pressable rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-border/60 transition-colors"
         title={isVoiceMuted ? "Unmute Spoken Punchlines" : "Mute Spoken Voice"}
       >
         {isVoiceMuted ? (
-          <VolumeX className="h-3.5 w-3.5 text-red-400" />
+          <VolumeX className="h-3.5 w-3.5 text-foreground" />
         ) : (
           <Volume2 className="h-3.5 w-3.5" />
         )}
