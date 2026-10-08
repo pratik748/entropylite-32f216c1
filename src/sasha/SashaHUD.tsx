@@ -98,18 +98,18 @@ export const SashaHUD: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={springGentle}
-            className="pointer-events-auto mb-3 w-[92vw] max-w-[540px] max-h-[82vh] flex flex-col rounded-2xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-2xl shadow-2xl overflow-hidden"
+            className="pointer-events-auto mb-3 w-[92vw] max-w-[540px] max-h-[82vh] flex flex-col rounded-2xl border border-border bg-background/95 backdrop-blur-2xl shadow-2xl overflow-hidden"
           >
             {/* HUD Top Bar */}
-            <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-2.5 bg-zinc-900/60">
+            <div className="flex items-center justify-between border-b border-border/80 px-4 py-2.5 bg-background/60">
               <div className="flex items-center gap-2">
                 <span className="flex h-5 w-5 items-center justify-center rounded bg-foreground text-[10.5px] font-bold font-serif text-background">
                   S
                 </span>
-                <span className="font-serif text-[13px] font-semibold tracking-tight text-zinc-100">
+                <span className="font-serif text-[13px] font-semibold tracking-tight text-muted-foreground">
                   SASHA
                 </span>
-                <span className="text-[9.5px] uppercase tracking-[0.18em] text-zinc-400 font-mono border-l border-zinc-800 pl-2">
+                <span className="text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground font-mono border-l border-border pl-2">
                   Voice Quant Copilot
                 </span>
               </div>
@@ -121,12 +121,12 @@ export const SashaHUD: React.FC = () => {
                   onClick={() => setWakeWordActive(!isWakeWordActive)}
                   className={`pressable flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium tracking-tight transition-colors ${
                     isWakeWordActive
-                      ? "border border-zinc-700 bg-zinc-800 text-zinc-100 font-semibold"
-                      : "border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      ? "border border-border bg-border text-muted-foreground font-semibold"
+                      : "border border-border text-muted-foreground hover:text-muted-foreground"
                   }`}
                   title={isWakeWordActive ? "Wake-word 'Hey Sasha' active" : "Enable hands-free 'Hey Sasha'"}
                 >
-                  <span className={`h-1.5 w-1.5 rounded-full ${isWakeWordActive ? "bg-emerald-400 animate-pulse" : "bg-zinc-600"}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${isWakeWordActive ? "bg-foreground animate-pulse" : "bg-muted"}`} />
                   "Hey Sasha"
                 </button>
 
@@ -134,10 +134,10 @@ export const SashaHUD: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setVoiceMuted(!isVoiceMuted)}
-                  className="pressable rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
+                  className="pressable rounded p-1 text-muted-foreground hover:text-muted-foreground transition-colors"
                   title={isVoiceMuted ? "Unmute Spoken Punchlines" : "Mute Spoken Voice"}
                 >
-                  {isVoiceMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  {isVoiceMuted ? <VolumeX className="h-3.5 w-3.5 text-foreground" /> : <Volume2 className="h-3.5 w-3.5" />}
                 </button>
 
                 {/* History Toggle */}
@@ -145,7 +145,7 @@ export const SashaHUD: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowHistory(!showHistory)}
-                    className="pressable rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
+                    className="pressable rounded p-1 text-muted-foreground hover:text-muted-foreground transition-colors"
                     title="History"
                   >
                     <History className="h-3.5 w-3.5" />
@@ -160,7 +160,7 @@ export const SashaHUD: React.FC = () => {
                     setIsOpen(false);
                     cancelSpeech();
                   }}
-                  className="pressable rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
+                  className="pressable rounded p-1 text-muted-foreground hover:text-muted-foreground transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -171,13 +171,13 @@ export const SashaHUD: React.FC = () => {
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
               {showHistory ? (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-zinc-800/60 pb-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Session Intelligence History
                     </span>
                     <button
                       onClick={clearHistory}
-                      className="text-[10px] text-zinc-500 hover:text-red-400 flex items-center gap-1 font-mono"
+                      className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 font-mono"
                     >
                       <RotateCcw className="h-2.5 w-2.5" /> Clear
                     </button>
@@ -189,13 +189,13 @@ export const SashaHUD: React.FC = () => {
                         submitQuery(item.intent.rawQuery);
                         setShowHistory(false);
                       }}
-                      className="pressable rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-2.5 hover:bg-zinc-900/60 cursor-pointer text-left"
+                      className="pressable rounded-lg border border-border/70 bg-background/30 p-2.5 hover:bg-background/60 cursor-pointer text-left"
                     >
                       <div className="flex items-center justify-between text-[11px] font-mono mb-1">
-                        <span className="font-semibold text-zinc-200 truncate">{item.headline}</span>
-                        <span className="text-zinc-500 text-[9px]">{item.executionTimeMs}ms</span>
+                        <span className="font-semibold text-muted-foreground truncate">{item.headline}</span>
+                        <span className="text-muted-foreground text-[9px]">{item.executionTimeMs}ms</span>
                       </div>
-                      <p className="text-[11px] text-zinc-400 line-clamp-1 font-serif">
+                      <p className="text-[11px] text-muted-foreground line-clamp-1 font-serif">
                         "{item.spokenPunchline}"
                       </p>
                     </div>
@@ -205,14 +205,14 @@ export const SashaHUD: React.FC = () => {
                 <SashaVisualCard result={activeResult} />
               ) : (
                 <div className="py-6 text-center space-y-3">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
-                    <Activity className="h-5 w-5 text-zinc-400" />
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background">
+                    <Activity className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <h4 className="font-serif text-[14px] font-semibold text-zinc-100">
+                    <h4 className="font-serif text-[14px] font-semibold text-muted-foreground">
                       Senior Quantitative Risk Officer
                     </h4>
-                    <p className="text-[11.5px] text-zinc-400 max-w-xs mx-auto mt-1">
+                    <p className="text-[11.5px] text-muted-foreground max-w-xs mx-auto mt-1">
                       Direct mathematical execution across portfolio Euler risk, Engle-Granger pairs cointegration, and macro shock propagation.
                     </p>
                   </div>
@@ -223,7 +223,7 @@ export const SashaHUD: React.FC = () => {
                         key={p.label}
                         type="button"
                         onClick={() => submitQuery(p.query)}
-                        className="pressable rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-[11px] font-medium tracking-tight text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+                        className="pressable rounded-full border border-border bg-background/80 px-3 py-1 text-[11px] font-medium tracking-tight text-muted-foreground hover:bg-border hover:text-muted-foreground transition-colors"
                       >
                         {p.label}
                       </button>
@@ -234,8 +234,8 @@ export const SashaHUD: React.FC = () => {
             </div>
 
             {/* HUD Query Input Bar */}
-            <form onSubmit={handleSubmit} className="border-t border-zinc-800/80 p-3 bg-zinc-900/40">
-              <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-1.5 focus-within:border-zinc-600 transition-colors">
+            <form onSubmit={handleSubmit} className="border-t border-border/80 p-3 bg-background/40">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 focus-within:border-zinc-600 transition-colors">
                 <input
                   ref={inputRef}
                   type="text"
@@ -246,7 +246,7 @@ export const SashaHUD: React.FC = () => {
                       ? "Listening to voice input…"
                       : "Ask Sasha: 'Tech subset risk', 'Compare NVDA vs AMD', 'Oil +15% shock'…"
                   }
-                  className="flex-1 bg-transparent text-[12.5px] text-zinc-100 placeholder:text-zinc-500 outline-none"
+                  className="flex-1 bg-transparent text-[12.5px] text-muted-foreground placeholder:text-muted-foreground outline-none"
                 />
 
                 {/* Mic Activation Button */}
@@ -255,8 +255,8 @@ export const SashaHUD: React.FC = () => {
                   onClick={isListening ? stopListening : startListening}
                   className={`pressable flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
                     isListening
-                      ? "bg-red-500 text-white animate-pulse"
-                      : "bg-zinc-800 text-zinc-400 hover:text-zinc-100"
+                      ? "bg-foreground text-white animate-pulse"
+                      : "bg-border text-muted-foreground hover:text-muted-foreground"
                   }`}
                   title={isListening ? "Stop listening" : "Start voice dictation (Alt+S)"}
                 >
@@ -266,14 +266,14 @@ export const SashaHUD: React.FC = () => {
                 <button
                   type="submit"
                   disabled={!queryInput.trim()}
-                  className="pressable flex h-7 items-center justify-center rounded-lg bg-zinc-100 px-3 text-[11px] font-semibold text-zinc-950 disabled:opacity-30 transition-opacity"
+                  className="pressable flex h-7 items-center justify-center rounded-lg bg-muted px-3 text-[11px] font-semibold text-muted-foreground disabled:opacity-30 transition-opacity"
                 >
                   Run
                 </button>
               </div>
 
               {/* Status / Shortcut Indicator */}
-              <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-zinc-500 font-mono">
+              <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-muted-foreground font-mono">
                 <span>
                   {voiceState === "speaking"
                     ? "Sasha speaking punchline…"
@@ -284,7 +284,7 @@ export const SashaHUD: React.FC = () => {
                     : "Zero hallucination • Math backed"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1 py-0.5 text-[8.5px] text-zinc-400">Alt+S</kbd>
+                  <kbd className="rounded border border-border bg-background px-1 py-0.5 text-[8.5px] text-muted-foreground">Alt+S</kbd>
                   <span>talk</span>
                 </span>
               </div>

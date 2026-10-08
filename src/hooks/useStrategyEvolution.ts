@@ -84,7 +84,7 @@ export function useStrategyEvolution(stocks: PortfolioStock[], refreshKey: numbe
   useEffect(() => {
     if (portfolio.length === 0) return;
     evolve();
-    intervalRef.current = setInterval(evolve, 120_000); // 120s loop
+    // No background loop: evolves on load and on explicit refresh only.
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [portfolio.length, refreshKey]);
 

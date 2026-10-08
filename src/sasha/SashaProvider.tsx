@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { routeSashaIntent } from "./intentRouter";
 import { useForesight } from "@/foresight/ForesightProvider";
+import { executeSubsetRisk, executeStockComparison, executeNewsImpact, executeStressTest } from "./quantEngine";
 import { toast } from "sonner";
 import {
   SashaSpeechController,
@@ -187,6 +188,27 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
       stopSpeaking();
 
       const parsedIntent: SashaParsedIntent = routeSashaIntent(query);
+
+      // Direct tool routes: questions the directory already maps to a deterministic
+      // engine run locally, with no model call and no key spend.
+      if (parsedIntent.type !== "llm_fallback") {
+        const positions: PortfolioPosition[] = hostRef.current?.getPositions() || [];
+        try {
+          const r =
+            parsedIntent.type === "subset_risk" ? await executeSubsetRisk(parsedIntent as any, positions)
+            : parsedIntent.type === "stock_comparison" ? await executeStockComparison(parsedIntent as any)
+            : parsedIntent.type === "news_impact" ? await executeNewsImpact(parsedIntent as any, positions)
+            : await executeStressTest(parsedIntent as any, positions);
+          setActiveResult(r);
+          setHistory((prev) => [r, ...prev.slice(0, 20)]);
+          setIsOpen(true);
+          setQueryInput("");
+          if (isVoiceMutedRef.current) setVoiceState("idle");
+          else { setVoiceState("speaking"); speakPunchline(r.spokenPunchline, () => setVoiceState("idle"), r.phoneticSpokenText); }
+          return r;
+        } catch { /* fall through to the agent */ }
+      }
+
       const fs = foresightRef.current;
       awaitingAnswerRef.current = true;
       fs.setOpen(true);
