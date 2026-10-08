@@ -220,6 +220,11 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
           },
           (state) => {
             setExecutionState(state);
+          },
+          {
+            history: messages,
+            activeTab: "risk",
+            activeContextTicker,
           }
         );
         result = orchestration.result;

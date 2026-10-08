@@ -736,3 +736,104 @@ describe("SASHA VENOR Institutional Invariants & Regression Suite", () => {
     expect(navData.quickLinks.length).toBeGreaterThan(0);
   });
 });
+
+describe("SASHA Senior Conversational Quant Agent & ReAct Reasoning Suite", () => {
+  const samplePositions: PortfolioPosition[] = [
+    { id: "1", ticker: "NVDA", buyPrice: 120, quantity: 100, currentPrice: 130 },
+    { id: "2", ticker: "MSFT", buyPrice: 400, quantity: 50, currentPrice: 420 },
+    { id: "3", ticker: "JPM", buyPrice: 190, quantity: 80, currentPrice: 200 },
+  ];
+
+  it("handles user critique and feedback with senior institutional composure and mathematical discipline", async () => {
+    const { result } = await executeSashaOrchestration("You are trash and useless", {
+      userId: "test",
+      executionId: "exec_critique",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("Senior Quantitative Review");
+    expect(result.spokenPunchline).toContain("mathematics");
+    expect(result.spokenPunchline).not.toContain("Brent Crude advances");
+    expect(result.spokenPunchline).not.toContain("Institutional intelligence synthesis complete");
+    expect(result.facts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("explains Euler risk decomposition accurately with mathematical formulations", async () => {
+    const { result } = await executeSashaOrchestration("Explain Euler risk decomposition in detail", {
+      userId: "test",
+      executionId: "exec_euler_explain",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("Euler");
+    expect(result.spokenPunchline).toContain("one hundred percent");
+    const cardData = result.cardData as any;
+    expect(cardData.summary).toContain("PCR_i");
+    expect(cardData.metrics.some((m: any) => m.label.includes("Invariant"))).toBe(true);
+  });
+
+  it("explains Ledoit-Wolf covariance shrinkage formulation and target matrix", async () => {
+    const { result } = await executeSashaOrchestration("What is Ledoit-Wolf shrinkage and why do we use it?", {
+      userId: "test",
+      executionId: "exec_lw_explain",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("Ledoit-Wolf");
+    expect(result.spokenPunchline).toContain("positive-definite");
+    const cardData = result.cardData as any;
+    expect(cardData.summary).toContain("positive-definite");
+  });
+
+  it("explains Engle-Granger cointegration and Ornstein-Uhlenbeck half-life", async () => {
+    const { result } = await executeSashaOrchestration("How does Engle-Granger cointegration and half-life work?", {
+      userId: "test",
+      executionId: "exec_eg_explain",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("Cointegration");
+    expect(result.spokenPunchline).toContain("Ornstein-Uhlenbeck");
+  });
+
+  it("provides institutional hedging and risk management philosophy", async () => {
+    const { result } = await executeSashaOrchestration("What is the best way to hedge a long tech book?", {
+      userId: "test",
+      executionId: "exec_hedge_phil",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("Hedging Philosophy");
+    expect(result.spokenPunchline).toContain("beta");
+  });
+
+  it("handles conversational greetings and outlines desk capabilities", async () => {
+    const { result } = await executeSashaOrchestration("Hey Sasha, what are your capabilities?", {
+      userId: "test",
+      executionId: "exec_meta",
+      positions: samplePositions,
+      portfolioValue: 100000,
+      timestamp: Date.now(),
+    });
+
+    expect(result.cardType).toBe("general_quant");
+    expect(result.headline).toContain("SASHA");
+    expect(result.spokenPunchline).toContain("Euler risk");
+  });
+});
+

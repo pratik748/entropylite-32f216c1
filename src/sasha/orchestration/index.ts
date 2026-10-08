@@ -1,26 +1,33 @@
 /**
- * SASHA Orchestration Engine
+ * SASHA Orchestration & Conversational Agent Engine
  *
- * Central entrypoint connecting Planner, Autonomous Executor, and Grounding Synthesizer.
+ * Central entrypoint connecting ReAct Conversational Agent, Planner,
+ * Autonomous Executor, and Grounding Synthesizer.
  */
 
 import { sashaPlanner } from "./planner";
 import { sashaExecutor } from "./executor";
 import { sashaSynthesizer } from "./synthesizer";
+import { sashaAgent, type AgentRunOptions } from "../agent/sashaAgent";
 import type { ToolExecutionContext } from "../tools/types";
-import type { SashaResult, SashaExecutionState } from "../types";
+import type { SashaResult, SashaExecutionState, SashaMessage } from "../types";
 import type { ExecutionPlan, ExecutionTrace } from "./types";
 
 export interface OrchestrationResult {
   result: SashaResult;
-  plan: ExecutionPlan;
-  trace: ExecutionTrace;
+  plan?: ExecutionPlan;
+  trace?: ExecutionTrace;
 }
 
 export async function executeSashaOrchestration(
   query: string,
   ctx?: ToolExecutionContext,
-  onStateChange?: (state: SashaExecutionState) => void
+  onStateChange?: (state: SashaExecutionState) => void,
+  options: {
+    history?: SashaMessage[];
+    activeTab?: string;
+    activeContextTicker?: string | null;
+  } = {}
 ): Promise<OrchestrationResult> {
   const executionContext: ToolExecutionContext = {
     userId: ctx?.userId || "user_default",
@@ -31,35 +38,19 @@ export async function executeSashaOrchestration(
     timestamp: Date.now(),
   };
 
-  onStateChange?.("UNDERSTANDING");
+  const agentOptions: AgentRunOptions = {
+    history: options.history,
+    activeTab: options.activeTab,
+    activeContextTicker: options.activeContextTicker,
+    onStateChange,
+  };
 
-  // 1. Intelligent Planning (DAG construction & validation)
-  onStateChange?.("PLANNING");
-  const plan = await sashaPlanner.createPlan(query, executionContext);
-
-  // 2. Autonomous Execution (topological resolution & parallel execution)
-  onStateChange?.("EXECUTING");
-  const { trace, resultsByNodeId, provenances } = await sashaExecutor.executePlan(
-    plan,
-    executionContext
-  );
-
-  // 3. Evidence-grounded Synthesis & Provenance Verification
-  onStateChange?.("VERIFYING");
-  const result = sashaSynthesizer.synthesize(
-    plan,
-    trace,
-    resultsByNodeId,
-    provenances,
-    executionContext
-  );
-
-  onStateChange?.("RESPONDING");
+  const output = await sashaAgent.execute(query, executionContext, agentOptions);
 
   return {
-    result,
-    plan,
-    trace,
+    result: output.result,
+    plan: output.plan,
+    trace: output.trace,
   };
 }
 
@@ -67,3 +58,4 @@ export * from "./types";
 export * from "./planner";
 export * from "./executor";
 export * from "./synthesizer";
+export * from "../agent/sashaAgent";
