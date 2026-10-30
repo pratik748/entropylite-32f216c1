@@ -325,8 +325,16 @@ async function callOpenAICompatible(
       throw lastErr;
     }
     const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content;
-    if (typeof text !== "string" || !text.trim()) { lastErr = new Error("Empty provider response"); continue; }
+    const msg = data?.choices?.[0]?.message;
+    const text =
+      (typeof msg?.content === "string" && msg.content.trim())
+        ? msg.content
+        : (typeof msg?.reasoning_content === "string" && msg.reasoning_content.trim())
+        ? msg.reasoning_content
+        : (typeof msg?.reasoning === "string" && msg.reasoning.trim())
+        ? msg.reasoning
+        : null;
+    if (!text || !text.trim()) { lastErr = new Error("Empty provider response"); continue; }
     return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "mistral" };
   }
   throw lastErr || new Error("No usable model");
@@ -606,12 +614,13 @@ function getOmniRouteModels(): string[] {
 
   const candidates = [
     ...(configured ? [configured] : []),
-    "gpt-4o",
+    "auto/best-fast",
+    "auto/best-chat",
+    "auto/coding",
+    "auto/gemini",
     "gemini-3.5-flash-lite",
     "gemini-3.8-flash",
-    "claude-3-5-sonnet-latest",
-    "deepseek-chat",
-    "llama-3.3-70b-versatile",
+    "gpt-4o",
     "default",
   ];
   return Array.from(new Set(candidates));
