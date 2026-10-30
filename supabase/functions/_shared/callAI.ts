@@ -22,6 +22,8 @@
  */
 import { getKeySync, getManagedSnapshot, refreshManagedKeys, getProviderHints, getHealthSnapshot, recordKeyHealth, getUpdatedAts } from "./managedKeys.ts";
 
+export type AIProvider = "groq" | "cloudflare" | "mistral" | "openai" | "gemini" | "omniroute" | "anthropic" | "openrouter" | "nvidia" | "1minai" | (string & {});
+
 interface CallAIOptions {
   systemPrompt: string;
   userPrompt: string;
@@ -30,7 +32,7 @@ interface CallAIOptions {
   tools?: any[];
   toolChoice?: any;
   model?: string;
-  provider?: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
+  provider?: AIProvider;
   jsonMode?: boolean;
   skipHardening?: boolean;
   /** No-op (kept for backward compatibility, Mistral has no native web search). */
@@ -39,7 +41,7 @@ interface CallAIOptions {
 
 interface AIResult {
   text: string;
-  provider: "groq" | "cloudflare" | "mistral" | "openai" | "gemini";
+  provider: AIProvider;
   toolCall?: any;
 }
 
@@ -419,10 +421,14 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
     throw { status: 503, message: "No AI keys configured. Add one in the API Manager." };
   }
   // Prioritization score:
-  // Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
-  // Recently successful keys get +2 bonus.
+  // 1. If caller requested a specific provider (e.g. "omniroute", "gemini"), give it highest priority (+100).
+  // 2. Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
+  // 3. Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();
-  const score = (l: Lane) => (l.source === "manager" ? 10 : 0) + ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 2 : 0);
+  const score = (l: Lane) =>
+    (reported && l.provider === reported ? 100 : 0) +
+    (l.source === "manager" ? 10 : 0) +
+    ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 2 : 0);
   const ready = lanes.filter((l) => !coolingDown(l.name));
   const resting = lanes.filter((l) => coolingDown(l.name) && classifyFailure(undefined, health[l.name]?.error || "") !== "dead");
 
@@ -504,17 +510,30 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // ---------------------------------------------------------------------------
 // Gemini lane (Google Generative Language API)
 // ---------------------------------------------------------------------------
-// Used as a tertiary failover after both Mistral keys. We expose two keys
-// (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2) and round-robin between them
-// inside the lane registry. Default model is gemini-2.0-flash for low latency
-// and high quota; can be overridden via GEMINI_DEFAULT_MODEL.
-const GEMINI_DEFAULT_MODEL = Deno.env.get("GEMINI_DEFAULT_MODEL") || "gemini-2.5-flash-lite";
-const GEMINI_MODELS = [
-  GEMINI_DEFAULT_MODEL,
-  "gemini-2.5-flash",
-  "gemini-flash-latest",
-  "gemini-2.0-flash",
-];
+// Used as a failover lane. We expose two keys (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2)
+// and round-robin between them inside the lane registry.
+// Default model is gemini-3.5-flash-lite for low latency and high quota;
+// can be overridden via GEMINI_DEFAULT_MODEL or GEMINI_MODEL.
+const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
+
+function getGeminiModels(): string[] {
+  const configured =
+    getKeySync("GEMINI_DEFAULT_MODEL") ||
+    getKeySync("GEMINI_MODEL") ||
+    Deno.env.get("GEMINI_DEFAULT_MODEL") ||
+    Deno.env.get("GEMINI_MODEL");
+
+  const candidates = [
+    ...(configured ? [configured] : []),
+    GEMINI_DEFAULT_MODEL,
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+  ];
+  return Array.from(new Set(candidates));
+}
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
@@ -523,7 +542,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
     : "";
   let lastErr: any = null;
 
-  for (const model of GEMINI_MODELS) {
+  for (const model of getGeminiModels()) {
     const body: Record<string, any> = {
       systemInstruction: { parts: [{ text: systemText }] },
       contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
@@ -548,7 +567,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
         // Keep the first real (non-404) error; a retired fallback model must not mask it.
         const err = { status: res.status, message: `Gemini ${model} ${res.status}: ${errBody.slice(0, 200)}` };
         if (!lastErr || lastErr.status === 404) lastErr = err;
-        if (res.status === 404 || res.status === 400) continue;
+        if (res.status === 404 || res.status === 400 || isModelAvailabilityError(res.status, errBody)) continue;
         throw err;
       }
       const data = await res.json();
@@ -558,11 +577,89 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
       return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "gemini" };
     } catch (e: any) {
       lastErr = e;
-      if (e?.status === 404 || e?.status === 400) continue;
+      if (e?.status === 404 || e?.status === 400 || isModelAvailabilityError(e?.status, String(e?.message || ""))) continue;
       throw e;
     }
   }
   throw lastErr || new Error("Gemini: no usable model");
+}
+
+// ---------------------------------------------------------------------------
+// OmniRoute lane (Local AI gateway / OpenAI-compatible proxy)
+// ---------------------------------------------------------------------------
+function normalizeOmniRouteEndpoint(raw: string): string {
+  let url = raw.trim().replace(/\/+$/, "");
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `http://${url}`;
+  }
+  if (url.endsWith("/chat/completions")) return url;
+  if (url.endsWith("/v1")) return `${url}/chat/completions`;
+  return `${url}/v1/chat/completions`;
+}
+
+function getOmniRouteModels(): string[] {
+  const configured =
+    getKeySync("OMNIROUTE_MODEL") ||
+    getKeySync("OMNIROUTE_DEFAULT_MODEL") ||
+    Deno.env.get("OMNIROUTE_MODEL") ||
+    Deno.env.get("OMNIROUTE_DEFAULT_MODEL");
+
+  const candidates = [
+    ...(configured ? [configured] : []),
+    "gpt-4o",
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+    "claude-3-5-sonnet-latest",
+    "deepseek-chat",
+    "llama-3.3-70b-versatile",
+    "default",
+  ];
+  return Array.from(new Set(candidates));
+}
+
+async function callOmniRoute(
+  opts: CallAIOptions,
+  apiKey: string,
+  reported?: AIResult["provider"],
+): Promise<AIResult> {
+  const rawEndpoint =
+    getKeySync("OMNIROUTE_URL") ||
+    getKeySync("OMNIROUTE_BASE_URL") ||
+    Deno.env.get("OMNIROUTE_URL") ||
+    Deno.env.get("OMNIROUTE_BASE_URL") ||
+    "http://localhost:20128/v1/chat/completions";
+
+  const primaryEndpoint = normalizeOmniRouteEndpoint(rawEndpoint);
+  const models = opts.model ? [opts.model] : getOmniRouteModels();
+
+  const candidateEndpoints = [primaryEndpoint];
+  if (primaryEndpoint.includes("localhost") || primaryEndpoint.includes("127.0.0.1")) {
+    candidateEndpoints.push(
+      primaryEndpoint.replace("localhost", "127.0.0.1"),
+      primaryEndpoint.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+    );
+  }
+  const uniqueEndpoints = Array.from(new Set(candidateEndpoints));
+
+  let lastErr: any = null;
+  for (const ep of uniqueEndpoints) {
+    try {
+      return await callOpenAICompatible(opts, apiKey || "local-omniroute", ep, models, reported || "omniroute");
+    } catch (e: any) {
+      lastErr = e;
+      const msg = String(e?.message || e || "");
+      if (
+        msg.includes("ECONNREFUSED") ||
+        msg.includes("Failed to fetch") ||
+        msg.includes("connection refused") ||
+        msg.includes("network")
+      ) {
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error("OmniRoute: unreachable at local endpoint");
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +678,7 @@ const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-4-maverick-17b
 
 function inferProvider(value: string): string | null {
   const v = value.trim();
+  if (/^omni-|^sk-omni-/.test(v)) return "omniroute";
   if (/^sk-or-/.test(v)) return "openrouter";
   if (/^sk-ant-/.test(v)) return "anthropic";
   if (/^gsk_/.test(v)) return "groq";
@@ -594,6 +692,7 @@ function inferProvider(value: string): string | null {
 export function detectProvider(name: string, value: string, hint?: string | null): string | null {
   if (hint && hint !== "auto" && hint.trim()) return hint.trim().toLowerCase();
   const n = name.toUpperCase();
+  if (n.includes("OMNIROUTE") || n.includes("OMNI_ROUTE") || n.includes("OMNI")) return "omniroute";
   if (n.includes("MISTRAL")) return "mistral";
   if (n.includes("GEMINI") || n.includes("GOOGLE")) return "gemini";
   if (n.includes("OPENROUTER")) return "openrouter";
@@ -635,11 +734,12 @@ async function callLovableAI(opts: CallAIOptions, reported?: AIResult["provider"
 }
 
 const probedProvider = new Map<string, string>();
-const PROBE_ORDER = ["mistral", "openai", "groq", "openrouter", "gemini", "anthropic", "nvidia", "deepseek", "xai", "together"];
+const PROBE_ORDER = ["omniroute", "mistral", "openai", "groq", "openrouter", "gemini", "anthropic", "nvidia", "deepseek", "xai", "together"];
 
 function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
   const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
   switch (provider) {
+    case "omniroute": return mk((o) => callOmniRoute(o, key, reported));
     case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
     case "gemini": return mk((o) => callGeminiWithKey(o, key, reported));
     case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", [OPENROUTER_DEFAULT_MODEL, "meta-llama/llama-3.3-70b-instruct:free"], reported));
@@ -693,13 +793,14 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
 
 /** Every configured AI credential, environment and API Manager, deduplicated by value. */
 export const ENV_AI_KEYS: Array<[string, string]> = [
+  ["OMNIROUTE_API_KEY", "omniroute"],
   ["MISTRAL_API_KEY", "mistral"], ["MISTRAL_API_KEY_2", "mistral"], ["MISTRAL_API_KEY_3", "mistral"],
   ["GOOGLE_GEMINI_KEY", "gemini"], ["GOOGLE_GEMINI_KEY_2", "gemini"],
   ["OPENAI_API_KEY", "openai"], ["ANTHROPIC_API_KEY", "anthropic"],
   ["OPENROUTER_API_KEY", "openrouter"], ["GROQ_API_KEY", "groq"], ["NVIDIA_API_KEY", "nvidia"],
   ["CLOUDFLARE_API_TOKEN", "cloudflare"], ["ONEMIN_AI_API_KEY", "1minai"],
 ];
-const NON_LLM_NAME = /(LOVABLE_AI_ENABLED|SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$)/i;
+const NON_LLM_NAME = /(LOVABLE_AI_ENABLED|SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$|_URL$|_BASE_URL$)/i;
 
 export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   const lanes: Lane[] = [];
@@ -721,7 +822,25 @@ export function buildLanes(reported?: AIResult["provider"]): Lane[] {
     const lane = laneFor(name, provider, v, "manager", reported);
     if (lane) { lanes.push(lane); seen.add(v); }
   }
-  // Server-side environment keys are retired: the API Manager is the only key source.
+
+  // 2. Fallback to environment keys if not overridden by manager
+  for (const [name, defaultProvider] of ENV_AI_KEYS) {
+    if (managed[name]) continue;
+    const envVal = Deno.env.get(name)?.trim();
+    if (envVal && !seen.has(envVal)) {
+      const lane = laneFor(name, defaultProvider, envVal, "environment", reported);
+      if (lane) { lanes.push(lane); seen.add(envVal); }
+    }
+  }
+
+  // 3. Local OmniRoute autodiscovery: if OMNIROUTE_URL is configured without an explicit key,
+  // enable the local omniroute lane with a local token.
+  const omniUrl = managed["OMNIROUTE_URL"] || Deno.env.get("OMNIROUTE_URL");
+  if (omniUrl && !lanes.some((l) => l.provider === "omniroute")) {
+    const lane = laneFor("OMNIROUTE_LOCAL", "omniroute", "local-omniroute", "environment", reported);
+    if (lane) lanes.push(lane);
+  }
+
   return lanes;
 }
 
