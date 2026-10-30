@@ -34,6 +34,7 @@ type Health = {
 };
 const PROVIDERS = [
   "auto",
+  "omniroute",
   "mistral",
   "gemini",
   "openai",
@@ -64,6 +65,10 @@ const KNOWN = [
   "MISTRAL_API_KEY_3",
   "GOOGLE_GEMINI_KEY",
   "GOOGLE_GEMINI_KEY_2",
+  "GEMINI_DEFAULT_MODEL",
+  "OMNIROUTE_API_KEY",
+  "OMNIROUTE_URL",
+  "OMNIROUTE_MODEL",
   "OPENROUTER_API_KEY",
   "GROQ_API_KEY",
   "OPENAI_API_KEY",
@@ -78,6 +83,7 @@ const KNOWN = [
 
 function detectProviderFromInput(n: string, v: string): string {
   const upper = n.toUpperCase();
+  if (upper.includes("OMNIROUTE") || upper.includes("OMNI_ROUTE") || upper.includes("OMNI")) return "omniroute";
   if (upper.includes("GEMINI")) return "gemini";
   if (upper.includes("MISTRAL")) return "mistral";
   if (upper.includes("GROQ")) return "groq";
