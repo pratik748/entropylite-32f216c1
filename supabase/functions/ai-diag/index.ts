@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     "GOOGLE_GEMINI_KEY", "GOOGLE_GEMINI_KEY_2", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
     "OPENROUTER_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "CLOUDFLARE_API_TOKEN", "ONEMIN_AI_API_KEY",
   ]) {
-    const v = Deno.env.get(env.name ? envName : envName);
+    const v = Deno.env.get(envName);
     report.env[envName] = v ? `present(len=${v.trim().length})` : "absent";
   }
 
