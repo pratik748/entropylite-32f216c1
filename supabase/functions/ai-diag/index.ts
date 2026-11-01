@@ -1,4 +1,4 @@
-// Temporary diagnostic: test Google "AQ."-format key auth styles + list models.
+// Temporary diagnostic: which newest Gemini models can this key actually generate with?
 // Returns REDACTED results only.
 import { getManagedSnapshot, refreshManagedKeys } from "../_shared/managedKeys.ts";
 
@@ -8,68 +8,53 @@ const cors = {
   "Content-Type": "application/json",
 };
 
+const CANDIDATES = [
+  "gemini-4-argon",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+  "gemini-2.5-flash",
+];
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   await refreshManagedKeys(true);
   const managed = getManagedSnapshot();
-  const report: any = { keys: [] };
+  const report: any = { tests: [] };
 
   for (const [name, value] of Object.entries(managed)) {
     const v = String(value || "").trim();
     if (!name || !v || !v.startsWith("AQ.")) continue;
 
-    const styles: any = {};
-    const listUrl = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200";
-
-    // 1. key= query param
-    try {
-      const r = await fetch(`${listUrl}&key=${v}`);
-      styles.queryParam = { status: r.status, body: (await r.text()).slice(0, 200) };
-    } catch (e: any) { styles.queryParam = { error: String(e?.message || e) }; }
-
-    // 2. Authorization: Bearer
-    try {
-      const r = await fetch(listUrl, { headers: { Authorization: `Bearer ${v}` } });
-      styles.bearer = { status: r.status, body: (await r.text()).slice(0, 200) };
-    } catch (e: any) { styles.bearer = { error: String(e?.message || e) }; }
-
-    // 3. x-goog-api-key header
-    try {
-      const r = await fetch(listUrl, { headers: { "x-goog-api-key": v } });
-      styles.xGoogApiKey = { status: r.status, body: (await r.text()).slice(0, 200) };
-    } catch (e: any) { styles.xGoogApiKey = { error: String(e?.message || e) }; }
-
-    const item: any = { name, styles };
-
-    // If any style works, list usable models and try a real generation.
-    const okStyle = Object.entries(styles).find(([_, s]: any) => s.status === 200);
-    if (okStyle) {
-      item.workingAuth = okStyle[0];
-      const [styleName] = okStyle;
-      const headers: Record<string, string> =
-        styleName === "bearer" ? { Authorization: `Bearer ${v}` } :
-        styleName === "xGoogApiKey" ? { "x-goog-api-key": v } : {};
-      const finalUrl = styleName === "queryParam" ? `${listUrl}&key=${v}` : listUrl;
-      const data = JSON.parse((await (await fetch(finalUrl, { headers })).text()));
-      const usable = (data.models || [])
-        .filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent"))
-        .map((m: any) => m.name.replace("models/", ""));
-      item.generateContentModels = usable;
-      const pick = usable.filter((m: string) => /flash/.test(m)).sort().reverse()[0] || usable[0];
-      if (pick) {
-        const t0 = Date.now();
-        const cres = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${pick}:generateContent`, {
-          method: "POST", headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with the single word OK." }] }], generationConfig: { maxOutputTokens: 8, temperature: 0 } }),
+    for (const model of CANDIDATES) {
+      const t0 = Date.now();
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${v}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: "Reply with the single word OK." }] },
+            contents: [{ role: "user", parts: [{ text: "ping" }] }],
+            generationConfig: { maxOutputTokens: 2048, temperature: 0 },
+          }),
         });
-        const ctext = await cres.text();
-        item.testModel = pick;
-        item.testStatus = cres.status;
-        item.testLatencyMs = Date.now() - t0;
-        item.testBody = ctext.slice(0, 240);
+        const text = await res.text();
+        let note = "";
+        try {
+          const j = JSON.parse(text);
+          const fr = j?.candidates?.[0]?.finishReason;
+          const out = j?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
+          note = fr ? `finishReason=${fr} text=${JSON.stringify(out.slice(0, 20))}` : text.slice(0, 120);
+        } catch { note = text.slice(0, 120); }
+        report.tests.push({ model, status: res.status, ms: Date.now() - t0, note });
+      } catch (e: any) {
+        report.tests.push({ model, status: 0, ms: Date.now() - t0, note: String(e?.message || e).slice(0, 120) });
       }
     }
-    report.keys.push(item);
   }
 
   return new Response(JSON.stringify(report, null, 2), { headers: cors });
