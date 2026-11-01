@@ -288,7 +288,18 @@ async function callMistralWithKey(opts: CallAIOptions, apiKey: string, reported?
  * Generic OpenAI-compatible lane (OpenRouter, Groq, or any admin-supplied
  * compatible endpoint). Used only as a fallback after every Mistral key.
  */
-const OPENROUTER_DEFAULT_MODEL = getKeySync("OPENROUTER_MODEL") || "mistralai/mistral-large";
+const getOpenRouterModels = (): string[] => {
+  const configured = getKeySync("OPENROUTER_MODEL");
+  const chain = [
+    ...(configured ? [configured] : []),
+    "google/gemini-3.8-flash",
+    "openai/gpt-6-luna",
+    "google/gemini-3.5-flash",
+    "anthropic/claude-haiku-5.5",
+    "deepseek/deepseek-v4.1-flash",
+  ];
+  return Array.from(new Set(chain));
+};
 const GROQ_DEFAULT_MODEL = getKeySync("GROQ_MODEL") || "llama-3.3-70b-versatile";
 
 async function callOpenAICompatible(
@@ -344,7 +355,11 @@ async function callOpenAICompatible(
 async function callAnthropic(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode ? "\n\nReturn ONLY a single valid JSON object. No prose. No markdown fences." : "";
-  const models = [getKeySync("ANTHROPIC_MODEL") || "claude-3-5-haiku-latest", "claude-3-haiku-20240307"];
+  const models = [
+    getKeySync("ANTHROPIC_MODEL") || "claude-haiku-5.5",
+    "claude-sonnet-5.5",
+    "claude-opus-5.5",
+  ];
   let lastErr: any = null;
   for (const m of models) {
     const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
@@ -378,10 +393,11 @@ type FailureClass = "dead" | "rate" | "transient" | "model";
 export function classifyFailure(status: number | undefined, message: string): FailureClass {
   const m = (message || "").toLowerCase();
   if (status === 401 || m.includes("invalid api key") || m.includes("suspended") || m.includes("user not found") ||
-      m.includes("permission denied") || m.includes("api key not valid") || m.includes("unauthorized")) return "dead";
+    m.includes("permission denied") || m.includes("api key not valid") || m.includes("unauthorized")) return "dead";
   if (status === 402 || m.includes("insufficient") || m.includes("quota") || m.includes("billing")) return "rate";
-  if (status === 429 || m.includes("rate limit")) return "rate";
-  if (status === 404 || m.includes("model_not_found") || m.includes("does not exist")) return "model";
+  if (status === 429 || m.includes("rate limit") || m.includes("exceeded your current quota")) return "rate";
+  if (status === 404 || m.includes("model_not_found") || m.includes("does not exist") ||
+    m.includes("no longer available")) return "model";
   if (status === 403) return "dead";
   return "transient";
 }
