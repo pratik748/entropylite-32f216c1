@@ -996,7 +996,7 @@ Rules:
     userPrompt: `${opts.userPrompt}${schemaHint}`,
   };
 
-  const r = await callMistral(jsonOpts, opts.provider || "mistral");
+  const r = await callMistral(jsonOpts, opts.provider);
 
   // Normalise: if model returned a bare array, wrap it under the array field name.
   let argText = r.text;
@@ -1024,7 +1024,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   await refreshManagedKeys();
   const needsTools = !!(opts.tools && opts.tools.length > 0);
   if (needsTools) return await callMistralToolMode(opts);
-  return await callMistral(opts, opts.provider || "mistral");
+  return await callMistral(opts, opts.provider);
 }
 
 /**
