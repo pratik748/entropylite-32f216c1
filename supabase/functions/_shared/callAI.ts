@@ -1074,7 +1074,7 @@ export async function fetchLiveWebContext(query: string, maxBullets = 8): Promis
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: `Search the live web for: ${query}\nReturn up to ${maxBullets} short factual bullets, each with its source domain.` }] }],
           tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
+          generationConfig: { temperature: 0.2, ...genThinkingConfig(), maxOutputTokens: 16384 },
         }),
       },
       45000,
