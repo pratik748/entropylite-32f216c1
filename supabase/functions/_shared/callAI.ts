@@ -1043,7 +1043,39 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
  * failure so callers degrade gracefully, but we DO try, because the user
  * explicitly asked for real-time recommendations, not training-cutoff guesses.
  */
-export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
-  // Live web context disabled, Gemini removed. Mistral-only stack.
-  return "";
+export async function fetchLiveWebContext(query: string, maxBullets = 8): Promise<string> {
+  try {
+    await refreshManagedKeys();
+    const managed = getManagedSnapshot();
+    const geminiKey =
+      Object.entries(managed)
+        .filter(([n, v]) => /GEMINI|GOOGLE/i.test(n) && String(v || "").trim())
+        .map(([_, v]) => String(v).trim())[0] ||
+      Deno.env.get("GOOGLE_GEMINI_KEY") ||
+      Deno.env.get("GOOGLE_GEMINI_KEY_2") ||
+      "";
+    if (!geminiKey) return "";
+
+    const model = geminiModelMemo.get(`gemini:${geminiKey.slice(0, 8)}:${geminiKey.slice(-4)}`) || "gemini-3.5-flash";
+    const res = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: `Search the live web for: ${query}\nReturn up to ${maxBullets} short factual bullets, each with its source domain.` }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
+        }),
+      },
+      45000,
+    );
+    if (!res.ok) return "";
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts;
+    const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("").trim() : "";
+    return text || "";
+  } catch {
+    return "";
+  }
 }
