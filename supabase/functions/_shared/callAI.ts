@@ -449,9 +449,17 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
   // 2. Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
   // 3. Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();
+  // OmniRoute/OpenRouter lead the chain (admin's chosen primary), then the
+  // cloud providers, then Mistral and the smaller lanes.
+  const PROVIDER_RANK: Record<string, number> = {
+    omniroute: 60, openrouter: 50, gemini: 40, openai: 30, anthropic: 28,
+    mistral: 25, groq: 20, deepseek: 18, xai: 16, together: 14, nvidia: 12,
+    cloudflare: 10, "1minai": 8, lovable: 5,
+  };
   const score = (l: Lane) =>
     (reported && l.provider === reported ? 100 : 0) +
     (l.source === "manager" ? 10 : 0) +
+    (PROVIDER_RANK[l.provider] ?? 0) +
     ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 2 : 0);
   const ready = lanes.filter((l) => !coolingDown(l.name));
   const resting = lanes.filter((l) => coolingDown(l.name) && classifyFailure(undefined, health[l.name]?.error || "") !== "dead");
@@ -536,9 +544,20 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // ---------------------------------------------------------------------------
 // Used as a failover lane. We expose two keys (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2)
 // and round-robin between them inside the lane registry.
-// Default model is gemini-3.5-flash-lite for low latency and high quota;
-// can be overridden via GEMINI_DEFAULT_MODEL or GEMINI_MODEL.
-const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
+// Default model is gemini-3.5-flash: the newest Gemini this key tier calls
+// fast (3.8 thinks far too long for live latency, gemini-4 needs paid quota,
+// and the 2.5 models are retired for new keys). Override via GEMINI_DEFAULT_MODEL or GEMINI_MODEL.
+const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash";
+
+const GEMINI_MODEL_CHAIN = [
+  GEMINI_DEFAULT_MODEL,
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+];
 
 function getGeminiModels(): string[] {
   const configured =
@@ -547,17 +566,11 @@ function getGeminiModels(): string[] {
     Deno.env.get("GEMINI_DEFAULT_MODEL") ||
     Deno.env.get("GEMINI_MODEL");
 
-  const candidates = [
-    ...(configured ? [configured] : []),
-    GEMINI_DEFAULT_MODEL,
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.8-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-flash-latest",
-  ];
-  return Array.from(new Set(candidates));
+  return Array.from(new Set([...(configured ? [configured] : []), ...GEMINI_MODEL_CHAIN]));
 }
+
+/** Remembers, per key, the newest Gemini model the key was actually allowed to call. */
+const geminiModelMemo = new Map<string, string>();
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
@@ -566,13 +579,22 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
     : "";
   let lastErr: any = null;
 
-  for (const model of getGeminiModels()) {
+  // Pin the newest model this key is actually allowed to call, so a retired
+  // fallback does not cost a wasted round-trip on every request.
+  const memoKey = `gemini:${apiKey.slice(0, 8)}:${apiKey.slice(-4)}`;
+  const preferred = geminiModelMemo.get(memoKey);
+  const all = getGeminiModels();
+  const chain = preferred ? [preferred, ...all.filter((m) => m !== preferred)] : all;
+
+  for (const model of chain) {
     const body: Record<string, any> = {
       systemInstruction: { parts: [{ text: systemText }] },
       contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
       generationConfig: {
         temperature: opts.temperature ?? 0.6,
-        maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+        // Gemini 3.x spends part of the budget on internal thinking, so the
+        // output budget must be well above the caller's ask to avoid truncation.
+        maxOutputTokens: Math.min(Math.max(opts.maxTokens ?? 4096, 16384), 32768),
         ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
       },
     };
@@ -598,6 +620,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
       const parts = data?.candidates?.[0]?.content?.parts;
       const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
       if (!text || !text.trim()) { lastErr = new Error("Empty Gemini response"); continue; }
+      geminiModelMemo.set(memoKey, model);
       return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "gemini" };
     } catch (e: any) {
       lastErr = e;
@@ -698,7 +721,7 @@ interface Lane {
 }
 
 const GROQ_MODELS = [GROQ_DEFAULT_MODEL, "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen/qwen3-32b", "openai/gpt-oss-20b", "openai/gpt-oss-120b"];
-const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-4o-mini", "gpt-4.1-mini"];
+const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-6.1-terra", "gpt-6-luna", "gpt-5.6-terra"];
 const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-4-maverick-17b-128e-instruct", "mistralai/mistral-small-24b-instruct", "meta/llama-3.1-8b-instruct"];
 
 function inferProvider(value: string): string | null {
@@ -764,10 +787,20 @@ const PROBE_ORDER = ["omniroute", "mistral", "openai", "groq", "openrouter", "ge
 function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
   const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
   switch (provider) {
-    case "omniroute": return mk((o) => callOmniRoute(o, key, reported));
+    case "omniroute": {
+      // An OmniRoute credential that is actually an OpenRouter key (and no
+      // local gateway is configured) routes straight to OpenRouter instead of
+      // a dead localhost endpoint.
+      const omniUrl = getKeySync("OMNIROUTE_URL") || getKeySync("OMNIROUTE_BASE_URL") ||
+        Deno.env.get("OMNIROUTE_URL") || Deno.env.get("OMNIROUTE_BASE_URL");
+      if (!omniUrl && /^sk-or-/.test(key)) {
+        return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
+      }
+      return mk((o) => callOmniRoute(o, key, reported));
+    }
     case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
     case "gemini": return mk((o) => callGeminiWithKey(o, key, reported));
-    case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", [OPENROUTER_DEFAULT_MODEL, "meta-llama/llama-3.3-70b-instruct:free"], reported));
+    case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
     case "groq": return mk((o) => callOpenAICompatible(o, key, "https://api.groq.com/openai/v1/chat/completions", GROQ_MODELS, reported));
     case "openai": return mk((o) => callOpenAICompatible(o, key, "https://api.openai.com/v1/chat/completions", OPENAI_MODELS(), reported));
     case "nvidia": return mk((o) => callOpenAICompatible(o, key, "https://integrate.api.nvidia.com/v1/chat/completions", NVIDIA_MODELS, reported));
@@ -779,7 +812,7 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
     }
     case "1minai": return getKeySync("ONEMIN_AI_ENABLED") === "1" ? mk((o) => callOneMinAI(o, reported)) : null;
     case "deepseek": return mk((o) => callOpenAICompatible(o, key, "https://api.deepseek.com/chat/completions", ["deepseek-chat"], reported));
-    case "xai": return mk((o) => callOpenAICompatible(o, key, "https://api.x.ai/v1/chat/completions", ["grok-3-mini", "grok-2-latest"], reported));
+    case "xai": return mk((o) => callOpenAICompatible(o, key, "https://api.x.ai/v1/chat/completions", ["grok-4.7", "grok-4.6", "grok-3-mini"], reported));
     case "together": return mk((o) => callOpenAICompatible(o, key, "https://api.together.xyz/v1/chat/completions", ["meta-llama/Llama-3.3-70B-Instruct-Turbo"], reported));
     case "auto": {
       // Unrecognised key shape: probe each provider once, then pin the one that accepts it.
@@ -963,7 +996,7 @@ Rules:
     userPrompt: `${opts.userPrompt}${schemaHint}`,
   };
 
-  const r = await callMistral(jsonOpts, opts.provider || "mistral");
+  const r = await callMistral(jsonOpts, opts.provider);
 
   // Normalise: if model returned a bare array, wrap it under the array field name.
   let argText = r.text;
@@ -991,7 +1024,7 @@ export async function callAI(opts: CallAIOptions): Promise<AIResult> {
   await refreshManagedKeys();
   const needsTools = !!(opts.tools && opts.tools.length > 0);
   if (needsTools) return await callMistralToolMode(opts);
-  return await callMistral(opts, opts.provider || "mistral");
+  return await callMistral(opts, opts.provider);
 }
 
 /**
@@ -1010,7 +1043,39 @@ export async function callAIParallel(opts: CallAIOptions): Promise<AIResult[]> {
  * failure so callers degrade gracefully, but we DO try, because the user
  * explicitly asked for real-time recommendations, not training-cutoff guesses.
  */
-export async function fetchLiveWebContext(_query: string, _maxBullets = 8): Promise<string> {
-  // Live web context disabled, Gemini removed. Mistral-only stack.
-  return "";
+export async function fetchLiveWebContext(query: string, maxBullets = 8): Promise<string> {
+  try {
+    await refreshManagedKeys();
+    const managed = getManagedSnapshot();
+    const geminiKey =
+      Object.entries(managed)
+        .filter(([n, v]) => /GEMINI|GOOGLE/i.test(n) && String(v || "").trim())
+        .map(([_, v]) => String(v).trim())[0] ||
+      Deno.env.get("GOOGLE_GEMINI_KEY") ||
+      Deno.env.get("GOOGLE_GEMINI_KEY_2") ||
+      "";
+    if (!geminiKey) return "";
+
+    const model = geminiModelMemo.get(`gemini:${geminiKey.slice(0, 8)}:${geminiKey.slice(-4)}`) || "gemini-3.5-flash";
+    const res = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: `Search the live web for: ${query}\nReturn up to ${maxBullets} short factual bullets, each with its source domain.` }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 16384 },
+        }),
+      },
+      45000,
+    );
+    if (!res.ok) return "";
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts;
+    const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("").trim() : "";
+    return text || "";
+  } catch {
+    return "";
+  }
 }
