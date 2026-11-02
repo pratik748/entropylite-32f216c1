@@ -536,9 +536,20 @@ async function callOneMinAI(opts: CallAIOptions, reported?: AIResult["provider"]
 // ---------------------------------------------------------------------------
 // Used as a failover lane. We expose two keys (GOOGLE_GEMINI_KEY, GOOGLE_GEMINI_KEY_2)
 // and round-robin between them inside the lane registry.
-// Default model is gemini-3.5-flash-lite for low latency and high quota;
-// can be overridden via GEMINI_DEFAULT_MODEL or GEMINI_MODEL.
-const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite";
+// Default model is gemini-3.5-flash: the newest Gemini this key tier calls
+// fast (3.8 thinks far too long for live latency, gemini-4 needs paid quota,
+// and the 2.5 models are retired for new keys). Override via GEMINI_DEFAULT_MODEL or GEMINI_MODEL.
+const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash";
+
+const GEMINI_MODEL_CHAIN = [
+  GEMINI_DEFAULT_MODEL,
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+];
 
 function getGeminiModels(): string[] {
   const configured =
@@ -547,16 +558,7 @@ function getGeminiModels(): string[] {
     Deno.env.get("GEMINI_DEFAULT_MODEL") ||
     Deno.env.get("GEMINI_MODEL");
 
-  const candidates = [
-    ...(configured ? [configured] : []),
-    GEMINI_DEFAULT_MODEL,
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.8-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-flash-latest",
-  ];
-  return Array.from(new Set(candidates));
+  return Array.from(new Set([...(configured ? [configured] : []), ...GEMINI_MODEL_CHAIN]));
 }
 
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
@@ -698,7 +700,7 @@ interface Lane {
 }
 
 const GROQ_MODELS = [GROQ_DEFAULT_MODEL, "llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen/qwen3-32b", "openai/gpt-oss-20b", "openai/gpt-oss-120b"];
-const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-4o-mini", "gpt-4.1-mini"];
+const OPENAI_MODELS = () => [getKeySync("OPENAI_MODEL") || "gpt-6.1-terra", "gpt-6-luna", "gpt-5.6-terra"];
 const NVIDIA_MODELS = ["meta/llama-3.3-70b-instruct", "meta/llama-4-maverick-17b-128e-instruct", "mistralai/mistral-small-24b-instruct", "meta/llama-3.1-8b-instruct"];
 
 function inferProvider(value: string): string | null {
@@ -767,7 +769,7 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
     case "omniroute": return mk((o) => callOmniRoute(o, key, reported));
     case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
     case "gemini": return mk((o) => callGeminiWithKey(o, key, reported));
-    case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", [OPENROUTER_DEFAULT_MODEL, "meta-llama/llama-3.3-70b-instruct:free"], reported));
+    case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
     case "groq": return mk((o) => callOpenAICompatible(o, key, "https://api.groq.com/openai/v1/chat/completions", GROQ_MODELS, reported));
     case "openai": return mk((o) => callOpenAICompatible(o, key, "https://api.openai.com/v1/chat/completions", OPENAI_MODELS(), reported));
     case "nvidia": return mk((o) => callOpenAICompatible(o, key, "https://integrate.api.nvidia.com/v1/chat/completions", NVIDIA_MODELS, reported));
@@ -779,7 +781,7 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
     }
     case "1minai": return getKeySync("ONEMIN_AI_ENABLED") === "1" ? mk((o) => callOneMinAI(o, reported)) : null;
     case "deepseek": return mk((o) => callOpenAICompatible(o, key, "https://api.deepseek.com/chat/completions", ["deepseek-chat"], reported));
-    case "xai": return mk((o) => callOpenAICompatible(o, key, "https://api.x.ai/v1/chat/completions", ["grok-3-mini", "grok-2-latest"], reported));
+    case "xai": return mk((o) => callOpenAICompatible(o, key, "https://api.x.ai/v1/chat/completions", ["grok-4.7", "grok-4.6", "grok-3-mini"], reported));
     case "together": return mk((o) => callOpenAICompatible(o, key, "https://api.together.xyz/v1/chat/completions", ["meta-llama/Llama-3.3-70B-Instruct-Turbo"], reported));
     case "auto": {
       // Unrecognised key shape: probe each provider once, then pin the one that accepts it.
