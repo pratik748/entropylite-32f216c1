@@ -449,9 +449,17 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
   // 2. Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
   // 3. Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();
+  // OmniRoute/OpenRouter lead the chain (admin's chosen primary), then the
+  // cloud providers, then Mistral and the smaller lanes.
+  const PROVIDER_RANK: Record<string, number> = {
+    omniroute: 60, openrouter: 50, gemini: 40, openai: 30, anthropic: 28,
+    mistral: 25, groq: 20, deepseek: 18, xai: 16, together: 14, nvidia: 12,
+    cloudflare: 10, "1minai": 8, lovable: 5,
+  };
   const score = (l: Lane) =>
     (reported && l.provider === reported ? 100 : 0) +
     (l.source === "manager" ? 10 : 0) +
+    (PROVIDER_RANK[l.provider] ?? 0) +
     ((health[l.name]?.okAt || 0) > (health[l.name]?.errorAt || 0) ? 2 : 0);
   const ready = lanes.filter((l) => !coolingDown(l.name));
   const resting = lanes.filter((l) => coolingDown(l.name) && classifyFailure(undefined, health[l.name]?.error || "") !== "dead");
@@ -779,7 +787,17 @@ const PROBE_ORDER = ["omniroute", "mistral", "openai", "groq", "openrouter", "ge
 function laneFor(name: string, provider: string, key: string, source: Lane["source"], reported?: AIResult["provider"]): Lane | null {
   const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
   switch (provider) {
-    case "omniroute": return mk((o) => callOmniRoute(o, key, reported));
+    case "omniroute": {
+      // An OmniRoute credential that is actually an OpenRouter key (and no
+      // local gateway is configured) routes straight to OpenRouter instead of
+      // a dead localhost endpoint.
+      const omniUrl = getKeySync("OMNIROUTE_URL") || getKeySync("OMNIROUTE_BASE_URL") ||
+        Deno.env.get("OMNIROUTE_URL") || Deno.env.get("OMNIROUTE_BASE_URL");
+      if (!omniUrl && /^sk-or-/.test(key)) {
+        return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
+      }
+      return mk((o) => callOmniRoute(o, key, reported));
+    }
     case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
     case "gemini": return mk((o) => callGeminiWithKey(o, key, reported));
     case "openrouter": return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
