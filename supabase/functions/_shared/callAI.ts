@@ -572,6 +572,11 @@ function getGeminiModels(): string[] {
 /** Remembers, per key, the newest Gemini model the key was actually allowed to call. */
 const geminiModelMemo = new Map<string, string>();
 
+/** Gemini 3.x thinking cap: keeps live latency predictable. */
+function genThinkingConfig(): Record<string, any> {
+  return { thinkingConfig: { thinkingBudget: 2048 } };
+}
+
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode
@@ -592,8 +597,12 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
       contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
       generationConfig: {
         temperature: opts.temperature ?? 0.6,
-        // Gemini 3.x spends part of the budget on internal thinking, so the
-        // output budget must be well above the caller's ask to avoid truncation.
+        // Gemini 3.x thinks before answering; uncapped thinking costs 20s+ per
+        // call. A 2048-token thinking budget keeps latency near 4s while
+        // preserving the quantitative reasoning the hardening layer demands.
+        ...(genThinkingConfig()),
+        // The output budget must stay well above the caller's ask so internal
+        // thinking plus the answer never truncate.
         maxOutputTokens: Math.min(Math.max(opts.maxTokens ?? 4096, 16384), 32768),
         ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
       },
