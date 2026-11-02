@@ -561,6 +561,9 @@ function getGeminiModels(): string[] {
   return Array.from(new Set([...(configured ? [configured] : []), ...GEMINI_MODEL_CHAIN]));
 }
 
+/** Remembers, per key, the newest Gemini model the key was actually allowed to call. */
+const geminiModelMemo = new Map<string, string>();
+
 async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?: AIResult["provider"]): Promise<AIResult> {
   const systemText = hardenSystemPrompt(opts.systemPrompt, opts.skipHardening);
   const jsonHint = opts.jsonMode
