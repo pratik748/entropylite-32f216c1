@@ -568,13 +568,22 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
     : "";
   let lastErr: any = null;
 
-  for (const model of getGeminiModels()) {
+  // Pin the newest model this key is actually allowed to call, so a retired
+  // fallback does not cost a wasted round-trip on every request.
+  const memoKey = `gemini:${apiKey.slice(0, 8)}:${apiKey.slice(-4)}`;
+  const preferred = geminiModelMemo.get(memoKey);
+  const all = getGeminiModels();
+  const chain = preferred ? [preferred, ...all.filter((m) => m !== preferred)] : all;
+
+  for (const model of chain) {
     const body: Record<string, any> = {
       systemInstruction: { parts: [{ text: systemText }] },
       contents: [{ role: "user", parts: [{ text: `${opts.userPrompt}${jsonHint}` }] }],
       generationConfig: {
         temperature: opts.temperature ?? 0.6,
-        maxOutputTokens: Math.min(opts.maxTokens ?? 4096, 8192),
+        // Gemini 3.x spends part of the budget on internal thinking, so the
+        // output budget must be well above the caller's ask to avoid truncation.
+        maxOutputTokens: Math.min(Math.max(opts.maxTokens ?? 4096, 16384), 32768),
         ...(opts.jsonMode ? { responseMimeType: "application/json" } : {}),
       },
     };
@@ -600,6 +609,7 @@ async function callGeminiWithKey(opts: CallAIOptions, apiKey: string, reported?:
       const parts = data?.candidates?.[0]?.content?.parts;
       const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || "").join("") : "";
       if (!text || !text.trim()) { lastErr = new Error("Empty Gemini response"); continue; }
+      geminiModelMemo.set(memoKey, model);
       return { text: stripLongDashes(stripThinkingBlocks(text)), provider: reported || "gemini" };
     } catch (e: any) {
       lastErr = e;
