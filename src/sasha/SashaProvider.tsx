@@ -30,6 +30,7 @@ import {
   speakPunchline,
   stopSpeaking,
 } from "./voiceEngine";
+import { SASHA_ENABLED } from "./index";
 
 const SashaContext = createContext<SashaContextValue | null>(null);
 
@@ -95,7 +96,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
 
   // Initialize Speech Controller
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !SASHA_ENABLED) return;
 
     const controller = new SashaSpeechController();
     speechControllerRef.current = controller;
@@ -149,6 +150,7 @@ export const SashaProvider: React.FC<SashaProviderProps> = ({
 
   // Global Hotkey Listener: Alt+S or Ctrl+Space to toggle voice quant copilot
   useEffect(() => {
+    if (!SASHA_ENABLED) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Alt+S or Option+S or Ctrl+Space
       const isAltS = e.altKey && (e.key === "s" || e.key === "S" || e.code === "KeyS");
