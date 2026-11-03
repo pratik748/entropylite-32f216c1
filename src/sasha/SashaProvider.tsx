@@ -30,7 +30,7 @@ import {
   speakPunchline,
   stopSpeaking,
 } from "./voiceEngine";
-import { SASHA_ENABLED } from "./index";
+import { SASHA_ENABLED } from "./flag";
 
 const SashaContext = createContext<SashaContextValue | null>(null);
 

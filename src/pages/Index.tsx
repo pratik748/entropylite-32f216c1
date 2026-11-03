@@ -849,7 +849,7 @@ const IndexContent = () => {
       )}
     </div>
     <Spotlight />
-    <SashaHUD />
+    {SASHA_ENABLED && <SashaHUD />}
     </SashaProvider>
     </ForesightProvider>
   );
