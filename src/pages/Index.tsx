@@ -54,7 +54,7 @@ import ForesightSurface from "@/foresight/ui/ForesightSurface";
 import Spotlight from "@/foresight/ui/Spotlight";
 import { onUIEvent } from "@/foresight/uiBus";
 import type { HostAdapter } from "@/foresight/types";
-import { SashaProvider, SashaHUD } from "@/sasha";
+import { SashaProvider, SashaHUD, SASHA_ENABLED } from "@/sasha";
 
 type Tab = "dashboard" | "market" | "sandbox" | "statarb" | "augment" | "geopolitical" | "desirable" | "risk" | "fortress" | "system";
 

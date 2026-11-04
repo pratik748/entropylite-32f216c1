@@ -446,6 +446,10 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
   }
   // Prioritization score:
   // 1. If caller requested a specific provider (e.g. "omniroute", "gemini"), give it highest priority (+100).
+  // NOTE: OmniRoute and OpenRouter are DIFFERENT providers and stay separate lanes.
+  // OmniRoute is the admin's self-hosted OpenAI-compatible gateway (provider/model
+  // ids, its own registered keys, URL stored under OMNIROUTE_URL); OpenRouter is
+  // the public cloud service with sk-or- keys. Never alias one to the other.
   // 2. Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
   // 3. Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();

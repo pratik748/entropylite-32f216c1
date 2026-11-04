@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { emitUIEvent } from "@/foresight/uiBus";
 import { Command, FileSearch, LogOut, Zap } from "lucide-react";
+import { SASHA_ENABLED } from "@/sasha";
 
 export interface PaletteTab {
   id: string;

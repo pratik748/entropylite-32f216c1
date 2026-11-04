@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Command, LogOut, Search, Zap } from "lucide-react";
 import { emitUIEvent } from "@/foresight/uiBus";
 import DemoIndicator from "@/components/DemoIndicator";
+import { SASHA_ENABLED } from "@/sasha";
 import { useDemo } from "@/demo/DemoProvider";
 import wordmarkBlack from "@/assets/entropy-wordmark-black.png";
 
