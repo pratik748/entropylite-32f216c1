@@ -193,8 +193,8 @@ async function fetchAllRSS(): Promise<{ articles: Article[]; successCount: numbe
 
 async function fetchGDELT(query: string): Promise<Article[]> {
   try {
-    const q = encodeURIComponent(query || "market OR economy OR stocks");
-    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q} sourcelang:eng&mode=artlist&maxrecords=50&format=json`;
+    const q = encodeURIComponent(`${query || "market OR economy OR stocks"} sourcelang:eng`);
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=50&format=json`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, { signal: controller.signal });

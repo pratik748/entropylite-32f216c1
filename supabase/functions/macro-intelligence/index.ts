@@ -39,12 +39,15 @@ async function fetchFRED(): Promise<MacroIndicator[]> {
     { id: "VIXCLS", name: "VIX Close", category: "volatility", impact: "high" as const },
   ];
 
-  const apiKey = await getKey("ALPHAVANTAGE_API_KEY");
+  // FRED requires a real API key (free at fred.stlouisfed.org); the demo key
+  // returns throttled/empty data, so without a key we report no indicators.
+  const apiKey = await getKey("FRED_API_KEY");
 
   for (const s of series) {
+    if (!apiKey) break;
     try {
-      // Use FRED's free JSON API
-      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${s.id}&api_key=DEMO_KEY&file_type=json&sort_order=desc&limit=2`;
+      // Use FRED's free JSON API with the configured key
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${s.id}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=2`;
       const res = await fetch(url);
       if (!res.ok) { await res.text(); continue; }
       const data = await res.json();

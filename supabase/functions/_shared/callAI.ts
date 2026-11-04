@@ -446,11 +446,14 @@ async function callMistral(opts: CallAIOptions, reported?: AIResult["provider"])
   }
   // Prioritization score:
   // 1. If caller requested a specific provider (e.g. "omniroute", "gemini"), give it highest priority (+100).
+  // NOTE: OmniRoute and OpenRouter are DIFFERENT providers and stay separate lanes.
+  // OmniRoute is the admin's self-hosted OpenAI-compatible gateway (provider/model
+  // ids, its own registered keys, URL stored under OMNIROUTE_URL); OpenRouter is
+  // the public cloud service with sk-or- keys. Never alias one to the other.
   // 2. Manager keys get high priority (+10) so admin-added keys are ALWAYS tried before environment keys.
   // 3. Recently successful keys get +2 bonus.
   const health = getHealthSnapshot();
-  // OmniRoute/OpenRouter lead the chain (admin's chosen primary), then the
-  // cloud providers, then Mistral and the smaller lanes.
+  // OmniRoute leads the chain (admin's chosen primary); OpenRouter is a separate cloud lane.
   const PROVIDER_RANK: Record<string, number> = {
     omniroute: 60, openrouter: 50, gemini: 40, openai: 30, anthropic: 28,
     mistral: 25, groq: 20, deepseek: 18, xai: 16, together: 14, nvidia: 12,
@@ -662,14 +665,13 @@ function getOmniRouteModels(): string[] {
 
   const candidates = [
     ...(configured ? [configured] : []),
-    "auto/best-fast",
-    "auto/best-chat",
-    "auto/coding",
-    "auto/gemini",
-    "gemini-3.5-flash-lite",
-    "gemini-3.8-flash",
-    "gpt-4o",
-    "default",
+    // OmniRoute model ids are provider/model combos (its /v1/models contract);
+    // `auto` routes by the gateway's own balancing rules and works unconfigured.
+    "auto",
+    "google/gemini-3.8-flash",
+    "google/gemini-3.5-flash",
+    "openai/gpt-6-luna",
+    "anthropic/claude-haiku-5.5",
   ];
   return Array.from(new Set(candidates));
 }
@@ -684,7 +686,14 @@ async function callOmniRoute(
     getKeySync("OMNIROUTE_BASE_URL") ||
     Deno.env.get("OMNIROUTE_URL") ||
     Deno.env.get("OMNIROUTE_BASE_URL") ||
-    "http://localhost:20128/v1/chat/completions";
+    "";
+  if (!rawEndpoint.trim()) {
+    throw {
+      status: 503,
+      message:
+        "OmniRoute gateway URL is not configured. Add a credential named OMNIROUTE_URL with your gateway base URL (e.g. https://your-host:20128) in the API Manager.",
+    };
+  }
 
   const primaryEndpoint = normalizeOmniRouteEndpoint(rawEndpoint);
   const models = opts.model ? [opts.model] : getOmniRouteModels();
@@ -797,14 +806,9 @@ function laneFor(name: string, provider: string, key: string, source: Lane["sour
   const mk = (call: Lane["call"]): Lane => ({ name, provider, source, call });
   switch (provider) {
     case "omniroute": {
-      // An OmniRoute credential that is actually an OpenRouter key (and no
-      // local gateway is configured) routes straight to OpenRouter instead of
-      // a dead localhost endpoint.
-      const omniUrl = getKeySync("OMNIROUTE_URL") || getKeySync("OMNIROUTE_BASE_URL") ||
-        Deno.env.get("OMNIROUTE_URL") || Deno.env.get("OMNIROUTE_BASE_URL");
-      if (!omniUrl && /^sk-or-/.test(key)) {
-        return mk((o) => callOpenAICompatible(o, key, "https://openrouter.ai/api/v1/chat/completions", getOpenRouterModels(), reported));
-      }
+      // OmniRoute is its own self-hosted gateway, NOT an OpenRouter alias.
+      // OpenAI-compatible /v1 endpoint, provider/model ids, its own registered
+      // keys. The endpoint comes from OMNIROUTE_URL; the key from this credential.
       return mk((o) => callOmniRoute(o, key, reported));
     }
     case "mistral": return mk((o) => callMistralWithKey(o, key, reported));
@@ -936,7 +940,7 @@ export async function testKey(name: string): Promise<{ ok: boolean; provider: st
     if (!rawKey.trim()) return { ok: false, provider: "newsdata", latencyMs: 0, error: "Key value is empty" };
     const t0 = Date.now();
     try {
-      const res = await fetchWithTimeout(`https://newsdata.io/api/1/news?apikey=${rawKey.trim()}&q=market&language=en`, {}, 15000);
+      const res = await fetchWithTimeout(`https://newsdata.io/api/1/latest?apikey=${rawKey.trim()}&q=market&language=en`, {}, 15000);
       const text = await res.text();
       const ok = res.ok && !text.includes('"status":"error"');
       return { ok, provider: "newsdata", latencyMs: Date.now() - t0, sample: ok ? "NewsData OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };

@@ -56,7 +56,7 @@ async function fetchNewsData(): Promise<RawHeadline[]> {
   const key = getNewsDataKey();
   if (!key) return [];
   try {
-    const url = `https://newsdata.io/api/1/news?apikey=${key}&category=world,politics,business&language=en&size=10`;
+    const url = `https://newsdata.io/api/1/latest?apikey=${key}&category=world,politics,business&language=en&size=10`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return [];
     const data = await res.json();

@@ -47,7 +47,8 @@ async function fetchAlphaVantage(symbol: string, range = "1y"): Promise<Bars | n
   // Only fallback for US-style tickers (Alpha Vantage is weaker on .NS / .BO)
   const cleanSym = symbol.replace(/\.(NS|BO)$/, "");
   try {
-    const outputsize = (range === "5y" || range === "max") ? "full" : "compact"; // compact = 100 days
+    // compact = last 100 sessions only; anything around 1y or longer needs full
+    const outputsize = (range === "1y" || range === "5y" || range === "max") ? "full" : "compact";
     const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(cleanSym)}&outputsize=${outputsize}&apikey=${avKey}`;
     const res = await fetch(url);
     if (!res.ok) return null;

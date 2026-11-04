@@ -30,34 +30,9 @@ async function fetchYahooV8(symbol: string): Promise<{ price: number; currency: 
   }
 }
 
-/** Secondary: Yahoo v6 quote endpoint */
-async function fetchYahooV6(symbol: string): Promise<{ price: number; currency: string } | null> {
-  try {
-    const url = `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const quote = data?.quoteResponse?.result?.[0];
-    if (quote?.regularMarketPrice && quote.regularMarketPrice > 0) {
-      return { price: quote.regularMarketPrice, currency: quote.currency || "USD" };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+// Yahoo v6 quote and v10 quoteSummary endpoints retired: both now require
+// cookie+crumb authentication and fail for bare server fetches.
 
-/** Tertiary: Yahoo v10 quoteSummary endpoint */
-async function fetchYahooV10(symbol: string): Promise<{ price: number; currency: string } | null> {
-  try {
-    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=price`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Cache-Control": "no-cache, no-store" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
     const priceModule = data?.quoteSummary?.result?.[0]?.price;
     const price = priceModule?.regularMarketPrice?.raw;
     if (price && price > 0) {
@@ -69,20 +44,12 @@ async function fetchYahooV10(symbol: string): Promise<{ price: number; currency:
   }
 }
 
-/** Combined fetch with triple fallback */
+/** Combined fetch. Yahoo v8 chart is the live contract; the retired v6/v10
+ * quote endpoints (401/403 without cookie+crumb auth) were removed. */
 async function fetchPrice(symbol: string): Promise<{ price: number; currency: string } | null> {
-  // Try v8 first (fastest)
   const v8 = await fetchYahooV8(symbol);
   if (v8) return v8;
-  
-  // Fallback to v6
-  const v6 = await fetchYahooV6(symbol);
-  if (v6) return v6;
-  
-  // Fallback to v10
-  const v10 = await fetchYahooV10(symbol);
-  if (v10) return v10;
-  
+
   return null;
 }
 
