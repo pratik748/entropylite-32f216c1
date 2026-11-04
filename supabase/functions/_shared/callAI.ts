@@ -940,7 +940,7 @@ export async function testKey(name: string): Promise<{ ok: boolean; provider: st
     if (!rawKey.trim()) return { ok: false, provider: "newsdata", latencyMs: 0, error: "Key value is empty" };
     const t0 = Date.now();
     try {
-      const res = await fetchWithTimeout(`https://newsdata.io/api/1/news?apikey=${rawKey.trim()}&q=market&language=en`, {}, 15000);
+      const res = await fetchWithTimeout(`https://newsdata.io/api/1/latest?apikey=${rawKey.trim()}&q=market&language=en`, {}, 15000);
       const text = await res.text();
       const ok = res.ok && !text.includes('"status":"error"');
       return { ok, provider: "newsdata", latencyMs: Date.now() - t0, sample: ok ? "NewsData OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };
