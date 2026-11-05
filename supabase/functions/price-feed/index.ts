@@ -33,17 +33,6 @@ async function fetchYahooV8(symbol: string): Promise<{ price: number; currency: 
 // Yahoo v6 quote and v10 quoteSummary endpoints retired: both now require
 // cookie+crumb authentication and fail for bare server fetches.
 
-    const priceModule = data?.quoteSummary?.result?.[0]?.price;
-    const price = priceModule?.regularMarketPrice?.raw;
-    if (price && price > 0) {
-      return { price, currency: priceModule?.currency || "USD" };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /** Combined fetch. Yahoo v8 chart is the live contract; the retired v6/v10
  * quote endpoints (401/403 without cookie+crumb auth) were removed. */
 async function fetchPrice(symbol: string): Promise<{ price: number; currency: string } | null> {

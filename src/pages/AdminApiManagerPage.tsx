@@ -48,6 +48,7 @@ const PROVIDERS = [
   "polymarket",
   "alpaca",
   "scrapegraph",
+  "fred",
 ];
 
 function ago(iso?: string | null) {
@@ -79,6 +80,7 @@ const KNOWN = [
   "ALPACA_API_KEY",
   "ALPACA_SECRET_KEY",
   "SCRAPEGRAPH_API_KEY",
+  "FRED_API_KEY",
 ];
 
 function detectProviderFromInput(n: string, v: string): string {
@@ -95,6 +97,7 @@ function detectProviderFromInput(n: string, v: string): string {
   if (upper.includes("POLYMARKET")) return "polymarket";
   if (upper.includes("ALPACA")) return "alpaca";
   if (upper.includes("SCRAPEGRAPH")) return "scrapegraph";
+  if (upper.includes("FRED")) return "fred";
   if (v.startsWith("AIzaSy")) return "gemini";
   if (v.startsWith("sk-ant-")) return "anthropic";
   if (v.startsWith("gsk_")) return "groq";

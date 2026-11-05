@@ -97,35 +97,40 @@ async function fetchETFFlows(): Promise<ETFFlow[]> {
   ];
 
   const flows: ETFFlow[] = [];
-  const symbols = etfs.map(e => e.symbol).join(",");
 
-  try {
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (!res.ok) { await res.text(); return flows; }
-    const data = await res.json();
+  for (const etf of etfs) {
+    try {
+      // v7/finance/quote is retired (cookie+crumb auth required); the v8 chart
+      // endpoint is the live contract. Today's volume vs the trailing 1-month average.
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(etf.symbol)}?interval=1d&range=1mo&_t=${Date.now()}`;
+      const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!res.ok) { await res.text(); continue; }
+      const data = await res.json();
+      const result = data?.chart?.result?.[0];
+      const meta = result?.meta;
+      const price = meta?.regularMarketPrice;
+      if (!price || price <= 0) continue;
 
-    for (const quote of data.quoteResponse?.result || []) {
-      const etf = etfs.find(e => e.symbol === quote.symbol);
-      if (!etf) continue;
-
-      const vol = quote.regularMarketVolume || 0;
-      const avgVol = quote.averageDailyVolume10Day || vol;
+      const vols: number[] = (result?.indicators?.quote?.[0]?.volume || []).filter((v: any) => typeof v === "number" && v > 0);
+      const vol = vols[vols.length - 1] || 0;
+      const prior: number[] = vols.slice(0, -1);
+      const avgVol = prior.length > 0 ? prior.reduce((s: number, v: number) => s + v, 0) / prior.length : vol;
       const volRatio = avgVol > 0 ? vol / avgVol : 1;
-      const change = quote.regularMarketChangePercent || 0;
+      const prevClose = meta.chartPreviousClose || meta.previousClose || 0;
+      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
 
       flows.push({
         symbol: etf.symbol,
         name: etf.name,
         sector: etf.sector,
-        price: quote.regularMarketPrice || 0,
+        price,
         change: parseFloat(change.toFixed(2)),
         volume: vol,
         flowSignal: volRatio > 1.3 && change > 0 ? "inflow" : volRatio > 1.3 && change < 0 ? "outflow" : "neutral",
       });
+    } catch (e) {
+      console.error(`ETF flow fetch failed for ${etf.symbol}:`, e);
     }
-  } catch (e) {
-    console.error("ETF flow fetch failed:", e);
   }
 
   return flows;

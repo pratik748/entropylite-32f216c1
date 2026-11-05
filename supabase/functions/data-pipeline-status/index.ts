@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getKey } from "../_shared/managedKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,24 +55,48 @@ async function checkEndpoint(name: string, url: string, type: string, credibilit
   }
 }
 
+/** A source that needs a credential the admin has not saved yet. */
+function missingKey(name: string, type: string, credibility: number, keyName: string): SourceStatus {
+  return {
+    source: name,
+    type,
+    status: "DEGRADED",
+    latency: 0,
+    lastCheck: new Date().toISOString(),
+    credibilityScore: credibility,
+    recordsEstimate: 0,
+    endpoint: `${keyName} not configured in the API Manager`,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const checks = [
+    // FRED, Alpha Vantage and newsdata.io need real credentials; probe with the
+    // configured key and report a key gap instead of a demo-key result.
+    const fredKey = await getKey("FRED_API_KEY");
+    const avKey = await getKey("ALPHAVANTAGE_API_KEY");
+    const ndKey = await getKey("NEWSDATA_API_KEY");
+    const day = (offset: number) => new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10).replace(/-/g, "");
+    const y2 = day(2);
+    const y1 = day(1);
+    const checks: Array<Promise<SourceStatus> | SourceStatus> = [
       checkEndpoint("Yahoo Finance", "https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d", "Market Data", 92),
-      checkEndpoint("FRED (St. Louis Fed)", "https://api.stlouisfed.org/fred/series?series_id=DGS10&api_key=DEMO_KEY&file_type=json", "Economic", 98),
       checkEndpoint("World Bank", "https://api.worldbank.org/v2/country/WLD/indicator/NY.GDP.MKTP.KD.ZG?format=json&per_page=1", "Economic", 97),
       checkEndpoint("SEC EDGAR", "https://efts.sec.gov/LATEST/search-index?q=AAPL&forms=10-K&from=0&size=1", "Regulatory", 99),
       checkEndpoint("GDELT News", "https://api.gdeltproject.org/api/v2/doc/doc?query=finance&mode=artlist&maxrecords=1&format=json", "News", 78),
-      checkEndpoint("Wikipedia Pageviews", "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Apple_Inc./daily/20250101/20250102", "Alternative", 70),
+      checkEndpoint("Wikipedia Pageviews", `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Apple_Inc./daily/${y2}/${y1}`, "Alternative", 70),
       checkEndpoint("GitHub API", "https://api.github.com/orgs/microsoft/repos?per_page=1", "Alternative", 65),
-      checkEndpoint("newsdata.io", "https://newsdata.io/api/1/news?apikey=test&q=markets&language=en", "News", 80),
-      checkEndpoint("Alpha Vantage", "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AAPL&apikey=demo", "Market Data", 88),
-      checkEndpoint("Finnhub", "https://finnhub.io/api/v1/quote?symbol=AAPL&token=demo", "Market Data", 85),
     ];
+    if (fredKey) checks.push(checkEndpoint("FRED (St. Louis Fed)", `https://api.stlouisfed.org/fred/series?series_id=DGS10&api_key=${fredKey}&file_type=json`, "Economic", 98));
+    else checks.push(missingKey("FRED (St. Louis Fed)", "Economic", 98, "FRED_API_KEY"));
+    if (avKey) checks.push(checkEndpoint("Alpha Vantage", `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AAPL&apikey=${avKey}`, "Market Data", 88));
+    else checks.push(missingKey("Alpha Vantage", "Market Data", 88, "ALPHAVANTAGE_API_KEY"));
+    if (ndKey) checks.push(checkEndpoint("newsdata.io", `https://newsdata.io/api/1/latest?apikey=${ndKey}&q=markets&language=en`, "News", 80));
+    else checks.push(missingKey("newsdata.io", "News", 80, "NEWSDATA_API_KEY"));
 
-    const results = await Promise.all(checks);
+    const results = await Promise.all(checks.map((c) => Promise.resolve(c)));
 
     // Estimate records based on source type
     const recordEstimates: Record<string, number> = {
@@ -103,7 +128,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("data-pipeline-status error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error)?.message || String(error) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

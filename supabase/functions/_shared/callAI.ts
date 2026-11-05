@@ -871,7 +871,7 @@ export const ENV_AI_KEYS: Array<[string, string]> = [
   ["OPENROUTER_API_KEY", "openrouter"], ["GROQ_API_KEY", "groq"], ["NVIDIA_API_KEY", "nvidia"],
   ["CLOUDFLARE_API_TOKEN", "cloudflare"], ["ONEMIN_AI_API_KEY", "1minai"],
 ];
-const NON_LLM_NAME = /(LOVABLE_AI_ENABLED|SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$|_URL$|_BASE_URL$)/i;
+const NON_LLM_NAME = /(LOVABLE_AI_ENABLED|SUPABASE|ALPACA|ALPHAVANTAGE|NEWSDATA|POLYMARKET|OPENSKY|SCRAPEGRAPH|CLOUDFLARE_ACCOUNT|AISSTREAM|FRED|DEMO_|SESSION|JWKS|DB_URL|_MODEL$|_ENABLED$|_URL$|_BASE_URL$)/i;
 
 export function buildLanes(reported?: AIResult["provider"]): Lane[] {
   const lanes: Lane[] = [];
@@ -946,6 +946,19 @@ export async function testKey(name: string): Promise<{ ok: boolean; provider: st
       return { ok, provider: "newsdata", latencyMs: Date.now() - t0, sample: ok ? "NewsData OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };
     } catch (e: any) {
       return { ok: false, provider: "newsdata", latencyMs: Date.now() - t0, error: e?.message || "Connection failed" };
+    }
+  }
+
+  if (upper.includes("FRED")) {
+    if (!rawKey.trim()) return { ok: false, provider: "fred", latencyMs: 0, error: "Key value is empty" };
+    const t0 = Date.now();
+    try {
+      const res = await fetchWithTimeout(`https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${rawKey.trim()}&file_type=json&sort_order=desc&limit=2`, {}, 15000);
+      const text = await res.text();
+      const ok = res.ok && text.includes("observations");
+      return { ok, provider: "fred", latencyMs: Date.now() - t0, sample: ok ? "FRED OK" : text.slice(0, 100), error: ok ? undefined : text.slice(0, 200) };
+    } catch (e: any) {
+      return { ok: false, provider: "fred", latencyMs: Date.now() - t0, error: e?.message || "Connection failed" };
     }
   }
 
